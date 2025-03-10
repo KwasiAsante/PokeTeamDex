@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:poke_team_dex/models/team.dart';
 import 'package:poke_team_dex/providers/team_provider.dart';
 import 'package:provider/provider.dart';
 
