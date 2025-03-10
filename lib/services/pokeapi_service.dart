@@ -6,8 +6,8 @@ import '../models/pokemon.dart';
 class PokeApiService {
   final String baseUrl = 'https://pokeapi.co/api/v2/';
 
-  Future<List<Pokemon>> fetchPokemonList({int limit = 20}) async {
-    final response = await http.get(Uri.parse('$baseUrl/pokemon?limit=$limit'));
+  Future<List<Pokemon>> fetchPokemonList({int limit = 20, int offset = 0}) async {
+    final response = await http.get(Uri.parse('$baseUrl/pokemon?limit=$limit&offset=$offset'));
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       List results = data['results'];

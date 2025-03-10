@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:poke_team_dex/providers/pokemon_provider.dart';
+import 'package:poke_team_dex/providers/team_provider.dart';
 import 'package:poke_team_dex/views/pokedex_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -38,10 +39,11 @@ class MyApp extends StatelessWidget {
     );*/
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => PokemonProvider()),
+        ChangeNotifierProvider(create: (_) => PokemonProvider()..loadPokemonList()),
+        ChangeNotifierProvider(create: (_) => TeamProvider()..loadTeam())
       ],
       child: MaterialApp(
-        title: 'Pokédex',
+        title: 'Pokédex & Team Builder',
         theme: ThemeData(primarySwatch: Colors.red),
         home: PokedexScreen(),
       ),
