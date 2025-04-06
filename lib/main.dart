@@ -44,7 +44,9 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'Pokédex & Team Builder',
-        theme: ThemeData(primarySwatch: Colors.red),
+        theme: ThemeData.light(),
+        darkTheme: ThemeData.dark(),
+        themeMode: ThemeMode.system, // Auto-switch based on system setting
         home: PokedexScreen(),
       ),
     );

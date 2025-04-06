@@ -6,6 +6,8 @@ import '../providers/pokemon_provider.dart';
 import '../widgets/pokemon_card.dart';
 
 class PokedexScreen extends StatefulWidget {
+  const PokedexScreen({super.key});
+
   @override
   _PokedexScreenState createState() => _PokedexScreenState();
 }
