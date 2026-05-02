@@ -1,0 +1,81 @@
+---
+description: PokéAPI usage, stats, type colours, Showdown export, routes — reference when editing Dart
+globs: lib/**/*.dart
+alwaysApply: false
+---
+
+# PokeTeamDex — domain reference (Dart)
+
+## PokéAPI patterns
+
+```dart
+const base = 'https://pokeapi.co/api/v2';
+// Full list (cache on first launch, TTL 24h):
+GET $base/pokemon?limit=10000&offset=0
+// Detail (cache on access, TTL 7d for static, 24h for list):
+GET $base/pokemon/{id}           // → sprites, stats, moves, abilities
+GET $base/pokemon-species/{id}   // → dex entries, evolution_chain url, gender_rate
+GET $base/evolution-chain/{id}
+GET $base/{move|ability|item|type|nature|location}/{id}
+
+// Sprites
+sprites.other['official-artwork'].front_default   // official art
+sprites.other['official-artwork'].front_shiny
+sprites.front_default  // small sprite
+sprites.front_shiny
+```
+
+## Stat formula
+
+```dart
+// HP
+floor(((2*base + iv + floor(ev/4)) * level / 100)) + level + 10
+// Other stats
+floor((floor(((2*base + iv + floor(ev/4)) * level / 100)) + 5) * natureMod)
+// natureMod: 1.1=boosted  0.9=reduced  1.0=neutral
+```
+
+## Type colours (use everywhere — badges, charts, filters)
+
+```dart
+const typeColors = {
+  'normal':#A8A878, 'fire':#F08030, 'water':#6890F0, 'electric':#F8D030,
+  'grass':#78C850,  'ice':#98D8D8,  'fighting':#C03028,'poison':#A040A0,
+  'ground':#E0C068, 'flying':#A890F0,'psychic':#F85888,'bug':#A8B820,
+  'rock':#B8A038,   'ghost':#705898, 'dragon':#7038F8, 'dark':#705848,
+  'steel':#B8B8D0,  'fairy':#EE99AC,
+};
+```
+
+## Showdown export format
+
+```text
+{Nickname} ({Species}) @ {Held Item}   ← if nickname==species: no parens
+Ability: {Ability}
+Level: {Level}
+Shiny: Yes                             ← omit if not shiny
+Nature: {Nature}
+EVs: 252 SpA / 252 Spe                 ← omit 0-EV stats
+- Move1
+- Move2
+- Move3
+- Move4
+```
+
+## Gender rate mapping (`pokemon-species.gender_rate`)
+
+```text
+-1 → Genderless | 0 → Male only | 8 → Female only | 1-7 → Male/Female
+```
+
+## Navigation routes
+
+```text
+/pokedex → /pokedex/:id
+/moves → /moves/:id
+/items → /items/:id
+/abilities/:id   (modal/sheet)
+/reference       (tabs: types | natures | locations)
+/teams → /teams/:teamId → /teams/:teamId/slots/:slotIndex
+```
+

@@ -1,0 +1,96 @@
+---
+description: PokeTeamDex identity, stack, folders, data rules, and API/sync conventions
+alwaysApply: true
+---
+
+# PokeTeamDex — architecture and constraints
+
+**App:** PokeTeamDex | Flutter cross-platform (iOS, Android, Web) | Private personal use  
+**Purpose:** Pokédex browser + offline-first team builder synced to PostgreSQL via PokéAPI  
+**Full requirements:** `PokeTeamDex_PRD.md`
+
+## Always do
+
+- Write all team/folder/slot changes to local Drift (SQLite) **first**, then queue for server sync.
+- Use soft deletes: set `is_deleted = true`, bump `updated_at`. Never hard-delete team data.
+- Check Hive cache before any PokéAPI network call.
+- Add `// PRD gap: chose X because Y` comments for decisions not covered by the PRD.
+- Use Riverpod for state management, `go_router` for navigation, `dio` for HTTP.
+- Return `Result<T, Failure>` (or similar) — never let raw exceptions bubble to UI.
+- Keep feature code in `lib/features/<feature>/`, services in `lib/services/`.
+
+## Never do
+
+- Never write to the backend API without first writing to local Drift.
+- Never hard-delete from `team_folders`, `teams`, or `team_slots` — always soft-delete.
+- Never re-fetch PokéAPI data that is already in the Hive cache.
+- Never add multi-user auth, battle simulation, or Pokémon GO data.
+- Never exceed EV total of 510 or individual EV of 252 — validate and block save.
+- Never skip the offline banner when `connectivity == none` in the Teams tab.
+
+## Stack constraints
+
+| Concern | Package |
+|---|---|
+| Local DB | `drift` |
+| PokéAPI cache | `hive_flutter` |
+| State | `riverpod` |
+| Navigation | `go_router` |
+| HTTP | `dio` |
+| Connectivity | `connectivity_plus` |
+| Background sync | `workmanager` |
+| Images | `cached_network_image` |
+
+## Folder layout
+
+```text
+lib/features/{pokedex,moves,abilities,items,reference,teams}/
+lib/services/{pokeapi,backend,sync}/
+lib/shared/{widgets,theme}/
+lib/router/
+```
+
+## Database quick ref
+
+### PostgreSQL (server)
+
+```sql
+-- team_folders: id, name, sort_order, is_deleted, local_id, created_at, updated_at
+-- teams:        id, folder_id(FK→folders SET NULL), name, format_label, sort_order, is_deleted, local_id, created_at, updated_at
+-- team_slots:   id, team_id(FK CASCADE), slot_index(0-5), species_id, form_name,
+--               nickname(max 12), level(1-100), gender, is_shiny, ability_name,
+--               nature_name, held_item_name, friendship(0-255), move_1..4,
+--               ev_hp/atk/def/spa/spd/spe(0-252, total≤510), iv_hp..spe(0-31 default 31),
+--               updated_at, is_deleted
+```
+
+### Drift additions (local only)
+
+```text
+-- sync_status TEXT on all server-mirrored tables: 'synced'|'pending'|'error'
+-- pending_sync_ops: id, op_type, entity_type, entity_local_id, payload(JSON),
+--                   created_at, retry_count(give up at 10), last_error
+-- meta: key TEXT PK, value TEXT  (stores: last_pull_timestamp, device_id)
+```
+
+## Sync engine rules
+
+1. Local write → insert `pending_sync_ops` → set `sync_status = 'pending'`
+2. Sync triggers: app foreground, connectivity restored, pull-to-refresh, background every 15min
+3. Process ops FIFO → on 2xx: delete op, set `sync_status = 'synced'`
+4. On failure: `retry_count++`. At 10 → `sync_status = 'error'`, show badge on team card
+5. After push: `GET /sync/pull?since=<last_pull_timestamp>` → merge (last-write-wins on `updated_at`)
+
+## API endpoints (all require `X-API-Key` header)
+
+```text
+GET|POST|PATCH|DELETE  /folders
+PATCH                  /folders/reorder
+GET|POST               /teams         (GET accepts ?folder_id=)
+GET|PATCH|DELETE       /teams/:id
+POST|PUT|PATCH|DELETE  /teams/:id/slots/:sid
+PATCH                  /teams/:id/reorder
+POST                   /sync/push     (batch ops array)
+GET                    /sync/pull?since=<ISO8601>
+```
+

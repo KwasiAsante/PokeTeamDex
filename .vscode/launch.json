@@ -1,0 +1,175 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "PokeTeamDex",
+            "request": "launch",
+            "type": "dart",
+        },
+        {
+            "name": "PokeTeamDex (profile mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "PokeTeamDex (debug mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug"
+        },
+        {
+            "name": "PokeTeamDex (release mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        // ─── Android ───────────────────────────────────────────────
+        {
+            "name": "Flutter (Android Debug)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "deviceId": "android"
+        },
+        {
+            "name": "Flutter (Android Profile)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "deviceId": "android"
+        },
+        {
+            "name": "Flutter (Android Release)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "deviceId": "android"
+        },
+        // ─── iOS ───────────────────────────────────────────────────
+        {
+            "name": "Flutter (iOS Debug)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "deviceId": "ios"
+        },
+        {
+            "name": "Flutter (iOS Profile)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "deviceId": "ios"
+        },
+        {
+            "name": "Flutter (iOS Release)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "deviceId": "ios"
+        },
+        // ─── Web (Chrome) ──────────────────────────────────────────
+        {
+            "name": "Flutter (Web Debug)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "deviceId": "chrome",
+            "args": [
+                "--web-renderer",
+                "html"
+            ]
+        },
+        {
+            "name": "Flutter (Web Profile)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "deviceId": "chrome",
+            "args": [
+                "--web-renderer",
+                "canvaskit"
+            ]
+        },
+        {
+            "name": "Flutter (Web Release)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "deviceId": "chrome",
+            "args": [
+                "--web-renderer",
+                "canvaskit"
+            ]
+        },
+        // ─── macOS ─────────────────────────────────────────────────
+        {
+            "name": "Flutter (macOS Debug)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "deviceId": "macos"
+        },
+        {
+            "name": "Flutter (macOS Profile)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "deviceId": "macos"
+        },
+        {
+            "name": "Flutter (macOS Release)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "deviceId": "macos"
+        },
+        // ─── Windows ───────────────────────────────────────────────
+        {
+            "name": "Flutter (Windows Debug)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "deviceId": "windows"
+        },
+        {
+            "name": "Flutter (Windows Profile)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "deviceId": "windows"
+        },
+        {
+            "name": "Flutter (Windows Release)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "deviceId": "windows"
+        },
+        // ─── Linux ─────────────────────────────────────────────────
+        {
+            "name": "Flutter (Linux Debug)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "deviceId": "linux"
+        },
+        {
+            "name": "Flutter (Linux Profile)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "deviceId": "linux"
+        },
+        {
+            "name": "Flutter (Linux Release)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "deviceId": "linux"
+        }
+    ]
+}
