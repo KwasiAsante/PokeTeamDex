@@ -1,5 +1,6 @@
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_cache.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_client.dart';
 
@@ -14,9 +15,9 @@ class PokeApiRepository {
       if (cache is Map<String, dynamic>) {
         if (include && (!cache.containsKey('sprites') || !cache.containsKey('types'))) {
           for (dynamic result in (cache['results'] as List)) {
-              String url = result['url'] as String;
-              result = await fetchPokemonDetails(url, result);
-            }
+            String url = result['url'] as String;
+            result = await fetchPokemonDetails(url, result);
+          }
         }
         return _parseList(cache);
       } else {
@@ -42,7 +43,7 @@ class PokeApiRepository {
       throw Exception('Failed to fetch pokemon list: $e');
     }
   }
-  
+
   Future<Map<String, dynamic>> fetchPokemonDetails(String url, Map<String, dynamic> result) async {
     if (url.isNotEmpty) {
       String endpoint = url.split('https://pokeapi.co/api/v2').last;
@@ -53,7 +54,6 @@ class PokeApiRepository {
         result['sprites'] = pokemonResponse['sprites'];
       }
     }
-
     return result;
   }
 
@@ -75,6 +75,21 @@ class PokeApiRepository {
     } catch (e) {
       throw Exception('Failed to fetch pokemon: $e');
     }
+  }
+
+  Future<PokemonSpeciesEntry> fetchPokemonSpecies(int id) async {
+    final cacheKey = 'pokemon_species_$id';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is Map<String, dynamic>) {
+      return PokemonSpeciesEntry.fromJson(cached);
+    }
+    final response = await _pokeApiClient.client.get('/pokemon-species/$id');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch species $id: ${response.statusCode}');
+    }
+    final data = Map<String, dynamic>.from(response.data);
+    _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
+    return PokemonSpeciesEntry.fromJson(data);
   }
 
   /// Returns the set of national dex IDs (1–1025) that belong to [typeName].
