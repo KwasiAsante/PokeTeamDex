@@ -1,4 +1,5 @@
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
@@ -106,6 +107,21 @@ class PokeApiRepository {
     final data = Map<String, dynamic>.from(response.data);
     _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
     return AbilityEntry.fromJson(data);
+  }
+
+  Future<MoveEntry> fetchMove(String name) async {
+    final cacheKey = 'move_$name';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is Map<String, dynamic>) {
+      return MoveEntry.fromJson(cached);
+    }
+    final response = await _pokeApiClient.client.get('/move/$name');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch move $name: ${response.statusCode}');
+    }
+    final data = Map<String, dynamic>.from(response.data);
+    _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
+    return MoveEntry.fromJson(data);
   }
 
   /// Returns the set of national dex IDs (1–1025) that belong to [typeName].

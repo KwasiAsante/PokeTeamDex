@@ -87,7 +87,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                 _OverviewTab(pokemon: pokemon, speciesAsync: speciesAsync),
                 _StatsTab(pokemon: pokemon),
                 _AbilitiesTab(pokemon: pokemon),
-                _ComingSoonTab(label: 'Moves'),
+                _MovesTab(pokemon: pokemon),
                 _ComingSoonTab(label: 'Evolutions'),
                 _ComingSoonTab(label: 'Forms'),
                 _ComingSoonTab(label: 'Locations'),
@@ -488,6 +488,255 @@ class _StatRangeTable extends StatelessWidget {
         padding: EdgeInsets.only(top: top, bottom: bottom, right: 8),
         child: Text(text, style: style, textAlign: align),
       );
+}
+
+// ── Moves Tab ────────────────────────────────────────────────────────────────
+
+/// Groups the raw moves list from PokemonEntry by learn method, with optional
+/// version-group filter. Move details are fetched lazily per row.
+class _MovesTab extends ConsumerStatefulWidget {
+  final PokemonEntry pokemon;
+  const _MovesTab({required this.pokemon});
+
+  @override
+  ConsumerState<_MovesTab> createState() => _MovesTabState();
+}
+
+class _MovesTabState extends ConsumerState<_MovesTab> {
+  String? _selectedVersion;
+
+  static const _methodOrder = ['level-up', 'machine', 'egg', 'tutor'];
+  static const _methodLabels = {
+    'level-up': 'Level Up',
+    'machine': 'TM / HM',
+    'egg': 'Egg Moves',
+    'tutor': 'Move Tutor',
+  };
+
+  /// All unique version-group names found in the moves list.
+  List<String> get _versions {
+    final seen = <String>{};
+    for (final m in widget.pokemon.moves) {
+      for (final vgd in (m['version_group_details'] as List)) {
+        seen.add((vgd as Map)['version_group']['name'] as String);
+      }
+    }
+    final sorted = seen.toList()..sort();
+    return sorted;
+  }
+
+  /// Moves grouped by learn method for the selected version group.
+  Map<String, List<_MoveRow>> _grouped(String? version) {
+    final groups = <String, List<_MoveRow>>{};
+    for (final m in widget.pokemon.moves) {
+      final moveName = (m['move'] as Map)['name'] as String;
+      for (final vgd in (m['version_group_details'] as List)) {
+        final vg = (vgd as Map)['version_group']['name'] as String;
+        if (version != null && vg != version) continue;
+        final method = vgd['move_learn_method']['name'] as String;
+        final level = vgd['level_learned_at'] as int? ?? 0;
+        groups.putIfAbsent(method, () => []);
+        // Avoid duplicates within same method
+        if (!groups[method]!.any((r) => r.moveName == moveName)) {
+          groups[method]!.add(_MoveRow(moveName: moveName, level: level));
+        }
+      }
+    }
+    // Sort level-up by level
+    groups['level-up']?.sort((a, b) => a.level.compareTo(b.level));
+    return groups;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final versions = _versions;
+    _selectedVersion ??= versions.isNotEmpty ? versions.last : null;
+    final grouped = _grouped(_selectedVersion);
+
+    return Column(
+      children: [
+        // Version filter
+        if (versions.isNotEmpty)
+          SizedBox(
+            height: 44,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              children: versions.map((v) {
+                final label = v.split('-').map((s) => s.isEmpty ? '' : '${s[0].toUpperCase()}${s.substring(1)}').join(' ');
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ChoiceChip(
+                    label: Text(label, style: const TextStyle(fontSize: 12)),
+                    selected: _selectedVersion == v,
+                    onSelected: (_) => setState(() => _selectedVersion = v),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        const Divider(height: 1),
+        Expanded(
+          child: grouped.isEmpty
+              ? const EmptyState(
+                  icon: Icons.search_off,
+                  title: 'No moves found',
+                  subtitle: 'Try selecting a different game version.',
+                )
+              : ListView(
+                  children: _methodOrder
+                      .where((m) => grouped.containsKey(m))
+                      .map((method) {
+                    final rows = grouped[method]!;
+                    return _MoveGroup(
+                      label: _methodLabels[method] ?? method,
+                      rows: rows,
+                      showLevel: method == 'level-up',
+                    );
+                  }).toList(),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MoveRow {
+  final String moveName;
+  final int level;
+  const _MoveRow({required this.moveName, required this.level});
+}
+
+class _MoveGroup extends StatelessWidget {
+  final String label;
+  final List<_MoveRow> rows;
+  final bool showLevel;
+
+  const _MoveGroup({
+    required this.label,
+    required this.rows,
+    required this.showLevel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Text(
+            '$label (${rows.length})',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ),
+        // Header row
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+          child: Row(
+            children: [
+              if (showLevel) const SizedBox(width: 36, child: Text('Lv', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
+              const Expanded(child: Text('Move', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
+              const SizedBox(width: 52, child: Text('Type', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
+              const SizedBox(width: 24, child: Text('Cat', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600), textAlign: TextAlign.center)),
+              const SizedBox(width: 32, child: Text('Pwr', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600), textAlign: TextAlign.right)),
+              const SizedBox(width: 32, child: Text('Acc', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600), textAlign: TextAlign.right)),
+            ],
+          ),
+        ),
+        const Divider(height: 1, indent: 16),
+        ...rows.map((r) => _MoveTile(row: r, showLevel: showLevel)),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+class _MoveTile extends ConsumerWidget {
+  final _MoveRow row;
+  final bool showLevel;
+  const _MoveTile({required this.row, required this.showLevel});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final moveAsync = ref.watch(moveProvider(row.moveName));
+    final typeColor = moveAsync.whenOrNull(
+          data: (m) => PokemonTypeColors.colors[m.typeName] ?? Colors.grey,
+        ) ??
+        Colors.grey;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      child: Row(
+        children: [
+          if (showLevel)
+            SizedBox(
+              width: 36,
+              child: Text(
+                row.level == 0 ? '—' : '${row.level}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          Expanded(
+            child: Text(
+              row.moveName
+                  .split('-')
+                  .map((s) => s.isEmpty ? '' : '${s[0].toUpperCase()}${s.substring(1)}')
+                  .join(' '),
+              style: Theme.of(context).textTheme.bodySmall,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          SizedBox(
+            width: 52,
+            child: moveAsync.whenOrNull(
+                  data: (m) => m.typeName != null
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: typeColor,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${m.typeName![0].toUpperCase()}${m.typeName!.substring(1)}',
+                            style: const TextStyle(color: Colors.white, fontSize: 10),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        )
+                      : null,
+                ) ??
+                const SizedBox.shrink(),
+          ),
+          SizedBox(
+            width: 24,
+            child: Text(
+              moveAsync.whenOrNull(data: (m) => m.categoryIcon) ?? '',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          SizedBox(
+            width: 32,
+            child: Text(
+              moveAsync.whenOrNull(data: (m) => m.power?.toString() ?? '—') ?? '…',
+              textAlign: TextAlign.right,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          SizedBox(
+            width: 32,
+            child: Text(
+              moveAsync.whenOrNull(data: (m) => m.accuracy != null ? '${m.accuracy}%' : '—') ?? '…',
+              textAlign: TextAlign.right,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ── Abilities Tab ─────────────────────────────────────────────────────────────
