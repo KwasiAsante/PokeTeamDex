@@ -86,7 +86,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
               children: [
                 _OverviewTab(pokemon: pokemon, speciesAsync: speciesAsync),
                 _StatsTab(pokemon: pokemon),
-                _ComingSoonTab(label: 'Abilities'),
+                _AbilitiesTab(pokemon: pokemon),
                 _ComingSoonTab(label: 'Moves'),
                 _ComingSoonTab(label: 'Evolutions'),
                 _ComingSoonTab(label: 'Forms'),
@@ -488,6 +488,119 @@ class _StatRangeTable extends StatelessWidget {
         padding: EdgeInsets.only(top: top, bottom: bottom, right: 8),
         child: Text(text, style: style, textAlign: align),
       );
+}
+
+// ── Abilities Tab ─────────────────────────────────────────────────────────────
+
+class _AbilitiesTab extends ConsumerWidget {
+  final PokemonEntry pokemon;
+  const _AbilitiesTab({required this.pokemon});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final abilities = pokemon.abilities;
+    if (abilities.isEmpty) {
+      return const EmptyState(icon: Icons.info_outline, title: 'No ability data');
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: abilities.length,
+      separatorBuilder: (_, __) => const Divider(height: 24),
+      itemBuilder: (context, i) {
+        final slot = abilities[i];
+        final name = (slot['ability'] as Map)['name'] as String;
+        final isHidden = slot['is_hidden'] as bool? ?? false;
+        return _AbilityCard(name: name, isHidden: isHidden, ref: ref);
+      },
+    );
+  }
+}
+
+class _AbilityCard extends ConsumerWidget {
+  final String name;
+  final bool isHidden;
+  final WidgetRef ref;
+
+  const _AbilityCard({
+    required this.name,
+    required this.isHidden,
+    required this.ref,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final abilityAsync = ref.watch(abilityProvider(name));
+
+    return abilityAsync.when(
+      loading: () => const LinearProgressIndicator(),
+      error: (e, _) => Text('Failed to load $name', style: const TextStyle(color: Colors.red)),
+      data: (ability) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                ability.displayName,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(width: 8),
+              if (isHidden)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Hidden',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSecondaryContainer,
+                        ),
+                  ),
+                ),
+              if (ability.generationLabel.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Text(
+                  ability.generationLabel,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ],
+          ),
+          if (ability.shortEffect != null) ...[
+            const SizedBox(height: 4),
+            Text(ability.shortEffect!, style: Theme.of(context).textTheme.bodyMedium),
+          ],
+          if (ability.longEffect != null && ability.longEffect != ability.shortEffect) ...[
+            const SizedBox(height: 6),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: Text(
+                'Full description',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    ability.longEffect!,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
