@@ -14,6 +14,7 @@ class PokemonSpeciesEntry {
   final bool isLegendary;
   final bool isMythical;
   final int? evolutionChainId;
+  final List<PokemonVariety> varieties;
   final List<EvolutionChainLink>? evolutionChain; // populated separately
 
   const PokemonSpeciesEntry({
@@ -30,6 +31,7 @@ class PokemonSpeciesEntry {
     required this.flavorTextEntries,
     this.isBaby = false,
     this.evolutionChainId,
+    this.varieties = const [],
     this.isLegendary = false,
     this.isMythical = false,
     this.evolutionChain,
@@ -64,6 +66,10 @@ class PokemonSpeciesEntry {
       isLegendary: json['is_legendary'] as bool? ?? false,
       isMythical: json['is_mythical'] as bool? ?? false,
       evolutionChainId: _extractChainId(json['evolution_chain']?['url'] as String?),
+      varieties: (json['varieties'] as List?)
+              ?.map((v) => PokemonVariety.fromJson(v as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
   }
 
@@ -118,4 +124,25 @@ class EvolutionChainLink {
   final int speciesId;
   final String speciesName;
   const EvolutionChainLink({required this.speciesId, required this.speciesName});
+}
+
+class PokemonVariety {
+  final bool isDefault;
+  final String name; // e.g. 'venusaur-mega', 'pikachu-alola-cap'
+
+  const PokemonVariety({required this.isDefault, required this.name});
+
+  factory PokemonVariety.fromJson(Map<String, dynamic> json) {
+    return PokemonVariety(
+      isDefault: json['is_default'] as bool,
+      name: (json['pokemon'] as Map)['name'] as String,
+    );
+  }
+
+  String get displayName {
+    return name
+        .split('-')
+        .map((s) => s.isEmpty ? '' : '${s[0].toUpperCase()}${s.substring(1)}')
+        .join(' ');
+  }
 }

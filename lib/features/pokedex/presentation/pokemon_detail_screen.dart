@@ -91,7 +91,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                 _AbilitiesTab(pokemon: pokemon),
                 _MovesTab(pokemon: pokemon),
                 _EvolutionsTab(speciesAsync: speciesAsync),
-                _ComingSoonTab(label: 'Forms'),
+                _FormsTab(speciesAsync: speciesAsync),
                 _ComingSoonTab(label: 'Locations'),
                 _ComingSoonTab(label: 'Add to Team'),
               ],
@@ -979,6 +979,122 @@ class _ConditionChip extends StatelessWidget {
       ),
       child: Text(label, style: Theme.of(context).textTheme.labelSmall),
     );
+  }
+}
+
+// ── Forms & Variants Tab ──────────────────────────────────────────────────────
+
+class _FormsTab extends ConsumerWidget {
+  final AsyncValue<PokemonSpeciesEntry> speciesAsync;
+  const _FormsTab({required this.speciesAsync});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return speciesAsync.when(
+      loading: () => const LoadingState(),
+      error: (e, _) => ErrorState(error: e),
+      data: (species) {
+        final nonDefault = species.varieties.where((v) => !v.isDefault).toList();
+        if (nonDefault.isEmpty) {
+          return const EmptyState(
+            icon: Icons.style_outlined,
+            title: 'No alternate forms',
+            subtitle: 'This Pokémon has no regional forms, Mega Evolutions, or other variants.',
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: nonDefault.length,
+          separatorBuilder: (_, __) => const Divider(height: 24),
+          itemBuilder: (_, i) => _FormCard(variety: nonDefault[i]),
+        );
+      },
+    );
+  }
+}
+
+class _FormCard extends ConsumerWidget {
+  final PokemonVariety variety;
+  const _FormCard({required this.variety});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pokemonAsync = ref.watch(pokemonByNameProvider(variety.name));
+
+    return pokemonAsync.when(
+      loading: () => ListTile(
+        leading: const SizedBox(
+          width: 56,
+          height: 56,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        title: Text(variety.displayName),
+      ),
+      error: (e, _) => ListTile(
+        title: Text(variety.displayName),
+        subtitle: const Text('Failed to load form data'),
+      ),
+      data: (pokemon) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                PokemonSprite(
+                  defaultUrl: pokemon.officialArtworkUrl ??
+                      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.id}.png',
+                  size: 80,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        variety.displayName,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: pokemon.types.values
+                            .map((t) => Padding(
+                                  padding: const EdgeInsets.only(right: 4),
+                                  child: TypeBadge(type: t),
+                                ))
+                            .toList(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (pokemon.stats.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ...pokemon.stats.map((s) {
+                final statName = (s['stat'] as Map)['name'] as String;
+                final value = s['base_stat'] as int;
+                final label = _shortStatLabel(statName);
+                return StatBar(label: label, value: value);
+              }),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  static String _shortStatLabel(String name) {
+    const map = {
+      'hp': 'HP',
+      'attack': 'Atk',
+      'defense': 'Def',
+      'special-attack': 'SpA',
+      'special-defense': 'SpD',
+      'speed': 'Spe',
+    };
+    return map[name] ?? name;
   }
 }
 
