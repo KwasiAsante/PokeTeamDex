@@ -77,10 +77,39 @@ class PokeApiRepository {
     }
   }
 
+  /// Returns the set of national dex IDs (1–1025) that belong to [typeName].
+  /// Cached for 7 days — type membership is static data.
+  Future<Set<int>> fetchPokemonIdsByType(String typeName) async {
+    final cacheKey = 'type_pokemon_$typeName';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is List) {
+      return Set<int>.from(cached.cast<int>());
+    }
+
+    final response = await _pokeApiClient.client.get('/type/$typeName');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch type $typeName: ${response.statusCode}');
+    }
+
+    final pokemonList = (response.data['pokemon'] as List)
+        .map((e) {
+          final url = e['pokemon']['url'] as String;
+          final segments = Uri.parse(url).pathSegments;
+          final idStr = segments.lastWhere((s) => s.isNotEmpty);
+          return int.tryParse(idStr);
+        })
+        .whereType<int>()
+        .where((id) => id >= 1 && id <= 1025)
+        .toSet();
+
+    _pokeApiCache.putWithTTL(cacheKey, pokemonList.toList(), const Duration(days: 7));
+    return pokemonList;
+  }
+
   List<PokemonListEntry> _parseList(Map<String, dynamic> raw) {
-  final results = raw['results'] as List;
-  return results
-      .map((e) => PokemonListEntry.fromJson(e as Map<String, dynamic>))
-      .toList();
-}
+    final results = raw['results'] as List;
+    return results
+        .map((e) => PokemonListEntry.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 }
