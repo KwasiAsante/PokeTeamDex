@@ -13,6 +13,7 @@ class PokemonSpeciesEntry {
   final bool isBaby;
   final bool isLegendary;
   final bool isMythical;
+  final int? evolutionChainId;
   final List<EvolutionChainLink>? evolutionChain; // populated separately
 
   const PokemonSpeciesEntry({
@@ -28,6 +29,7 @@ class PokemonSpeciesEntry {
     required this.eggGroups,
     required this.flavorTextEntries,
     this.isBaby = false,
+    this.evolutionChainId,
     this.isLegendary = false,
     this.isMythical = false,
     this.evolutionChain,
@@ -61,7 +63,15 @@ class PokemonSpeciesEntry {
       isBaby: json['is_baby'] as bool? ?? false,
       isLegendary: json['is_legendary'] as bool? ?? false,
       isMythical: json['is_mythical'] as bool? ?? false,
+      evolutionChainId: _extractChainId(json['evolution_chain']?['url'] as String?),
     );
+  }
+
+  static int? _extractChainId(String? url) {
+    if (url == null) return null;
+    final segments = Uri.parse(url).pathSegments;
+    final idStr = segments.lastWhere((s) => s.isNotEmpty, orElse: () => '');
+    return int.tryParse(idStr);
   }
 
   String genderDisplay() {

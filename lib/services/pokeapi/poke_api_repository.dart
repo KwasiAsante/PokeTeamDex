@@ -1,4 +1,5 @@
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
@@ -107,6 +108,21 @@ class PokeApiRepository {
     final data = Map<String, dynamic>.from(response.data);
     _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
     return AbilityEntry.fromJson(data);
+  }
+
+  Future<EvolutionNode> fetchEvolutionChain(int chainId) async {
+    final cacheKey = 'evolution_chain_$chainId';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is Map<String, dynamic>) {
+      return EvolutionNode.fromJson(cached['chain'] as Map<String, dynamic>);
+    }
+    final response = await _pokeApiClient.client.get('/evolution-chain/$chainId');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch evolution chain $chainId: ${response.statusCode}');
+    }
+    final data = Map<String, dynamic>.from(response.data);
+    _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
+    return EvolutionNode.fromJson(data['chain'] as Map<String, dynamic>);
   }
 
   Future<MoveEntry> fetchMove(String name) async {
