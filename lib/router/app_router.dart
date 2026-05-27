@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poke_team_dex/features/pokedex/presentation/pokedex_placeholder_screen.dart';
+import 'package:poke_team_dex/features/pokedex/presentation/pokemon_detail_placeholder_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/pokedex',
@@ -13,6 +15,13 @@ final appRouter = GoRouter(
             GoRoute(
               path: '/pokedex',
               builder: (context, state) => const PokedexPlaceholderScreen(),
+              routes: [
+                GoRoute(
+                  path: ':id',
+                  builder: (context, state) =>
+                      PokemonDetailPlaceholderScreen(goRouterState: state),
+                ),
+              ],
             ),
           ],
         ),
@@ -52,14 +61,6 @@ final appRouter = GoRouter(
     ),
   ],
 );
-
-class PokedexPlaceholderScreen extends StatelessWidget {
-  const PokedexPlaceholderScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Placeholder();
-  }
-}
 
 class MovesPlaceholderScreen extends StatelessWidget {
   const MovesPlaceholderScreen({super.key});
@@ -112,8 +113,14 @@ class ScaffoldWithNavBar extends StatelessWidget {
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Pokedex'),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Moves'),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Items'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Reference'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'My Teams'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Reference',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'My Teams',
+          ),
         ],
       ),
     );

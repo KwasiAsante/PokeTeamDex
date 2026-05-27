@@ -7,7 +7,7 @@ alwaysApply: true
 
 **App:** PokeTeamDex | Flutter cross-platform (iOS, Android, Web) | Private personal use  
 **Purpose:** Pokédex browser + offline-first team builder synced to PostgreSQL via PokéAPI  
-**Full requirements:** `PokeTeamDex_PRD.md`
+**Full requirements:** `docs/PokeTeamDex_PRD.md`
 
 ## Always do
 

@@ -1,4 +1,6 @@
 # Miscellaneous
+# Stray local images (e.g. downloaded sprites for debugging)
+/*.png
 *.class
 *.log
 *.pyc

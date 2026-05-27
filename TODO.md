@@ -1,6 +1,6 @@
 # PokeTeamDex Implementation TODO
 
-This file converts `PokeTeamDex_PRD.md` + `PokeTeamDex_PRD_learning.md` into an actionable build plan.
+This file converts `docs/PokeTeamDex_PRD.md` + `docs/PokeTeamDex_PRD_learning.md` into an actionable build plan.
 
 ## Rules of Execution
 
