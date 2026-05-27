@@ -3,63 +3,81 @@ class PokemonEntry {
   final String name;
   final int height;
   final int weight;
+  final int? baseExperience;
   final Map<int, String> types;
   final String? officialArtworkUrl;
   final Map<String, dynamic>? sprites;
+  final List<Map<String, dynamic>> stats;
+  final List<Map<String, dynamic>> abilities;
+  final List<Map<String, dynamic>> moves;
 
   PokemonEntry({
-      required this.id,
-      required this.name,
-      required this.height,
-      required this.weight,
-      required this.types,
-      this.officialArtworkUrl,
-      this.sprites
+    required this.id,
+    required this.name,
+    required this.height,
+    required this.weight,
+    this.baseExperience,
+    required this.types,
+    this.officialArtworkUrl,
+    this.sprites,
+    this.stats = const [],
+    this.abilities = const [],
+    this.moves = const [],
   });
 
   factory PokemonEntry.fromJson(Map<String, dynamic> json) {
-    Map<String, dynamic>? sprites = json['sprites'] as Map<String, dynamic>?;
-    var entry = PokemonEntry(
-      id: json['id'],
-      name: json['name'],
-      height: json['height'],
-      weight: json['weight'],
+    final sprites = json['sprites'] as Map<String, dynamic>?;
+    return PokemonEntry(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      height: json['height'] as int,
+      weight: json['weight'] as int,
+      baseExperience: json['base_experience'] as int?,
       types: Map.fromEntries(
         (json['types'] as List<dynamic>).map(
-          (type) => MapEntry(type['slot'] as int, type['type']['name'] as String)
-        )
+          (t) => MapEntry(t['slot'] as int, t['type']['name'] as String),
+        ),
       ),
       sprites: sprites,
-      officialArtworkUrl: sprites?['other']?['official-artwork']?['front_default']
+      officialArtworkUrl:
+          sprites?['other']?['official-artwork']?['front_default'] as String?,
+      stats: (json['stats'] as List?)
+              ?.map((s) => Map<String, dynamic>.from(s as Map))
+              .toList() ??
+          [],
+      abilities: (json['abilities'] as List?)
+              ?.map((a) => Map<String, dynamic>.from(a as Map))
+              .toList() ??
+          [],
+      moves: (json['moves'] as List?)
+              ?.map((m) => Map<String, dynamic>.from(m as Map))
+              .toList() ??
+          [],
     );
-
-    return entry;
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'height': height,
-      'weight': weight,
-      'types': types,
-      'sprites': sprites
-    };
-  }
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'height': height,
+        'weight': weight,
+        'base_experience': baseExperience,
+        'types': types,
+        'sprites': sprites,
+        'stats': stats,
+        'abilities': abilities,
+        'moves': moves,
+      };
+
+  String displayId() => '#${id.toString().padLeft(3, '0')}';
 
   String? getImageUrl() {
     if (officialArtworkUrl != null && officialArtworkUrl!.isNotEmpty) {
       return officialArtworkUrl;
     }
-
-    return sprites!['front_default'];
+    return sprites?['front_default'] as String?;
   }
 
-  String displayHeight() {
-    return "Height: ${(height / 10).toStringAsFixed(1)} m";
-  }
-
-  String displayWeight() {
-    return "Weight: ${(weight / 10).toStringAsFixed(1)} kg";
-  }
+  String displayHeight() => '${(height / 10).toStringAsFixed(1)} m';
+  String displayWeight() => '${(weight / 10).toStringAsFixed(1)} kg';
 }

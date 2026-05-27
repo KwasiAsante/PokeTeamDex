@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/pokedex_screen.dart';
-import 'package:poke_team_dex/features/pokedex/presentation/pokemon_detail_placeholder_screen.dart';
+import 'package:poke_team_dex/features/pokedex/presentation/pokemon_detail_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/pokedex',
@@ -18,8 +18,9 @@ final appRouter = GoRouter(
               routes: [
                 GoRoute(
                   path: ':id',
-                  builder: (context, state) =>
-                      PokemonDetailPlaceholderScreen(goRouterState: state),
+                  builder: (context, state) => PokemonDetailScreen(
+                    pokemonId: int.parse(state.pathParameters['id']!),
+                  ),
                 ),
               ],
             ),
