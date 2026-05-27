@@ -1,33 +1,54 @@
 import 'package:flutter/material.dart';
-import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 
 class AppTheme {
+  static const Color _primaryRed = Color(0xFFCC0000);
+  static const Color _primaryRedDark = Color(0xFFFF4444);
+
   static ThemeData light() {
     return ThemeData(
-      primaryColor: Colors.blue,
-      scaffoldBackgroundColor: Colors.white,
+      useMaterial3: true,
       brightness: Brightness.light,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: _primaryRed,
+        brightness: Brightness.light,
       ),
-      colorScheme: ColorScheme.light().copyWith(secondary: Colors.blueAccent),
+      scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+      appBarTheme: const AppBarTheme(
+        centerTitle: false,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: _primaryRed,
+        unselectedItemColor: Color(0xFF9E9E9E),
+        showUnselectedLabels: true,
+        elevation: 8,
+      ),
     );
   }
 
   static ThemeData dark() {
     return ThemeData(
-      primaryColor: Colors.blue,
-      scaffoldBackgroundColor: Colors.black,
+      useMaterial3: true,
       brightness: Brightness.dark,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-      ),
       colorScheme: ColorScheme.fromSeed(
-        seedColor: PokemonTypeColors.colors['dark']!,
+        seedColor: _primaryRedDark,
         brightness: Brightness.dark,
-      ).copyWith(secondary: Colors.blueAccent),
+      ),
+      scaffoldBackgroundColor: const Color(0xFF121212),
+      appBarTheme: const AppBarTheme(
+        centerTitle: false,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: _primaryRedDark,
+        unselectedItemColor: Color(0xFF757575),
+        showUnselectedLabels: true,
+        elevation: 8,
+      ),
     );
   }
 }
