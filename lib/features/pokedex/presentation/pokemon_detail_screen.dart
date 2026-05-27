@@ -8,6 +8,7 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
+import 'package:poke_team_dex/shared/widgets/stat_bar.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 
 class PokemonDetailScreen extends ConsumerStatefulWidget {
@@ -84,7 +85,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
               controller: _tabController,
               children: [
                 _OverviewTab(pokemon: pokemon, speciesAsync: speciesAsync),
-                _ComingSoonTab(label: 'Stats'),
+                _StatsTab(pokemon: pokemon),
                 _ComingSoonTab(label: 'Abilities'),
                 _ComingSoonTab(label: 'Moves'),
                 _ComingSoonTab(label: 'Evolutions'),
@@ -329,6 +330,167 @@ class _InfoGrid extends StatelessWidget {
     );
   }
 }
+
+// ── Stats Tab ─────────────────────────────────────────────────────────────────
+
+class _StatsTab extends StatelessWidget {
+  final PokemonEntry pokemon;
+  const _StatsTab({required this.pokemon});
+
+  // Canonical stat order and short labels
+  static const _statMeta = [
+    ('hp', 'HP'),
+    ('attack', 'Atk'),
+    ('defense', 'Def'),
+    ('special-attack', 'SpA'),
+    ('special-defense', 'SpD'),
+    ('speed', 'Spe'),
+  ];
+
+  int _base(String statName) {
+    for (final s in pokemon.stats) {
+      if ((s['stat'] as Map)['name'] == statName) {
+        return s['base_stat'] as int;
+      }
+    }
+    return 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bases = _statMeta.map((m) => _base(m.$1)).toList();
+    final bst = bases.fold(0, (a, b) => a + b);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Stat bars
+          ...List.generate(_statMeta.length, (i) {
+            return StatBar(label: _statMeta[i].$2, value: bases[i]);
+          }),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 52,
+                  child: Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 8),
+                Text(bst.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+
+          const Divider(height: 32),
+
+          // Min / Max table
+          Text('Stat Ranges', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            'Min: IV 0, EV 0, hindering nature  •  Max: IV 31, EV 252, helpful nature',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 12),
+          _StatRangeTable(bases: bases, statMeta: _statMeta),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatRangeTable extends StatelessWidget {
+  final List<int> bases;
+  final List<(String, String)> statMeta;
+
+  const _StatRangeTable({required this.bases, required this.statMeta});
+
+  int _hp(int base, int iv, int ev, int level) =>
+      ((2 * base + iv + (ev ~/ 4)) * level ~/ 100) + level + 10;
+
+  int _stat(int base, int iv, int ev, int level, double nature) =>
+      (((2 * base + iv + (ev ~/ 4)) * level ~/ 100 + 5) * nature).floor();
+
+  @override
+  Widget build(BuildContext context) {
+    final headerStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+        );
+    final cellStyle = Theme.of(context).textTheme.bodySmall;
+
+    return Table(
+      columnWidths: const {
+        0: IntrinsicColumnWidth(),
+        1: FlexColumnWidth(),
+        2: FlexColumnWidth(),
+        3: FlexColumnWidth(),
+        4: FlexColumnWidth(),
+      },
+      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+      children: [
+        // Header
+        TableRow(
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: Theme.of(context).dividerColor,
+              ),
+            ),
+          ),
+          children: [
+            _cell('', headerStyle, bottom: 6),
+            _cell('Min 50', headerStyle, bottom: 6, align: TextAlign.center),
+            _cell('Max 50', headerStyle, bottom: 6, align: TextAlign.center),
+            _cell('Min 100', headerStyle, bottom: 6, align: TextAlign.center),
+            _cell('Max 100', headerStyle, bottom: 6, align: TextAlign.center),
+          ],
+        ),
+        // Rows
+        ...List.generate(statMeta.length, (i) {
+          final name = statMeta[i].$1;
+          final label = statMeta[i].$2;
+          final base = bases[i];
+          final isHp = name == 'hp';
+
+          final min50 = isHp ? _hp(base, 0, 0, 50) : _stat(base, 0, 0, 50, 0.9);
+          final max50 = isHp ? _hp(base, 31, 252, 50) : _stat(base, 31, 252, 50, 1.1);
+          final min100 = isHp ? _hp(base, 0, 0, 100) : _stat(base, 0, 0, 100, 0.9);
+          final max100 = isHp ? _hp(base, 31, 252, 100) : _stat(base, 31, 252, 100, 1.1);
+
+          return TableRow(
+            children: [
+              _cell(label, cellStyle?.copyWith(fontWeight: FontWeight.w600), top: 6, bottom: 6),
+              _cell(min50.toString(), cellStyle, top: 6, bottom: 6, align: TextAlign.center),
+              _cell(max50.toString(), cellStyle, top: 6, bottom: 6, align: TextAlign.center),
+              _cell(min100.toString(), cellStyle, top: 6, bottom: 6, align: TextAlign.center),
+              _cell(max100.toString(), cellStyle, top: 6, bottom: 6, align: TextAlign.center),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  static Widget _cell(
+    String text,
+    TextStyle? style, {
+    double top = 0,
+    double bottom = 0,
+    TextAlign align = TextAlign.start,
+  }) =>
+      Padding(
+        padding: EdgeInsets.only(top: top, bottom: bottom, right: 8),
+        child: Text(text, style: style, textAlign: align),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _ComingSoonTab extends StatelessWidget {
   final String label;
