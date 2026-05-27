@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
@@ -21,6 +22,12 @@ final abilityProvider =
     FutureProvider.autoDispose.family<AbilityEntry, String>((ref, name) async {
   final repo = ref.read(pokeApiRepositoryProvider);
   return repo.fetchAbility(name);
+});
+
+final evolutionChainProvider =
+    FutureProvider.autoDispose.family<EvolutionNode, int>((ref, chainId) async {
+  final repo = ref.read(pokeApiRepositoryProvider);
+  return repo.fetchEvolutionChain(chainId);
 });
 
 final moveProvider =

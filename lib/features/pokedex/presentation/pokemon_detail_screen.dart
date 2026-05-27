@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:change_case/change_case.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
@@ -88,7 +90,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                 _StatsTab(pokemon: pokemon),
                 _AbilitiesTab(pokemon: pokemon),
                 _MovesTab(pokemon: pokemon),
-                _ComingSoonTab(label: 'Evolutions'),
+                _EvolutionsTab(speciesAsync: speciesAsync),
                 _ComingSoonTab(label: 'Forms'),
                 _ComingSoonTab(label: 'Locations'),
                 _ComingSoonTab(label: 'Add to Team'),
@@ -848,6 +850,134 @@ class _AbilityCard extends ConsumerWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+// ── Evolutions Tab ────────────────────────────────────────────────────────────
+
+class _EvolutionsTab extends ConsumerWidget {
+  final AsyncValue<PokemonSpeciesEntry> speciesAsync;
+  const _EvolutionsTab({required this.speciesAsync});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return speciesAsync.when(
+      loading: () => const LoadingState(),
+      error: (e, _) => ErrorState(error: e),
+      data: (species) {
+        final chainId = species.evolutionChainId;
+        if (chainId == null) {
+          return const EmptyState(
+            icon: Icons.device_unknown,
+            title: 'No evolution data',
+          );
+        }
+        final chainAsync = ref.watch(evolutionChainProvider(chainId));
+        return chainAsync.when(
+          loading: () => const LoadingState(),
+          error: (e, _) => ErrorState(error: e),
+          data: (root) => SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: _EvolutionTree(node: root),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Recursively renders the evolution chain as a vertical tree.
+/// Branching evolutions (e.g. Eevee) are rendered side-by-side.
+class _EvolutionTree extends StatelessWidget {
+  final EvolutionNode node;
+  const _EvolutionTree({required this.node});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _EvolutionNodeCard(node: node),
+        if (node.evolvesTo.isNotEmpty) ...[
+          const Icon(Icons.arrow_downward, size: 20, color: Colors.grey),
+          if (node.evolvesTo.length == 1) ...[
+            _ConditionChip(details: node.evolvesTo.first.details),
+            const SizedBox(height: 4),
+            _EvolutionTree(node: node.evolvesTo.first),
+          ] else
+            // Branching (e.g. Eevee evolutions)
+            Column(
+              children: node.evolvesTo.map((child) {
+                return Column(
+                  children: [
+                    _ConditionChip(details: child.details),
+                    const SizedBox(height: 4),
+                    _EvolutionTree(node: child),
+                    const SizedBox(height: 8),
+                  ],
+                );
+              }).toList(),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _EvolutionNodeCard extends StatelessWidget {
+  final EvolutionNode node;
+  const _EvolutionNodeCard({required this.node});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push('/pokedex/${node.speciesId}'),
+      child: Column(
+        children: [
+          CachedNetworkImage(
+            imageUrl: node.spriteUrl,
+            width: 80,
+            height: 80,
+            placeholder: (_, __) => const SizedBox(
+              width: 80,
+              height: 80,
+              child: Icon(Icons.catching_pokemon, color: Colors.grey),
+            ),
+            errorWidget: (_, __, ___) => const Icon(Icons.broken_image_outlined),
+          ),
+          Text(
+            node.displayName,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          Text(
+            '#${node.speciesId.toString().padLeft(3, '0')}',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConditionChip extends StatelessWidget {
+  final List<EvolutionDetail> details;
+  const _ConditionChip({required this.details});
+
+  @override
+  Widget build(BuildContext context) {
+    if (details.isEmpty) return const SizedBox.shrink();
+    final label = details.map((d) => d.conditionLabel).join(' / ');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(label, style: Theme.of(context).textTheme.labelSmall),
     );
   }
 }
