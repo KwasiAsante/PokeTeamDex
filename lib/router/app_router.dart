@@ -110,15 +110,29 @@ class ScaffoldWithNavBar extends StatelessWidget {
           initialLocation: index == navigationShell.currentIndex,
         ),
         items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Pokedex'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Moves'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Items'),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
+            icon: Icon(Icons.catching_pokemon_outlined),
+            activeIcon: Icon(Icons.catching_pokemon),
+            label: 'Pokédex',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.sports_martial_arts_outlined),
+            activeIcon: Icon(Icons.sports_martial_arts),
+            label: 'Moves',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.inventory_2_outlined),
+            activeIcon: Icon(Icons.inventory_2),
+            label: 'Items',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.menu_book_outlined),
+            activeIcon: Icon(Icons.menu_book),
             label: 'Reference',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
+            icon: Icon(Icons.groups_outlined),
+            activeIcon: Icon(Icons.groups),
             label: 'My Teams',
           ),
         ],
