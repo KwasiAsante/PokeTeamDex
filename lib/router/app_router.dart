@@ -5,6 +5,8 @@ import 'package:poke_team_dex/features/items/presentation/items_screen.dart';
 import 'package:poke_team_dex/features/moves/presentation/moves_screen.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/pokedex_screen.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/pokemon_detail_screen.dart';
+import 'package:poke_team_dex/features/reference/presentation/reference_hub_screen.dart';
+import 'package:poke_team_dex/features/types/presentation/types_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/pokedex',
@@ -49,7 +51,17 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/reference',
-              builder: (context, state) => const AbilitiesScreen(),
+              builder: (context, state) => const ReferenceHubScreen(),
+              routes: [
+                GoRoute(
+                  path: 'abilities',
+                  builder: (context, state) => const AbilitiesScreen(),
+                ),
+                GoRoute(
+                  path: 'types',
+                  builder: (context, state) => const TypesScreen(),
+                ),
+              ],
             ),
           ],
         ),
