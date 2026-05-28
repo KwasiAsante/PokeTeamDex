@@ -24,6 +24,12 @@ final abilityProvider =
   return repo.fetchAbility(name);
 });
 
+final pokemonByNameProvider =
+    FutureProvider.autoDispose.family<PokemonEntry, String>((ref, name) async {
+  final repo = ref.read(pokeApiRepositoryProvider);
+  return repo.fetchPokemonByName(name);
+});
+
 final evolutionChainProvider =
     FutureProvider.autoDispose.family<EvolutionNode, int>((ref, chainId) async {
   final repo = ref.read(pokeApiRepositoryProvider);

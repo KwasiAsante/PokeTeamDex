@@ -80,6 +80,21 @@ class PokeApiRepository {
     }
   }
 
+  Future<PokemonEntry> fetchPokemonByName(String name) async {
+    final cacheKey = 'pokemon_name_$name';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is Map<String, dynamic>) {
+      return PokemonEntry.fromJson(cached);
+    }
+    final response = await _pokeApiClient.client.get('/pokemon/$name');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch pokemon $name: ${response.statusCode}');
+    }
+    final data = Map<String, dynamic>.from(response.data);
+    _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
+    return PokemonEntry.fromJson(data);
+  }
+
   Future<PokemonSpeciesEntry> fetchPokemonSpecies(int id) async {
     final cacheKey = 'pokemon_species_$id';
     final cached = _pokeApiCache.getIfValid(cacheKey);
