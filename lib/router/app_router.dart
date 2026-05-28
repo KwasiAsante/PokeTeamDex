@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poke_team_dex/features/abilities/presentation/abilities_screen.dart';
 import 'package:poke_team_dex/features/moves/presentation/moves_screen.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/pokedex_screen.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/pokemon_detail_screen.dart';
@@ -47,7 +48,7 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/reference',
-              builder: (context, state) => const ReferencePlaceholderScreen(),
+              builder: (context, state) => const AbilitiesScreen(),
             ),
           ],
         ),
@@ -66,14 +67,6 @@ final appRouter = GoRouter(
 
 class ItemsPlaceholderScreen extends StatelessWidget {
   const ItemsPlaceholderScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Placeholder();
-  }
-}
-
-class ReferencePlaceholderScreen extends StatelessWidget {
-  const ReferencePlaceholderScreen({super.key});
   @override
   Widget build(BuildContext context) {
     return const Placeholder();
