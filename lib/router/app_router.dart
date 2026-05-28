@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poke_team_dex/features/moves/presentation/moves_screen.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/pokedex_screen.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/pokemon_detail_screen.dart';
 
@@ -30,7 +31,7 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/moves',
-              builder: (context, state) => const MovesPlaceholderScreen(),
+              builder: (context, state) => const MovesScreen(),
             ),
           ],
         ),
@@ -62,14 +63,6 @@ final appRouter = GoRouter(
     ),
   ],
 );
-
-class MovesPlaceholderScreen extends StatelessWidget {
-  const MovesPlaceholderScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Placeholder();
-  }
-}
 
 class ItemsPlaceholderScreen extends StatelessWidget {
   const ItemsPlaceholderScreen({super.key});
