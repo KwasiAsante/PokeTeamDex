@@ -1,6 +1,7 @@
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/encounter_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
+import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
@@ -240,6 +241,41 @@ class PokeApiRepository {
         .toList();
     _pokeApiCache.putWithTTL(cacheKey, names, const Duration(days: 7));
     return names;
+  }
+
+  Future<List<String>> fetchItemList() async {
+    const cacheKey = 'item_list';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is List) {
+      return cached.cast<String>();
+    }
+    final response = await _pokeApiClient.client.get('/item', queryParameters: {
+      'limit': 10000,
+      'offset': 0,
+    });
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch item list: ${response.statusCode}');
+    }
+    final names = (response.data['results'] as List)
+        .map((e) => e['name'] as String)
+        .toList();
+    _pokeApiCache.putWithTTL(cacheKey, names, const Duration(days: 7));
+    return names;
+  }
+
+  Future<ItemEntry> fetchItem(String name) async {
+    final cacheKey = 'item_$name';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is Map<String, dynamic>) {
+      return ItemEntry.fromJson(cached);
+    }
+    final response = await _pokeApiClient.client.get('/item/$name');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch item $name: ${response.statusCode}');
+    }
+    final data = Map<String, dynamic>.from(response.data);
+    _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
+    return ItemEntry.fromJson(data);
   }
 
   List<PokemonListEntry> _parseList(Map<String, dynamic> raw) {
