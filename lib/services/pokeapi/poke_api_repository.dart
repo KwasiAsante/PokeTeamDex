@@ -1,4 +1,5 @@
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/encounter_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
@@ -182,6 +183,23 @@ class PokeApiRepository {
 
     _pokeApiCache.putWithTTL(cacheKey, pokemonList.toList(), const Duration(days: 7));
     return pokemonList;
+  }
+
+  Future<List<EncounterEntry>> fetchPokemonEncounters(int id) async {
+    final cacheKey = 'pokemon_encounters_$id';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is List) {
+      return cached
+          .map((e) => EncounterEntry.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    final response = await _pokeApiClient.client.get('/pokemon/$id/encounters');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch encounters for $id: ${response.statusCode}');
+    }
+    final data = (response.data as List).cast<Map<String, dynamic>>();
+    _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
+    return data.map(EncounterEntry.fromJson).toList();
   }
 
   List<PokemonListEntry> _parseList(Map<String, dynamic> raw) {

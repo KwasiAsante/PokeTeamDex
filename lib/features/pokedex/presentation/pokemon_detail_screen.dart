@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/services/pokeapi/models/encounter_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
@@ -92,7 +93,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                 _MovesTab(pokemon: pokemon),
                 _EvolutionsTab(speciesAsync: speciesAsync),
                 _FormsTab(speciesAsync: speciesAsync),
-                _ComingSoonTab(label: 'Locations'),
+                _LocationsTab(pokemonId: widget.pokemonId),
                 _ComingSoonTab(label: 'Add to Team'),
               ],
             ),
@@ -1095,6 +1096,191 @@ class _FormCard extends ConsumerWidget {
       'speed': 'Spe',
     };
     return map[name] ?? name;
+  }
+}
+
+// ── Locations Tab ─────────────────────────────────────────────────────────────
+
+class _LocationsTab extends ConsumerStatefulWidget {
+  final int pokemonId;
+  const _LocationsTab({required this.pokemonId});
+
+  @override
+  ConsumerState<_LocationsTab> createState() => _LocationsTabState();
+}
+
+class _LocationsTabState extends ConsumerState<_LocationsTab> {
+  String? _selectedVersion;
+
+  @override
+  Widget build(BuildContext context) {
+    final encountersAsync = ref.watch(pokemonEncountersProvider(widget.pokemonId));
+
+    return encountersAsync.when(
+      loading: () => const LoadingState(),
+      error: (e, _) => ErrorState(error: e),
+      data: (encounters) {
+        if (encounters.isEmpty) {
+          return const EmptyState(
+            icon: Icons.map_outlined,
+            title: 'No location data',
+            subtitle: 'This Pokémon is not encountered in the wild.',
+          );
+        }
+
+        // Collect all versions from encounter data
+        final versions = encounters
+            .expand((e) => e.versionDetails.map((v) => v.version))
+            .toSet()
+            .toList()
+          ..sort();
+
+        _selectedVersion ??= versions.first;
+
+        // Filter encounters for the selected version
+        final filtered = encounters
+            .map((e) {
+              final vd = e.versionDetails
+                  .where((v) => v.version == _selectedVersion)
+                  .toList();
+              return vd.isEmpty ? null : (entry: e, vd: vd.first);
+            })
+            .whereType<({EncounterEntry entry, VersionEncounter vd})>()
+            .toList();
+
+        return Column(
+          children: [
+            _VersionFilterBar(
+              versions: versions,
+              selected: _selectedVersion!,
+              onSelected: (v) => setState(() => _selectedVersion = v),
+            ),
+            Expanded(
+              child: filtered.isEmpty
+                  ? const EmptyState(
+                      icon: Icons.map_outlined,
+                      title: 'Not available',
+                      subtitle: 'This Pokémon is not encountered in this version.',
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) => const Divider(height: 8),
+                      itemBuilder: (_, i) {
+                        final item = filtered[i];
+                        return _LocationTile(
+                          entry: item.entry,
+                          versionEncounter: item.vd,
+                        );
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _VersionFilterBar extends StatelessWidget {
+  final List<String> versions;
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  const _VersionFilterBar({
+    required this.versions,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        itemCount: versions.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (_, i) {
+          final v = versions[i];
+          final isSelected = v == selected;
+          return FilterChip(
+            label: Text(_versionLabel(v)),
+            selected: isSelected,
+            onSelected: (_) => onSelected(v),
+          );
+        },
+      ),
+    );
+  }
+
+  static String _versionLabel(String v) {
+    return v
+        .split('-')
+        .map((s) => s.isEmpty ? '' : '${s[0].toUpperCase()}${s.substring(1)}')
+        .join(' ');
+  }
+}
+
+class _LocationTile extends StatelessWidget {
+  final EncounterEntry entry;
+  final VersionEncounter versionEncounter;
+
+  const _LocationTile({
+    required this.entry,
+    required this.versionEncounter,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.place_outlined, size: 16, color: colorScheme.primary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    entry.displayName,
+                    style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Text(
+                  '${versionEncounter.maxChance}%',
+                  style: textTheme.bodySmall?.copyWith(color: colorScheme.primary),
+                ),
+              ],
+            ),
+            if (versionEncounter.methods.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: versionEncounter.methods.map((m) {
+                  return Chip(
+                    label: Text(
+                      '${m.methodLabel} · ${m.levelRange} · ${m.chance}%',
+                      style: textTheme.labelSmall,
+                    ),
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 
