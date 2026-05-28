@@ -222,6 +222,26 @@ class PokeApiRepository {
     return names;
   }
 
+  Future<List<String>> fetchAbilityList() async {
+    const cacheKey = 'ability_list';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is List) {
+      return cached.cast<String>();
+    }
+    final response = await _pokeApiClient.client.get('/ability', queryParameters: {
+      'limit': 10000,
+      'offset': 0,
+    });
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch ability list: ${response.statusCode}');
+    }
+    final names = (response.data['results'] as List)
+        .map((e) => e['name'] as String)
+        .toList();
+    _pokeApiCache.putWithTTL(cacheKey, names, const Duration(days: 7));
+    return names;
+  }
+
   List<PokemonListEntry> _parseList(Map<String, dynamic> raw) {
     final results = raw['results'] as List;
     return results
