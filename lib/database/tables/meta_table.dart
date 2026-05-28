@@ -1,0 +1,10 @@
+import 'package:drift/drift.dart';
+
+/// Key-value store for app metadata (e.g. last_sync_at, user_id).
+class Meta extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+
+  @override
+  Set<Column> get primaryKey => {key};
+}
