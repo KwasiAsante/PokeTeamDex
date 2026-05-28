@@ -94,7 +94,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                 _EvolutionsTab(speciesAsync: speciesAsync),
                 _FormsTab(speciesAsync: speciesAsync),
                 _LocationsTab(pokemonId: widget.pokemonId),
-                _ComingSoonTab(label: 'Add to Team'),
+                _AddToTeamTab(pokemon: pokemon),
               ],
             ),
           ),
@@ -1284,18 +1284,174 @@ class _LocationTile extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Add to Team Tab ───────────────────────────────────────────────────────────
 
-class _ComingSoonTab extends StatelessWidget {
-  final String label;
-  const _ComingSoonTab({required this.label});
+class _AddToTeamTab extends StatefulWidget {
+  final PokemonEntry pokemon;
+  const _AddToTeamTab({required this.pokemon});
+
+  @override
+  State<_AddToTeamTab> createState() => _AddToTeamTabState();
+}
+
+class _AddToTeamTabState extends State<_AddToTeamTab> {
+  int? _selectedSlot;
 
   @override
   Widget build(BuildContext context) {
-    return EmptyState(
-      icon: Icons.construction,
-      title: label,
-      subtitle: 'Coming in a future PR.',
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final pokemon = widget.pokemon;
+    final primaryType = pokemon.types[1] ?? pokemon.types.values.first;
+    final typeColor = PokemonTypeColors.colors[primaryType] ?? colorScheme.primary;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Pokémon summary card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  PokemonSprite(
+                    defaultUrl: pokemon.officialArtworkUrl ??
+                        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.id}.png',
+                    size: 80,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          pokemon.name.toCapitalCase(),
+                          style: textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '#${pokemon.displayId()}',
+                          style: textTheme.bodySmall
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: pokemon.types.values
+                              .map((t) => Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: TypeBadge(type: t),
+                                  ))
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          Text(
+            'Select a team slot',
+            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+
+          // 6-slot grid
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.4,
+            ),
+            itemCount: 6,
+            itemBuilder: (_, i) {
+              final slot = i + 1;
+              final isSelected = _selectedSlot == slot;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedSlot = slot),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: isSelected ? typeColor : colorScheme.outlineVariant,
+                      width: isSelected ? 2 : 1,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    color: isSelected
+                        ? typeColor.withValues(alpha: 0.1)
+                        : colorScheme.surfaceContainerHighest,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.catching_pokemon,
+                        size: 28,
+                        color: isSelected
+                            ? typeColor
+                            : colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Slot $slot',
+                        style: textTheme.labelSmall?.copyWith(
+                          color: isSelected
+                              ? typeColor
+                              : colorScheme.onSurfaceVariant,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 28),
+
+          FilledButton.icon(
+            onPressed: _selectedSlot == null
+                ? null
+                : () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Team Builder coming soon — ${pokemon.name.toCapitalCase()} queued for slot $_selectedSlot!',
+                        ),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+            icon: const Icon(Icons.add),
+            label: Text(
+              _selectedSlot == null
+                  ? 'Select a slot first'
+                  : 'Add to Slot $_selectedSlot',
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          Text(
+            'Full Team Builder with folder management and sync is coming in a future update.',
+            style: textTheme.bodySmall
+                ?.copyWith(color: colorScheme.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 }
+
