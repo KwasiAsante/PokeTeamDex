@@ -30,7 +30,6 @@ class ReferenceHubScreen extends StatelessWidget {
             title: 'Natures',
             subtitle: 'View stat modifiers for all 25 natures',
             onTap: () => context.go('/reference/natures'),
-            trailing: _ComingBadge(),
           ),
         ],
       ),
@@ -43,14 +42,12 @@ class _HubTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final Widget? trailing;
 
   const _HubTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.trailing,
   });
 
   @override
@@ -70,28 +67,10 @@ class _HubTile extends StatelessWidget {
                 .titleSmall
                 ?.copyWith(fontWeight: FontWeight.bold)),
         subtitle: Text(subtitle),
-        trailing: trailing ?? const Icon(Icons.chevron_right),
+        trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
       ),
     );
   }
 }
 
-class _ComingBadge extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        'Soon',
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSecondaryContainer,
-            ),
-      ),
-    );
-  }
-}
