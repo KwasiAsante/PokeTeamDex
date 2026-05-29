@@ -62,3 +62,11 @@ class SlotResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ── Sync ──────────────────────────────────────────────────────────────────────
+
+class SyncPullResponse(BaseModel):
+    folders: list[FolderResponse]
+    teams: list[TeamResponse]
+    slots: list[SlotResponse]

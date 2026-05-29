@@ -16,23 +16,18 @@ import 'package:poke_team_dex/features/settings/presentation/settings_screen.dar
 import 'package:poke_team_dex/features/settings/presentation/sync_monitor_screen.dart';
 import 'package:poke_team_dex/features/types/presentation/types_screen.dart';
 
-// Auth-gated routes — redirect to /login if not logged in.
-const _authedPaths = ['/teams'];
-
 GoRouter buildAppRouter(String? initialToken) {
   return GoRouter(
     initialLocation: '/pokedex',
     redirect: (context, state) {
-      // Redirect is driven by the token passed at build time; the router
-      // is rebuilt when auth state changes (see main.dart).
+      // Teams are local-first and always accessible without auth.
+      // Auth is only required to sync — the sync button handles that check.
+      // The only redirect we keep: don't send already-logged-in users back
+      // to the auth screens.
       final loggedIn = initialToken != null && initialToken.isNotEmpty;
       final goingToAuth = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register';
 
-      if (!loggedIn &&
-          _authedPaths.any((p) => state.matchedLocation.startsWith(p))) {
-        return '/login';
-      }
       if (loggedIn && goingToAuth) return '/pokedex';
       return null;
     },
