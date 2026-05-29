@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
+import 'package:poke_team_dex/services/connectivity/connectivity_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
@@ -20,6 +21,11 @@ class TeamsScreen extends ConsumerWidget {
     final pendingCount = ref.watch(pendingSyncCountProvider);
     final pending = pendingCount.when(data: (v) => v, loading: () => 0, error: (_, __) => 0);
     final isSyncing = syncState.status == SyncStatus.syncing;
+    final isOnline = ref.watch(isOnlineProvider).when(
+      data: (v) => v,
+      loading: () => true,
+      error: (_, __) => true,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -82,14 +88,31 @@ class TeamsScreen extends ConsumerWidget {
           const SettingsButton(),
         ],
       ),
-      body: allTeamsAsync.when(
-        loading: () => const LoadingState(),
-        error: (e, _) => ErrorState(error: e),
-        data: (_) => foldersAsync.when(
-          loading: () => const LoadingState(),
-          error: (e, _) => ErrorState(error: e),
-          data: (folders) => _TeamsList(folders: folders),
-        ),
+      body: Column(
+        children: [
+          if (!isOnline)
+            MaterialBanner(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              content: const Text(
+                'You are offline — changes will sync when reconnected',
+              ),
+              leading: const Icon(Icons.cloud_off_outlined),
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+              dividerColor: Colors.transparent,
+              actions: const [SizedBox.shrink()],
+            ),
+          Expanded(
+            child: allTeamsAsync.when(
+              loading: () => const LoadingState(),
+              error: (e, _) => ErrorState(error: e),
+              data: (_) => foldersAsync.when(
+                loading: () => const LoadingState(),
+                error: (e, _) => ErrorState(error: e),
+                data: (folders) => _TeamsList(folders: folders),
+              ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showTeamDialog(context, ref),
