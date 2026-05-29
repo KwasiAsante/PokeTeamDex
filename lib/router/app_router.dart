@@ -7,6 +7,7 @@ import 'package:poke_team_dex/features/pokedex/presentation/pokedex_screen.dart'
 import 'package:poke_team_dex/features/pokedex/presentation/pokemon_detail_screen.dart';
 import 'package:poke_team_dex/features/natures/presentation/natures_screen.dart';
 import 'package:poke_team_dex/features/reference/presentation/reference_hub_screen.dart';
+import 'package:poke_team_dex/features/teams/presentation/team_detail_screen.dart';
 import 'package:poke_team_dex/features/teams/presentation/teams_screen.dart';
 import 'package:poke_team_dex/features/types/presentation/types_screen.dart';
 
@@ -76,6 +77,14 @@ final appRouter = GoRouter(
             GoRoute(
               path: '/teams',
               builder: (context, state) => const TeamsScreen(),
+              routes: [
+                GoRoute(
+                  path: ':teamId',
+                  builder: (context, state) => TeamDetailScreen(
+                    teamId: int.parse(state.pathParameters['teamId']!),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
