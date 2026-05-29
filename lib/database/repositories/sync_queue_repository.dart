@@ -13,6 +13,11 @@ class SyncQueueRepository {
   Stream<int> watchPendingCount() =>
       _db.pendingSyncOps.count().watchSingle();
 
+  Stream<List<PendingSyncOp>> watchPending() =>
+      (_db.select(_db.pendingSyncOps)
+            ..orderBy([(o) => OrderingTerm.asc(o.createdAt)]))
+          .watch();
+
   Future<int> enqueue(PendingSyncOpsCompanion entry) =>
       _db.into(_db.pendingSyncOps).insert(entry);
 
