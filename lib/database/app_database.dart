@@ -26,6 +26,21 @@ class AppDatabase extends _$AppDatabase {
 
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
-    return driftDatabase(name: 'poketeamdex');
+    return driftDatabase(
+      name: 'poketeamdex',
+      web: DriftWebOptions(
+        sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+        driftWorker: Uri.parse('drift_worker.dart.js'),
+        onResult: (result) {
+          if (result.missingFeatures.isNotEmpty) {
+            // ignore: avoid_print
+            print(
+              'Drift web: using ${result.chosenImplementation} '
+              '(missing: ${result.missingFeatures})',
+            );
+          }
+        },
+      ),
+    );
   });
 }
