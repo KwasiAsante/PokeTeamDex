@@ -14,17 +14,16 @@ router = APIRouter(prefix="/teams", tags=["teams"])
 @router.get("", response_model=list[TeamResponse])
 async def list_teams(current_user: CurrentUser, db: DB) -> list[TeamResponse]:
     result = await db.execute(
-        select(Team)
-        .join(TeamFolder, Team.folder_id == TeamFolder.id)
-        .where(TeamFolder.user_id == current_user.id)
+        select(Team).where(Team.user_id == current_user.id)
     )
     return [TeamResponse.model_validate(t) for t in result.scalars()]
 
 
 @router.post("", response_model=TeamResponse, status_code=status.HTTP_201_CREATED)
 async def create_team(body: TeamCreate, current_user: CurrentUser, db: DB) -> TeamResponse:
-    await _get_owned_folder(body.folder_id, current_user.id, db)
-    team = Team(folder_id=body.folder_id, name=body.name)
+    if body.folder_id is not None:
+        await _get_owned_folder(body.folder_id, current_user.id, db)
+    team = Team(user_id=current_user.id, folder_id=body.folder_id, name=body.name)
     db.add(team)
     await db.commit()
     await db.refresh(team)
@@ -110,9 +109,7 @@ async def _get_owned_folder(folder_id: int, user_id: int, db: DB) -> TeamFolder:
 
 async def _get_owned_team(team_id: int, user_id: int, db: DB) -> Team:
     result = await db.execute(
-        select(Team)
-        .join(TeamFolder, Team.folder_id == TeamFolder.id)
-        .where(Team.id == team_id, TeamFolder.user_id == user_id)
+        select(Team).where(Team.id == team_id, Team.user_id == user_id)
     )
     team = result.scalar_one_or_none()
     if team is None:

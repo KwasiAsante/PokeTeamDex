@@ -26,7 +26,7 @@ class FolderResponse(BaseModel):
 
 class TeamCreate(BaseModel):
     name: str
-    folder_id: int
+    folder_id: int | None = None
 
 
 class TeamUpdate(BaseModel):
@@ -35,7 +35,8 @@ class TeamUpdate(BaseModel):
 
 class TeamResponse(BaseModel):
     id: int
-    folder_id: int
+    user_id: int
+    folder_id: int | None
     name: str
     created_at: datetime
     updated_at: datetime

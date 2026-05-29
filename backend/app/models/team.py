@@ -29,8 +29,9 @@ class Team(Base):
     __tablename__ = "teams"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    folder_id: Mapped[int] = mapped_column(
-        ForeignKey("team_folders.id", ondelete="CASCADE"), index=True
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    folder_id: Mapped[int | None] = mapped_column(
+        ForeignKey("team_folders.id", ondelete="SET NULL"), index=True, nullable=True
     )
     name: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(
@@ -40,7 +41,7 @@ class Team(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    folder: Mapped[TeamFolder] = relationship("TeamFolder", back_populates="teams")
+    folder: Mapped[TeamFolder | None] = relationship("TeamFolder", back_populates="teams")
     slots: Mapped[list["TeamSlot"]] = relationship(
         "TeamSlot", back_populates="team", cascade="all, delete-orphan"
     )
