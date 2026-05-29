@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 
-final itemsListProvider = FutureProvider.autoDispose<List<String>>((ref) async {
+final itemsListProvider = FutureProvider<List<String>>((ref) async {
   final repo = ref.read(pokeApiRepositoryProvider);
   return repo.fetchItemList();
 });

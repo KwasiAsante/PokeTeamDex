@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 
-final abilitiesListProvider = FutureProvider.autoDispose<List<String>>((ref) async {
+final abilitiesListProvider = FutureProvider<List<String>>((ref) async {
   final repo = ref.read(pokeApiRepositoryProvider);
   return repo.fetchAbilityList();
 });
