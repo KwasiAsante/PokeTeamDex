@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
+import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
@@ -33,7 +35,23 @@ class _SyncMonitorScreenState extends ConsumerState<SyncMonitorScreen> {
     super.dispose();
   }
 
-  void _syncNow() => ref.read(syncServiceProvider).run();
+  void _syncNow() {
+    final token = ref.read(authTokenProvider);
+    final loggedIn = token != null && token.isNotEmpty;
+    if (!loggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Sign in to sync your teams to the cloud.'),
+          action: SnackBarAction(
+            label: 'Sign In',
+            onPressed: () => context.push('/login'),
+          ),
+        ),
+      );
+      return;
+    }
+    ref.read(syncServiceProvider).run();
+  }
 
   void _refreshHealth() {
     ref.invalidate(backendHealthProvider);

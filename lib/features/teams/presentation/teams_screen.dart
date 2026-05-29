@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
+import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
@@ -43,7 +44,24 @@ class TeamsScreen extends ConsumerWidget {
                 tooltip: 'Sync now',
                 onPressed: isSyncing
                     ? null
-                    : () => ref.read(syncServiceProvider).run(),
+                    : () {
+                        final token = ref.read(authTokenProvider);
+                        final loggedIn = token != null && token.isNotEmpty;
+                        if (!loggedIn) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                  'Sign in to sync your teams.'),
+                              action: SnackBarAction(
+                                label: 'Sign In',
+                                onPressed: () => context.push('/login'),
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        ref.read(syncServiceProvider).run();
+                      },
               ),
               if (pending > 0 && !isSyncing)
                 Positioned(

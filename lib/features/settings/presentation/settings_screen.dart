@@ -163,6 +163,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
+void _syncNow(BuildContext context, WidgetRef ref) {
+  final token = ref.read(authTokenProvider);
+  final loggedIn = token != null && token.isNotEmpty;
+  if (!loggedIn) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Sign in to sync your teams to the cloud.'),
+        action: SnackBarAction(
+          label: 'Sign In',
+          onPressed: () => context.push('/login'),
+        ),
+      ),
+    );
+    return;
+  }
+  ref.read(syncServiceProvider).run();
+}
+
 class _SyncStatusTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -203,7 +221,7 @@ class _SyncStatusTile extends ConsumerWidget {
             tooltip: 'Sync now',
             onPressed: syncState.status == SyncStatus.syncing
                 ? null
-                : () => ref.read(syncServiceProvider).run(),
+                : () => _syncNow(context, ref),
           ),
           IconButton(
             icon: const Icon(Icons.open_in_new),
