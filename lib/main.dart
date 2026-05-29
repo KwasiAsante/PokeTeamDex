@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/router/app_router.dart';
-import 'package:poke_team_dex/services/sync/sync_service.dart';
+import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/shared/theme/app_theme.dart';
 import 'package:workmanager/workmanager.dart';
 

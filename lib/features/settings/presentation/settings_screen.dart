@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/database/repositories/app_config_repository.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
+import 'package:poke_team_dex/services/sync/sync_providers.dart';
+import 'package:poke_team_dex/services/sync/sync_status.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -114,6 +116,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const Divider(),
           const SizedBox(height: 16),
 
+          // ── Sync ───────────────────────────────────────────────────────────
+          _SectionHeader('Sync'),
+          const SizedBox(height: 8),
+          _SyncStatusTile(),
+          const SizedBox(height: 32),
+          const Divider(),
+          const SizedBox(height: 16),
+
           // ── Account ────────────────────────────────────────────────────────
           _SectionHeader('Account'),
           const SizedBox(height: 8),
@@ -147,6 +157,59 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               label: const Text('Sign In'),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SyncStatusTile extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final syncState = ref.watch(syncStateProvider);
+    final pendingCount = ref.watch(pendingSyncCountProvider);
+
+    final (icon, color, label) = switch (syncState.status) {
+      SyncStatus.idle => (Icons.cloud_outlined, Colors.grey, 'Idle'),
+      SyncStatus.syncing => (Icons.sync, Colors.blue, 'Syncing…'),
+      SyncStatus.success => (Icons.cloud_done_outlined, Colors.green, 'Up to date'),
+      SyncStatus.error => (Icons.cloud_off_outlined, Colors.red, 'Error'),
+    };
+
+    final pending = pendingCount.when(
+      data: (v) => v,
+      loading: () => 0,
+      error: (_, __) => 0,
+    );
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: syncState.status == SyncStatus.syncing
+          ? SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2, color: color),
+            )
+          : Icon(icon, color: color),
+      title: Text(label),
+      subtitle: pending > 0
+          ? Text('$pending operation${pending == 1 ? '' : 's'} pending')
+          : null,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.sync),
+            tooltip: 'Sync now',
+            onPressed: syncState.status == SyncStatus.syncing
+                ? null
+                : () => ref.read(syncServiceProvider).run(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.open_in_new),
+            tooltip: 'Sync monitor',
+            onPressed: () => context.push('/sync-monitor'),
+          ),
         ],
       ),
     );

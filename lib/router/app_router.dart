@@ -13,6 +13,7 @@ import 'package:poke_team_dex/features/teams/presentation/slot_picker_screen.dar
 import 'package:poke_team_dex/features/teams/presentation/team_detail_screen.dart';
 import 'package:poke_team_dex/features/teams/presentation/teams_screen.dart';
 import 'package:poke_team_dex/features/settings/presentation/settings_screen.dart';
+import 'package:poke_team_dex/features/settings/presentation/sync_monitor_screen.dart';
 import 'package:poke_team_dex/features/types/presentation/types_screen.dart';
 
 // Auth-gated routes — redirect to /login if not logged in.
@@ -40,6 +41,7 @@ GoRouter buildAppRouter(String? initialToken) {
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
       GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+      GoRoute(path: '/sync-monitor', builder: (_, __) => const SyncMonitorScreen()),
 
       // ── Main shell ─────────────────────────────────────────────────────────
       StatefulShellRoute.indexedStack(
