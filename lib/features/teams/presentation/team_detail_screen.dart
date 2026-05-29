@@ -53,7 +53,11 @@ class TeamDetailScreen extends ConsumerWidget {
           return const Scaffold(body: LoadingState());
         }
 
-        final slots = slotsAsync.valueOrNull ?? [];
+        final slots = slotsAsync.when(
+          data: (s) => s,
+          loading: () => <TeamSlot>[],
+          error: (_, __) => <TeamSlot>[],
+        );
 
         return Scaffold(
           appBar: AppBar(
