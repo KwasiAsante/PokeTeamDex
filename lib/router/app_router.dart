@@ -7,6 +7,7 @@ import 'package:poke_team_dex/features/pokedex/presentation/pokedex_screen.dart'
 import 'package:poke_team_dex/features/pokedex/presentation/pokemon_detail_screen.dart';
 import 'package:poke_team_dex/features/natures/presentation/natures_screen.dart';
 import 'package:poke_team_dex/features/reference/presentation/reference_hub_screen.dart';
+import 'package:poke_team_dex/features/teams/presentation/teams_screen.dart';
 import 'package:poke_team_dex/features/types/presentation/types_screen.dart';
 
 final appRouter = GoRouter(
@@ -74,7 +75,7 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/teams',
-              builder: (context, state) => const TeamsPlaceholderScreen(),
+              builder: (context, state) => const TeamsScreen(),
             ),
           ],
         ),
@@ -82,14 +83,6 @@ final appRouter = GoRouter(
     ),
   ],
 );
-
-class TeamsPlaceholderScreen extends StatelessWidget {
-  const TeamsPlaceholderScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Placeholder();
-  }
-}
 
 class ScaffoldWithNavBar extends StatelessWidget {
   const ScaffoldWithNavBar({super.key, required this.navigationShell});
