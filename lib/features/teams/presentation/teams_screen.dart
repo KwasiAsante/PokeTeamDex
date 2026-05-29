@@ -22,6 +22,11 @@ class TeamsScreen extends ConsumerWidget {
             tooltip: 'New folder',
             onPressed: () => _showFolderDialog(context, ref),
           ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: () => context.push('/settings'),
+          ),
         ],
       ),
       body: allTeamsAsync.when(
