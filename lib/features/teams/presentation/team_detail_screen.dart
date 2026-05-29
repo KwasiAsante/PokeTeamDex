@@ -1,12 +1,15 @@
 import 'package:change_case/change_case.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
+import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
+import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
@@ -50,6 +53,12 @@ class TeamDetailScreen extends ConsumerWidget {
           return const Scaffold(body: LoadingState());
         }
 
+        final slots = slotsAsync.when(
+          data: (s) => s,
+          loading: () => <TeamSlot>[],
+          error: (_, __) => <TeamSlot>[],
+        );
+
         return Scaffold(
           appBar: AppBar(
             title: Text(team.name),
@@ -59,6 +68,12 @@ class TeamDetailScreen extends ConsumerWidget {
                 tooltip: 'Rename',
                 onPressed: () => _renameTeam(context, ref, team),
               ),
+              if (slots.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.upload_outlined),
+                  tooltip: 'Export to Showdown',
+                  onPressed: () => _exportShowdown(context, ref, slots),
+                ),
               IconButton(
                 icon: const Icon(Icons.delete_outline),
                 tooltip: 'Delete team',
@@ -75,6 +90,26 @@ class TeamDetailScreen extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<void> _exportShowdown(
+      BuildContext context, WidgetRef ref, List<TeamSlot> slots) async {
+    final pokeApi = ref.read(pokeApiRepositoryProvider);
+    try {
+      final text = await buildShowdownExport(slots, pokeApi);
+      await Clipboard.setData(ClipboardData(text: text));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Showdown export copied to clipboard')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Export failed — try again')),
+        );
+      }
+    }
   }
 
   Future<void> _renameTeam(
