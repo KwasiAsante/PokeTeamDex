@@ -30,7 +30,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       await login(ref, _emailController.text.trim(), _passwordController.text);
-      if (mounted) context.go('/pokedex');
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        context.go('/pokedex');
+      }
     } on DioException catch (e) {
       final detail = (e.response?.data as Map?)?['detail'] ?? 'Login failed';
       setState(() => _error = detail.toString());
