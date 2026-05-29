@@ -48,13 +48,14 @@ class TeamsScreen extends ConsumerWidget {
                         final token = ref.read(authTokenProvider);
                         final loggedIn = token != null && token.isNotEmpty;
                         if (!loggedIn) {
+                          final router = GoRouter.of(context);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: const Text(
                                   'Sign in to sync your teams.'),
                               action: SnackBarAction(
                                 label: 'Sign In',
-                                onPressed: () => context.push('/login'),
+                                onPressed: () => router.push('/login'),
                               ),
                             ),
                           );

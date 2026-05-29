@@ -39,6 +39,8 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     syncQueue: ref.read(syncQueueRepositoryProvider),
     folderRepo: ref.read(teamFolderRepositoryProvider),
     teamRepo: ref.read(teamRepositoryProvider),
+    slotRepo: ref.read(teamSlotRepositoryProvider),
+    metaRepo: ref.read(metaRepositoryProvider),
     api: ref.read(teamSyncApiProvider),
     db: ref.read(appDatabaseProvider),
     notifier: ref.read(syncStateProvider.notifier),

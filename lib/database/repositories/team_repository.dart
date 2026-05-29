@@ -23,6 +23,10 @@ class TeamRepository {
   Future<Team> getById(int id) =>
       (_db.select(_db.teams)..where((t) => t.id.equals(id))).getSingle();
 
+  Future<Team?> getByRemoteId(String remoteId) =>
+      (_db.select(_db.teams)..where((t) => t.remoteId.equals(remoteId)))
+          .getSingleOrNull();
+
   Future<int> insert(TeamsCompanion entry) =>
       _db.into(_db.teams).insert(entry);
 

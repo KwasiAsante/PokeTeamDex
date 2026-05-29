@@ -31,7 +31,8 @@ GoRouter buildAppRouter(String? initialToken) {
 
       if (!loggedIn &&
           _authedPaths.any((p) => state.matchedLocation.startsWith(p))) {
-        return '/login';
+        final from = Uri.encodeComponent(state.matchedLocation);
+        return '/login?from=$from';
       }
       if (loggedIn && goingToAuth) return '/pokedex';
       return null;

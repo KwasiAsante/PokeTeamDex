@@ -13,6 +13,10 @@ class TeamFolderRepository {
   Future<TeamFolder> getById(int id) =>
       (_db.select(_db.teamFolders)..where((t) => t.id.equals(id))).getSingle();
 
+  Future<TeamFolder?> getByRemoteId(String remoteId) =>
+      (_db.select(_db.teamFolders)..where((t) => t.remoteId.equals(remoteId)))
+          .getSingleOrNull();
+
   Future<int> insert(TeamFoldersCompanion entry) =>
       _db.into(_db.teamFolders).insert(entry);
 

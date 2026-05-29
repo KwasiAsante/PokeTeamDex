@@ -11,6 +11,11 @@ class TeamSlotRepository {
             ..orderBy([(s) => OrderingTerm.asc(s.slot)]))
           .watch();
 
+  Future<TeamSlot?> getByTeamAndSlot(int teamId, int slot) =>
+      (_db.select(_db.teamSlots)
+            ..where((s) => s.teamId.equals(teamId) & s.slot.equals(slot)))
+          .getSingleOrNull();
+
   Future<List<TeamSlot>> getByTeam(int teamId) =>
       (_db.select(_db.teamSlots)
             ..where((s) => s.teamId.equals(teamId))
