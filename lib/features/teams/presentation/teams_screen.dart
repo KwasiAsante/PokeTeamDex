@@ -426,7 +426,13 @@ class _TeamTile extends ConsumerWidget {
           loading: () => <int>{},
           error: (_, __) => <int>{},
         );
-    final hasPending = pendingIds.contains(team.id);
+    final errorIds = ref.watch(errorTeamIdsProvider).when(
+          data: (ids) => ids,
+          loading: () => <int>{},
+          error: (_, __) => <int>{},
+        );
+    final hasError = errorIds.contains(team.id);
+    final hasPending = !hasError && pendingIds.contains(team.id);
 
     return ListTile(
       contentPadding:
@@ -439,7 +445,17 @@ class _TeamTile extends ConsumerWidget {
             child: Icon(Icons.catching_pokemon,
                 color: colorScheme.onPrimaryContainer, size: 20),
           ),
-          if (hasPending)
+          if (hasError)
+            Positioned(
+              top: -4,
+              right: -4,
+              child: Icon(
+                Icons.warning_rounded,
+                size: 16,
+                color: colorScheme.error,
+              ),
+            )
+          else if (hasPending)
             Positioned(
               top: -2,
               right: -2,
@@ -459,6 +475,15 @@ class _TeamTile extends ConsumerWidget {
         ],
       ),
       title: Text(team.name),
+      subtitle: hasError
+          ? Text(
+              'Sync issue — check sync monitor',
+              style: TextStyle(
+                color: colorScheme.error,
+                fontSize: 12,
+              ),
+            )
+          : null,
       trailing: PopupMenuButton<String>(
         onSelected: (v) => _onTeamAction(context, ref, v),
         itemBuilder: (_) => const [
