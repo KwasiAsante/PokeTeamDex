@@ -421,14 +421,42 @@ class _TeamTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final pendingIds = ref.watch(pendingTeamIdsProvider).when(
+          data: (ids) => ids,
+          loading: () => <int>{},
+          error: (_, __) => <int>{},
+        );
+    final hasPending = pendingIds.contains(team.id);
 
     return ListTile(
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-      leading: CircleAvatar(
-        backgroundColor: colorScheme.primaryContainer,
-        child: Icon(Icons.catching_pokemon,
-            color: colorScheme.onPrimaryContainer, size: 20),
+      leading: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          CircleAvatar(
+            backgroundColor: colorScheme.primaryContainer,
+            child: Icon(Icons.catching_pokemon,
+                color: colorScheme.onPrimaryContainer, size: 20),
+          ),
+          if (hasPending)
+            Positioned(
+              top: -2,
+              right: -2,
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: Colors.orange,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: colorScheme.surface,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       title: Text(team.name),
       trailing: PopupMenuButton<String>(
