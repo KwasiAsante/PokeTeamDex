@@ -12,6 +12,7 @@ import 'package:poke_team_dex/features/pokedex/models/pokedex_filter.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
 // Local search provider scoped to this screen (avoids polluting the Pokédex tab)
 final _pickerSearchProvider = StateProvider.autoDispose<String>((ref) => '');
@@ -80,6 +81,7 @@ class _SlotPickerScreenState extends ConsumerState<SlotPickerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Pick for Slot ${widget.slotNumber}'),
+        actions: [const SettingsButton()],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(108),
           child: Column(

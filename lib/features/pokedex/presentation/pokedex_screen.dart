@@ -5,6 +5,7 @@ import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.d
 import 'package:poke_team_dex/features/pokedex/presentation/widget/pokemon_list_tile.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
 class PokedexScreen extends ConsumerStatefulWidget {
   const PokedexScreen({super.key});
@@ -33,7 +34,7 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
     final listAsync = ref.watch(filteredPokemonListProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Pokédex')),
+      appBar: AppBar(title: const Text('Pokédex'), actions: [const SettingsButton()]),
       body: Column(
         children: [
           _SearchBar(controller: _searchController),

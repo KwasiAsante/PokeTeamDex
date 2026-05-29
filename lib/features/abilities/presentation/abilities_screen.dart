@@ -4,6 +4,7 @@ import 'package:poke_team_dex/features/abilities/providers/abilities_provider.da
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
 class AbilitiesScreen extends ConsumerStatefulWidget {
   const AbilitiesScreen({super.key});
@@ -28,6 +29,7 @@ class _AbilitiesScreenState extends ConsumerState<AbilitiesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Abilities'),
+        actions: [const SettingsButton()],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(64),
           child: Padding(
