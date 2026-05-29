@@ -421,7 +421,11 @@ class _TeamTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    final pendingIds = ref.watch(pendingTeamIdsProvider).valueOrNull ?? {};
+    final pendingIds = ref.watch(pendingTeamIdsProvider).when(
+          data: (ids) => ids,
+          loading: () => <int>{},
+          error: (_, __) => <int>{},
+        );
     final hasPending = pendingIds.contains(team.id);
 
     return ListTile(
