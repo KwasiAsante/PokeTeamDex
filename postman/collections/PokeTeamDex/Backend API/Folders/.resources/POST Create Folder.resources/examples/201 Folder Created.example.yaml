@@ -1,0 +1,19 @@
+$kind: http-example
+name: 201 Folder Created
+request:
+  url: '{{baseUrl}}/folders'
+  method: POST
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "id": 3,
+        "name": "My Folder",
+        "owner_id": 1
+      }

@@ -1,0 +1,28 @@
+$kind: http-example
+name: 200 Slots List
+request:
+  url: '{{baseUrl}}/teams/{{team_id}}/slots'
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      [
+        {
+          "slot_number": 1,
+          "pokemon_id": 25,
+          "nickname": "Pikachu",
+          "team_id": 1
+        },
+        {
+          "slot_number": 2,
+          "pokemon_id": 6,
+          "nickname": "Charizard",
+          "team_id": 1
+        }
+      ]

@@ -1,0 +1,7 @@
+$kind: http-request
+name: Get Current User
+method: GET
+url: '{{baseUrl}}/auth/me'
+order: 3000
+
+examples: './.resources/GET Get Current User.resources/examples'

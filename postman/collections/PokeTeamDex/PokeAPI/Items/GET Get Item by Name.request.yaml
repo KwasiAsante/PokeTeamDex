@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Item by Name
+method: GET
+url: '{{pokeApiBase}}/item/{{item_name}}'
+order: 2000
+pathVariables:
+  - key: item_name
+    value: potion

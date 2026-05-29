@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Pokemon Species
+method: GET
+url: '{{pokeApiBase}}/pokemon-species/{{pokemon_id}}'
+order: 1000
+pathVariables:
+  - key: pokemon_id
+    value: '25'

@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Pokemon by Name
+method: GET
+url: '{{pokeApiBase}}/pokemon/{{pokemon_name}}'
+order: 3000
+pathVariables:
+  - key: pokemon_name
+    value: pikachu

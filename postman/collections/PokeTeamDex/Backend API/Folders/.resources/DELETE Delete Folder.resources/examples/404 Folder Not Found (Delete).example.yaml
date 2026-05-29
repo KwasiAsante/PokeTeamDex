@@ -1,0 +1,17 @@
+$kind: http-example
+name: '404 Folder Not Found (Delete)'
+request:
+  url: '{{baseUrl}}/folders/{{folder_id}}'
+  method: DELETE
+response:
+  statusCode: 404
+  statusText: Not Found
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "detail": "Folder not found"
+      }

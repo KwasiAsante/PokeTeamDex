@@ -1,0 +1,7 @@
+$kind: http-request
+name: Delete Folder
+method: DELETE
+url: '{{baseUrl}}/folders/{{folder_id}}'
+order: 4000
+
+examples: './.resources/DELETE Delete Folder.resources/examples'

@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Evolution Chain
+method: GET
+url: '{{pokeApiBase}}/evolution-chain/{{chain_id}}'
+order: 2000
+pathVariables:
+  - key: chain_id
+    value: '1'

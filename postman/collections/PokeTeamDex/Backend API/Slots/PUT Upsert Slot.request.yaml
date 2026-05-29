@@ -1,0 +1,17 @@
+$kind: http-request
+name: Upsert Slot
+method: PUT
+url: '{{baseUrl}}/teams/{{team_id}}/slots/{{slot_number}}'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "pokemon_id": 25,
+      "nickname": "Pikachu"
+    }
+
+examples: './.resources/PUT Upsert Slot.resources/examples'

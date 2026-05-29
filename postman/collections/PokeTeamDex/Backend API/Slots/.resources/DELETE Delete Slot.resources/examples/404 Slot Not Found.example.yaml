@@ -1,0 +1,17 @@
+$kind: http-example
+name: 404 Slot Not Found
+request:
+  url: '{{baseUrl}}/teams/{{team_id}}/slots/{{slot_number}}'
+  method: DELETE
+response:
+  statusCode: 404
+  statusText: Not Found
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "detail": "Slot not found"
+      }

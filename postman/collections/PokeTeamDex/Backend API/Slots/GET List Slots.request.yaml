@@ -1,0 +1,7 @@
+$kind: http-request
+name: List Slots
+method: GET
+url: '{{baseUrl}}/teams/{{team_id}}/slots'
+order: 1000
+
+examples: './.resources/GET List Slots.resources/examples'

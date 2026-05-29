@@ -1,0 +1,20 @@
+$kind: http-example
+name: 200 Team Renamed
+request:
+  url: '{{baseUrl}}/teams/{{team_id}}'
+  method: PATCH
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "id": 1,
+        "name": "Renamed Team",
+        "folder_id": null,
+        "owner_id": 1
+      }

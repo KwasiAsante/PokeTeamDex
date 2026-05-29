@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Ability by Name
+method: GET
+url: '{{pokeApiBase}}/ability/{{ability_name}}'
+order: 2000
+pathVariables:
+  - key: ability_name
+    value: overgrow

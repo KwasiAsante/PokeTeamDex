@@ -1,0 +1,12 @@
+$kind: http-example
+name: 204 Team Deleted
+request:
+  url: '{{baseUrl}}/teams/{{team_id}}'
+  method: DELETE
+response:
+  statusCode: 204
+  statusText: No Content
+  headers: []
+  body:
+    type: text
+    content: ''

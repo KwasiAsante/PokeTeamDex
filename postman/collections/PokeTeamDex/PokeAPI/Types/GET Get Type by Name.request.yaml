@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Type by Name
+method: GET
+url: '{{pokeApiBase}}/type/{{type_name}}'
+order: 1000
+pathVariables:
+  - key: type_name
+    value: fire

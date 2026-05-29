@@ -1,0 +1,7 @@
+$kind: http-request
+name: Delete Team
+method: DELETE
+url: '{{baseUrl}}/teams/{{team_id}}'
+order: 4000
+
+examples: './.resources/DELETE Delete Team.resources/examples'

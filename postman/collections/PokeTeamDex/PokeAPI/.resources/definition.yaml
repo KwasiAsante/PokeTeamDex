@@ -1,0 +1,4 @@
+$kind: collection
+name: PokeAPI
+auth:
+  type: noauth

@@ -1,0 +1,12 @@
+$kind: http-example
+name: 204 Slot Deleted
+request:
+  url: '{{baseUrl}}/teams/{{team_id}}/slots/{{slot_number}}'
+  method: DELETE
+response:
+  statusCode: 204
+  statusText: No Content
+  headers: []
+  body:
+    type: text
+    content: ''

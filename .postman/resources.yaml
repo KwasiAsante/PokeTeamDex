@@ -1,0 +1,16 @@
+workspace:
+  id: 4c8bfd9f-71aa-4afa-ba61-48f498764c7a
+
+localResources:
+  collections:
+    - ../postman/collections/PokeTeamDex
+  docs:
+    - ..\docs\PokeTeamDex_PRD_learning.md
+    - ..\backend\SETUP.md
+
+# Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
+
+cloudResources:
+  collections:
+    ../postman/collections/PokeTeamDex: 7789685-13201b2d-0a0a-4202-9d0d-d0b930a84da2
+85-13201b2d-0a0a-4202-9d0d-d0b930a84da2

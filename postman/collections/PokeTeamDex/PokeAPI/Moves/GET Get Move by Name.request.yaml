@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Move by Name
+method: GET
+url: '{{pokeApiBase}}/move/{{move_name}}'
+order: 2000
+pathVariables:
+  - key: move_name
+    value: tackle

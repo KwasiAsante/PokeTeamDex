@@ -1,0 +1,19 @@
+$kind: http-example
+name: 200 Folder Renamed
+request:
+  url: '{{baseUrl}}/folders/{{folder_id}}'
+  method: PATCH
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "id": 1,
+        "name": "Renamed Folder",
+        "owner_id": 1
+      }

@@ -1,0 +1,17 @@
+$kind: http-example
+name: 409 Email Already Registered
+request:
+  url: '{{baseUrl}}/auth/register'
+  method: POST
+response:
+  statusCode: 409
+  statusText: Conflict
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "detail": "Email already registered"
+      }

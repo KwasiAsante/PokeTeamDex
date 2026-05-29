@@ -1,0 +1,28 @@
+$kind: http-example
+name: 200 Teams List
+request:
+  url: '{{baseUrl}}/teams'
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      [
+        {
+          "id": 1,
+          "name": "My First Team",
+          "folder_id": null,
+          "owner_id": 1
+        },
+        {
+          "id": 2,
+          "name": "Rain Team",
+          "folder_id": 1,
+          "owner_id": 1
+        }
+      ]

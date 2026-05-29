@@ -1,0 +1,12 @@
+$kind: http-example
+name: 204 Folder Deleted
+request:
+  url: '{{baseUrl}}/folders/{{folder_id}}'
+  method: DELETE
+response:
+  statusCode: 204
+  statusText: No Content
+  headers: []
+  body:
+    type: text
+    content: ''

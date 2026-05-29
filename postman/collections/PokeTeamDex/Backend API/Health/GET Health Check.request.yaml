@@ -1,0 +1,9 @@
+$kind: http-request
+name: Health Check
+method: GET
+url: '{{baseUrl}}/health'
+order: 1000
+auth:
+  type: noauth
+
+examples: './.resources/GET Health Check.resources/examples'

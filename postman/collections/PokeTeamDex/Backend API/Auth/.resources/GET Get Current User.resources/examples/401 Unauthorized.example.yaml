@@ -1,0 +1,17 @@
+$kind: http-example
+name: 401 Unauthorized
+request:
+  url: '{{baseUrl}}/auth/me'
+  method: GET
+response:
+  statusCode: 401
+  statusText: Unauthorized
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "detail": "Not authenticated"
+      }

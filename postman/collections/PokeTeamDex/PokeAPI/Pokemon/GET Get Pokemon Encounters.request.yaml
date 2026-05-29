@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Pokemon Encounters
+method: GET
+url: '{{pokeApiBase}}/pokemon/{{pokemon_id}}/encounters'
+order: 4000
+pathVariables:
+  - key: pokemon_id
+    value: '25'

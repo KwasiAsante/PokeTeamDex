@@ -1,0 +1,18 @@
+$kind: http-example
+name: 200 Login Success
+request:
+  url: '{{baseUrl}}/auth/login'
+  method: POST
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzE3MDAwMDAwfQ.abc123",
+        "token_type": "bearer"
+      }

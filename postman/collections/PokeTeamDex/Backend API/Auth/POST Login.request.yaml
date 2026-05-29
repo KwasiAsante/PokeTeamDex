@@ -1,0 +1,26 @@
+$kind: http-request
+name: Login
+method: POST
+url: '{{baseUrl}}/auth/login'
+order: 2000
+auth:
+  type: noauth
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "user@example.com",
+      "password": "password123"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      if (pm.response.code === 200) {
+        pm.collectionVariables.set('token', pm.response.json().access_token);
+      }
+
+examples: './.resources/POST Login.resources/examples'

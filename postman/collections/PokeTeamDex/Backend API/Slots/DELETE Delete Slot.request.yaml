@@ -1,0 +1,7 @@
+$kind: http-request
+name: Delete Slot
+method: DELETE
+url: '{{baseUrl}}/teams/{{team_id}}/slots/{{slot_number}}'
+order: 3000
+
+examples: './.resources/DELETE Delete Slot.resources/examples'

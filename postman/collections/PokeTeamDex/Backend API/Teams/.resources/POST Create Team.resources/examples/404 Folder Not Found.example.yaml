@@ -1,0 +1,17 @@
+$kind: http-example
+name: 404 Folder Not Found
+request:
+  url: '{{baseUrl}}/teams'
+  method: POST
+response:
+  statusCode: 404
+  statusText: Not Found
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "detail": "Folder not found"
+      }

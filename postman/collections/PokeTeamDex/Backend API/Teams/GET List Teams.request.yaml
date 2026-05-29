@@ -1,0 +1,7 @@
+$kind: http-request
+name: List Teams
+method: GET
+url: '{{baseUrl}}/teams'
+order: 1000
+
+examples: './.resources/GET List Teams.resources/examples'

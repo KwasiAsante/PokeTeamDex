@@ -1,0 +1,17 @@
+$kind: http-example
+name: '404 Team Not Found (Upsert)'
+request:
+  url: '{{baseUrl}}/teams/{{team_id}}/slots/{{slot_number}}'
+  method: PUT
+response:
+  statusCode: 404
+  statusText: Not Found
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "detail": "Team not found"
+      }

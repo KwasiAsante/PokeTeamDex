@@ -1,0 +1,17 @@
+$kind: http-request
+name: Create Team
+method: POST
+url: '{{baseUrl}}/teams'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "My Team",
+      "folder_id": null
+    }
+
+examples: './.resources/POST Create Team.resources/examples'

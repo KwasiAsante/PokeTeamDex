@@ -1,0 +1,10 @@
+$kind: http-request
+name: List Moves
+method: GET
+url: '{{pokeApiBase}}/move'
+order: 1000
+queryParams:
+  - key: limit
+    value: '20'
+  - key: offset
+    value: '0'

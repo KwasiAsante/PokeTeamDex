@@ -1,0 +1,16 @@
+$kind: http-request
+name: Create Folder
+method: POST
+url: '{{baseUrl}}/folders'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "My Folder"
+    }
+
+examples: './.resources/POST Create Folder.resources/examples'
