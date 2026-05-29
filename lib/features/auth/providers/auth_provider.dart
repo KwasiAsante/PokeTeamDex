@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:poke_team_dex/services/api/auth_api.dart';
+import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _tokenKey = 'auth_token';
@@ -41,6 +42,7 @@ Future<void> register(WidgetRef ref, String email, String password) async {
   final token = await api.register(email, password);
   await _saveToken(token);
   ref.read(authTokenProvider.notifier).state = token;
+  ref.read(syncServiceProvider).run();
 }
 
 Future<void> login(WidgetRef ref, String email, String password) async {
@@ -48,6 +50,7 @@ Future<void> login(WidgetRef ref, String email, String password) async {
   final token = await api.login(email, password);
   await _saveToken(token);
   ref.read(authTokenProvider.notifier).state = token;
+  ref.read(syncServiceProvider).run();
 }
 
 Future<void> logout(WidgetRef ref) async {
