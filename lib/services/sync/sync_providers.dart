@@ -81,6 +81,28 @@ final pendingTeamIdsProvider = StreamProvider<Set<int>>((ref) {
   });
 });
 
+// ── Team IDs with errored ops ─────────────────────────────────────────────────
+// Returns the set of local team IDs that have at least one op with >= 3
+// failed attempts (PRD threshold). These teams need user attention.
+
+const syncErrorAttemptThreshold = 3;
+
+final errorTeamIdsProvider = StreamProvider<Set<int>>((ref) {
+  return ref.watch(syncQueueRepositoryProvider).watchPending().map((ops) {
+    final ids = <int>{};
+    for (final op in ops.where((o) => o.attempts >= syncErrorAttemptThreshold)) {
+      if (op.entityType == 'team') {
+        ids.add(op.entityId);
+      } else if (op.entityType == 'team_slot') {
+        final payload = jsonDecode(op.payload) as Map<String, dynamic>;
+        final teamLocalId = payload['team_local_id'];
+        if (teamLocalId is int) ids.add(teamLocalId);
+      }
+    }
+    return ids;
+  });
+});
+
 // ── Backend health ────────────────────────────────────────────────────────────
 
 enum HealthStatus { checking, healthy, unreachable }
