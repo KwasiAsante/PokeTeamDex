@@ -3,7 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
+import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
+import 'package:poke_team_dex/services/sync/sync_providers.dart';
+import 'package:poke_team_dex/services/sync/sync_status.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
 class TeamsScreen extends ConsumerWidget {
   const TeamsScreen({super.key});
@@ -12,6 +16,10 @@ class TeamsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final foldersAsync = ref.watch(foldersProvider);
     final allTeamsAsync = ref.watch(allTeamsProvider);
+    final syncState = ref.watch(syncStateProvider);
+    final pendingCount = ref.watch(pendingSyncCountProvider);
+    final pending = pendingCount.when(data: (v) => v, loading: () => 0, error: (_, __) => 0);
+    final isSyncing = syncState.status == SyncStatus.syncing;
 
     return Scaffold(
       appBar: AppBar(
@@ -22,6 +30,55 @@ class TeamsScreen extends ConsumerWidget {
             tooltip: 'New folder',
             onPressed: () => _showFolderDialog(context, ref),
           ),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: isSyncing
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.sync),
+                tooltip: 'Sync now',
+                onPressed: isSyncing
+                    ? null
+                    : () {
+                        final token = ref.read(authTokenProvider);
+                        final loggedIn = token != null && token.isNotEmpty;
+                        if (!loggedIn) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                  'Sign in to sync your teams.'),
+                              action: SnackBarAction(
+                                label: 'Sign In',
+                                onPressed: () => context.push('/login'),
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        ref.read(syncServiceProvider).run();
+                      },
+              ),
+              if (pending > 0 && !isSyncing)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Colors.orange,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SettingsButton(),
         ],
       ),
       body: allTeamsAsync.when(

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
@@ -24,17 +26,29 @@ final teamsByFolderProvider =
 
 Future<void> createFolder(WidgetRef ref, String name) async {
   final repo = ref.read(teamFolderRepositoryProvider);
-  await repo.insert(
+  final syncQueue = ref.read(syncQueueRepositoryProvider);
+
+  final localId = await repo.insert(
     TeamFoldersCompanion(
       name: Value(name),
       createdAt: Value(DateTime.now()),
       updatedAt: Value(DateTime.now()),
     ),
   );
+
+  await syncQueue.enqueue(PendingSyncOpsCompanion(
+    operation: const Value('create'),
+    entityType: const Value('team_folder'),
+    entityId: Value(localId),
+    payload: Value(jsonEncode({'name': name})),
+    createdAt: Value(DateTime.now()),
+  ));
 }
 
 Future<void> renameFolder(WidgetRef ref, int id, String name) async {
   final repo = ref.read(teamFolderRepositoryProvider);
+  final syncQueue = ref.read(syncQueueRepositoryProvider);
+
   await repo.update(
     TeamFoldersCompanion(
       id: Value(id),
@@ -42,16 +56,38 @@ Future<void> renameFolder(WidgetRef ref, int id, String name) async {
       updatedAt: Value(DateTime.now()),
     ),
   );
+
+  await syncQueue.enqueue(PendingSyncOpsCompanion(
+    operation: const Value('update'),
+    entityType: const Value('team_folder'),
+    entityId: Value(id),
+    payload: Value(jsonEncode({'name': name})),
+    createdAt: Value(DateTime.now()),
+  ));
 }
 
 Future<void> deleteFolder(WidgetRef ref, int id) async {
   final repo = ref.read(teamFolderRepositoryProvider);
+  final syncQueue = ref.read(syncQueueRepositoryProvider);
+
+  // Capture remoteId before deleting locally
+  final folder = await repo.getById(id);
   await repo.delete(id);
+
+  await syncQueue.enqueue(PendingSyncOpsCompanion(
+    operation: const Value('delete'),
+    entityType: const Value('team_folder'),
+    entityId: Value(id),
+    payload: Value(jsonEncode({'remote_id': folder.remoteId})),
+    createdAt: Value(DateTime.now()),
+  ));
 }
 
 Future<int> createTeam(WidgetRef ref, String name, {int? folderId}) async {
   final repo = ref.read(teamRepositoryProvider);
-  return repo.insert(
+  final syncQueue = ref.read(syncQueueRepositoryProvider);
+
+  final localId = await repo.insert(
     TeamsCompanion(
       name: Value(name),
       folderId: Value(folderId),
@@ -59,10 +95,22 @@ Future<int> createTeam(WidgetRef ref, String name, {int? folderId}) async {
       updatedAt: Value(DateTime.now()),
     ),
   );
+
+  await syncQueue.enqueue(PendingSyncOpsCompanion(
+    operation: const Value('create'),
+    entityType: const Value('team'),
+    entityId: Value(localId),
+    payload: Value(jsonEncode({'name': name, 'folder_local_id': folderId})),
+    createdAt: Value(DateTime.now()),
+  ));
+
+  return localId;
 }
 
 Future<void> renameTeam(WidgetRef ref, int id, String name) async {
   final repo = ref.read(teamRepositoryProvider);
+  final syncQueue = ref.read(syncQueueRepositoryProvider);
+
   await repo.update(
     TeamsCompanion(
       id: Value(id),
@@ -70,9 +118,28 @@ Future<void> renameTeam(WidgetRef ref, int id, String name) async {
       updatedAt: Value(DateTime.now()),
     ),
   );
+
+  await syncQueue.enqueue(PendingSyncOpsCompanion(
+    operation: const Value('update'),
+    entityType: const Value('team'),
+    entityId: Value(id),
+    payload: Value(jsonEncode({'name': name})),
+    createdAt: Value(DateTime.now()),
+  ));
 }
 
 Future<void> deleteTeam(WidgetRef ref, int id) async {
   final repo = ref.read(teamRepositoryProvider);
+  final syncQueue = ref.read(syncQueueRepositoryProvider);
+
+  final team = await repo.getById(id);
   await repo.delete(id);
+
+  await syncQueue.enqueue(PendingSyncOpsCompanion(
+    operation: const Value('delete'),
+    entityType: const Value('team'),
+    entityId: Value(id),
+    payload: Value(jsonEncode({'remote_id': team.remoteId})),
+    createdAt: Value(DateTime.now()),
+  ));
 }

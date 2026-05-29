@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/features/types/providers/types_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/type_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
+import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
 class TypesScreen extends StatelessWidget {
   const TypesScreen({super.key});
@@ -10,7 +11,7 @@ class TypesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Types')),
+      appBar: AppBar(title: const Text('Types'), actions: [const SettingsButton()]),
       body: GridView.builder(
         padding: const EdgeInsets.all(12),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

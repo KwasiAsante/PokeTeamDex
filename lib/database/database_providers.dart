@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
+import 'package:poke_team_dex/database/repositories/app_config_repository.dart';
 import 'package:poke_team_dex/database/repositories/meta_repository.dart';
 import 'package:poke_team_dex/database/repositories/sync_queue_repository.dart';
 import 'package:poke_team_dex/database/repositories/team_folder_repository.dart';
@@ -30,4 +31,12 @@ final syncQueueRepositoryProvider = Provider<SyncQueueRepository>((ref) {
 
 final metaRepositoryProvider = Provider<MetaRepository>((ref) {
   return MetaRepository(ref.read(appDatabaseProvider));
+});
+
+final appConfigRepositoryProvider = Provider<AppConfigRepository>((ref) {
+  return AppConfigRepository(ref.read(appDatabaseProvider));
+});
+
+final apiBaseUrlProvider = StreamProvider<String>((ref) {
+  return ref.watch(appConfigRepositoryProvider).watchApiBaseUrl();
 });

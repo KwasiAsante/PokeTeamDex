@@ -5,6 +5,7 @@ import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
 class MovesScreen extends ConsumerStatefulWidget {
   const MovesScreen({super.key});
@@ -30,6 +31,7 @@ class _MovesScreenState extends ConsumerState<MovesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Moves'),
+        actions: [const SettingsButton()],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(108),
           child: Column(

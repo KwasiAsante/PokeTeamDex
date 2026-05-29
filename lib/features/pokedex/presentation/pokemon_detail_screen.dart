@@ -11,6 +11,7 @@ import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
+import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/stat_bar.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 
@@ -144,6 +145,7 @@ class _DetailSliverAppBar extends StatelessWidget {
           ),
           onPressed: onShinyToggle,
         ),
+        const SettingsButton(),
       ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(

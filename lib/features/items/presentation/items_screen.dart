@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/features/items/providers/items_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
 class ItemsScreen extends ConsumerStatefulWidget {
   const ItemsScreen({super.key});
@@ -28,6 +29,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Items'),
+        actions: [const SettingsButton()],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(64),
           child: Padding(
