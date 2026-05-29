@@ -69,4 +69,16 @@ class TeamSyncApi {
   Future<void> deleteSlot(String teamRemoteId, int slot) async {
     await _dio.delete('/teams/$teamRemoteId/slots/$slot');
   }
+
+  // ── Pull ─────────────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> pullSince(DateTime? since) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '/sync/pull',
+      queryParameters: since != null
+          ? {'since': since.toUtc().toIso8601String()}
+          : null,
+    );
+    return res.data!;
+  }
 }

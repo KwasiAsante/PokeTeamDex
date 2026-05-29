@@ -19,6 +19,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   String? _error;
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Clear any snackbar that was shown before navigating here (e.g. "sign in to sync")
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ScaffoldMessenger.of(context).clearSnackBars();
+    });
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
@@ -32,7 +41,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await login(ref, _emailController.text.trim(), _passwordController.text);
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
-        context.go('/pokedex');
+        final from = GoRouterState.of(context).uri.queryParameters['from'];
+        context.go(from != null && from.isNotEmpty ? from : '/pokedex');
       }
     } on DioException catch (e) {
       final detail = (e.response?.data as Map?)?['detail'] ?? 'Login failed';
