@@ -410,7 +410,7 @@ Teams, folders, and slot configurations are **always read from and written to th
 | `form_name`      | TEXT             | PokéAPI form name if alternate form                  |
 | `nickname`       | TEXT             | Max 12 chars                                         |
 | `level`          | SMALLINT         | 1–100                                                |
-| `gender`         | TEXT             | `'male'` | `'female'` | `'genderless'`               |
+| `gender`         | TEXT             | `'male'`, `'female'`, `'genderless'`                 |
 | `is_shiny`       | BOOLEAN          | Default false                                        |
 | `ability_name`   | TEXT             | PokéAPI ability name                                 |
 | `nature_name`    | TEXT             | PokéAPI nature name                                  |
@@ -442,8 +442,8 @@ Teams, folders, and slot configurations are **always read from and written to th
 | Column            | Type          | Notes                                    |
 | ----------------- | ------------- | ---------------------------------------- |
 | `id`              | INTEGER PK    | Auto-increment                           |
-| `op_type`         | TEXT NOT NULL | `'create'` | `'update'` | `'delete'`     |
-| `entity_type`     | TEXT NOT NULL | `'folder'` | `'team'` | `'slot'`         |
+| `op_type`         | TEXT NOT NULL | `'create'`, `'update'`, `'delete'`       |
+| `entity_type`     | TEXT NOT NULL | `'folder'`, `'team'`, `'slot'`           |
 | `entity_local_id` | TEXT NOT NULL | `local_id` of the affected record        |
 | `payload`         | TEXT (JSON)   | Full serialised entity at time of change |
 | `created_at`      | TIMESTAMPTZ   | When the local change was made           |
@@ -536,7 +536,7 @@ GET https://pokeapi.co/api/v2/pokemon?limit=10000&offset=0
 | Pokédex   | Pokémon List → Detail → (Move / Ability / Location overlays) |
 | Moves     | Move List → Move Detail                                      |
 | Items     | Item List → Item Detail                                      |
-| Reference | Types Chart | Natures Table | Abilities List | Locations     |
+| Reference | Types Chart, Natures Table, Abilities List, Locations        |
 | My Teams  | Team List (with folders) → Team Detail → Slot Config         |
 
 ### 11.2 Design Principles
