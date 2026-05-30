@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
+import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/connectivity/connectivity_provider.dart';
@@ -166,11 +167,25 @@ class TeamsScreen extends ConsumerWidget {
   }
 }
 
-// ── Teams list with folders ───────────────────────────────────────────────────
+// ── Teams list with folders (folder list is reorderable) ─────────────────────
 
 class _TeamsList extends ConsumerWidget {
   final List<TeamFolder> folders;
   const _TeamsList({required this.folders});
+
+  Future<void> _onReorderFolders(WidgetRef ref, int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex--;
+    final reordered = [...folders];
+    final moved = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, moved);
+
+    final repo = ref.read(teamFolderRepositoryProvider);
+    for (int i = 0; i < reordered.length; i++) {
+      if (reordered[i].sortOrder != i) {
+        await repo.updateSortOrder(reordered[i].id, i);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -180,8 +195,7 @@ class _TeamsList extends ConsumerWidget {
       loading: () => const LoadingState(),
       error: (e, _) => ErrorState(error: e),
       data: (allTeams) {
-        final ungrouped =
-            allTeams.where((t) => t.folderId == null).toList();
+        final ungrouped = allTeams.where((t) => t.folderId == null).toList();
 
         if (folders.isEmpty && ungrouped.isEmpty) {
           return const EmptyState(
@@ -192,34 +206,41 @@ class _TeamsList extends ConsumerWidget {
           );
         }
 
-        return ListView(
-          padding: const EdgeInsets.only(bottom: 88),
-          children: [
-            // Folders
-            for (final folder in folders) ...[
-              _FolderSection(folder: folder),
-            ],
+        return CustomScrollView(
+          slivers: [
+            // Reorderable folder list
+            if (folders.isNotEmpty)
+              SliverReorderableList(
+                itemCount: folders.length,
+                onReorder: (o, n) => _onReorderFolders(ref, o, n),
+                itemBuilder: (_, i) => _FolderSection(
+                  key: ValueKey(folders[i].id),
+                  folder: folders[i],
+                  index: i,
+                ),
+              ),
             // Ungrouped teams
             if (ungrouped.isNotEmpty) ...[
               if (folders.isNotEmpty)
-                Padding(
-                  padding:
-                      const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                  child: Text(
-                    'Ungrouped',
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelMedium
-                        ?.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
-                        ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                    child: Text(
+                      'Ungrouped',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
                   ),
                 ),
-              for (final team in ungrouped)
-                _TeamTile(team: team),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (_, i) => _TeamTile(team: ungrouped[i]),
+                  childCount: ungrouped.length,
+                ),
+              ),
             ],
+            const SliverToBoxAdapter(child: SizedBox(height: 88)),
           ],
         );
       },
@@ -231,7 +252,13 @@ class _TeamsList extends ConsumerWidget {
 
 class _FolderSection extends ConsumerStatefulWidget {
   final TeamFolder folder;
-  const _FolderSection({required this.folder});
+  final int index; // position in the reorderable folder list
+
+  const _FolderSection({
+    required super.key,
+    required this.folder,
+    required this.index,
+  });
 
   @override
   ConsumerState<_FolderSection> createState() => _FolderSectionState();
@@ -240,19 +267,35 @@ class _FolderSection extends ConsumerStatefulWidget {
 class _FolderSectionState extends ConsumerState<_FolderSection> {
   bool _expanded = true;
 
+  Future<void> _onReorderTeams(List<Team> teams, int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex--;
+    final reordered = [...teams];
+    final moved = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, moved);
+
+    final repo = ref.read(teamRepositoryProvider);
+    for (int i = 0; i < reordered.length; i++) {
+      if (reordered[i].sortOrder != i) {
+        await repo.updateSortOrder(reordered[i].id, i);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final teamsAsync =
-        ref.watch(teamsByFolderProvider(widget.folder.id));
+    final teamsAsync = ref.watch(teamsByFolderProvider(widget.folder.id));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ListTile(
-          leading: Icon(
-            _expanded ? Icons.folder_open : Icons.folder,
-            color: colorScheme.primary,
+          leading: ReorderableDragStartListener(
+            index: widget.index,
+            child: Icon(
+              _expanded ? Icons.folder_open : Icons.folder,
+              color: colorScheme.primary,
+            ),
           ),
           title: Text(
             widget.folder.name,
@@ -277,13 +320,8 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
                 ],
               ),
               IconButton(
-                icon: Icon(
-                  _expanded
-                      ? Icons.expand_less
-                      : Icons.expand_more,
-                ),
-                onPressed: () =>
-                    setState(() => _expanded = !_expanded),
+                icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+                onPressed: () => setState(() => _expanded = !_expanded),
               ),
             ],
           ),
@@ -298,24 +336,25 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
             error: (e, _) => Text('Error: $e'),
             data: (teams) => teams.isEmpty
                 ? Padding(
-                    padding:
-                        const EdgeInsets.fromLTRB(24, 0, 16, 8),
+                    padding: const EdgeInsets.fromLTRB(24, 0, 16, 8),
                     child: Text(
                       'No teams — tap + to add one.',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
                     ),
                   )
-                : Column(
-                    children: teams
-                        .map((t) => _TeamTile(team: t))
-                        .toList(),
+                : ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    onReorder: (o, n) => _onReorderTeams(teams, o, n),
+                    itemCount: teams.length,
+                    itemBuilder: (_, i) => _TeamTile(
+                      key: ValueKey(teams[i].id),
+                      team: teams[i],
+                      dragIndex: i,
+                    ),
                   ),
           ),
         const Divider(height: 1),
@@ -416,7 +455,10 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
 
 class _TeamTile extends ConsumerWidget {
   final Team team;
-  const _TeamTile({required this.team});
+  // Non-null when inside a reorderable folder section; used for the drag handle.
+  final int? dragIndex;
+
+  const _TeamTile({super.key, required this.team, this.dragIndex});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -484,11 +526,24 @@ class _TeamTile extends ConsumerWidget {
               ),
             )
           : null,
-      trailing: PopupMenuButton<String>(
-        onSelected: (v) => _onTeamAction(context, ref, v),
-        itemBuilder: (_) => const [
-          PopupMenuItem(value: 'rename', child: Text('Rename')),
-          PopupMenuItem(value: 'delete', child: Text('Delete')),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (dragIndex != null)
+            ReorderableDragStartListener(
+              index: dragIndex!,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Icon(Icons.drag_handle, size: 20),
+              ),
+            ),
+          PopupMenuButton<String>(
+            onSelected: (v) => _onTeamAction(context, ref, v),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'rename', child: Text('Rename')),
+              PopupMenuItem(value: 'delete', child: Text('Delete')),
+            ],
+          ),
         ],
       ),
       onTap: () => context.push('/teams/${team.id}'),
