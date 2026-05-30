@@ -1,3 +1,8 @@
+// Safe helpers — PS JSON can have unexpected types (e.g. accuracy: true,
+// type stored as nested object in some edge cases).
+String? _str(dynamic v) => v is String ? v : null;
+int? _int(dynamic v) => v is int ? v : null;
+
 /// A competitive or game-specific format that can be assigned to a team.
 class GameFormat {
   final String id;
@@ -280,16 +285,16 @@ class PsMoveEntry {
   factory PsMoveEntry.fromJson(String id, Map<String, dynamic> j) =>
       PsMoveEntry(
         id: id,
-        name: j['name'] as String? ?? id,
-        gen: j['gen'] as int? ?? 1,
-        type: j['type'] as String? ?? 'normal',
-        category: j['category'] as String? ?? 'Status',
-        basePower: j['base_power'] as int? ?? 0,
+        name: _str(j['name']) ?? id,
+        gen: _int(j['gen']) ?? 1,
+        type: (_str(j['type']) ?? 'normal').toLowerCase(),
+        category: _str(j['category']) ?? 'Status',
+        basePower: _int(j['base_power']) ?? 0,
         // PS stores accuracy as true (bool) for moves that always hit.
-        accuracy: j['accuracy'] is int ? j['accuracy'] as int : null,
-        pp: j['pp'] as int? ?? 0,
-        isZMove: j['is_z_move'] as bool? ?? false,
-        isMaxMove: j['is_max_move'] as bool? ?? false,
+        accuracy: _int(j['accuracy']),
+        pp: _int(j['pp']) ?? 0,
+        isZMove: j['is_z_move'] == true,
+        isMaxMove: j['is_max_move'] == true,
       );
 }
 
@@ -319,14 +324,14 @@ class PsItemEntry {
   factory PsItemEntry.fromJson(String id, Map<String, dynamic> j) =>
       PsItemEntry(
         id: id,
-        name: j['name'] as String? ?? id,
-        gen: j['gen'] as int? ?? 1,
-        isMegaStone: j['is_mega_stone'] as bool? ?? false,
-        megaSpecies: j['mega_species'] as String?,
-        isZCrystal: j['is_z_crystal'] as bool? ?? false,
-        isBerry: j['is_berry'] as bool? ?? false,
-        isPlate: j['is_plate'] as bool? ?? false,
-        isMemory: j['is_memory'] as bool? ?? false,
+        name: _str(j['name']) ?? id,
+        gen: _int(j['gen']) ?? 1,
+        isMegaStone: j['is_mega_stone'] == true,
+        megaSpecies: _str(j['mega_species']),
+        isZCrystal: j['is_z_crystal'] == true,
+        isBerry: j['is_berry'] == true,
+        isPlate: j['is_plate'] == true,
+        isMemory: j['is_memory'] == true,
       );
 }
 
@@ -344,7 +349,7 @@ class PsAbilityEntry {
   factory PsAbilityEntry.fromJson(String id, Map<String, dynamic> j) =>
       PsAbilityEntry(
         id: id,
-        name: j['name'] as String? ?? id,
-        gen: j['gen'] as int? ?? 3,
+        name: _str(j['name']) ?? id,
+        gen: _int(j['gen']) ?? 3,
       );
 }
