@@ -46,4 +46,11 @@ class TeamRepository {
   Future<int> updateSortOrder(int id, int sortOrder) =>
       (_db.update(_db.teams)..where((t) => t.id.equals(id)))
           .write(TeamsCompanion(sortOrder: Value(sortOrder)));
+
+  Future<int> updateFormatLabel(int id, String? formatLabel) =>
+      (_db.update(_db.teams)..where((t) => t.id.equals(id)))
+          .write(TeamsCompanion(
+            formatLabel: Value(formatLabel),
+            updatedAt: Value(DateTime.now()),
+          ));
 }

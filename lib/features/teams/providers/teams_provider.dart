@@ -121,13 +121,7 @@ Future<void> updateTeamFormat(WidgetRef ref, int id, String? formatLabel) async 
   final repo = ref.read(teamRepositoryProvider);
   final syncQueue = ref.read(syncQueueRepositoryProvider);
 
-  await repo.update(
-    TeamsCompanion(
-      id: Value(id),
-      formatLabel: Value(formatLabel),
-      updatedAt: Value(DateTime.now()),
-    ),
-  );
+  await repo.updateFormatLabel(id, formatLabel);
 
   await syncQueue.enqueue(PendingSyncOpsCompanion(
     operation: const Value('update'),
