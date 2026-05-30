@@ -78,7 +78,7 @@
   - [x] Friendship/happiness (0–255 slider)
 - [x] **Local DB slot config columns** — schema v3: all slot config fields + `is_deleted` + `sync_status` on all entity tables, `format_label` + `sort_order` on teams, `sort_order` on folders
 - [x] **Stat preview** — real-time Gen III+ calculator updating as EVs/IVs/nature/level change
-- [ ] **Drag-reorder** — slots within a team; teams within a folder (`ReorderableListView`)
+- [x] **Drag-reorder** — slots within a team; teams within a folder; folders (all `ReorderableListView` / `SliverReorderableList`)
 - [ ] **`format_label` UI** — game/format label field (e.g. "VGC 2025") exists in DB but not surfaced in team create/edit UI yet
 
 ---
@@ -112,7 +112,7 @@
 - [x] **EV/IV validation** — 0–252 per stat, 510 total cap with red highlight; save blocked when over limit
 - [x] **Shiny sprite** — shiny artwork shown when slot `is_shiny = true`
 - [x] Performance pass — list providers no longer `autoDispose`; survive tab navigation
-- [ ] **Drag-reorder** — reorder slots within team; reorder teams within folder
+- [x] **Drag-reorder** — reorder slots within team; reorder teams within folder; reorder folders
 - [ ] **Team list card sprites** — show row of 6 mini sprites (Poké Ball for empty slots) on team tile per PRD §6.1.2
 
 ---
