@@ -83,7 +83,12 @@ Future<void> deleteFolder(WidgetRef ref, int id) async {
   ));
 }
 
-Future<int> createTeam(WidgetRef ref, String name, {int? folderId}) async {
+Future<int> createTeam(
+  WidgetRef ref,
+  String name, {
+  int? folderId,
+  String? formatLabel,
+}) async {
   final repo = ref.read(teamRepositoryProvider);
   final syncQueue = ref.read(syncQueueRepositoryProvider);
 
@@ -91,6 +96,7 @@ Future<int> createTeam(WidgetRef ref, String name, {int? folderId}) async {
     TeamsCompanion(
       name: Value(name),
       folderId: Value(folderId),
+      formatLabel: Value(formatLabel),
       createdAt: Value(DateTime.now()),
       updatedAt: Value(DateTime.now()),
     ),
@@ -100,11 +106,36 @@ Future<int> createTeam(WidgetRef ref, String name, {int? folderId}) async {
     operation: const Value('create'),
     entityType: const Value('team'),
     entityId: Value(localId),
-    payload: Value(jsonEncode({'name': name, 'folder_local_id': folderId})),
+    payload: Value(jsonEncode({
+      'name': name,
+      'folder_local_id': folderId,
+      'format_label': formatLabel,
+    })),
     createdAt: Value(DateTime.now()),
   ));
 
   return localId;
+}
+
+Future<void> updateTeamFormat(WidgetRef ref, int id, String? formatLabel) async {
+  final repo = ref.read(teamRepositoryProvider);
+  final syncQueue = ref.read(syncQueueRepositoryProvider);
+
+  await repo.update(
+    TeamsCompanion(
+      id: Value(id),
+      formatLabel: Value(formatLabel),
+      updatedAt: Value(DateTime.now()),
+    ),
+  );
+
+  await syncQueue.enqueue(PendingSyncOpsCompanion(
+    operation: const Value('update'),
+    entityType: const Value('team'),
+    entityId: Value(id),
+    payload: Value(jsonEncode({'format_label': formatLabel})),
+    createdAt: Value(DateTime.now()),
+  ));
 }
 
 Future<void> renameTeam(WidgetRef ref, int id, String name) async {

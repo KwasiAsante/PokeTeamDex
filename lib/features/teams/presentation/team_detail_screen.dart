@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
 import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
@@ -94,12 +95,32 @@ class TeamDetailScreen extends ConsumerWidget {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(team.name),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(team.name),
+                if (team.formatLabel != null)
+                  Text(
+                    team.formatLabel!,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.7),
+                        ),
+                  ),
+              ],
+            ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.edit_outlined),
                 tooltip: 'Rename',
                 onPressed: () => _renameTeam(context, ref, team),
+              ),
+              IconButton(
+                icon: const Icon(Icons.tune_outlined),
+                tooltip: 'Change format',
+                onPressed: () => _editFormat(context, ref, team),
               ),
               if (slots.isNotEmpty)
                 IconButton(
@@ -143,6 +164,18 @@ class TeamDetailScreen extends ConsumerWidget {
         );
       }
     }
+  }
+
+  Future<void> _editFormat(
+      BuildContext context, WidgetRef ref, Team team) async {
+    final result = await showModalBottomSheet<dynamic>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FormatPickerSheet(current: team.formatLabel),
+    );
+    if (result == null) return; // dismissed
+    final newLabel = isFormatCleared(result) ? null : (result.name as String);
+    await updateTeamFormat(ref, team.id, newLabel);
   }
 
   Future<void> _renameTeam(
