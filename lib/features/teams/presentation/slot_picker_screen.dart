@@ -66,11 +66,62 @@ class SlotPickerScreen extends ConsumerStatefulWidget {
 
 class _SlotPickerScreenState extends ConsumerState<SlotPickerScreen> {
   final _searchController = SearchController();
+  bool _saving = false;
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  // All DB work happens here so navigation uses this State's stable context.
+  Future<void> _selectPokemon(PokemonListEntry entry) async {
+    if (_saving) return;
+    setState(() => _saving = true);
+
+    try {
+      final repo = ref.read(teamSlotRepositoryProvider);
+      final syncQueue = ref.read(syncQueueRepositoryProvider);
+
+      await repo.deleteSlot(widget.teamId, widget.slotNumber);
+
+      await repo.insert(
+        TeamSlotsCompanion(
+          teamId: Value(widget.teamId),
+          slot: Value(widget.slotNumber),
+          pokemonId: Value(entry.id),
+          createdAt: Value(DateTime.now()),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+
+      await syncQueue.enqueue(PendingSyncOpsCompanion(
+        operation: const Value('upsert'),
+        entityType: const Value('team_slot'),
+        entityId: Value(widget.teamId),
+        payload: Value(jsonEncode({
+          'team_local_id': widget.teamId,
+          'slot': widget.slotNumber,
+          'pokemon_id': entry.id,
+        })),
+        createdAt: Value(DateTime.now()),
+      ));
+
+      // Replace the Slot Picker with Slot Config in the branch stack so that
+      // back from Slot Config returns to Team Detail, not the picker.
+      if (mounted) {
+        context.replace(
+          '/teams/${widget.teamId}/config/${widget.slotNumber}',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add Pokémon: $e')),
+        );
+        setState(() => _saving = false);
+      }
+    }
   }
 
   @override
@@ -111,28 +162,29 @@ class _SlotPickerScreenState extends ConsumerState<SlotPickerScreen> {
           ),
         ),
       ),
-      body: filteredAsync.when(
-        loading: () => const LoadingState(),
-        error: (e, _) => ErrorState(error: e),
-        data: (entries) {
-          if (entries.isEmpty) {
-            return const EmptyState(
-              icon: Icons.search_off,
-              title: 'No Pokémon found',
-              subtitle: 'Try adjusting your search or filter.',
-            );
-          }
-          return ListView.builder(
-            itemCount: entries.length,
-            itemExtent: 64,
-            itemBuilder: (_, i) => _PickerTile(
-              entry: entries[i],
-              teamId: widget.teamId,
-              slotNumber: widget.slotNumber,
+      body: _saving
+          ? const Center(child: CircularProgressIndicator())
+          : filteredAsync.when(
+              loading: () => const LoadingState(),
+              error: (e, _) => ErrorState(error: e),
+              data: (entries) {
+                if (entries.isEmpty) {
+                  return const EmptyState(
+                    icon: Icons.search_off,
+                    title: 'No Pokémon found',
+                    subtitle: 'Try adjusting your search or filter.',
+                  );
+                }
+                return ListView.builder(
+                  itemCount: entries.length,
+                  itemExtent: 64,
+                  itemBuilder: (_, i) => _PickerTile(
+                    entry: entries[i],
+                    onTap: () => _selectPokemon(entries[i]),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 }
@@ -177,19 +229,14 @@ class _GenFilterBar extends ConsumerWidget {
 
 // ── Picker tile ───────────────────────────────────────────────────────────────
 
-class _PickerTile extends ConsumerWidget {
+class _PickerTile extends StatelessWidget {
   final PokemonListEntry entry;
-  final int teamId;
-  final int slotNumber;
+  final VoidCallback onTap;
 
-  const _PickerTile({
-    required this.entry,
-    required this.teamId,
-    required this.slotNumber,
-  });
+  const _PickerTile({required this.entry, required this.onTap});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -208,41 +255,7 @@ class _PickerTile extends ConsumerWidget {
         style: textTheme.bodySmall
             ?.copyWith(color: colorScheme.onSurfaceVariant),
       ),
-      onTap: () => _addToSlot(context, ref),
+      onTap: onTap,
     );
-  }
-
-  Future<void> _addToSlot(BuildContext context, WidgetRef ref) async {
-    final repo = ref.read(teamSlotRepositoryProvider);
-    final syncQueue = ref.read(syncQueueRepositoryProvider);
-
-    // Remove any existing Pokémon in this slot first
-    await repo.deleteSlot(teamId, slotNumber);
-
-    // Insert the new slot
-    await repo.insert(
-      TeamSlotsCompanion(
-        teamId: Value(teamId),
-        slot: Value(slotNumber),
-        pokemonId: Value(entry.id),
-        createdAt: Value(DateTime.now()),
-        updatedAt: Value(DateTime.now()),
-      ),
-    );
-
-    await syncQueue.enqueue(PendingSyncOpsCompanion(
-      operation: const Value('upsert'),
-      entityType: const Value('team_slot'),
-      entityId: Value(teamId),
-      payload: Value(jsonEncode({
-        'team_local_id': teamId,
-        'slot': slotNumber,
-        'pokemon_id': entry.id,
-        'nickname': null,
-      })),
-      createdAt: Value(DateTime.now()),
-    ));
-
-    if (context.mounted) context.pop();
   }
 }

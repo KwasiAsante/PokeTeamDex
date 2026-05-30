@@ -1,5 +1,5 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:change_case/change_case.dart';
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +9,7 @@ import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
 import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
+import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
@@ -16,7 +17,7 @@ import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 
-// ── Provider for a single team's slots ───────────────────────────────────────
+// ── Providers ─────────────────────────────────────────────────────────────────
 
 final teamSlotsProvider =
     StreamProvider.autoDispose.family<List<TeamSlot>, int>((ref, teamId) {
@@ -29,6 +30,43 @@ final teamByIdProvider =
   return (db.select(db.teams)..where((t) => t.id.equals(teamId)))
       .watchSingleOrNull();
 });
+
+final _slotItemDetailProvider =
+    FutureProvider.autoDispose.family<ItemEntry, String>((ref, name) =>
+        ref.read(pokeApiRepositoryProvider).fetchItem(name));
+
+// ── Stat calculator (Gen III+ formula) ───────────────────────────────────────
+
+const _kNatureModifiers = <String, (String?, String?)>{
+  'hardy': (null, null), 'docile': (null, null), 'serious': (null, null),
+  'bashful': (null, null), 'quirky': (null, null),
+  'lonely': ('attack', 'defense'), 'brave': ('attack', 'speed'),
+  'adamant': ('attack', 'special-attack'), 'naughty': ('attack', 'special-defense'),
+  'bold': ('defense', 'attack'), 'relaxed': ('defense', 'speed'),
+  'impish': ('defense', 'special-attack'), 'lax': ('defense', 'special-defense'),
+  'timid': ('speed', 'attack'), 'hasty': ('speed', 'defense'),
+  'jolly': ('speed', 'special-attack'), 'naive': ('speed', 'special-defense'),
+  'modest': ('special-attack', 'attack'), 'mild': ('special-attack', 'defense'),
+  'quiet': ('special-attack', 'speed'), 'rash': ('special-attack', 'special-defense'),
+  'calm': ('special-defense', 'attack'), 'gentle': ('special-defense', 'defense'),
+  'sassy': ('special-defense', 'speed'), 'careful': ('special-defense', 'special-attack'),
+};
+
+int _calcHP(int base, int iv, int ev, int level) =>
+    ((2 * base + iv + ev ~/ 4) * level) ~/ 100 + level + 10;
+
+int _calcStat(int base, int iv, int ev, int level, double mod) {
+  return (((2 * base + iv + ev ~/ 4) * level) ~/ 100 + 5) * mod ~/ 1;
+}
+
+double _natureMod(String? nature, String key) {
+  if (nature == null) return 1.0;
+  final m = _kNatureModifiers[nature.toLowerCase()];
+  if (m == null) return 1.0;
+  if (m.$1 == key) return 1.1;
+  if (m.$2 == key) return 0.9;
+  return 1.0;
+}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -46,18 +84,13 @@ class TeamDetailScreen extends ConsumerWidget {
       error: (e, _) => Scaffold(appBar: AppBar(), body: ErrorState(error: e)),
       data: (team) {
         if (team == null) {
-          // Team was deleted — pop back
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (context.canPop()) context.pop();
           });
           return const Scaffold(body: LoadingState());
         }
 
-        final slots = slotsAsync.when(
-          data: (s) => s,
-          loading: () => <TeamSlot>[],
-          error: (_, __) => <TeamSlot>[],
-        );
+        final slots = slotsAsync.asData?.value ?? [];
 
         return Scaffold(
           appBar: AppBar(
@@ -85,7 +118,7 @@ class TeamDetailScreen extends ConsumerWidget {
           body: slotsAsync.when(
             loading: () => const LoadingState(),
             error: (e, _) => ErrorState(error: e),
-            data: (slots) => _SlotGrid(teamId: teamId, slots: slots),
+            data: (slots) => _SlotList(teamId: teamId, slots: slots),
           ),
         );
       },
@@ -127,17 +160,14 @@ class TeamDetailScreen extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel')),
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, controller.text),
               child: const Text('Save')),
         ],
       ),
     );
-    if (name != null && name.isNotEmpty) {
-      await renameTeam(ref, team.id, name);
-    }
+    if (name != null && name.isNotEmpty) await renameTeam(ref, team.id, name);
   }
 
   Future<void> _deleteTeam(
@@ -164,33 +194,30 @@ class TeamDetailScreen extends ConsumerWidget {
   }
 }
 
-// ── 6-slot grid ───────────────────────────────────────────────────────────────
+// ── Slot list ─────────────────────────────────────────────────────────────────
 
-class _SlotGrid extends StatelessWidget {
+class _SlotList extends StatelessWidget {
   final int teamId;
   final List<TeamSlot> slots;
 
-  const _SlotGrid({required this.teamId, required this.slots});
+  const _SlotList({required this.teamId, required this.slots});
 
   @override
   Widget build(BuildContext context) {
     final slotMap = {for (final s in slots) s.slot: s};
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 1.1,
-      ),
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       itemCount: 6,
       itemBuilder: (_, i) {
         final slotNumber = i + 1;
         final slot = slotMap[slotNumber];
-        return slot != null
-            ? _FilledSlotCard(slot: slot, teamId: teamId)
-            : _EmptySlotCard(teamId: teamId, slotNumber: slotNumber);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: slot != null
+              ? _FilledSlotCard(slot: slot, teamId: teamId)
+              : _EmptySlotCard(teamId: teamId, slotNumber: slotNumber),
+        );
       },
     );
   }
@@ -204,93 +231,271 @@ class _FilledSlotCard extends ConsumerWidget {
 
   const _FilledSlotCard({required this.slot, required this.teamId});
 
+  static const _statLabels = ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe'];
+  static const _statKeys = [
+    'hp', 'attack', 'defense', 'special-attack', 'special-defense', 'speed',
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pokemonAsync = ref.watch(pokemonDetailProvider(slot.pokemonId));
+    final itemAsync = slot.heldItemName != null
+        ? ref.watch(_slotItemDetailProvider(slot.heldItemName!))
+        : null;
+
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return pokemonAsync.when(
       loading: () => Card(
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 8),
-              Text('Slot ${slot.slot}', style: textTheme.labelSmall),
-            ],
-          ),
+        child: SizedBox(
+          height: 120,
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
         ),
       ),
-      error: (e, _) => Card(
-        child: Center(
-          child: Text('Error', style: textTheme.bodySmall),
-        ),
-      ),
+      error: (e, _) =>
+          Card(child: Center(child: Text('Error', style: textTheme.bodySmall))),
       data: (pokemon) {
-        final primaryType = pokemon.types[1] ?? pokemon.types.values.first;
+        final speciesName = pokemon.name.toCapitalCase();
+        final nickname = slot.nickname?.trim();
+        final hasNickname =
+            nickname != null && nickname.isNotEmpty && nickname != speciesName;
+        final displayName = hasNickname ? nickname : speciesName;
+
+        final primaryType =
+            pokemon.types[1] ?? pokemon.types.values.firstOrNull ?? 'normal';
         final typeColor =
             PokemonTypeColors.colors[primaryType] ?? colorScheme.primary;
+
+        // Base stats map
+        final baseStats = <String, int>{
+          for (final s in pokemon.stats)
+            s['stat']['name'] as String: s['base_stat'] as int,
+        };
+
+        // Calculate final stats
+        final level = slot.level ?? 50;
+        final evs = [
+          slot.evHp ?? 0, slot.evAtk ?? 0, slot.evDef ?? 0,
+          slot.evSpa ?? 0, slot.evSpd ?? 0, slot.evSpe ?? 0,
+        ];
+        final ivs = [
+          slot.ivHp ?? 31, slot.ivAtk ?? 31, slot.ivDef ?? 31,
+          slot.ivSpa ?? 31, slot.ivSpd ?? 31, slot.ivSpe ?? 31,
+        ];
+        final calcStats = <int>[
+          for (int i = 0; i < _statKeys.length; i++)
+            _statKeys[i] == 'hp'
+                ? _calcHP(baseStats['hp'] ?? 45, ivs[0], evs[0], level)
+                : _calcStat(
+                    baseStats[_statKeys[i]] ?? 50,
+                    ivs[i], evs[i], level,
+                    _natureMod(slot.natureName, _statKeys[i]),
+                  ),
+        ];
+
+        // Item detail (for sprite)
+        final itemEntry = itemAsync?.whenOrNull(data: (e) => e);
+
+        final moves = [slot.move1, slot.move2, slot.move3, slot.move4]
+            .where((m) => m != null)
+            .cast<String>()
+            .toList();
 
         return Card(
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: () => context.push('/pokedex/${slot.pokemonId}'),
+            onTap: () =>
+                context.push('/teams/$teamId/config/${slot.slot}'),
             onLongPress: () => _showSlotMenu(context, ref),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    typeColor.withValues(alpha: 0.15),
-                    typeColor.withValues(alpha: 0.05),
-                  ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Coloured accent strip ──
+                Container(
+                  width: double.infinity,
+                  color: typeColor.withValues(alpha: 0.15),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  child: Row(
+                    children: [
+                      Text(
+                        displayName,
+                        style: textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      if (hasNickname) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          speciesName,
+                          style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  PokemonSprite(
-                    defaultUrl: 'https://raw.githubusercontent.com/PokeAPI/'
-                        'sprites/master/sprites/pokemon/${slot.pokemonId}.png',
-                    size: 72,
+
+                // ── Main body ──
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Col 1 — Sprite + item icon + species
+                      SizedBox(
+                        width: 80,
+                        child: Column(
+                          children: [
+                            PokemonSprite(
+                              defaultUrl:
+                                  'https://raw.githubusercontent.com/PokeAPI/'
+                                  'sprites/master/sprites/pokemon/'
+                                  '${slot.pokemonId}.png',
+                              shinyUrl:
+                                  'https://raw.githubusercontent.com/PokeAPI/'
+                                  'sprites/master/sprites/pokemon/shiny/'
+                                  '${slot.pokemonId}.png',
+                              shiny: slot.isShiny,
+                              size: 72,
+                            ),
+                            if (itemEntry?.spriteUrl != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: CachedNetworkImage(
+                                  imageUrl: itemEntry!.spriteUrl!,
+                                  width: 24,
+                                  height: 24,
+                                  errorWidget: (_, __, ___) =>
+                                      const SizedBox.shrink(),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // Col 2 — Details
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Types
+                            Row(
+                              children: pokemon.types.values
+                                  .map((t) => Padding(
+                                        padding: const EdgeInsets.only(right: 4),
+                                        child: TypeBadge(type: t),
+                                      ))
+                                  .toList(),
+                            ),
+                            const SizedBox(height: 4),
+                            // Level · gender · shiny
+                            Row(
+                              children: [
+                                Text('Lv $level',
+                                    style: textTheme.bodySmall?.copyWith(
+                                        fontWeight: FontWeight.w600)),
+                                if (slot.gender != null) ...[
+                                  Text(
+                                    ' · ${_genderSymbol(slot.gender!)}',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: slot.gender == 'male'
+                                          ? Colors.blue
+                                          : slot.gender == 'female'
+                                              ? Colors.pink
+                                              : colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                                if (slot.isShiny) ...[
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.auto_awesome,
+                                      size: 12, color: Colors.amber),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            // Item
+                            if (slot.heldItemName != null)
+                              Text(
+                                slot.heldItemName!.toCapitalCase(),
+                                style: textTheme.bodySmall,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            // Ability
+                            if (slot.abilityName != null)
+                              Text(
+                                slot.abilityName!.toCapitalCase(),
+                                style: textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            // Nature
+                            if (slot.natureName != null)
+                              Text(
+                                slot.natureName!,
+                                style: textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+
+                      // Col 3 — Compact stat bars
+                      SizedBox(
+                        width: 88,
+                        child: Column(
+                          children: [
+                            for (int i = 0; i < _statLabels.length; i++)
+                              _CompactStatBar(
+                                label: _statLabels[i],
+                                value: calcStats[i],
+                                ev: evs[i],
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    slot.nickname?.isNotEmpty == true
-                        ? slot.nickname!
-                        : pokemon.name.toCapitalCase(),
-                    style: textTheme.labelMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: pokemon.types.values
-                        .map((t) => Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 2),
-                              child: TypeBadge(type: t),
-                            ))
-                        .toList(),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Slot ${slot.slot}',
-                    style: textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                ),
+
+                // ── Moves strip ──
+                if (moves.isNotEmpty) ...[
+                  Divider(
+                      height: 1,
+                      color: colorScheme.outlineVariant),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+                    child: Wrap(
+                      spacing: 12,
+                      runSpacing: 2,
+                      children: moves
+                          .map((m) => Text(
+                                '• ${m.toCapitalCase()}',
+                                style: textTheme.bodySmall,
+                              ))
+                          .toList(),
                     ),
                   ),
                 ],
-              ),
+              ],
             ),
           ),
         );
       },
     );
+  }
+
+  String _genderSymbol(String gender) {
+    switch (gender) {
+      case 'male': return '♂';
+      case 'female': return '♀';
+      default: return '⚲';
+    }
   }
 
   Future<void> _showSlotMenu(BuildContext context, WidgetRef ref) async {
@@ -301,9 +506,9 @@ class _FilledSlotCard extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('Edit nickname'),
-              onTap: () => Navigator.pop(ctx, 'nickname'),
+              leading: const Icon(Icons.tune_outlined),
+              title: const Text('Configure slot'),
+              onTap: () => Navigator.pop(ctx, 'config'),
             ),
             ListTile(
               leading: const Icon(Icons.swap_horiz),
@@ -322,41 +527,8 @@ class _FilledSlotCard extends ConsumerWidget {
 
     if (!context.mounted) return;
 
-    if (action == 'nickname') {
-      final controller = TextEditingController(text: slot.nickname ?? '');
-      final nickname = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Edit Nickname'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(hintText: 'Nickname (optional)'),
-            textCapitalization: TextCapitalization.words,
-            onSubmitted: (v) => Navigator.pop(ctx, v),
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel')),
-            FilledButton(
-                onPressed: () => Navigator.pop(ctx, controller.text),
-                child: const Text('Save')),
-          ],
-        ),
-      );
-      if (nickname != null) {
-        await ref.read(teamSlotRepositoryProvider).update(
-              TeamSlotsCompanion(
-                id: Value(slot.id),
-                teamId: Value(slot.teamId),
-                slot: Value(slot.slot),
-                pokemonId: Value(slot.pokemonId),
-                nickname: Value(nickname.isEmpty ? null : nickname),
-                updatedAt: Value(DateTime.now()),
-              ),
-            );
-      }
+    if (action == 'config') {
+      context.push('/teams/$teamId/config/${slot.slot}');
     } else if (action == 'replace') {
       context.push('/teams/$teamId/pick/${slot.slot}');
     } else if (action == 'remove') {
@@ -364,6 +536,77 @@ class _FilledSlotCard extends ConsumerWidget {
           .read(teamSlotRepositoryProvider)
           .deleteSlot(slot.teamId, slot.slot);
     }
+  }
+}
+
+// ── Compact stat bar (for slot summary card) ──────────────────────────────────
+
+class _CompactStatBar extends StatelessWidget {
+  final String label;
+  final int value;
+  final int ev;
+
+  const _CompactStatBar({
+    required this.label,
+    required this.value,
+    required this.ev,
+  });
+
+  Color _barColor(ColorScheme cs, int ev) {
+    if (ev >= 252) return Colors.green.shade600;
+    if (ev > 0) return Colors.amber.shade700;
+    return cs.primary;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    const maxStat = 700.0;
+    final fraction = (value / maxStat).clamp(0.0, 1.0);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1.5),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 24,
+            child: Text(
+              label,
+              style: textTheme.labelSmall?.copyWith(
+                fontSize: 9,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                value: fraction,
+                minHeight: 7,
+                backgroundColor: colorScheme.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                    _barColor(colorScheme, ev)),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 26,
+            child: Text(
+              ev > 0 ? '$ev' : '',
+              textAlign: TextAlign.right,
+              style: textTheme.labelSmall?.copyWith(
+                fontSize: 9,
+                color: ev >= 252
+                    ? Colors.green.shade600
+                    : colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -383,27 +626,20 @@ class _EmptySlotCard extends StatelessWidget {
     return Card(
       child: InkWell(
         onTap: () => context.push('/teams/$teamId/pick/$slotNumber'),
-        borderRadius: BorderRadius.circular(12),
-        child: DottedBorder(
-          color: colorScheme.outlineVariant,
-          child: Column(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 Icons.add_circle_outline,
-                size: 36,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                size: 28,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(width: 10),
               Text(
-                'Slot $slotNumber',
-                style: textTheme.labelMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              Text(
-                'Tap to add',
-                style: textTheme.labelSmall?.copyWith(
+                'Slot $slotNumber — tap to add Pokémon',
+                style: textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                 ),
               ),
@@ -413,61 +649,4 @@ class _EmptySlotCard extends StatelessWidget {
       ),
     );
   }
-}
-
-// ── Dotted border helper ──────────────────────────────────────────────────────
-
-class DottedBorder extends StatelessWidget {
-  final Color color;
-  final Widget child;
-
-  const DottedBorder({super.key, required this.color, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _DottedBorderPainter(color: color),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: SizedBox.expand(child: Center(child: child)),
-      ),
-    );
-  }
-}
-
-class _DottedBorderPainter extends CustomPainter {
-  final Color color;
-  _DottedBorderPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-
-    const dashWidth = 6.0;
-    const dashSpace = 4.0;
-    const radius = 12.0;
-    final rect =
-        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(radius));
-    final path = Path()..addRRect(rect);
-    final metricsIt = path.computeMetrics().iterator;
-
-    while (metricsIt.moveNext()) {
-      final metric = metricsIt.current;
-      double distance = 0;
-      while (distance < metric.length) {
-        canvas.drawPath(
-          metric.extractPath(
-              distance, (distance + dashWidth).clamp(0, metric.length)),
-          paint,
-        );
-        distance += dashWidth + dashSpace;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DottedBorderPainter old) => old.color != color;
 }
