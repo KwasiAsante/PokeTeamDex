@@ -35,4 +35,9 @@ class TeamSlotRepository {
 
   Future<int> deleteAllForTeam(int teamId) =>
       (_db.delete(_db.teamSlots)..where((s) => s.teamId.equals(teamId))).go();
+
+  /// Updates only the slot-position column — safe to call during reorder.
+  Future<int> updateSlotPosition(int id, int newSlot) =>
+      (_db.update(_db.teamSlots)..where((s) => s.id.equals(id)))
+          .write(TeamSlotsCompanion(slot: Value(newSlot)));
 }

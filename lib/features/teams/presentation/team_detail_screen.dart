@@ -194,29 +194,55 @@ class TeamDetailScreen extends ConsumerWidget {
   }
 }
 
-// ── Slot list ─────────────────────────────────────────────────────────────────
+// ── Slot list (reorderable) ───────────────────────────────────────────────────
 
-class _SlotList extends StatelessWidget {
+class _SlotList extends ConsumerWidget {
   final int teamId;
   final List<TeamSlot> slots;
 
   const _SlotList({required this.teamId, required this.slots});
 
-  @override
-  Widget build(BuildContext context) {
-    final slotMap = {for (final s in slots) s.slot: s};
+  // Build a 6-element growable list keyed by position (0-based); null = empty slot.
+  List<TeamSlot?> _positions() {
+    final pos = List<TeamSlot?>.filled(6, null, growable: true);
+    for (final s in slots) {
+      if (s.slot >= 1 && s.slot <= 6) pos[s.slot - 1] = s;
+    }
+    return pos;
+  }
 
-    return ListView.builder(
+  Future<void> _onReorder(WidgetRef ref, int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex--;
+    final pos = _positions();
+    final moved = pos.removeAt(oldIndex);
+    pos.insert(newIndex, moved);
+
+    final repo = ref.read(teamSlotRepositoryProvider);
+    for (int i = 0; i < 6; i++) {
+      final s = pos[i];
+      if (s != null && s.slot != i + 1) {
+        await repo.updateSlotPosition(s.id, i + 1);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pos = _positions();
+
+    return ReorderableListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      buildDefaultDragHandles: false, // explicit handles inside each card
+      onReorder: (o, n) => _onReorder(ref, o, n),
       itemCount: 6,
       itemBuilder: (_, i) {
-        final slotNumber = i + 1;
-        final slot = slotMap[slotNumber];
+        final slot = pos[i];
         return Padding(
+          key: ValueKey(i),
           padding: const EdgeInsets.only(bottom: 10),
           child: slot != null
-              ? _FilledSlotCard(slot: slot, teamId: teamId)
-              : _EmptySlotCard(teamId: teamId, slotNumber: slotNumber),
+              ? _FilledSlotCard(slot: slot, teamId: teamId, dragIndex: i)
+              : _EmptySlotCard(teamId: teamId, slotNumber: i + 1, dragIndex: i),
         );
       },
     );
@@ -228,8 +254,13 @@ class _SlotList extends StatelessWidget {
 class _FilledSlotCard extends ConsumerWidget {
   final TeamSlot slot;
   final int teamId;
+  final int dragIndex;
 
-  const _FilledSlotCard({required this.slot, required this.teamId});
+  const _FilledSlotCard({
+    required this.slot,
+    required this.teamId,
+    required this.dragIndex,
+  });
 
   static const _statLabels = ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe'];
   static const _statKeys = [
@@ -332,6 +363,15 @@ class _FilledSlotCard extends ConsumerWidget {
                               color: colorScheme.onSurfaceVariant),
                         ),
                       ],
+                      const Spacer(),
+                      ReorderableDragStartListener(
+                        index: dragIndex,
+                        child: Icon(
+                          Icons.drag_handle,
+                          size: 18,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -615,8 +655,13 @@ class _CompactStatBar extends StatelessWidget {
 class _EmptySlotCard extends StatelessWidget {
   final int teamId;
   final int slotNumber;
+  final int dragIndex;
 
-  const _EmptySlotCard({required this.teamId, required this.slotNumber});
+  const _EmptySlotCard({
+    required this.teamId,
+    required this.slotNumber,
+    required this.dragIndex,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -629,7 +674,6 @@ class _EmptySlotCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 Icons.add_circle_outline,
@@ -637,10 +681,20 @@ class _EmptySlotCard extends StatelessWidget {
                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
               ),
               const SizedBox(width: 10),
-              Text(
-                'Slot $slotNumber — tap to add Pokémon',
-                style: textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              Expanded(
+                child: Text(
+                  'Slot $slotNumber — tap to add Pokémon',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                ),
+              ),
+              ReorderableDragStartListener(
+                index: dragIndex,
+                child: Icon(
+                  Icons.drag_handle,
+                  size: 20,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                 ),
               ),
             ],

@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 
 class TeamRepository {
@@ -5,19 +6,25 @@ class TeamRepository {
   final AppDatabase _db;
 
   Stream<List<Team>> watchAll() =>
-      _db.select(_db.teams).watch();
+      (_db.select(_db.teams)
+            ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
+          .watch();
 
   Stream<List<Team>> watchByFolder(int folderId) =>
       (_db.select(_db.teams)
-            ..where((t) => t.folderId.equals(folderId)))
+            ..where((t) => t.folderId.equals(folderId))
+            ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
           .watch();
 
   Future<List<Team>> getAll() =>
-      _db.select(_db.teams).get();
+      (_db.select(_db.teams)
+            ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
+          .get();
 
   Future<List<Team>> getByFolder(int folderId) =>
       (_db.select(_db.teams)
-            ..where((t) => t.folderId.equals(folderId)))
+            ..where((t) => t.folderId.equals(folderId))
+            ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
           .get();
 
   Future<Team> getById(int id) =>
@@ -35,4 +42,8 @@ class TeamRepository {
 
   Future<int> delete(int id) =>
       (_db.delete(_db.teams)..where((t) => t.id.equals(id))).go();
+
+  Future<int> updateSortOrder(int id, int sortOrder) =>
+      (_db.update(_db.teams)..where((t) => t.id.equals(id)))
+          .write(TeamsCompanion(sortOrder: Value(sortOrder)));
 }
