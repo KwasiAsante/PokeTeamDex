@@ -17,7 +17,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -25,6 +25,46 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (m, from, to) async {
           if (from < 2) {
             await m.createTable(appConfigs);
+          }
+          if (from < 3) {
+            // TeamFolders — sort order + soft-delete + sync status
+            await m.addColumn(teamFolders, teamFolders.sortOrder);
+            await m.addColumn(teamFolders, teamFolders.isDeleted);
+            await m.addColumn(teamFolders, teamFolders.syncStatus);
+
+            // Teams — format label + sort order + soft-delete + sync status
+            await m.addColumn(teams, teams.formatLabel);
+            await m.addColumn(teams, teams.sortOrder);
+            await m.addColumn(teams, teams.isDeleted);
+            await m.addColumn(teams, teams.syncStatus);
+
+            // TeamSlots — all slot config fields + soft-delete + sync status
+            await m.addColumn(teamSlots, teamSlots.formName);
+            await m.addColumn(teamSlots, teamSlots.level);
+            await m.addColumn(teamSlots, teamSlots.gender);
+            await m.addColumn(teamSlots, teamSlots.isShiny);
+            await m.addColumn(teamSlots, teamSlots.friendship);
+            await m.addColumn(teamSlots, teamSlots.abilityName);
+            await m.addColumn(teamSlots, teamSlots.natureName);
+            await m.addColumn(teamSlots, teamSlots.heldItemName);
+            await m.addColumn(teamSlots, teamSlots.move1);
+            await m.addColumn(teamSlots, teamSlots.move2);
+            await m.addColumn(teamSlots, teamSlots.move3);
+            await m.addColumn(teamSlots, teamSlots.move4);
+            await m.addColumn(teamSlots, teamSlots.evHp);
+            await m.addColumn(teamSlots, teamSlots.evAtk);
+            await m.addColumn(teamSlots, teamSlots.evDef);
+            await m.addColumn(teamSlots, teamSlots.evSpa);
+            await m.addColumn(teamSlots, teamSlots.evSpd);
+            await m.addColumn(teamSlots, teamSlots.evSpe);
+            await m.addColumn(teamSlots, teamSlots.ivHp);
+            await m.addColumn(teamSlots, teamSlots.ivAtk);
+            await m.addColumn(teamSlots, teamSlots.ivDef);
+            await m.addColumn(teamSlots, teamSlots.ivSpa);
+            await m.addColumn(teamSlots, teamSlots.ivSpd);
+            await m.addColumn(teamSlots, teamSlots.ivSpe);
+            await m.addColumn(teamSlots, teamSlots.isDeleted);
+            await m.addColumn(teamSlots, teamSlots.syncStatus);
           }
         },
       );
