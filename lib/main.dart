@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -30,7 +32,7 @@ void main() async {
   final token = await loadStoredToken();
 
   // Register WorkManager background task (Android/iOS only)
-  if (!kIsWeb) {
+  if (!kIsWeb && !Platform.isWindows && Platform.isAndroid && !Platform.isLinux) {
     await Workmanager().initialize(_workmanagerCallback);
     await Workmanager().registerPeriodicTask(
       _syncTaskName,

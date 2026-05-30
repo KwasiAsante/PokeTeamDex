@@ -9,6 +9,7 @@ import 'package:poke_team_dex/features/pokedex/presentation/pokedex_screen.dart'
 import 'package:poke_team_dex/features/pokedex/presentation/pokemon_detail_screen.dart';
 import 'package:poke_team_dex/features/natures/presentation/natures_screen.dart';
 import 'package:poke_team_dex/features/reference/presentation/reference_hub_screen.dart';
+import 'package:poke_team_dex/features/teams/presentation/slot_config_screen.dart';
 import 'package:poke_team_dex/features/teams/presentation/slot_picker_screen.dart';
 import 'package:poke_team_dex/features/teams/presentation/team_detail_screen.dart';
 import 'package:poke_team_dex/features/teams/presentation/teams_screen.dart';
@@ -112,6 +113,15 @@ GoRouter buildAppRouter(String? initialToken) {
                       GoRoute(
                         path: 'pick/:slot',
                         builder: (context, state) => SlotPickerScreen(
+                          teamId:
+                              int.parse(state.pathParameters['teamId']!),
+                          slotNumber:
+                              int.parse(state.pathParameters['slot']!),
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'config/:slot',
+                        builder: (context, state) => SlotConfigScreen(
                           teamId:
                               int.parse(state.pathParameters['teamId']!),
                           slotNumber:

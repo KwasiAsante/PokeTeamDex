@@ -42,6 +42,45 @@ class $TeamFoldersTable extends TeamFolders
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _isDeletedMeta = const VerificationMeta(
+    'isDeleted',
+  );
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+    'is_deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('synced'),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -71,6 +110,9 @@ class $TeamFoldersTable extends TeamFolders
     id,
     name,
     remoteId,
+    sortOrder,
+    isDeleted,
+    syncStatus,
     createdAt,
     updatedAt,
   ];
@@ -101,6 +143,24 @@ class $TeamFoldersTable extends TeamFolders
       context.handle(
         _remoteIdMeta,
         remoteId.isAcceptableOrUnknown(data['remote_id']!, _remoteIdMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('is_deleted')) {
+      context.handle(
+        _isDeletedMeta,
+        isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta),
+      );
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
       );
     }
     if (data.containsKey('created_at')) {
@@ -136,6 +196,18 @@ class $TeamFoldersTable extends TeamFolders
         DriftSqlType.string,
         data['${effectivePrefix}remote_id'],
       ),
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      isDeleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_deleted'],
+      )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -157,12 +229,18 @@ class TeamFolder extends DataClass implements Insertable<TeamFolder> {
   final int id;
   final String name;
   final String? remoteId;
+  final int sortOrder;
+  final bool isDeleted;
+  final String syncStatus;
   final DateTime createdAt;
   final DateTime updatedAt;
   const TeamFolder({
     required this.id,
     required this.name,
     this.remoteId,
+    required this.sortOrder,
+    required this.isDeleted,
+    required this.syncStatus,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -174,6 +252,9 @@ class TeamFolder extends DataClass implements Insertable<TeamFolder> {
     if (!nullToAbsent || remoteId != null) {
       map['remote_id'] = Variable<String>(remoteId);
     }
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['is_deleted'] = Variable<bool>(isDeleted);
+    map['sync_status'] = Variable<String>(syncStatus);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -186,6 +267,9 @@ class TeamFolder extends DataClass implements Insertable<TeamFolder> {
       remoteId: remoteId == null && nullToAbsent
           ? const Value.absent()
           : Value(remoteId),
+      sortOrder: Value(sortOrder),
+      isDeleted: Value(isDeleted),
+      syncStatus: Value(syncStatus),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -200,6 +284,9 @@ class TeamFolder extends DataClass implements Insertable<TeamFolder> {
       id: serializer.fromJson<int>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       remoteId: serializer.fromJson<String?>(json['remoteId']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -211,6 +298,9 @@ class TeamFolder extends DataClass implements Insertable<TeamFolder> {
       'id': serializer.toJson<int>(id),
       'name': serializer.toJson<String>(name),
       'remoteId': serializer.toJson<String?>(remoteId),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
+      'syncStatus': serializer.toJson<String>(syncStatus),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -220,12 +310,18 @@ class TeamFolder extends DataClass implements Insertable<TeamFolder> {
     int? id,
     String? name,
     Value<String?> remoteId = const Value.absent(),
+    int? sortOrder,
+    bool? isDeleted,
+    String? syncStatus,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => TeamFolder(
     id: id ?? this.id,
     name: name ?? this.name,
     remoteId: remoteId.present ? remoteId.value : this.remoteId,
+    sortOrder: sortOrder ?? this.sortOrder,
+    isDeleted: isDeleted ?? this.isDeleted,
+    syncStatus: syncStatus ?? this.syncStatus,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -234,6 +330,11 @@ class TeamFolder extends DataClass implements Insertable<TeamFolder> {
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -245,6 +346,9 @@ class TeamFolder extends DataClass implements Insertable<TeamFolder> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('remoteId: $remoteId, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('syncStatus: $syncStatus, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -252,7 +356,16 @@ class TeamFolder extends DataClass implements Insertable<TeamFolder> {
   }
 
   @override
-  int get hashCode => Object.hash(id, name, remoteId, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    remoteId,
+    sortOrder,
+    isDeleted,
+    syncStatus,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -260,6 +373,9 @@ class TeamFolder extends DataClass implements Insertable<TeamFolder> {
           other.id == this.id &&
           other.name == this.name &&
           other.remoteId == this.remoteId &&
+          other.sortOrder == this.sortOrder &&
+          other.isDeleted == this.isDeleted &&
+          other.syncStatus == this.syncStatus &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -268,12 +384,18 @@ class TeamFoldersCompanion extends UpdateCompanion<TeamFolder> {
   final Value<int> id;
   final Value<String> name;
   final Value<String?> remoteId;
+  final Value<int> sortOrder;
+  final Value<bool> isDeleted;
+  final Value<String> syncStatus;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const TeamFoldersCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.remoteId = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+    this.syncStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -281,6 +403,9 @@ class TeamFoldersCompanion extends UpdateCompanion<TeamFolder> {
     this.id = const Value.absent(),
     required String name,
     this.remoteId = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+    this.syncStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   }) : name = Value(name);
@@ -288,6 +413,9 @@ class TeamFoldersCompanion extends UpdateCompanion<TeamFolder> {
     Expression<int>? id,
     Expression<String>? name,
     Expression<String>? remoteId,
+    Expression<int>? sortOrder,
+    Expression<bool>? isDeleted,
+    Expression<String>? syncStatus,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -295,6 +423,9 @@ class TeamFoldersCompanion extends UpdateCompanion<TeamFolder> {
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (remoteId != null) 'remote_id': remoteId,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (isDeleted != null) 'is_deleted': isDeleted,
+      if (syncStatus != null) 'sync_status': syncStatus,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -304,6 +435,9 @@ class TeamFoldersCompanion extends UpdateCompanion<TeamFolder> {
     Value<int>? id,
     Value<String>? name,
     Value<String?>? remoteId,
+    Value<int>? sortOrder,
+    Value<bool>? isDeleted,
+    Value<String>? syncStatus,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -311,6 +445,9 @@ class TeamFoldersCompanion extends UpdateCompanion<TeamFolder> {
       id: id ?? this.id,
       name: name ?? this.name,
       remoteId: remoteId ?? this.remoteId,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isDeleted: isDeleted ?? this.isDeleted,
+      syncStatus: syncStatus ?? this.syncStatus,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -328,6 +465,15 @@ class TeamFoldersCompanion extends UpdateCompanion<TeamFolder> {
     if (remoteId.present) {
       map['remote_id'] = Variable<String>(remoteId.value);
     }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -343,6 +489,9 @@ class TeamFoldersCompanion extends UpdateCompanion<TeamFolder> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('remoteId: $remoteId, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('syncStatus: $syncStatus, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -402,6 +551,56 @@ class $TeamsTable extends Teams with TableInfo<$TeamsTable, Team> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _formatLabelMeta = const VerificationMeta(
+    'formatLabel',
+  );
+  @override
+  late final GeneratedColumn<String> formatLabel = GeneratedColumn<String>(
+    'format_label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _isDeletedMeta = const VerificationMeta(
+    'isDeleted',
+  );
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+    'is_deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('synced'),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -432,6 +631,10 @@ class $TeamsTable extends Teams with TableInfo<$TeamsTable, Team> {
     folderId,
     name,
     remoteId,
+    formatLabel,
+    sortOrder,
+    isDeleted,
+    syncStatus,
     createdAt,
     updatedAt,
   ];
@@ -468,6 +671,33 @@ class $TeamsTable extends Teams with TableInfo<$TeamsTable, Team> {
       context.handle(
         _remoteIdMeta,
         remoteId.isAcceptableOrUnknown(data['remote_id']!, _remoteIdMeta),
+      );
+    }
+    if (data.containsKey('format_label')) {
+      context.handle(
+        _formatLabelMeta,
+        formatLabel.isAcceptableOrUnknown(
+          data['format_label']!,
+          _formatLabelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('is_deleted')) {
+      context.handle(
+        _isDeletedMeta,
+        isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta),
+      );
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
       );
     }
     if (data.containsKey('created_at')) {
@@ -507,6 +737,22 @@ class $TeamsTable extends Teams with TableInfo<$TeamsTable, Team> {
         DriftSqlType.string,
         data['${effectivePrefix}remote_id'],
       ),
+      formatLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}format_label'],
+      ),
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      isDeleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_deleted'],
+      )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -529,6 +775,10 @@ class Team extends DataClass implements Insertable<Team> {
   final int? folderId;
   final String name;
   final String? remoteId;
+  final String? formatLabel;
+  final int sortOrder;
+  final bool isDeleted;
+  final String syncStatus;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Team({
@@ -536,6 +786,10 @@ class Team extends DataClass implements Insertable<Team> {
     this.folderId,
     required this.name,
     this.remoteId,
+    this.formatLabel,
+    required this.sortOrder,
+    required this.isDeleted,
+    required this.syncStatus,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -550,6 +804,12 @@ class Team extends DataClass implements Insertable<Team> {
     if (!nullToAbsent || remoteId != null) {
       map['remote_id'] = Variable<String>(remoteId);
     }
+    if (!nullToAbsent || formatLabel != null) {
+      map['format_label'] = Variable<String>(formatLabel);
+    }
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['is_deleted'] = Variable<bool>(isDeleted);
+    map['sync_status'] = Variable<String>(syncStatus);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -565,6 +825,12 @@ class Team extends DataClass implements Insertable<Team> {
       remoteId: remoteId == null && nullToAbsent
           ? const Value.absent()
           : Value(remoteId),
+      formatLabel: formatLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(formatLabel),
+      sortOrder: Value(sortOrder),
+      isDeleted: Value(isDeleted),
+      syncStatus: Value(syncStatus),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -580,6 +846,10 @@ class Team extends DataClass implements Insertable<Team> {
       folderId: serializer.fromJson<int?>(json['folderId']),
       name: serializer.fromJson<String>(json['name']),
       remoteId: serializer.fromJson<String?>(json['remoteId']),
+      formatLabel: serializer.fromJson<String?>(json['formatLabel']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -592,6 +862,10 @@ class Team extends DataClass implements Insertable<Team> {
       'folderId': serializer.toJson<int?>(folderId),
       'name': serializer.toJson<String>(name),
       'remoteId': serializer.toJson<String?>(remoteId),
+      'formatLabel': serializer.toJson<String?>(formatLabel),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
+      'syncStatus': serializer.toJson<String>(syncStatus),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -602,6 +876,10 @@ class Team extends DataClass implements Insertable<Team> {
     Value<int?> folderId = const Value.absent(),
     String? name,
     Value<String?> remoteId = const Value.absent(),
+    Value<String?> formatLabel = const Value.absent(),
+    int? sortOrder,
+    bool? isDeleted,
+    String? syncStatus,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Team(
@@ -609,6 +887,10 @@ class Team extends DataClass implements Insertable<Team> {
     folderId: folderId.present ? folderId.value : this.folderId,
     name: name ?? this.name,
     remoteId: remoteId.present ? remoteId.value : this.remoteId,
+    formatLabel: formatLabel.present ? formatLabel.value : this.formatLabel,
+    sortOrder: sortOrder ?? this.sortOrder,
+    isDeleted: isDeleted ?? this.isDeleted,
+    syncStatus: syncStatus ?? this.syncStatus,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -618,6 +900,14 @@ class Team extends DataClass implements Insertable<Team> {
       folderId: data.folderId.present ? data.folderId.value : this.folderId,
       name: data.name.present ? data.name.value : this.name,
       remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
+      formatLabel: data.formatLabel.present
+          ? data.formatLabel.value
+          : this.formatLabel,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -630,6 +920,10 @@ class Team extends DataClass implements Insertable<Team> {
           ..write('folderId: $folderId, ')
           ..write('name: $name, ')
           ..write('remoteId: $remoteId, ')
+          ..write('formatLabel: $formatLabel, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('syncStatus: $syncStatus, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -637,8 +931,18 @@ class Team extends DataClass implements Insertable<Team> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, folderId, name, remoteId, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    folderId,
+    name,
+    remoteId,
+    formatLabel,
+    sortOrder,
+    isDeleted,
+    syncStatus,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -647,6 +951,10 @@ class Team extends DataClass implements Insertable<Team> {
           other.folderId == this.folderId &&
           other.name == this.name &&
           other.remoteId == this.remoteId &&
+          other.formatLabel == this.formatLabel &&
+          other.sortOrder == this.sortOrder &&
+          other.isDeleted == this.isDeleted &&
+          other.syncStatus == this.syncStatus &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -656,6 +964,10 @@ class TeamsCompanion extends UpdateCompanion<Team> {
   final Value<int?> folderId;
   final Value<String> name;
   final Value<String?> remoteId;
+  final Value<String?> formatLabel;
+  final Value<int> sortOrder;
+  final Value<bool> isDeleted;
+  final Value<String> syncStatus;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const TeamsCompanion({
@@ -663,6 +975,10 @@ class TeamsCompanion extends UpdateCompanion<Team> {
     this.folderId = const Value.absent(),
     this.name = const Value.absent(),
     this.remoteId = const Value.absent(),
+    this.formatLabel = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+    this.syncStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -671,6 +987,10 @@ class TeamsCompanion extends UpdateCompanion<Team> {
     this.folderId = const Value.absent(),
     required String name,
     this.remoteId = const Value.absent(),
+    this.formatLabel = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+    this.syncStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   }) : name = Value(name);
@@ -679,6 +999,10 @@ class TeamsCompanion extends UpdateCompanion<Team> {
     Expression<int>? folderId,
     Expression<String>? name,
     Expression<String>? remoteId,
+    Expression<String>? formatLabel,
+    Expression<int>? sortOrder,
+    Expression<bool>? isDeleted,
+    Expression<String>? syncStatus,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -687,6 +1011,10 @@ class TeamsCompanion extends UpdateCompanion<Team> {
       if (folderId != null) 'folder_id': folderId,
       if (name != null) 'name': name,
       if (remoteId != null) 'remote_id': remoteId,
+      if (formatLabel != null) 'format_label': formatLabel,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (isDeleted != null) 'is_deleted': isDeleted,
+      if (syncStatus != null) 'sync_status': syncStatus,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -697,6 +1025,10 @@ class TeamsCompanion extends UpdateCompanion<Team> {
     Value<int?>? folderId,
     Value<String>? name,
     Value<String?>? remoteId,
+    Value<String?>? formatLabel,
+    Value<int>? sortOrder,
+    Value<bool>? isDeleted,
+    Value<String>? syncStatus,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -705,6 +1037,10 @@ class TeamsCompanion extends UpdateCompanion<Team> {
       folderId: folderId ?? this.folderId,
       name: name ?? this.name,
       remoteId: remoteId ?? this.remoteId,
+      formatLabel: formatLabel ?? this.formatLabel,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isDeleted: isDeleted ?? this.isDeleted,
+      syncStatus: syncStatus ?? this.syncStatus,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -725,6 +1061,18 @@ class TeamsCompanion extends UpdateCompanion<Team> {
     if (remoteId.present) {
       map['remote_id'] = Variable<String>(remoteId.value);
     }
+    if (formatLabel.present) {
+      map['format_label'] = Variable<String>(formatLabel.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -741,6 +1089,10 @@ class TeamsCompanion extends UpdateCompanion<Team> {
           ..write('folderId: $folderId, ')
           ..write('name: $name, ')
           ..write('remoteId: $remoteId, ')
+          ..write('formatLabel: $formatLabel, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('syncStatus: $syncStatus, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -810,6 +1162,265 @@ class $TeamSlotsTable extends TeamSlots
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _formNameMeta = const VerificationMeta(
+    'formName',
+  );
+  @override
+  late final GeneratedColumn<String> formName = GeneratedColumn<String>(
+    'form_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _levelMeta = const VerificationMeta('level');
+  @override
+  late final GeneratedColumn<int> level = GeneratedColumn<int>(
+    'level',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _genderMeta = const VerificationMeta('gender');
+  @override
+  late final GeneratedColumn<String> gender = GeneratedColumn<String>(
+    'gender',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isShinyMeta = const VerificationMeta(
+    'isShiny',
+  );
+  @override
+  late final GeneratedColumn<bool> isShiny = GeneratedColumn<bool>(
+    'is_shiny',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_shiny" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _friendshipMeta = const VerificationMeta(
+    'friendship',
+  );
+  @override
+  late final GeneratedColumn<int> friendship = GeneratedColumn<int>(
+    'friendship',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _abilityNameMeta = const VerificationMeta(
+    'abilityName',
+  );
+  @override
+  late final GeneratedColumn<String> abilityName = GeneratedColumn<String>(
+    'ability_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _natureNameMeta = const VerificationMeta(
+    'natureName',
+  );
+  @override
+  late final GeneratedColumn<String> natureName = GeneratedColumn<String>(
+    'nature_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _heldItemNameMeta = const VerificationMeta(
+    'heldItemName',
+  );
+  @override
+  late final GeneratedColumn<String> heldItemName = GeneratedColumn<String>(
+    'held_item_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _move1Meta = const VerificationMeta('move1');
+  @override
+  late final GeneratedColumn<String> move1 = GeneratedColumn<String>(
+    'move1',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _move2Meta = const VerificationMeta('move2');
+  @override
+  late final GeneratedColumn<String> move2 = GeneratedColumn<String>(
+    'move2',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _move3Meta = const VerificationMeta('move3');
+  @override
+  late final GeneratedColumn<String> move3 = GeneratedColumn<String>(
+    'move3',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _move4Meta = const VerificationMeta('move4');
+  @override
+  late final GeneratedColumn<String> move4 = GeneratedColumn<String>(
+    'move4',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _evHpMeta = const VerificationMeta('evHp');
+  @override
+  late final GeneratedColumn<int> evHp = GeneratedColumn<int>(
+    'ev_hp',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _evAtkMeta = const VerificationMeta('evAtk');
+  @override
+  late final GeneratedColumn<int> evAtk = GeneratedColumn<int>(
+    'ev_atk',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _evDefMeta = const VerificationMeta('evDef');
+  @override
+  late final GeneratedColumn<int> evDef = GeneratedColumn<int>(
+    'ev_def',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _evSpaMeta = const VerificationMeta('evSpa');
+  @override
+  late final GeneratedColumn<int> evSpa = GeneratedColumn<int>(
+    'ev_spa',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _evSpdMeta = const VerificationMeta('evSpd');
+  @override
+  late final GeneratedColumn<int> evSpd = GeneratedColumn<int>(
+    'ev_spd',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _evSpeMeta = const VerificationMeta('evSpe');
+  @override
+  late final GeneratedColumn<int> evSpe = GeneratedColumn<int>(
+    'ev_spe',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ivHpMeta = const VerificationMeta('ivHp');
+  @override
+  late final GeneratedColumn<int> ivHp = GeneratedColumn<int>(
+    'iv_hp',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ivAtkMeta = const VerificationMeta('ivAtk');
+  @override
+  late final GeneratedColumn<int> ivAtk = GeneratedColumn<int>(
+    'iv_atk',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ivDefMeta = const VerificationMeta('ivDef');
+  @override
+  late final GeneratedColumn<int> ivDef = GeneratedColumn<int>(
+    'iv_def',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ivSpaMeta = const VerificationMeta('ivSpa');
+  @override
+  late final GeneratedColumn<int> ivSpa = GeneratedColumn<int>(
+    'iv_spa',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ivSpdMeta = const VerificationMeta('ivSpd');
+  @override
+  late final GeneratedColumn<int> ivSpd = GeneratedColumn<int>(
+    'iv_spd',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ivSpeMeta = const VerificationMeta('ivSpe');
+  @override
+  late final GeneratedColumn<int> ivSpe = GeneratedColumn<int>(
+    'iv_spe',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isDeletedMeta = const VerificationMeta(
+    'isDeleted',
+  );
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+    'is_deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('synced'),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -841,6 +1452,32 @@ class $TeamSlotsTable extends TeamSlots
     slot,
     pokemonId,
     nickname,
+    formName,
+    level,
+    gender,
+    isShiny,
+    friendship,
+    abilityName,
+    natureName,
+    heldItemName,
+    move1,
+    move2,
+    move3,
+    move4,
+    evHp,
+    evAtk,
+    evDef,
+    evSpa,
+    evSpd,
+    evSpe,
+    ivHp,
+    ivAtk,
+    ivDef,
+    ivSpa,
+    ivSpd,
+    ivSpe,
+    isDeleted,
+    syncStatus,
     createdAt,
     updatedAt,
   ];
@@ -889,6 +1526,168 @@ class $TeamSlotsTable extends TeamSlots
         nickname.isAcceptableOrUnknown(data['nickname']!, _nicknameMeta),
       );
     }
+    if (data.containsKey('form_name')) {
+      context.handle(
+        _formNameMeta,
+        formName.isAcceptableOrUnknown(data['form_name']!, _formNameMeta),
+      );
+    }
+    if (data.containsKey('level')) {
+      context.handle(
+        _levelMeta,
+        level.isAcceptableOrUnknown(data['level']!, _levelMeta),
+      );
+    }
+    if (data.containsKey('gender')) {
+      context.handle(
+        _genderMeta,
+        gender.isAcceptableOrUnknown(data['gender']!, _genderMeta),
+      );
+    }
+    if (data.containsKey('is_shiny')) {
+      context.handle(
+        _isShinyMeta,
+        isShiny.isAcceptableOrUnknown(data['is_shiny']!, _isShinyMeta),
+      );
+    }
+    if (data.containsKey('friendship')) {
+      context.handle(
+        _friendshipMeta,
+        friendship.isAcceptableOrUnknown(data['friendship']!, _friendshipMeta),
+      );
+    }
+    if (data.containsKey('ability_name')) {
+      context.handle(
+        _abilityNameMeta,
+        abilityName.isAcceptableOrUnknown(
+          data['ability_name']!,
+          _abilityNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('nature_name')) {
+      context.handle(
+        _natureNameMeta,
+        natureName.isAcceptableOrUnknown(data['nature_name']!, _natureNameMeta),
+      );
+    }
+    if (data.containsKey('held_item_name')) {
+      context.handle(
+        _heldItemNameMeta,
+        heldItemName.isAcceptableOrUnknown(
+          data['held_item_name']!,
+          _heldItemNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('move1')) {
+      context.handle(
+        _move1Meta,
+        move1.isAcceptableOrUnknown(data['move1']!, _move1Meta),
+      );
+    }
+    if (data.containsKey('move2')) {
+      context.handle(
+        _move2Meta,
+        move2.isAcceptableOrUnknown(data['move2']!, _move2Meta),
+      );
+    }
+    if (data.containsKey('move3')) {
+      context.handle(
+        _move3Meta,
+        move3.isAcceptableOrUnknown(data['move3']!, _move3Meta),
+      );
+    }
+    if (data.containsKey('move4')) {
+      context.handle(
+        _move4Meta,
+        move4.isAcceptableOrUnknown(data['move4']!, _move4Meta),
+      );
+    }
+    if (data.containsKey('ev_hp')) {
+      context.handle(
+        _evHpMeta,
+        evHp.isAcceptableOrUnknown(data['ev_hp']!, _evHpMeta),
+      );
+    }
+    if (data.containsKey('ev_atk')) {
+      context.handle(
+        _evAtkMeta,
+        evAtk.isAcceptableOrUnknown(data['ev_atk']!, _evAtkMeta),
+      );
+    }
+    if (data.containsKey('ev_def')) {
+      context.handle(
+        _evDefMeta,
+        evDef.isAcceptableOrUnknown(data['ev_def']!, _evDefMeta),
+      );
+    }
+    if (data.containsKey('ev_spa')) {
+      context.handle(
+        _evSpaMeta,
+        evSpa.isAcceptableOrUnknown(data['ev_spa']!, _evSpaMeta),
+      );
+    }
+    if (data.containsKey('ev_spd')) {
+      context.handle(
+        _evSpdMeta,
+        evSpd.isAcceptableOrUnknown(data['ev_spd']!, _evSpdMeta),
+      );
+    }
+    if (data.containsKey('ev_spe')) {
+      context.handle(
+        _evSpeMeta,
+        evSpe.isAcceptableOrUnknown(data['ev_spe']!, _evSpeMeta),
+      );
+    }
+    if (data.containsKey('iv_hp')) {
+      context.handle(
+        _ivHpMeta,
+        ivHp.isAcceptableOrUnknown(data['iv_hp']!, _ivHpMeta),
+      );
+    }
+    if (data.containsKey('iv_atk')) {
+      context.handle(
+        _ivAtkMeta,
+        ivAtk.isAcceptableOrUnknown(data['iv_atk']!, _ivAtkMeta),
+      );
+    }
+    if (data.containsKey('iv_def')) {
+      context.handle(
+        _ivDefMeta,
+        ivDef.isAcceptableOrUnknown(data['iv_def']!, _ivDefMeta),
+      );
+    }
+    if (data.containsKey('iv_spa')) {
+      context.handle(
+        _ivSpaMeta,
+        ivSpa.isAcceptableOrUnknown(data['iv_spa']!, _ivSpaMeta),
+      );
+    }
+    if (data.containsKey('iv_spd')) {
+      context.handle(
+        _ivSpdMeta,
+        ivSpd.isAcceptableOrUnknown(data['iv_spd']!, _ivSpdMeta),
+      );
+    }
+    if (data.containsKey('iv_spe')) {
+      context.handle(
+        _ivSpeMeta,
+        ivSpe.isAcceptableOrUnknown(data['iv_spe']!, _ivSpeMeta),
+      );
+    }
+    if (data.containsKey('is_deleted')) {
+      context.handle(
+        _isDeletedMeta,
+        isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta),
+      );
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -930,6 +1729,110 @@ class $TeamSlotsTable extends TeamSlots
         DriftSqlType.string,
         data['${effectivePrefix}nickname'],
       ),
+      formName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}form_name'],
+      ),
+      level: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}level'],
+      ),
+      gender: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}gender'],
+      ),
+      isShiny: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_shiny'],
+      )!,
+      friendship: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}friendship'],
+      ),
+      abilityName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ability_name'],
+      ),
+      natureName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}nature_name'],
+      ),
+      heldItemName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}held_item_name'],
+      ),
+      move1: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}move1'],
+      ),
+      move2: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}move2'],
+      ),
+      move3: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}move3'],
+      ),
+      move4: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}move4'],
+      ),
+      evHp: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ev_hp'],
+      ),
+      evAtk: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ev_atk'],
+      ),
+      evDef: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ev_def'],
+      ),
+      evSpa: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ev_spa'],
+      ),
+      evSpd: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ev_spd'],
+      ),
+      evSpe: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ev_spe'],
+      ),
+      ivHp: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}iv_hp'],
+      ),
+      ivAtk: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}iv_atk'],
+      ),
+      ivDef: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}iv_def'],
+      ),
+      ivSpa: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}iv_spa'],
+      ),
+      ivSpd: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}iv_spd'],
+      ),
+      ivSpe: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}iv_spe'],
+      ),
+      isDeleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_deleted'],
+      )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -953,6 +1856,32 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
   final int slot;
   final int pokemonId;
   final String? nickname;
+  final String? formName;
+  final int? level;
+  final String? gender;
+  final bool isShiny;
+  final int? friendship;
+  final String? abilityName;
+  final String? natureName;
+  final String? heldItemName;
+  final String? move1;
+  final String? move2;
+  final String? move3;
+  final String? move4;
+  final int? evHp;
+  final int? evAtk;
+  final int? evDef;
+  final int? evSpa;
+  final int? evSpd;
+  final int? evSpe;
+  final int? ivHp;
+  final int? ivAtk;
+  final int? ivDef;
+  final int? ivSpa;
+  final int? ivSpd;
+  final int? ivSpe;
+  final bool isDeleted;
+  final String syncStatus;
   final DateTime createdAt;
   final DateTime updatedAt;
   const TeamSlot({
@@ -961,6 +1890,32 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     required this.slot,
     required this.pokemonId,
     this.nickname,
+    this.formName,
+    this.level,
+    this.gender,
+    required this.isShiny,
+    this.friendship,
+    this.abilityName,
+    this.natureName,
+    this.heldItemName,
+    this.move1,
+    this.move2,
+    this.move3,
+    this.move4,
+    this.evHp,
+    this.evAtk,
+    this.evDef,
+    this.evSpa,
+    this.evSpd,
+    this.evSpe,
+    this.ivHp,
+    this.ivAtk,
+    this.ivDef,
+    this.ivSpa,
+    this.ivSpd,
+    this.ivSpe,
+    required this.isDeleted,
+    required this.syncStatus,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -974,6 +1929,78 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     if (!nullToAbsent || nickname != null) {
       map['nickname'] = Variable<String>(nickname);
     }
+    if (!nullToAbsent || formName != null) {
+      map['form_name'] = Variable<String>(formName);
+    }
+    if (!nullToAbsent || level != null) {
+      map['level'] = Variable<int>(level);
+    }
+    if (!nullToAbsent || gender != null) {
+      map['gender'] = Variable<String>(gender);
+    }
+    map['is_shiny'] = Variable<bool>(isShiny);
+    if (!nullToAbsent || friendship != null) {
+      map['friendship'] = Variable<int>(friendship);
+    }
+    if (!nullToAbsent || abilityName != null) {
+      map['ability_name'] = Variable<String>(abilityName);
+    }
+    if (!nullToAbsent || natureName != null) {
+      map['nature_name'] = Variable<String>(natureName);
+    }
+    if (!nullToAbsent || heldItemName != null) {
+      map['held_item_name'] = Variable<String>(heldItemName);
+    }
+    if (!nullToAbsent || move1 != null) {
+      map['move1'] = Variable<String>(move1);
+    }
+    if (!nullToAbsent || move2 != null) {
+      map['move2'] = Variable<String>(move2);
+    }
+    if (!nullToAbsent || move3 != null) {
+      map['move3'] = Variable<String>(move3);
+    }
+    if (!nullToAbsent || move4 != null) {
+      map['move4'] = Variable<String>(move4);
+    }
+    if (!nullToAbsent || evHp != null) {
+      map['ev_hp'] = Variable<int>(evHp);
+    }
+    if (!nullToAbsent || evAtk != null) {
+      map['ev_atk'] = Variable<int>(evAtk);
+    }
+    if (!nullToAbsent || evDef != null) {
+      map['ev_def'] = Variable<int>(evDef);
+    }
+    if (!nullToAbsent || evSpa != null) {
+      map['ev_spa'] = Variable<int>(evSpa);
+    }
+    if (!nullToAbsent || evSpd != null) {
+      map['ev_spd'] = Variable<int>(evSpd);
+    }
+    if (!nullToAbsent || evSpe != null) {
+      map['ev_spe'] = Variable<int>(evSpe);
+    }
+    if (!nullToAbsent || ivHp != null) {
+      map['iv_hp'] = Variable<int>(ivHp);
+    }
+    if (!nullToAbsent || ivAtk != null) {
+      map['iv_atk'] = Variable<int>(ivAtk);
+    }
+    if (!nullToAbsent || ivDef != null) {
+      map['iv_def'] = Variable<int>(ivDef);
+    }
+    if (!nullToAbsent || ivSpa != null) {
+      map['iv_spa'] = Variable<int>(ivSpa);
+    }
+    if (!nullToAbsent || ivSpd != null) {
+      map['iv_spd'] = Variable<int>(ivSpd);
+    }
+    if (!nullToAbsent || ivSpe != null) {
+      map['iv_spe'] = Variable<int>(ivSpe);
+    }
+    map['is_deleted'] = Variable<bool>(isDeleted);
+    map['sync_status'] = Variable<String>(syncStatus);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -988,6 +2015,74 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       nickname: nickname == null && nullToAbsent
           ? const Value.absent()
           : Value(nickname),
+      formName: formName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(formName),
+      level: level == null && nullToAbsent
+          ? const Value.absent()
+          : Value(level),
+      gender: gender == null && nullToAbsent
+          ? const Value.absent()
+          : Value(gender),
+      isShiny: Value(isShiny),
+      friendship: friendship == null && nullToAbsent
+          ? const Value.absent()
+          : Value(friendship),
+      abilityName: abilityName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(abilityName),
+      natureName: natureName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(natureName),
+      heldItemName: heldItemName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(heldItemName),
+      move1: move1 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(move1),
+      move2: move2 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(move2),
+      move3: move3 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(move3),
+      move4: move4 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(move4),
+      evHp: evHp == null && nullToAbsent ? const Value.absent() : Value(evHp),
+      evAtk: evAtk == null && nullToAbsent
+          ? const Value.absent()
+          : Value(evAtk),
+      evDef: evDef == null && nullToAbsent
+          ? const Value.absent()
+          : Value(evDef),
+      evSpa: evSpa == null && nullToAbsent
+          ? const Value.absent()
+          : Value(evSpa),
+      evSpd: evSpd == null && nullToAbsent
+          ? const Value.absent()
+          : Value(evSpd),
+      evSpe: evSpe == null && nullToAbsent
+          ? const Value.absent()
+          : Value(evSpe),
+      ivHp: ivHp == null && nullToAbsent ? const Value.absent() : Value(ivHp),
+      ivAtk: ivAtk == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ivAtk),
+      ivDef: ivDef == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ivDef),
+      ivSpa: ivSpa == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ivSpa),
+      ivSpd: ivSpd == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ivSpd),
+      ivSpe: ivSpe == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ivSpe),
+      isDeleted: Value(isDeleted),
+      syncStatus: Value(syncStatus),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -1004,6 +2099,32 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       slot: serializer.fromJson<int>(json['slot']),
       pokemonId: serializer.fromJson<int>(json['pokemonId']),
       nickname: serializer.fromJson<String?>(json['nickname']),
+      formName: serializer.fromJson<String?>(json['formName']),
+      level: serializer.fromJson<int?>(json['level']),
+      gender: serializer.fromJson<String?>(json['gender']),
+      isShiny: serializer.fromJson<bool>(json['isShiny']),
+      friendship: serializer.fromJson<int?>(json['friendship']),
+      abilityName: serializer.fromJson<String?>(json['abilityName']),
+      natureName: serializer.fromJson<String?>(json['natureName']),
+      heldItemName: serializer.fromJson<String?>(json['heldItemName']),
+      move1: serializer.fromJson<String?>(json['move1']),
+      move2: serializer.fromJson<String?>(json['move2']),
+      move3: serializer.fromJson<String?>(json['move3']),
+      move4: serializer.fromJson<String?>(json['move4']),
+      evHp: serializer.fromJson<int?>(json['evHp']),
+      evAtk: serializer.fromJson<int?>(json['evAtk']),
+      evDef: serializer.fromJson<int?>(json['evDef']),
+      evSpa: serializer.fromJson<int?>(json['evSpa']),
+      evSpd: serializer.fromJson<int?>(json['evSpd']),
+      evSpe: serializer.fromJson<int?>(json['evSpe']),
+      ivHp: serializer.fromJson<int?>(json['ivHp']),
+      ivAtk: serializer.fromJson<int?>(json['ivAtk']),
+      ivDef: serializer.fromJson<int?>(json['ivDef']),
+      ivSpa: serializer.fromJson<int?>(json['ivSpa']),
+      ivSpd: serializer.fromJson<int?>(json['ivSpd']),
+      ivSpe: serializer.fromJson<int?>(json['ivSpe']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -1017,6 +2138,32 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       'slot': serializer.toJson<int>(slot),
       'pokemonId': serializer.toJson<int>(pokemonId),
       'nickname': serializer.toJson<String?>(nickname),
+      'formName': serializer.toJson<String?>(formName),
+      'level': serializer.toJson<int?>(level),
+      'gender': serializer.toJson<String?>(gender),
+      'isShiny': serializer.toJson<bool>(isShiny),
+      'friendship': serializer.toJson<int?>(friendship),
+      'abilityName': serializer.toJson<String?>(abilityName),
+      'natureName': serializer.toJson<String?>(natureName),
+      'heldItemName': serializer.toJson<String?>(heldItemName),
+      'move1': serializer.toJson<String?>(move1),
+      'move2': serializer.toJson<String?>(move2),
+      'move3': serializer.toJson<String?>(move3),
+      'move4': serializer.toJson<String?>(move4),
+      'evHp': serializer.toJson<int?>(evHp),
+      'evAtk': serializer.toJson<int?>(evAtk),
+      'evDef': serializer.toJson<int?>(evDef),
+      'evSpa': serializer.toJson<int?>(evSpa),
+      'evSpd': serializer.toJson<int?>(evSpd),
+      'evSpe': serializer.toJson<int?>(evSpe),
+      'ivHp': serializer.toJson<int?>(ivHp),
+      'ivAtk': serializer.toJson<int?>(ivAtk),
+      'ivDef': serializer.toJson<int?>(ivDef),
+      'ivSpa': serializer.toJson<int?>(ivSpa),
+      'ivSpd': serializer.toJson<int?>(ivSpd),
+      'ivSpe': serializer.toJson<int?>(ivSpe),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
+      'syncStatus': serializer.toJson<String>(syncStatus),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -1028,6 +2175,32 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     int? slot,
     int? pokemonId,
     Value<String?> nickname = const Value.absent(),
+    Value<String?> formName = const Value.absent(),
+    Value<int?> level = const Value.absent(),
+    Value<String?> gender = const Value.absent(),
+    bool? isShiny,
+    Value<int?> friendship = const Value.absent(),
+    Value<String?> abilityName = const Value.absent(),
+    Value<String?> natureName = const Value.absent(),
+    Value<String?> heldItemName = const Value.absent(),
+    Value<String?> move1 = const Value.absent(),
+    Value<String?> move2 = const Value.absent(),
+    Value<String?> move3 = const Value.absent(),
+    Value<String?> move4 = const Value.absent(),
+    Value<int?> evHp = const Value.absent(),
+    Value<int?> evAtk = const Value.absent(),
+    Value<int?> evDef = const Value.absent(),
+    Value<int?> evSpa = const Value.absent(),
+    Value<int?> evSpd = const Value.absent(),
+    Value<int?> evSpe = const Value.absent(),
+    Value<int?> ivHp = const Value.absent(),
+    Value<int?> ivAtk = const Value.absent(),
+    Value<int?> ivDef = const Value.absent(),
+    Value<int?> ivSpa = const Value.absent(),
+    Value<int?> ivSpd = const Value.absent(),
+    Value<int?> ivSpe = const Value.absent(),
+    bool? isDeleted,
+    String? syncStatus,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => TeamSlot(
@@ -1036,6 +2209,32 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     slot: slot ?? this.slot,
     pokemonId: pokemonId ?? this.pokemonId,
     nickname: nickname.present ? nickname.value : this.nickname,
+    formName: formName.present ? formName.value : this.formName,
+    level: level.present ? level.value : this.level,
+    gender: gender.present ? gender.value : this.gender,
+    isShiny: isShiny ?? this.isShiny,
+    friendship: friendship.present ? friendship.value : this.friendship,
+    abilityName: abilityName.present ? abilityName.value : this.abilityName,
+    natureName: natureName.present ? natureName.value : this.natureName,
+    heldItemName: heldItemName.present ? heldItemName.value : this.heldItemName,
+    move1: move1.present ? move1.value : this.move1,
+    move2: move2.present ? move2.value : this.move2,
+    move3: move3.present ? move3.value : this.move3,
+    move4: move4.present ? move4.value : this.move4,
+    evHp: evHp.present ? evHp.value : this.evHp,
+    evAtk: evAtk.present ? evAtk.value : this.evAtk,
+    evDef: evDef.present ? evDef.value : this.evDef,
+    evSpa: evSpa.present ? evSpa.value : this.evSpa,
+    evSpd: evSpd.present ? evSpd.value : this.evSpd,
+    evSpe: evSpe.present ? evSpe.value : this.evSpe,
+    ivHp: ivHp.present ? ivHp.value : this.ivHp,
+    ivAtk: ivAtk.present ? ivAtk.value : this.ivAtk,
+    ivDef: ivDef.present ? ivDef.value : this.ivDef,
+    ivSpa: ivSpa.present ? ivSpa.value : this.ivSpa,
+    ivSpd: ivSpd.present ? ivSpd.value : this.ivSpd,
+    ivSpe: ivSpe.present ? ivSpe.value : this.ivSpe,
+    isDeleted: isDeleted ?? this.isDeleted,
+    syncStatus: syncStatus ?? this.syncStatus,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -1046,6 +2245,42 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       slot: data.slot.present ? data.slot.value : this.slot,
       pokemonId: data.pokemonId.present ? data.pokemonId.value : this.pokemonId,
       nickname: data.nickname.present ? data.nickname.value : this.nickname,
+      formName: data.formName.present ? data.formName.value : this.formName,
+      level: data.level.present ? data.level.value : this.level,
+      gender: data.gender.present ? data.gender.value : this.gender,
+      isShiny: data.isShiny.present ? data.isShiny.value : this.isShiny,
+      friendship: data.friendship.present
+          ? data.friendship.value
+          : this.friendship,
+      abilityName: data.abilityName.present
+          ? data.abilityName.value
+          : this.abilityName,
+      natureName: data.natureName.present
+          ? data.natureName.value
+          : this.natureName,
+      heldItemName: data.heldItemName.present
+          ? data.heldItemName.value
+          : this.heldItemName,
+      move1: data.move1.present ? data.move1.value : this.move1,
+      move2: data.move2.present ? data.move2.value : this.move2,
+      move3: data.move3.present ? data.move3.value : this.move3,
+      move4: data.move4.present ? data.move4.value : this.move4,
+      evHp: data.evHp.present ? data.evHp.value : this.evHp,
+      evAtk: data.evAtk.present ? data.evAtk.value : this.evAtk,
+      evDef: data.evDef.present ? data.evDef.value : this.evDef,
+      evSpa: data.evSpa.present ? data.evSpa.value : this.evSpa,
+      evSpd: data.evSpd.present ? data.evSpd.value : this.evSpd,
+      evSpe: data.evSpe.present ? data.evSpe.value : this.evSpe,
+      ivHp: data.ivHp.present ? data.ivHp.value : this.ivHp,
+      ivAtk: data.ivAtk.present ? data.ivAtk.value : this.ivAtk,
+      ivDef: data.ivDef.present ? data.ivDef.value : this.ivDef,
+      ivSpa: data.ivSpa.present ? data.ivSpa.value : this.ivSpa,
+      ivSpd: data.ivSpd.present ? data.ivSpd.value : this.ivSpd,
+      ivSpe: data.ivSpe.present ? data.ivSpe.value : this.ivSpe,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -1059,6 +2294,32 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
           ..write('slot: $slot, ')
           ..write('pokemonId: $pokemonId, ')
           ..write('nickname: $nickname, ')
+          ..write('formName: $formName, ')
+          ..write('level: $level, ')
+          ..write('gender: $gender, ')
+          ..write('isShiny: $isShiny, ')
+          ..write('friendship: $friendship, ')
+          ..write('abilityName: $abilityName, ')
+          ..write('natureName: $natureName, ')
+          ..write('heldItemName: $heldItemName, ')
+          ..write('move1: $move1, ')
+          ..write('move2: $move2, ')
+          ..write('move3: $move3, ')
+          ..write('move4: $move4, ')
+          ..write('evHp: $evHp, ')
+          ..write('evAtk: $evAtk, ')
+          ..write('evDef: $evDef, ')
+          ..write('evSpa: $evSpa, ')
+          ..write('evSpd: $evSpd, ')
+          ..write('evSpe: $evSpe, ')
+          ..write('ivHp: $ivHp, ')
+          ..write('ivAtk: $ivAtk, ')
+          ..write('ivDef: $ivDef, ')
+          ..write('ivSpa: $ivSpa, ')
+          ..write('ivSpd: $ivSpd, ')
+          ..write('ivSpe: $ivSpe, ')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('syncStatus: $syncStatus, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1066,8 +2327,41 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, teamId, slot, pokemonId, nickname, createdAt, updatedAt);
+  int get hashCode => Object.hashAll([
+    id,
+    teamId,
+    slot,
+    pokemonId,
+    nickname,
+    formName,
+    level,
+    gender,
+    isShiny,
+    friendship,
+    abilityName,
+    natureName,
+    heldItemName,
+    move1,
+    move2,
+    move3,
+    move4,
+    evHp,
+    evAtk,
+    evDef,
+    evSpa,
+    evSpd,
+    evSpe,
+    ivHp,
+    ivAtk,
+    ivDef,
+    ivSpa,
+    ivSpd,
+    ivSpe,
+    isDeleted,
+    syncStatus,
+    createdAt,
+    updatedAt,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1077,6 +2371,32 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
           other.slot == this.slot &&
           other.pokemonId == this.pokemonId &&
           other.nickname == this.nickname &&
+          other.formName == this.formName &&
+          other.level == this.level &&
+          other.gender == this.gender &&
+          other.isShiny == this.isShiny &&
+          other.friendship == this.friendship &&
+          other.abilityName == this.abilityName &&
+          other.natureName == this.natureName &&
+          other.heldItemName == this.heldItemName &&
+          other.move1 == this.move1 &&
+          other.move2 == this.move2 &&
+          other.move3 == this.move3 &&
+          other.move4 == this.move4 &&
+          other.evHp == this.evHp &&
+          other.evAtk == this.evAtk &&
+          other.evDef == this.evDef &&
+          other.evSpa == this.evSpa &&
+          other.evSpd == this.evSpd &&
+          other.evSpe == this.evSpe &&
+          other.ivHp == this.ivHp &&
+          other.ivAtk == this.ivAtk &&
+          other.ivDef == this.ivDef &&
+          other.ivSpa == this.ivSpa &&
+          other.ivSpd == this.ivSpd &&
+          other.ivSpe == this.ivSpe &&
+          other.isDeleted == this.isDeleted &&
+          other.syncStatus == this.syncStatus &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -1087,6 +2407,32 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
   final Value<int> slot;
   final Value<int> pokemonId;
   final Value<String?> nickname;
+  final Value<String?> formName;
+  final Value<int?> level;
+  final Value<String?> gender;
+  final Value<bool> isShiny;
+  final Value<int?> friendship;
+  final Value<String?> abilityName;
+  final Value<String?> natureName;
+  final Value<String?> heldItemName;
+  final Value<String?> move1;
+  final Value<String?> move2;
+  final Value<String?> move3;
+  final Value<String?> move4;
+  final Value<int?> evHp;
+  final Value<int?> evAtk;
+  final Value<int?> evDef;
+  final Value<int?> evSpa;
+  final Value<int?> evSpd;
+  final Value<int?> evSpe;
+  final Value<int?> ivHp;
+  final Value<int?> ivAtk;
+  final Value<int?> ivDef;
+  final Value<int?> ivSpa;
+  final Value<int?> ivSpd;
+  final Value<int?> ivSpe;
+  final Value<bool> isDeleted;
+  final Value<String> syncStatus;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const TeamSlotsCompanion({
@@ -1095,6 +2441,32 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     this.slot = const Value.absent(),
     this.pokemonId = const Value.absent(),
     this.nickname = const Value.absent(),
+    this.formName = const Value.absent(),
+    this.level = const Value.absent(),
+    this.gender = const Value.absent(),
+    this.isShiny = const Value.absent(),
+    this.friendship = const Value.absent(),
+    this.abilityName = const Value.absent(),
+    this.natureName = const Value.absent(),
+    this.heldItemName = const Value.absent(),
+    this.move1 = const Value.absent(),
+    this.move2 = const Value.absent(),
+    this.move3 = const Value.absent(),
+    this.move4 = const Value.absent(),
+    this.evHp = const Value.absent(),
+    this.evAtk = const Value.absent(),
+    this.evDef = const Value.absent(),
+    this.evSpa = const Value.absent(),
+    this.evSpd = const Value.absent(),
+    this.evSpe = const Value.absent(),
+    this.ivHp = const Value.absent(),
+    this.ivAtk = const Value.absent(),
+    this.ivDef = const Value.absent(),
+    this.ivSpa = const Value.absent(),
+    this.ivSpd = const Value.absent(),
+    this.ivSpe = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+    this.syncStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -1104,6 +2476,32 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     required int slot,
     required int pokemonId,
     this.nickname = const Value.absent(),
+    this.formName = const Value.absent(),
+    this.level = const Value.absent(),
+    this.gender = const Value.absent(),
+    this.isShiny = const Value.absent(),
+    this.friendship = const Value.absent(),
+    this.abilityName = const Value.absent(),
+    this.natureName = const Value.absent(),
+    this.heldItemName = const Value.absent(),
+    this.move1 = const Value.absent(),
+    this.move2 = const Value.absent(),
+    this.move3 = const Value.absent(),
+    this.move4 = const Value.absent(),
+    this.evHp = const Value.absent(),
+    this.evAtk = const Value.absent(),
+    this.evDef = const Value.absent(),
+    this.evSpa = const Value.absent(),
+    this.evSpd = const Value.absent(),
+    this.evSpe = const Value.absent(),
+    this.ivHp = const Value.absent(),
+    this.ivAtk = const Value.absent(),
+    this.ivDef = const Value.absent(),
+    this.ivSpa = const Value.absent(),
+    this.ivSpd = const Value.absent(),
+    this.ivSpe = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+    this.syncStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   }) : teamId = Value(teamId),
@@ -1115,6 +2513,32 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     Expression<int>? slot,
     Expression<int>? pokemonId,
     Expression<String>? nickname,
+    Expression<String>? formName,
+    Expression<int>? level,
+    Expression<String>? gender,
+    Expression<bool>? isShiny,
+    Expression<int>? friendship,
+    Expression<String>? abilityName,
+    Expression<String>? natureName,
+    Expression<String>? heldItemName,
+    Expression<String>? move1,
+    Expression<String>? move2,
+    Expression<String>? move3,
+    Expression<String>? move4,
+    Expression<int>? evHp,
+    Expression<int>? evAtk,
+    Expression<int>? evDef,
+    Expression<int>? evSpa,
+    Expression<int>? evSpd,
+    Expression<int>? evSpe,
+    Expression<int>? ivHp,
+    Expression<int>? ivAtk,
+    Expression<int>? ivDef,
+    Expression<int>? ivSpa,
+    Expression<int>? ivSpd,
+    Expression<int>? ivSpe,
+    Expression<bool>? isDeleted,
+    Expression<String>? syncStatus,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -1124,6 +2548,32 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
       if (slot != null) 'slot': slot,
       if (pokemonId != null) 'pokemon_id': pokemonId,
       if (nickname != null) 'nickname': nickname,
+      if (formName != null) 'form_name': formName,
+      if (level != null) 'level': level,
+      if (gender != null) 'gender': gender,
+      if (isShiny != null) 'is_shiny': isShiny,
+      if (friendship != null) 'friendship': friendship,
+      if (abilityName != null) 'ability_name': abilityName,
+      if (natureName != null) 'nature_name': natureName,
+      if (heldItemName != null) 'held_item_name': heldItemName,
+      if (move1 != null) 'move1': move1,
+      if (move2 != null) 'move2': move2,
+      if (move3 != null) 'move3': move3,
+      if (move4 != null) 'move4': move4,
+      if (evHp != null) 'ev_hp': evHp,
+      if (evAtk != null) 'ev_atk': evAtk,
+      if (evDef != null) 'ev_def': evDef,
+      if (evSpa != null) 'ev_spa': evSpa,
+      if (evSpd != null) 'ev_spd': evSpd,
+      if (evSpe != null) 'ev_spe': evSpe,
+      if (ivHp != null) 'iv_hp': ivHp,
+      if (ivAtk != null) 'iv_atk': ivAtk,
+      if (ivDef != null) 'iv_def': ivDef,
+      if (ivSpa != null) 'iv_spa': ivSpa,
+      if (ivSpd != null) 'iv_spd': ivSpd,
+      if (ivSpe != null) 'iv_spe': ivSpe,
+      if (isDeleted != null) 'is_deleted': isDeleted,
+      if (syncStatus != null) 'sync_status': syncStatus,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -1135,6 +2585,32 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     Value<int>? slot,
     Value<int>? pokemonId,
     Value<String?>? nickname,
+    Value<String?>? formName,
+    Value<int?>? level,
+    Value<String?>? gender,
+    Value<bool>? isShiny,
+    Value<int?>? friendship,
+    Value<String?>? abilityName,
+    Value<String?>? natureName,
+    Value<String?>? heldItemName,
+    Value<String?>? move1,
+    Value<String?>? move2,
+    Value<String?>? move3,
+    Value<String?>? move4,
+    Value<int?>? evHp,
+    Value<int?>? evAtk,
+    Value<int?>? evDef,
+    Value<int?>? evSpa,
+    Value<int?>? evSpd,
+    Value<int?>? evSpe,
+    Value<int?>? ivHp,
+    Value<int?>? ivAtk,
+    Value<int?>? ivDef,
+    Value<int?>? ivSpa,
+    Value<int?>? ivSpd,
+    Value<int?>? ivSpe,
+    Value<bool>? isDeleted,
+    Value<String>? syncStatus,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -1144,6 +2620,32 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
       slot: slot ?? this.slot,
       pokemonId: pokemonId ?? this.pokemonId,
       nickname: nickname ?? this.nickname,
+      formName: formName ?? this.formName,
+      level: level ?? this.level,
+      gender: gender ?? this.gender,
+      isShiny: isShiny ?? this.isShiny,
+      friendship: friendship ?? this.friendship,
+      abilityName: abilityName ?? this.abilityName,
+      natureName: natureName ?? this.natureName,
+      heldItemName: heldItemName ?? this.heldItemName,
+      move1: move1 ?? this.move1,
+      move2: move2 ?? this.move2,
+      move3: move3 ?? this.move3,
+      move4: move4 ?? this.move4,
+      evHp: evHp ?? this.evHp,
+      evAtk: evAtk ?? this.evAtk,
+      evDef: evDef ?? this.evDef,
+      evSpa: evSpa ?? this.evSpa,
+      evSpd: evSpd ?? this.evSpd,
+      evSpe: evSpe ?? this.evSpe,
+      ivHp: ivHp ?? this.ivHp,
+      ivAtk: ivAtk ?? this.ivAtk,
+      ivDef: ivDef ?? this.ivDef,
+      ivSpa: ivSpa ?? this.ivSpa,
+      ivSpd: ivSpd ?? this.ivSpd,
+      ivSpe: ivSpe ?? this.ivSpe,
+      isDeleted: isDeleted ?? this.isDeleted,
+      syncStatus: syncStatus ?? this.syncStatus,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -1167,6 +2669,84 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     if (nickname.present) {
       map['nickname'] = Variable<String>(nickname.value);
     }
+    if (formName.present) {
+      map['form_name'] = Variable<String>(formName.value);
+    }
+    if (level.present) {
+      map['level'] = Variable<int>(level.value);
+    }
+    if (gender.present) {
+      map['gender'] = Variable<String>(gender.value);
+    }
+    if (isShiny.present) {
+      map['is_shiny'] = Variable<bool>(isShiny.value);
+    }
+    if (friendship.present) {
+      map['friendship'] = Variable<int>(friendship.value);
+    }
+    if (abilityName.present) {
+      map['ability_name'] = Variable<String>(abilityName.value);
+    }
+    if (natureName.present) {
+      map['nature_name'] = Variable<String>(natureName.value);
+    }
+    if (heldItemName.present) {
+      map['held_item_name'] = Variable<String>(heldItemName.value);
+    }
+    if (move1.present) {
+      map['move1'] = Variable<String>(move1.value);
+    }
+    if (move2.present) {
+      map['move2'] = Variable<String>(move2.value);
+    }
+    if (move3.present) {
+      map['move3'] = Variable<String>(move3.value);
+    }
+    if (move4.present) {
+      map['move4'] = Variable<String>(move4.value);
+    }
+    if (evHp.present) {
+      map['ev_hp'] = Variable<int>(evHp.value);
+    }
+    if (evAtk.present) {
+      map['ev_atk'] = Variable<int>(evAtk.value);
+    }
+    if (evDef.present) {
+      map['ev_def'] = Variable<int>(evDef.value);
+    }
+    if (evSpa.present) {
+      map['ev_spa'] = Variable<int>(evSpa.value);
+    }
+    if (evSpd.present) {
+      map['ev_spd'] = Variable<int>(evSpd.value);
+    }
+    if (evSpe.present) {
+      map['ev_spe'] = Variable<int>(evSpe.value);
+    }
+    if (ivHp.present) {
+      map['iv_hp'] = Variable<int>(ivHp.value);
+    }
+    if (ivAtk.present) {
+      map['iv_atk'] = Variable<int>(ivAtk.value);
+    }
+    if (ivDef.present) {
+      map['iv_def'] = Variable<int>(ivDef.value);
+    }
+    if (ivSpa.present) {
+      map['iv_spa'] = Variable<int>(ivSpa.value);
+    }
+    if (ivSpd.present) {
+      map['iv_spd'] = Variable<int>(ivSpd.value);
+    }
+    if (ivSpe.present) {
+      map['iv_spe'] = Variable<int>(ivSpe.value);
+    }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1184,6 +2764,32 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
           ..write('slot: $slot, ')
           ..write('pokemonId: $pokemonId, ')
           ..write('nickname: $nickname, ')
+          ..write('formName: $formName, ')
+          ..write('level: $level, ')
+          ..write('gender: $gender, ')
+          ..write('isShiny: $isShiny, ')
+          ..write('friendship: $friendship, ')
+          ..write('abilityName: $abilityName, ')
+          ..write('natureName: $natureName, ')
+          ..write('heldItemName: $heldItemName, ')
+          ..write('move1: $move1, ')
+          ..write('move2: $move2, ')
+          ..write('move3: $move3, ')
+          ..write('move4: $move4, ')
+          ..write('evHp: $evHp, ')
+          ..write('evAtk: $evAtk, ')
+          ..write('evDef: $evDef, ')
+          ..write('evSpa: $evSpa, ')
+          ..write('evSpd: $evSpd, ')
+          ..write('evSpe: $evSpe, ')
+          ..write('ivHp: $ivHp, ')
+          ..write('ivAtk: $ivAtk, ')
+          ..write('ivDef: $ivDef, ')
+          ..write('ivSpa: $ivSpa, ')
+          ..write('ivSpd: $ivSpd, ')
+          ..write('ivSpe: $ivSpe, ')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('syncStatus: $syncStatus, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -2140,6 +3746,9 @@ typedef $$TeamFoldersTableCreateCompanionBuilder =
       Value<int> id,
       required String name,
       Value<String?> remoteId,
+      Value<int> sortOrder,
+      Value<bool> isDeleted,
+      Value<String> syncStatus,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -2148,6 +3757,9 @@ typedef $$TeamFoldersTableUpdateCompanionBuilder =
       Value<int> id,
       Value<String> name,
       Value<String?> remoteId,
+      Value<int> sortOrder,
+      Value<bool> isDeleted,
+      Value<String> syncStatus,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -2197,6 +3809,21 @@ class $$TeamFoldersTableFilterComposer
 
   ColumnFilters<String> get remoteId => $composableBuilder(
     column: $table.remoteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2260,6 +3887,21 @@ class $$TeamFoldersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -2288,6 +3930,17 @@ class $$TeamFoldersTableAnnotationComposer
 
   GeneratedColumn<String> get remoteId =>
       $composableBuilder(column: $table.remoteId, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -2352,12 +4005,18 @@ class $$TeamFoldersTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> remoteId = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => TeamFoldersCompanion(
                 id: id,
                 name: name,
                 remoteId: remoteId,
+                sortOrder: sortOrder,
+                isDeleted: isDeleted,
+                syncStatus: syncStatus,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -2366,12 +4025,18 @@ class $$TeamFoldersTableTableManager
                 Value<int> id = const Value.absent(),
                 required String name,
                 Value<String?> remoteId = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => TeamFoldersCompanion.insert(
                 id: id,
                 name: name,
                 remoteId: remoteId,
+                sortOrder: sortOrder,
+                isDeleted: isDeleted,
+                syncStatus: syncStatus,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -2433,6 +4098,10 @@ typedef $$TeamsTableCreateCompanionBuilder =
       Value<int?> folderId,
       required String name,
       Value<String?> remoteId,
+      Value<String?> formatLabel,
+      Value<int> sortOrder,
+      Value<bool> isDeleted,
+      Value<String> syncStatus,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -2442,6 +4111,10 @@ typedef $$TeamsTableUpdateCompanionBuilder =
       Value<int?> folderId,
       Value<String> name,
       Value<String?> remoteId,
+      Value<String?> formatLabel,
+      Value<int> sortOrder,
+      Value<bool> isDeleted,
+      Value<String> syncStatus,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -2506,6 +4179,26 @@ class $$TeamsTableFilterComposer extends Composer<_$AppDatabase, $TeamsTable> {
 
   ColumnFilters<String> get remoteId => $composableBuilder(
     column: $table.remoteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get formatLabel => $composableBuilder(
+    column: $table.formatLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2592,6 +4285,26 @@ class $$TeamsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get formatLabel => $composableBuilder(
+    column: $table.formatLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -2643,6 +4356,22 @@ class $$TeamsTableAnnotationComposer
 
   GeneratedColumn<String> get remoteId =>
       $composableBuilder(column: $table.remoteId, builder: (column) => column);
+
+  GeneratedColumn<String> get formatLabel => $composableBuilder(
+    column: $table.formatLabel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -2731,6 +4460,10 @@ class $$TeamsTableTableManager
                 Value<int?> folderId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> remoteId = const Value.absent(),
+                Value<String?> formatLabel = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => TeamsCompanion(
@@ -2738,6 +4471,10 @@ class $$TeamsTableTableManager
                 folderId: folderId,
                 name: name,
                 remoteId: remoteId,
+                formatLabel: formatLabel,
+                sortOrder: sortOrder,
+                isDeleted: isDeleted,
+                syncStatus: syncStatus,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -2747,6 +4484,10 @@ class $$TeamsTableTableManager
                 Value<int?> folderId = const Value.absent(),
                 required String name,
                 Value<String?> remoteId = const Value.absent(),
+                Value<String?> formatLabel = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => TeamsCompanion.insert(
@@ -2754,6 +4495,10 @@ class $$TeamsTableTableManager
                 folderId: folderId,
                 name: name,
                 remoteId: remoteId,
+                formatLabel: formatLabel,
+                sortOrder: sortOrder,
+                isDeleted: isDeleted,
+                syncStatus: syncStatus,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -2841,6 +4586,32 @@ typedef $$TeamSlotsTableCreateCompanionBuilder =
       required int slot,
       required int pokemonId,
       Value<String?> nickname,
+      Value<String?> formName,
+      Value<int?> level,
+      Value<String?> gender,
+      Value<bool> isShiny,
+      Value<int?> friendship,
+      Value<String?> abilityName,
+      Value<String?> natureName,
+      Value<String?> heldItemName,
+      Value<String?> move1,
+      Value<String?> move2,
+      Value<String?> move3,
+      Value<String?> move4,
+      Value<int?> evHp,
+      Value<int?> evAtk,
+      Value<int?> evDef,
+      Value<int?> evSpa,
+      Value<int?> evSpd,
+      Value<int?> evSpe,
+      Value<int?> ivHp,
+      Value<int?> ivAtk,
+      Value<int?> ivDef,
+      Value<int?> ivSpa,
+      Value<int?> ivSpd,
+      Value<int?> ivSpe,
+      Value<bool> isDeleted,
+      Value<String> syncStatus,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -2851,6 +4622,32 @@ typedef $$TeamSlotsTableUpdateCompanionBuilder =
       Value<int> slot,
       Value<int> pokemonId,
       Value<String?> nickname,
+      Value<String?> formName,
+      Value<int?> level,
+      Value<String?> gender,
+      Value<bool> isShiny,
+      Value<int?> friendship,
+      Value<String?> abilityName,
+      Value<String?> natureName,
+      Value<String?> heldItemName,
+      Value<String?> move1,
+      Value<String?> move2,
+      Value<String?> move3,
+      Value<String?> move4,
+      Value<int?> evHp,
+      Value<int?> evAtk,
+      Value<int?> evDef,
+      Value<int?> evSpa,
+      Value<int?> evSpd,
+      Value<int?> evSpe,
+      Value<int?> ivHp,
+      Value<int?> ivAtk,
+      Value<int?> ivDef,
+      Value<int?> ivSpa,
+      Value<int?> ivSpd,
+      Value<int?> ivSpe,
+      Value<bool> isDeleted,
+      Value<String> syncStatus,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -2904,6 +4701,136 @@ class $$TeamSlotsTableFilterComposer
 
   ColumnFilters<String> get nickname => $composableBuilder(
     column: $table.nickname,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get formName => $composableBuilder(
+    column: $table.formName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get level => $composableBuilder(
+    column: $table.level,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get gender => $composableBuilder(
+    column: $table.gender,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isShiny => $composableBuilder(
+    column: $table.isShiny,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get friendship => $composableBuilder(
+    column: $table.friendship,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get abilityName => $composableBuilder(
+    column: $table.abilityName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get natureName => $composableBuilder(
+    column: $table.natureName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get heldItemName => $composableBuilder(
+    column: $table.heldItemName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get move1 => $composableBuilder(
+    column: $table.move1,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get move2 => $composableBuilder(
+    column: $table.move2,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get move3 => $composableBuilder(
+    column: $table.move3,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get move4 => $composableBuilder(
+    column: $table.move4,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get evHp => $composableBuilder(
+    column: $table.evHp,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get evAtk => $composableBuilder(
+    column: $table.evAtk,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get evDef => $composableBuilder(
+    column: $table.evDef,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get evSpa => $composableBuilder(
+    column: $table.evSpa,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get evSpd => $composableBuilder(
+    column: $table.evSpd,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get evSpe => $composableBuilder(
+    column: $table.evSpe,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ivHp => $composableBuilder(
+    column: $table.ivHp,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ivAtk => $composableBuilder(
+    column: $table.ivAtk,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ivDef => $composableBuilder(
+    column: $table.ivDef,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ivSpa => $composableBuilder(
+    column: $table.ivSpa,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ivSpd => $composableBuilder(
+    column: $table.ivSpd,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ivSpe => $composableBuilder(
+    column: $table.ivSpe,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2970,6 +4897,136 @@ class $$TeamSlotsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get formName => $composableBuilder(
+    column: $table.formName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get level => $composableBuilder(
+    column: $table.level,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get gender => $composableBuilder(
+    column: $table.gender,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isShiny => $composableBuilder(
+    column: $table.isShiny,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get friendship => $composableBuilder(
+    column: $table.friendship,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get abilityName => $composableBuilder(
+    column: $table.abilityName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get natureName => $composableBuilder(
+    column: $table.natureName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get heldItemName => $composableBuilder(
+    column: $table.heldItemName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get move1 => $composableBuilder(
+    column: $table.move1,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get move2 => $composableBuilder(
+    column: $table.move2,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get move3 => $composableBuilder(
+    column: $table.move3,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get move4 => $composableBuilder(
+    column: $table.move4,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get evHp => $composableBuilder(
+    column: $table.evHp,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get evAtk => $composableBuilder(
+    column: $table.evAtk,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get evDef => $composableBuilder(
+    column: $table.evDef,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get evSpa => $composableBuilder(
+    column: $table.evSpa,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get evSpd => $composableBuilder(
+    column: $table.evSpd,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get evSpe => $composableBuilder(
+    column: $table.evSpe,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ivHp => $composableBuilder(
+    column: $table.ivHp,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ivAtk => $composableBuilder(
+    column: $table.ivAtk,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ivDef => $composableBuilder(
+    column: $table.ivDef,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ivSpa => $composableBuilder(
+    column: $table.ivSpa,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ivSpd => $composableBuilder(
+    column: $table.ivSpd,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ivSpe => $composableBuilder(
+    column: $table.ivSpe,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -3024,6 +5081,94 @@ class $$TeamSlotsTableAnnotationComposer
 
   GeneratedColumn<String> get nickname =>
       $composableBuilder(column: $table.nickname, builder: (column) => column);
+
+  GeneratedColumn<String> get formName =>
+      $composableBuilder(column: $table.formName, builder: (column) => column);
+
+  GeneratedColumn<int> get level =>
+      $composableBuilder(column: $table.level, builder: (column) => column);
+
+  GeneratedColumn<String> get gender =>
+      $composableBuilder(column: $table.gender, builder: (column) => column);
+
+  GeneratedColumn<bool> get isShiny =>
+      $composableBuilder(column: $table.isShiny, builder: (column) => column);
+
+  GeneratedColumn<int> get friendship => $composableBuilder(
+    column: $table.friendship,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get abilityName => $composableBuilder(
+    column: $table.abilityName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get natureName => $composableBuilder(
+    column: $table.natureName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get heldItemName => $composableBuilder(
+    column: $table.heldItemName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get move1 =>
+      $composableBuilder(column: $table.move1, builder: (column) => column);
+
+  GeneratedColumn<String> get move2 =>
+      $composableBuilder(column: $table.move2, builder: (column) => column);
+
+  GeneratedColumn<String> get move3 =>
+      $composableBuilder(column: $table.move3, builder: (column) => column);
+
+  GeneratedColumn<String> get move4 =>
+      $composableBuilder(column: $table.move4, builder: (column) => column);
+
+  GeneratedColumn<int> get evHp =>
+      $composableBuilder(column: $table.evHp, builder: (column) => column);
+
+  GeneratedColumn<int> get evAtk =>
+      $composableBuilder(column: $table.evAtk, builder: (column) => column);
+
+  GeneratedColumn<int> get evDef =>
+      $composableBuilder(column: $table.evDef, builder: (column) => column);
+
+  GeneratedColumn<int> get evSpa =>
+      $composableBuilder(column: $table.evSpa, builder: (column) => column);
+
+  GeneratedColumn<int> get evSpd =>
+      $composableBuilder(column: $table.evSpd, builder: (column) => column);
+
+  GeneratedColumn<int> get evSpe =>
+      $composableBuilder(column: $table.evSpe, builder: (column) => column);
+
+  GeneratedColumn<int> get ivHp =>
+      $composableBuilder(column: $table.ivHp, builder: (column) => column);
+
+  GeneratedColumn<int> get ivAtk =>
+      $composableBuilder(column: $table.ivAtk, builder: (column) => column);
+
+  GeneratedColumn<int> get ivDef =>
+      $composableBuilder(column: $table.ivDef, builder: (column) => column);
+
+  GeneratedColumn<int> get ivSpa =>
+      $composableBuilder(column: $table.ivSpa, builder: (column) => column);
+
+  GeneratedColumn<int> get ivSpd =>
+      $composableBuilder(column: $table.ivSpd, builder: (column) => column);
+
+  GeneratedColumn<int> get ivSpe =>
+      $composableBuilder(column: $table.ivSpe, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -3088,6 +5233,32 @@ class $$TeamSlotsTableTableManager
                 Value<int> slot = const Value.absent(),
                 Value<int> pokemonId = const Value.absent(),
                 Value<String?> nickname = const Value.absent(),
+                Value<String?> formName = const Value.absent(),
+                Value<int?> level = const Value.absent(),
+                Value<String?> gender = const Value.absent(),
+                Value<bool> isShiny = const Value.absent(),
+                Value<int?> friendship = const Value.absent(),
+                Value<String?> abilityName = const Value.absent(),
+                Value<String?> natureName = const Value.absent(),
+                Value<String?> heldItemName = const Value.absent(),
+                Value<String?> move1 = const Value.absent(),
+                Value<String?> move2 = const Value.absent(),
+                Value<String?> move3 = const Value.absent(),
+                Value<String?> move4 = const Value.absent(),
+                Value<int?> evHp = const Value.absent(),
+                Value<int?> evAtk = const Value.absent(),
+                Value<int?> evDef = const Value.absent(),
+                Value<int?> evSpa = const Value.absent(),
+                Value<int?> evSpd = const Value.absent(),
+                Value<int?> evSpe = const Value.absent(),
+                Value<int?> ivHp = const Value.absent(),
+                Value<int?> ivAtk = const Value.absent(),
+                Value<int?> ivDef = const Value.absent(),
+                Value<int?> ivSpa = const Value.absent(),
+                Value<int?> ivSpd = const Value.absent(),
+                Value<int?> ivSpe = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => TeamSlotsCompanion(
@@ -3096,6 +5267,32 @@ class $$TeamSlotsTableTableManager
                 slot: slot,
                 pokemonId: pokemonId,
                 nickname: nickname,
+                formName: formName,
+                level: level,
+                gender: gender,
+                isShiny: isShiny,
+                friendship: friendship,
+                abilityName: abilityName,
+                natureName: natureName,
+                heldItemName: heldItemName,
+                move1: move1,
+                move2: move2,
+                move3: move3,
+                move4: move4,
+                evHp: evHp,
+                evAtk: evAtk,
+                evDef: evDef,
+                evSpa: evSpa,
+                evSpd: evSpd,
+                evSpe: evSpe,
+                ivHp: ivHp,
+                ivAtk: ivAtk,
+                ivDef: ivDef,
+                ivSpa: ivSpa,
+                ivSpd: ivSpd,
+                ivSpe: ivSpe,
+                isDeleted: isDeleted,
+                syncStatus: syncStatus,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -3106,6 +5303,32 @@ class $$TeamSlotsTableTableManager
                 required int slot,
                 required int pokemonId,
                 Value<String?> nickname = const Value.absent(),
+                Value<String?> formName = const Value.absent(),
+                Value<int?> level = const Value.absent(),
+                Value<String?> gender = const Value.absent(),
+                Value<bool> isShiny = const Value.absent(),
+                Value<int?> friendship = const Value.absent(),
+                Value<String?> abilityName = const Value.absent(),
+                Value<String?> natureName = const Value.absent(),
+                Value<String?> heldItemName = const Value.absent(),
+                Value<String?> move1 = const Value.absent(),
+                Value<String?> move2 = const Value.absent(),
+                Value<String?> move3 = const Value.absent(),
+                Value<String?> move4 = const Value.absent(),
+                Value<int?> evHp = const Value.absent(),
+                Value<int?> evAtk = const Value.absent(),
+                Value<int?> evDef = const Value.absent(),
+                Value<int?> evSpa = const Value.absent(),
+                Value<int?> evSpd = const Value.absent(),
+                Value<int?> evSpe = const Value.absent(),
+                Value<int?> ivHp = const Value.absent(),
+                Value<int?> ivAtk = const Value.absent(),
+                Value<int?> ivDef = const Value.absent(),
+                Value<int?> ivSpa = const Value.absent(),
+                Value<int?> ivSpd = const Value.absent(),
+                Value<int?> ivSpe = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => TeamSlotsCompanion.insert(
@@ -3114,6 +5337,32 @@ class $$TeamSlotsTableTableManager
                 slot: slot,
                 pokemonId: pokemonId,
                 nickname: nickname,
+                formName: formName,
+                level: level,
+                gender: gender,
+                isShiny: isShiny,
+                friendship: friendship,
+                abilityName: abilityName,
+                natureName: natureName,
+                heldItemName: heldItemName,
+                move1: move1,
+                move2: move2,
+                move3: move3,
+                move4: move4,
+                evHp: evHp,
+                evAtk: evAtk,
+                evDef: evDef,
+                evSpa: evSpa,
+                evSpd: evSpd,
+                evSpe: evSpe,
+                ivHp: ivHp,
+                ivAtk: ivAtk,
+                ivDef: ivDef,
+                ivSpa: ivSpa,
+                ivSpd: ivSpd,
+                ivSpe: ivSpe,
+                isDeleted: isDeleted,
+                syncStatus: syncStatus,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
