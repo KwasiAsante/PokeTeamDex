@@ -1,6 +1,6 @@
 # PokeTeamDex — Progress Tracker
 
-> Generated 2026-05-29 from PRD v1.0 audit. Checked items are confirmed implemented in the codebase.
+> Updated 2026-05-30 after schema v3 + slot config merge (PR #30).
 
 ---
 
@@ -52,36 +52,34 @@
 - [x] Slot endpoints (`POST/PUT/PATCH/DELETE /teams/:id/slots/:slotId`)
 - [x] `GET /sync/pull?since=` endpoint (returns folders + teams + slots updated after timestamp)
 - [ ] **`POST /sync/push` batch endpoint** — PRD §9 specifies a single batch-push; current client calls individual CRUD endpoints per queued op instead *(no `/sync/push` route exists)*
-- [ ] **`is_deleted` soft-delete on local Drift schema** — `teams`, `team_folders`, `team_slots` tables lack the column; deletions can't propagate to other devices via pull
 
 ---
 
-## Phase 5 — Team Builder
+## Phase 5 — Team Builder ✅
 
 - [x] Folder hierarchy UI — collapsible sections, create/rename/delete, team count badge
 - [x] Teams list with folder grouping and ungrouped fallback section
 - [x] Create / rename / delete team
-- [x] Team detail — 6-slot grid (filled + empty cards)
-- [x] Filled slot card — sprite, nickname/species, type badges
-- [x] Slot long-press menu — edit nickname, replace Pokémon, remove from team
-- [x] Empty slot — tap to pick Pokémon (slot picker screen)
+- [x] Team detail — full-width slot cards (redesigned from grid)
+- [x] Filled slot card — sprite (shiny-aware), nickname/species, type badges, level, gender, item sprite + name, ability, nature, calculated stat bars, move strip
+- [x] Slot long-press menu — configure slot, replace Pokémon, remove from team
+- [x] Empty slot — tap → Slot Picker → Slot Config (context.replace, no intermediate Team Detail step)
 - [x] Slot picker screen (search Pokédex, select Pokémon for a slot)
-- [ ] **Slot Config screen** — all per-slot fields (required to unblock full Showdown export + stat preview):
-  - [ ] Ability dropdown (valid abilities for species, labelled 1 / 2 / Hidden)
-  - [ ] Nature dropdown (25 natures with +/− stat labels inline)
-  - [ ] Held item — searchable dropdown with sprite + effect sub-text
-  - [ ] 4 move slots — moves the Pokémon can learn, type badge + power/accuracy, tap for detail overlay
-  - [ ] EV sliders/inputs (0–252 each; running total, highlight red over 510)
-  - [ ] IV inputs (0–31 each, default 31)
-  - [ ] Level (1–100, default 50)
-  - [ ] Shiny toggle
-  - [ ] Gender picker (respects species `gender_rate`)
-  - [ ] Form/variant selector
-  - [ ] Friendship/happiness (0–255)
-- [ ] **Local DB slot config columns** — `team_slots` Drift table currently stores only `pokemonId` + `nickname`; needs all slot config fields added (ability, nature, held item, moves 1–4, EVs 1–6, IVs 1–6, level, is_shiny, gender, form_name)
-- [ ] **Stat preview** — real-time Gen III+ calculator updating as EVs/IVs/nature/level change (formula in PRD §12)
-- [ ] **Drag-reorder** — slots within a team; teams within a folder
-- [ ] **`format_label` field on Team** — game/format label (e.g. "VGC 2025") per PRD §6.1.2; not in DB schema or UI yet
+- [x] **Slot Config screen** — all per-slot fields:
+  - [x] Ability cards (valid abilities for species, with effect description, labelled Hidden)
+  - [x] Nature dropdown (25 natures with +/− stat labels inline)
+  - [x] Held item — searchable picker with sprite + effect sub-text
+  - [x] 4 move slots — learnable moves with type badge + power/acc/pp + effect description
+  - [x] EV grid (0–252 each; running total, blocks save over 510)
+  - [x] IV grid (0–31 each, default 31)
+  - [x] Level (1–100, slider, default 50)
+  - [x] Shiny toggle (swaps sprite to shiny URL)
+  - [x] Gender picker (Male / Female / None chips)
+  - [x] Friendship/happiness (0–255 slider)
+- [x] **Local DB slot config columns** — schema v3: all slot config fields + `is_deleted` + `sync_status` on all entity tables, `format_label` + `sort_order` on teams, `sort_order` on folders
+- [x] **Stat preview** — real-time Gen III+ calculator updating as EVs/IVs/nature/level change
+- [ ] **Drag-reorder** — slots within a team; teams within a folder (`ReorderableListView`)
+- [ ] **`format_label` UI** — game/format label field (e.g. "VGC 2025") exists in DB but not surfaced in team create/edit UI yet
 
 ---
 
@@ -98,8 +96,9 @@
 - [x] Connectivity listener — auto-triggers sync when network returns
 - [x] Auto-sync on login and register
 - [x] WorkManager registered with 1-hour periodic task (non-web)
+- [x] `is_deleted` + `sync_status` columns on all entity tables (schema v3)
 - [ ] **WorkManager background sync callback** — registered but callback is a no-op stub; needs to call `SyncService.run()`
-- [ ] **Soft-delete propagation** — `is_deleted` not in local Drift schema; deletions made on device A don't reach device B via pull
+- [ ] **Soft-delete propagation** — `is_deleted` column exists in local Drift schema but sync engine still hard-deletes; deletions made on device A don't reach device B via pull
 - [ ] **Pull-to-refresh on Teams screen** — PRD §7.2 specifies this as a sync trigger *(not implemented)*
 
 ---
@@ -109,19 +108,19 @@
 - [x] Type colour palette (18 types, used on badges + detail pages)
 - [x] Dark/light mode toggle (system-driven)
 - [x] Sync status indicators — pending dot + error badge on team tiles
-- [x] Basic Showdown export — `{Nickname} ({Species})` / `{Species}` per team, copies to clipboard
-- [x] Performance pass — list providers (`movesListProvider`, `itemsListProvider`, `abilitiesListProvider`) no longer `autoDispose`; survive tab navigation
-- [ ] **Full Showdown export** — blocked by Slot Config; needs held item, ability, level, shiny, nature, EVs (omit zeros), 4 moves per PRD §11.3
-- [ ] **EV/IV validation** — 0–252 per stat, 510 total cap with red highlight *(blocked by Slot Config)*
-- [ ] **Shiny sprite** — shiny artwork shown when slot `is_shiny = true`; infrastructure exists in sprite widget but not wired to slot state
-- [ ] **Drag-reorder** — reorder slots within team; reorder teams within folder (`ReorderableListView`)
+- [x] **Full Showdown export** — PRD §11.3 format: nickname, item, ability, level, shiny, nature, EVs (zeros omitted), 4 moves
+- [x] **EV/IV validation** — 0–252 per stat, 510 total cap with red highlight; save blocked when over limit
+- [x] **Shiny sprite** — shiny artwork shown when slot `is_shiny = true`
+- [x] Performance pass — list providers no longer `autoDispose`; survive tab navigation
+- [ ] **Drag-reorder** — reorder slots within team; reorder teams within folder
+- [ ] **Team list card sprites** — show row of 6 mini sprites (Poké Ball for empty slots) on team tile per PRD §6.1.2
 
 ---
 
 ## Phase 8 — Testing
 
 - [ ] Unit tests — `SyncService` (push drain, pull merge, conflict resolution)
-- [ ] Unit tests — `buildShowdownExport` (when full fields are in place)
+- [ ] Unit tests — `buildShowdownExport`
 - [ ] Unit tests — stat formula calculator
 - [ ] Widget tests — `TeamsScreen`, `TeamDetailScreen`, `PokemonDetailScreen`
 - [ ] Widget tests — slot config form (EV overflow, IV clamping)
@@ -134,8 +133,6 @@
 
 ## UI / UX Polish & Responsive Layouts
 
-> The app currently functions but looks bare-bones. This section covers visual polish, interaction quality, and making the layout work well across phone, tablet, and desktop web.
-
 ### Navigation & Shell
 
 - [ ] **Adaptive nav** — switch from bottom `NavigationBar` to a `NavigationRail` (tablet) or permanent `NavigationDrawer` (desktop/wide web) at ≥ 600 dp breakpoint
@@ -143,7 +140,7 @@
 
 ### Pokédex
 
-- [ ] **List layout** — replace flat `ListView` with a 2-column grid on tablet / 3-column on desktop; card size adapts to available width
+- [ ] **List layout** — replace flat `ListView` with a 2-column grid on tablet / 3-column on desktop
 - [ ] **Detail screen layout** — on wide screens show tabs as a left sidebar (rail) rather than a horizontal `TabBar` that truncates
 - [ ] **Pokédex entry card** — add subtle gradient using primary type colour; official artwork on card instead of small sprite
 - [ ] **Stat bars** — animate fill on first render (staggered per stat)
@@ -153,15 +150,13 @@
 
 ### Reference Browsers (Moves / Items / Abilities)
 
-- [ ] **Skeleton placeholders** — replace `LinearProgressIndicator` in tile subtitles with a shimmer skeleton while per-item detail loads (name is known; only stat row is pending)
+- [ ] **Skeleton placeholders** — replace `LinearProgressIndicator` in tile subtitles with a shimmer skeleton while per-item detail loads
 - [ ] **Move/Item/Ability list layout** — 2-column grid on tablet+
 - [ ] **Filter persistence** — remember search query and filter chips across tab switches (currently resets because search state is `autoDispose`)
 
 ### Team Builder
 
-- [ ] **Team list card** — show row of 6 mini sprites (Poké Ball for empty slots) on the team tile, matching PRD §6.1.2
-- [ ] **Team detail — wide layout** — on tablet/desktop, show the 6-slot grid alongside a detail panel so tapping a slot opens its config without full navigation
-- [ ] **Slot card polish** — show held item icon, nature label, 4 move names in the filled slot summary card (once Slot Config is done)
+- [ ] **Team detail — wide layout** — on tablet/desktop, show the 6-slot list alongside a detail panel so tapping a slot opens its config without full navigation
 - [ ] **Empty-state illustrations** — replace generic icon + text with a more polished empty state (e.g. Poké Ball graphic for empty team list)
 - [ ] **Folder drag-and-drop** — reorder folders with long-press drag
 
@@ -169,9 +164,9 @@
 
 - [ ] **Colour-scheme seeding** — allow user to choose accent colour in Settings (fed into `ColorScheme.fromSeed`); current red is hardcoded
 - [ ] **Type badge sizing** — standardise badge height and font size; currently slightly inconsistent between Pokédex list, detail tabs, and team slot cards
-- [ ] **Loading states** — replace full-screen `CircularProgressIndicator` on list screens with a paginated skeleton list (avoids blank screen on first load)
+- [ ] **Loading states** — replace full-screen `CircularProgressIndicator` on list screens with a paginated skeleton list
 - [ ] **Error states** — add a branded error illustration and a clear retry CTA; current `ErrorState` widget is plain text
-- [ ] **Snackbar → toast migration** — use Material 3 `SnackBar` styling consistently; avoid stacking snackbars (dismiss previous before showing new)
+- [ ] **Snackbar → toast migration** — use Material 3 `SnackBar` styling consistently; avoid stacking snackbars
 - [ ] **Haptic feedback** — light impact on long-press (slot menu, folder actions), success notification on Showdown export copy
 
 ### Accessibility
@@ -197,7 +192,3 @@
 - Multi-user / public team sharing
 - Pokémon GO data
 - In-app purchases
-
----
-
-*Next milestone: **Slot Config screen** (Phase 5) — unblocks full Showdown export, EV/IV validation, stat preview, and shiny toggle.*
