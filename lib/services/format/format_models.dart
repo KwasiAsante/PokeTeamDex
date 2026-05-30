@@ -285,7 +285,8 @@ class PsMoveEntry {
         type: j['type'] as String? ?? 'normal',
         category: j['category'] as String? ?? 'Status',
         basePower: j['base_power'] as int? ?? 0,
-        accuracy: j['accuracy'] as int?,
+        // PS stores accuracy as true (bool) for moves that always hit.
+        accuracy: j['accuracy'] is int ? j['accuracy'] as int : null,
         pp: j['pp'] as int? ?? 0,
         isZMove: j['is_z_move'] as bool? ?? false,
         isMaxMove: j['is_max_move'] as bool? ?? false,
