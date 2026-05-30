@@ -132,6 +132,65 @@
 
 ---
 
+## UI / UX Polish & Responsive Layouts
+
+> The app currently functions but looks bare-bones. This section covers visual polish, interaction quality, and making the layout work well across phone, tablet, and desktop web.
+
+### Navigation & Shell
+
+- [ ] **Adaptive nav** — switch from bottom `NavigationBar` to a `NavigationRail` (tablet) or permanent `NavigationDrawer` (desktop/wide web) at ≥ 600 dp breakpoint
+- [ ] **App-wide back gesture / breadcrumb** — on wide layouts the detail screen should open in a side panel rather than pushing a new route (master-detail pattern for Pokédex, Teams)
+
+### Pokédex
+
+- [ ] **List layout** — replace flat `ListView` with a 2-column grid on tablet / 3-column on desktop; card size adapts to available width
+- [ ] **Detail screen layout** — on wide screens show tabs as a left sidebar (rail) rather than a horizontal `TabBar` that truncates
+- [ ] **Pokédex entry card** — add subtle gradient using primary type colour; official artwork on card instead of small sprite
+- [ ] **Stat bars** — animate fill on first render (staggered per stat)
+- [ ] **Evolution chain** — style with connecting arrows/icons and evolution condition chips; currently text-only
+- [ ] **Type effectiveness grid** — full 18×18 visual matrix in the Types browser; currently only shows matchups for one type at a time
+- [ ] **Hero animation** — shared element transition (sprite) from list card to detail screen
+
+### Reference Browsers (Moves / Items / Abilities)
+
+- [ ] **Skeleton placeholders** — replace `LinearProgressIndicator` in tile subtitles with a shimmer skeleton while per-item detail loads (name is known; only stat row is pending)
+- [ ] **Move/Item/Ability list layout** — 2-column grid on tablet+
+- [ ] **Filter persistence** — remember search query and filter chips across tab switches (currently resets because search state is `autoDispose`)
+
+### Team Builder
+
+- [ ] **Team list card** — show row of 6 mini sprites (Poké Ball for empty slots) on the team tile, matching PRD §6.1.2
+- [ ] **Team detail — wide layout** — on tablet/desktop, show the 6-slot grid alongside a detail panel so tapping a slot opens its config without full navigation
+- [ ] **Slot card polish** — show held item icon, nature label, 4 move names in the filled slot summary card (once Slot Config is done)
+- [ ] **Empty-state illustrations** — replace generic icon + text with a more polished empty state (e.g. Poké Ball graphic for empty team list)
+- [ ] **Folder drag-and-drop** — reorder folders with long-press drag
+
+### Theming & Visual Consistency
+
+- [ ] **Colour-scheme seeding** — allow user to choose accent colour in Settings (fed into `ColorScheme.fromSeed`); current red is hardcoded
+- [ ] **Type badge sizing** — standardise badge height and font size; currently slightly inconsistent between Pokédex list, detail tabs, and team slot cards
+- [ ] **Loading states** — replace full-screen `CircularProgressIndicator` on list screens with a paginated skeleton list (avoids blank screen on first load)
+- [ ] **Error states** — add a branded error illustration and a clear retry CTA; current `ErrorState` widget is plain text
+- [ ] **Snackbar → toast migration** — use Material 3 `SnackBar` styling consistently; avoid stacking snackbars (dismiss previous before showing new)
+- [ ] **Haptic feedback** — light impact on long-press (slot menu, folder actions), success notification on Showdown export copy
+
+### Accessibility
+
+- [ ] **Semantic labels** — add `Semantics` / `tooltip` to icon-only buttons (sync, export, settings)
+- [ ] **Minimum touch targets** — audit all tappable widgets for 48 × 48 dp minimum
+- [ ] **Text scaling** — verify layouts don't break at large (1.3×) and extra-large (1.5×) system font sizes
+- [ ] **Screen reader order** — ensure tab order on wide layouts is logical (left-to-right, top-to-bottom)
+
+### Responsive Breakpoints (reference)
+
+| Breakpoint | Width      | Layout change |
+| ---------- | ---------- | ------------- |
+| Compact    | < 600 dp   | Current layout — bottom nav, single column |
+| Medium     | 600–840 dp | `NavigationRail`, 2-column grids |
+| Expanded   | > 840 dp   | Permanent `NavigationDrawer`, master-detail panels, 3-column grids |
+
+---
+
 ## Deferred / Out of Scope
 
 - Real-time battle simulation
