@@ -322,15 +322,23 @@ class _GenerationPicker extends StatelessWidget {
           child: Text('Select Generation',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         ),
-        ...List.generate(9, (i) {
-          final gen = i + 1;
-          return ListTile(
-            title: Text(_labels[i]),
-            trailing: current == gen ? const Icon(Icons.check) : null,
-            onTap: () => onSelected(gen),
-          );
-        }),
-        const SizedBox(height: 8),
+        const Divider(height: 1),
+        Flexible(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              ...List.generate(9, (i) {
+                final gen = i + 1;
+                return ListTile(
+                  title: Text(_labels[i]),
+                  trailing: current == gen ? const Icon(Icons.check) : null,
+                  onTap: () => onSelected(gen),
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
       ],
     );
   }
