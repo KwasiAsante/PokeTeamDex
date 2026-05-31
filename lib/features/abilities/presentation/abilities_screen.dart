@@ -35,47 +35,108 @@ class _AbilitiesScreenState extends ConsumerState<AbilitiesScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredAsync = ref.watch(filteredAbilitiesProvider);
+    final gen  = ref.watch(abilityGenerationFilterProvider);
+    final sort = ref.watch(abilitySortProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Abilities'),
         actions: [const SettingsButton()],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(64),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-            child: SearchBar(
-              controller: _searchController,
-              hintText: 'Search abilities…',
-              leading: const Icon(Icons.search),
-              trailing: [
-                if (_searchController.text.isNotEmpty)
-                  IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      _searchController.clear();
-                      ref.read(abilitiesSearchProvider.notifier).state = '';
-                    },
-                  ),
-              ],
-              onChanged: (v) =>
-                  ref.read(abilitiesSearchProvider.notifier).state = v,
-            ),
+          preferredSize: const Size.fromHeight(108),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                child: SearchBar(
+                  controller: _searchController,
+                  hintText: 'Search abilities…',
+                  leading: const Icon(Icons.search),
+                  trailing: [
+                    if (_searchController.text.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          ref
+                              .read(abilitiesSearchProvider.notifier)
+                              .state = '';
+                        },
+                      ),
+                  ],
+                  onChanged: (v) =>
+                      ref.read(abilitiesSearchProvider.notifier).state = v,
+                ),
+              ),
+              // Sort + generation filter chips
+              SizedBox(
+                height: 44,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 4),
+                  children: [
+                    // Sort toggle
+                    FilterChip(
+                      label: Text(sort == AbilitySort.nameAZ
+                          ? 'A → Z'
+                          : 'Z → A'),
+                      avatar: const Icon(Icons.sort, size: 16),
+                      selected: sort == AbilitySort.nameZA,
+                      onSelected: (_) => ref
+                          .read(abilitySortProvider.notifier)
+                          .state = sort == AbilitySort.nameAZ
+                          ? AbilitySort.nameZA
+                          : AbilitySort.nameAZ,
+                    ),
+                    const SizedBox(width: 6),
+                    // Generation filter chips
+                    for (final entry in kAbilityGenerations.entries) ...[
+                      FilterChip(
+                        label: Text(entry.value),
+                        selected: gen == entry.key,
+                        onSelected: (_) => ref
+                            .read(abilityGenerationFilterProvider.notifier)
+                            .state =
+                            gen == entry.key ? null : entry.key,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    // Clear filter
+                    if (gen != null)
+                      ActionChip(
+                        avatar: const Icon(Icons.close, size: 16),
+                        label: const Text('Clear'),
+                        onPressed: () => ref
+                            .read(
+                                abilityGenerationFilterProvider.notifier)
+                            .state = null,
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
       body: filteredAsync.when(
-        loading: () => const LoadingState(),
+        loading: () =>
+            const LoadingState(message: 'Loading abilities…'),
         error: (e, _) => ErrorState(
           error: e,
-          onRetry: () => ref.invalidate(abilitiesListProvider),
+          onRetry: () {
+            ref.invalidate(abilitiesListProvider);
+            if (gen != null) {
+              ref.invalidate(abilitiesByGenerationProvider(gen));
+            }
+          },
         ),
         data: (names) {
           if (names.isEmpty) {
             return const EmptyState(
               icon: Icons.search_off,
               title: 'No abilities found',
-              subtitle: 'Try adjusting your search.',
+              subtitle: 'Try adjusting your search or filter.',
             );
           }
           return ListView.builder(

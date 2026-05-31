@@ -385,6 +385,24 @@ class PokeApiRepository {
     return data;
   }
 
+  /// Returns ability names introduced in [genName] (e.g. "generation-iii").
+  /// Uses /generation/{name} and caches the list for 7 days.
+  Future<List<String>> fetchAbilitiesByGeneration(String genName) async {
+    final cacheKey = 'abilities_gen_$genName';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is List) return cached.cast<String>();
+    final r = await _pokeApiClient.client.get('/generation/$genName');
+    if (r.statusCode != 200) {
+      throw Exception('Failed to fetch generation $genName');
+    }
+    final names = (r.data['abilities'] as List)
+        .map((a) => (a as Map)['name'] as String)
+        .toList()
+      ..sort();
+    _pokeApiCache.putWithTTL(cacheKey, names, const Duration(days: 7));
+    return names;
+  }
+
   List<PokemonListEntry> _parseList(Map<String, dynamic> raw) {
     final results = raw['results'] as List;
     return results
