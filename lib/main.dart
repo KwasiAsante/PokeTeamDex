@@ -1,14 +1,25 @@
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:poke_team_dex/database/app_database.dart';
+import 'package:poke_team_dex/database/repositories/app_config_repository.dart';
+import 'package:poke_team_dex/database/repositories/meta_repository.dart';
+import 'package:poke_team_dex/database/repositories/sync_queue_repository.dart';
+import 'package:poke_team_dex/database/repositories/team_folder_repository.dart';
+import 'package:poke_team_dex/database/repositories/team_repository.dart';
+import 'package:poke_team_dex/database/repositories/team_slot_repository.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/router/app_router.dart';
+import 'package:poke_team_dex/services/api/team_sync_api.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
+import 'package:poke_team_dex/services/sync/sync_service.dart';
 import 'package:poke_team_dex/shared/theme/app_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
 const _syncTaskName = 'poketeamdex.sync';
@@ -16,9 +27,59 @@ const _syncTaskName = 'poketeamdex.sync';
 @pragma('vm:entry-point')
 void _workmanagerCallback() {
   Workmanager().executeTask((task, _) async {
-    // Background sync is handled by SyncService; here we just return success.
-    // A full implementation would init the DB and call SyncService.run().
-    return Future.value(true);
+    try {
+      await Hive.initFlutter();
+      await Hive.openBox('pokeapi_cache');
+
+      final db = AppDatabase();
+      final configRepo  = AppConfigRepository(db);
+      final metaRepo    = MetaRepository(db);
+      final syncQueue   = SyncQueueRepository(db);
+      final folderRepo  = TeamFolderRepository(db);
+      final teamRepo    = TeamRepository(db);
+      final slotRepo    = TeamSlotRepository(db);
+
+      final apiBaseUrl = await configRepo.getApiBaseUrl();
+      final prefs      = await SharedPreferences.getInstance();
+      final token      = prefs.getString('auth_token');
+
+      // Skip if not authenticated
+      if (token == null || token.isEmpty) {
+        await db.close();
+        return true;
+      }
+
+      final dio = Dio(BaseOptions(
+        baseUrl: apiBaseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+      ));
+      dio.interceptors.add(InterceptorsWrapper(
+        onRequest: (options, handler) {
+          options.headers['Authorization'] = 'Bearer $token';
+          handler.next(options);
+        },
+      ));
+
+      final api      = TeamSyncApi(dio);
+      final notifier = SyncStateNotifier();
+
+      await SyncService(
+        syncQueue:  syncQueue,
+        folderRepo: folderRepo,
+        teamRepo:   teamRepo,
+        slotRepo:   slotRepo,
+        metaRepo:   metaRepo,
+        api:        api,
+        db:         db,
+        notifier:   notifier,
+      ).run();
+
+      await db.close();
+      return true;
+    } catch (_) {
+      return false;
+    }
   });
 }
 

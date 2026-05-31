@@ -11,6 +11,9 @@ import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/connectivity/connectivity_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:poke_team_dex/features/teams/presentation/team_detail_screen.dart'
+    show teamSlotsProvider;
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
@@ -213,7 +216,9 @@ class _TeamsList extends ConsumerWidget {
           );
         }
 
-        return CustomScrollView(
+        return RefreshIndicator(
+          onRefresh: () => ref.read(syncServiceProvider).run(),
+          child: CustomScrollView(
           slivers: [
             // Reorderable folder list
             if (folders.isNotEmpty)
@@ -249,6 +254,7 @@ class _TeamsList extends ConsumerWidget {
             ],
             const SliverToBoxAdapter(child: SizedBox(height: 88)),
           ],
+        ),
         );
       },
     );
@@ -524,22 +530,29 @@ class _TeamTile extends ConsumerWidget {
         ],
       ),
       title: Text(team.name),
-      subtitle: hasError
-          ? Text(
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Mini sprite row — 6 slots, Poké Ball for empty
+          _TeamSpriteRow(teamId: team.id),
+          if (hasError)
+            Text(
               'Sync issue — check sync monitor',
-              style: TextStyle(color: colorScheme.error, fontSize: 12),
+              style: TextStyle(color: colorScheme.error, fontSize: 11),
             )
-          : team.formatLabel != null
-              ? Text(
-                  ref.watch(formatServiceProvider)
-                          .formatById(team.formatLabel!)?.name ??
-                      team.formatLabel!,
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
-                )
-              : null,
+          else if (team.formatLabel != null)
+            Text(
+              ref.watch(formatServiceProvider)
+                      .formatById(team.formatLabel!)?.name ??
+                  team.formatLabel!,
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 11,
+              ),
+            ),
+        ],
+      ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -723,5 +736,55 @@ class _CreateTeamDialogState extends ConsumerState<_CreateTeamDialog> {
       name: _ctrl.text.trim(),
       formatId: _selectedFormat?.id, // store format id (e.g. "gen9")
     ));
+  }
+}
+
+// ── Team sprite row (6 mini sprites) ─────────────────────────────────────────
+
+class _TeamSpriteRow extends ConsumerWidget {
+  final int teamId;
+  const _TeamSpriteRow({required this.teamId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final slotsAsync = ref.watch(teamSlotsProvider(teamId));
+    final slots = slotsAsync.asData?.value ?? [];
+    final slotMap = {for (final s in slots) s.slot: s};
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 2),
+      child: Row(
+        children: List.generate(6, (i) {
+          final slot = slotMap[i + 1];
+          if (slot == null) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 2),
+              child: Icon(
+                Icons.catching_pokemon,
+                size: 24,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+              ),
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.only(right: 2),
+            child: CachedNetworkImage(
+              imageUrl:
+                  'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
+                  'sprites/pokemon/${slot.pokemonId}.png',
+              width: 24,
+              height: 24,
+              fit: BoxFit.contain,
+              errorWidget: (_, __, ___) => Icon(
+                Icons.catching_pokemon,
+                size: 24,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
   }
 }
