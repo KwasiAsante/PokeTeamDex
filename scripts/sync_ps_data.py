@@ -110,7 +110,8 @@ def transform_moves(raw: dict) -> dict:
             "type": (d.get("type") or "Normal").lower(),
             "category": d.get("category", "Status"),
             "base_power": d.get("basePower") or 0,
-            "accuracy": d.get("accuracy"),   # None = always hits (e.g. Swift)
+            # PS uses True (bool) for moves that always hit; normalise to None.
+            "accuracy": d.get("accuracy") if isinstance(d.get("accuracy"), int) else None,
             "pp": d.get("pp", 0),
             "is_z_move": bool(d.get("isZ")),
             "is_max_move": bool(d.get("isMax")),

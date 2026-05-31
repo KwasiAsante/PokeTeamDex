@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 
 const _kApiBaseUrl = 'api_base_url';
+const _kUseFormatSprites = 'use_format_sprites';
 const kDefaultApiBaseUrl = 'http://localhost:8000';
 
 class AppConfigRepository {
@@ -40,4 +41,17 @@ class AppConfigRepository {
 
   Stream<String> watchApiBaseUrl() =>
       watch(_kApiBaseUrl).map((v) => v ?? kDefaultApiBaseUrl);
+
+  // ── Sprite style ──────────────────────────────────────────────────────────
+
+  /// Whether to use generation-appropriate sprites when a format is assigned.
+  /// Defaults to true.
+  Future<bool> getUseFormatSprites() async =>
+      (await get(_kUseFormatSprites)) != 'false';
+
+  Future<void> setUseFormatSprites(bool value) =>
+      set(_kUseFormatSprites, value.toString());
+
+  Stream<bool> watchUseFormatSprites() =>
+      watch(_kUseFormatSprites).map((v) => v != 'false');
 }

@@ -65,6 +65,12 @@ class SyncService {
         await syncQueue.delete(op.id);
       } on DioException {
         await syncQueue.markAttempted(op.id, op.attempts);
+      } on StateError {
+        // The referenced entity no longer exists locally — drop the stale op.
+        await syncQueue.delete(op.id);
+      } catch (_) {
+        // Unexpected error — mark attempted so it doesn't block forever.
+        await syncQueue.markAttempted(op.id, op.attempts);
       }
     }
   }
@@ -82,8 +88,8 @@ class SyncService {
             .write(TeamFoldersCompanion(remoteId: Value(remoteId)));
 
       case 'team_folder:update':
-        final folder = await folderRepo.getById(op.entityId);
-        if (folder.remoteId == null) return;
+        final folder = await folderRepo.getByIdOrNull(op.entityId);
+        if (folder == null || folder.remoteId == null) return;
         await api.updateFolder(folder.remoteId!, payload['name'] as String);
 
       case 'team_folder:delete':
@@ -96,7 +102,8 @@ class SyncService {
         String? folderRemoteId;
         final folderLocalId = payload['folder_local_id'];
         if (folderLocalId != null) {
-          final folder = await folderRepo.getById(folderLocalId as int);
+          final folder = await folderRepo.getByIdOrNull(folderLocalId as int);
+          if (folder == null) return;
           folderRemoteId = folder.remoteId;
           if (folderRemoteId == null) return;
         }
@@ -109,9 +116,12 @@ class SyncService {
             .write(TeamsCompanion(remoteId: Value(remoteId)));
 
       case 'team:update':
-        final team = await teamRepo.getById(op.entityId);
-        if (team.remoteId == null) return;
-        await api.updateTeam(team.remoteId!, payload['name'] as String);
+        final team = await teamRepo.getByIdOrNull(op.entityId);
+        if (team == null || team.remoteId == null) return;
+        // payload['name'] may be absent if only format_label changed — fall
+        // back to the current name from the DB so the API call is always valid.
+        final teamName = payload['name'] as String? ?? team.name;
+        await api.updateTeam(team.remoteId!, teamName);
 
       case 'team:delete':
         final remoteId = payload['remote_id'] as String?;
@@ -121,8 +131,8 @@ class SyncService {
       // ── Slots ─────────────────────────────────────────────────────────────────
       case 'team_slot:upsert':
         final teamLocalId = payload['team_local_id'] as int;
-        final team = await teamRepo.getById(teamLocalId);
-        if (team.remoteId == null) return;
+        final team = await teamRepo.getByIdOrNull(teamLocalId);
+        if (team == null || team.remoteId == null) return;
         await api.upsertSlot(
           team.remoteId!,
           payload['slot'] as int,
@@ -132,8 +142,8 @@ class SyncService {
 
       case 'team_slot:delete':
         final teamLocalId = payload['team_local_id'] as int;
-        final team = await teamRepo.getById(teamLocalId);
-        if (team.remoteId == null) return;
+        final team = await teamRepo.getByIdOrNull(teamLocalId);
+        if (team == null || team.remoteId == null) return;
         await api.deleteSlot(team.remoteId!, payload['slot'] as int);
     }
   }

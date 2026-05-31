@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
+import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
+import 'package:poke_team_dex/services/format/format_models.dart';
+import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/connectivity/connectivity_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
@@ -132,9 +135,13 @@ class TeamsScreen extends ConsumerWidget {
 
   Future<void> _showTeamDialog(BuildContext context, WidgetRef ref,
       {int? folderId}) async {
-    final name = await _nameDialog(context, title: 'New Team', hint: 'Team name');
-    if (name != null && name.isNotEmpty) {
-      await createTeam(ref, name, folderId: folderId);
+    final result = await showDialog<({String name, String? formatId})>(
+      context: context,
+      builder: (ctx) => _CreateTeamDialog(),
+    );
+    if (result != null && result.name.isNotEmpty) {
+      await createTeam(ref, result.name,
+          folderId: folderId, formatLabel: result.formatId);
     }
   }
 
@@ -520,12 +527,19 @@ class _TeamTile extends ConsumerWidget {
       subtitle: hasError
           ? Text(
               'Sync issue — check sync monitor',
-              style: TextStyle(
-                color: colorScheme.error,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: colorScheme.error, fontSize: 12),
             )
-          : null,
+          : team.formatLabel != null
+              ? Text(
+                  ref.watch(formatServiceProvider)
+                          .formatById(team.formatLabel!)?.name ??
+                      team.formatLabel!,
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                )
+              : null,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -602,5 +616,112 @@ class _TeamTile extends ConsumerWidget {
         await deleteTeam(ref, team.id);
       }
     }
+  }
+}
+
+// ── Create team dialog (name + optional format) ───────────────────────────────
+
+class _CreateTeamDialog extends ConsumerStatefulWidget {
+  const _CreateTeamDialog();
+
+  @override
+  ConsumerState<_CreateTeamDialog> createState() => _CreateTeamDialogState();
+}
+
+class _CreateTeamDialogState extends ConsumerState<_CreateTeamDialog> {
+  final _ctrl = TextEditingController();
+  GameFormat? _selectedFormat;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickFormat() async {
+    final result = await showModalBottomSheet<GameFormat?>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FormatPickerSheet(
+        current: _selectedFormat?.id,
+      ),
+    );
+    if (result == null) return; // dismissed
+    setState(() {
+      _selectedFormat = isFormatCleared(result) ? null : result;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return AlertDialog(
+      title: const Text('New Team'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _ctrl,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Team name',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            textCapitalization: TextCapitalization.words,
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 12),
+          // Format selector
+          InkWell(
+            onTap: _pickFormat,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                border: Border.all(color: colorScheme.outline),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.tune_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _selectedFormat?.name ?? 'No format',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: _selectedFormat == null
+                                ? colorScheme.onSurfaceVariant
+                                : null,
+                          ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, size: 18),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Create'),
+        ),
+      ],
+    );
+  }
+
+  void _submit() {
+    Navigator.pop(context, (
+      name: _ctrl.text.trim(),
+      formatId: _selectedFormat?.id, // store format id (e.g. "gen9")
+    ));
   }
 }

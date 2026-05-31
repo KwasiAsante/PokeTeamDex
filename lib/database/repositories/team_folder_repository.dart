@@ -18,6 +18,9 @@ class TeamFolderRepository {
   Future<TeamFolder> getById(int id) =>
       (_db.select(_db.teamFolders)..where((f) => f.id.equals(id))).getSingle();
 
+  Future<TeamFolder?> getByIdOrNull(int id) =>
+      (_db.select(_db.teamFolders)..where((f) => f.id.equals(id))).getSingleOrNull();
+
   Future<TeamFolder?> getByRemoteId(String remoteId) =>
       (_db.select(_db.teamFolders)..where((f) => f.remoteId.equals(remoteId)))
           .getSingleOrNull();

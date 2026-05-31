@@ -7,6 +7,10 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
+import 'package:poke_team_dex/services/format/format_models.dart';
+import 'package:poke_team_dex/services/format/format_providers.dart';
+import 'package:poke_team_dex/services/format/sprite_resolver.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
 import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
@@ -94,12 +98,17 @@ class TeamDetailScreen extends ConsumerWidget {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(team.name),
+            title: _TeamAppBarTitle(team: team),
             actions: [
               IconButton(
                 icon: const Icon(Icons.edit_outlined),
                 tooltip: 'Rename',
                 onPressed: () => _renameTeam(context, ref, team),
+              ),
+              IconButton(
+                icon: const Icon(Icons.tune_outlined),
+                tooltip: 'Change format',
+                onPressed: () => _editFormat(context, ref, team),
               ),
               if (slots.isNotEmpty)
                 IconButton(
@@ -118,7 +127,11 @@ class TeamDetailScreen extends ConsumerWidget {
           body: slotsAsync.when(
             loading: () => const LoadingState(),
             error: (e, _) => ErrorState(error: e),
-            data: (slots) => _SlotList(teamId: teamId, slots: slots),
+            data: (slots) => _SlotList(
+              teamId: teamId,
+              slots: slots,
+              formatId: team.formatLabel,
+            ),
           ),
         );
       },
@@ -143,6 +156,18 @@ class TeamDetailScreen extends ConsumerWidget {
         );
       }
     }
+  }
+
+  Future<void> _editFormat(
+      BuildContext context, WidgetRef ref, Team team) async {
+    final result = await showModalBottomSheet<dynamic>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FormatPickerSheet(current: team.formatLabel),
+    );
+    if (result == null) return; // dismissed
+    final newLabel = isFormatCleared(result) ? null : (result as GameFormat).id;
+    await updateTeamFormat(ref, team.id, newLabel);
   }
 
   Future<void> _renameTeam(
@@ -194,13 +219,52 @@ class TeamDetailScreen extends ConsumerWidget {
   }
 }
 
+// ── AppBar title with format name resolved from ID ───────────────────────────
+
+class _TeamAppBarTitle extends ConsumerWidget {
+  final Team team;
+  const _TeamAppBarTitle({required this.team});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    String? formatName;
+    if (team.formatLabel != null) {
+      final fmtAsync = ref.watch(allFormatsProvider);
+      fmtAsync.whenData((formats) {}); // ensure loaded
+      final service = ref.watch(formatServiceProvider);
+      formatName = service.formatById(team.formatLabel!)?.name ?? team.formatLabel;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(team.name),
+        if (formatName != null)
+          Text(
+            formatName,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.7),
+                ),
+          ),
+      ],
+    );
+  }
+}
+
 // ── Slot list (reorderable) ───────────────────────────────────────────────────
 
 class _SlotList extends ConsumerWidget {
   final int teamId;
   final List<TeamSlot> slots;
+  final String? formatId;
 
-  const _SlotList({required this.teamId, required this.slots});
+  const _SlotList({
+    required this.teamId,
+    required this.slots,
+    this.formatId,
+  });
 
   // Build a 6-element growable list keyed by position (0-based); null = empty slot.
   List<TeamSlot?> _positions() {
@@ -241,7 +305,12 @@ class _SlotList extends ConsumerWidget {
           key: ValueKey(i),
           padding: const EdgeInsets.only(bottom: 10),
           child: slot != null
-              ? _FilledSlotCard(slot: slot, teamId: teamId, dragIndex: i)
+              ? _FilledSlotCard(
+                  slot: slot,
+                  teamId: teamId,
+                  dragIndex: i,
+                  formatId: formatId,
+                )
               : _EmptySlotCard(teamId: teamId, slotNumber: i + 1, dragIndex: i),
         );
       },
@@ -255,11 +324,13 @@ class _FilledSlotCard extends ConsumerWidget {
   final TeamSlot slot;
   final int teamId;
   final int dragIndex;
+  final String? formatId;
 
   const _FilledSlotCard({
     required this.slot,
     required this.teamId,
     required this.dragIndex,
+    this.formatId,
   });
 
   static const _statLabels = ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe'];
@@ -328,6 +399,33 @@ class _FilledSlotCard extends ConsumerWidget {
         // Item detail (for sprite)
         final itemEntry = itemAsync?.whenOrNull(data: (e) => e);
 
+        // Sprite resolution — use format-aware sprites when setting is on
+        final useFormatSprites = ref
+            .watch(useFormatSpritesProvider)
+            .asData?.value ?? true;
+        final format = formatId != null
+            ? ref.watch(formatServiceProvider).formatById(formatId!)
+            : null;
+        final spriteUrls = resolveSprite(
+          sprites: pokemon.sprites,
+          pokemonId: slot.pokemonId,
+          pokemonName: pokemon.name,
+          format: format,
+          useFormatSprites: useFormatSprites,
+        );
+
+        // Slot validation against format (Layer 1)
+        final validation = formatId != null
+            ? ref
+                .watch(slotValidationProvider((
+                  slot: slot,
+                  formatId: formatId!,
+                )))
+                .asData
+                ?.value
+            : null;
+        final hasViolations = validation != null && !validation.isValid;
+
         final moves = [slot.move1, slot.move2, slot.move3, slot.move4]
             .where((m) => m != null)
             .cast<String>()
@@ -364,6 +462,18 @@ class _FilledSlotCard extends ConsumerWidget {
                         ),
                       ],
                       const Spacer(),
+                      if (hasViolations)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: Tooltip(
+                            message: validation.violations.values.join('\n'),
+                            child: Icon(
+                              Icons.warning_amber_rounded,
+                              size: 16,
+                              color: colorScheme.error,
+                            ),
+                          ),
+                        ),
                       ReorderableDragStartListener(
                         index: dragIndex,
                         child: Icon(
@@ -388,14 +498,8 @@ class _FilledSlotCard extends ConsumerWidget {
                         child: Column(
                           children: [
                             PokemonSprite(
-                              defaultUrl:
-                                  'https://raw.githubusercontent.com/PokeAPI/'
-                                  'sprites/master/sprites/pokemon/'
-                                  '${slot.pokemonId}.png',
-                              shinyUrl:
-                                  'https://raw.githubusercontent.com/PokeAPI/'
-                                  'sprites/master/sprites/pokemon/shiny/'
-                                  '${slot.pokemonId}.png',
+                              defaultUrl: spriteUrls.defaultUrl,
+                              shinyUrl: spriteUrls.shinyUrl,
                               shiny: slot.isShiny,
                               size: 72,
                             ),
