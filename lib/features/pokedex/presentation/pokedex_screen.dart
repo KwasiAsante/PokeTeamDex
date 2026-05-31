@@ -7,6 +7,9 @@ import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
+// How many Pokémon to render per page.
+const _kPageSize = 50;
+
 class PokedexScreen extends ConsumerStatefulWidget {
   const PokedexScreen({super.key});
 
@@ -16,21 +19,49 @@ class PokedexScreen extends ConsumerStatefulWidget {
 
 class _PokedexScreenState extends ConsumerState<PokedexScreen> {
   late TextEditingController _searchController;
+  final ScrollController _scrollController = ScrollController();
+
+  /// How many items are currently visible in the list.
+  int _visibleCount = _kPageSize;
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    // Trigger 300px before the very bottom so the next page appears
+    // before the user runs out of content.
+    if (pos.pixels >= pos.maxScrollExtent - 300) {
+      setState(() => _visibleCount += _kPageSize);
+    }
+  }
+
+  /// Reset to the first page and scroll to top — called when search/filter changes.
+  void _resetPage() {
+    setState(() => _visibleCount = _kPageSize);
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Reset pagination whenever the search query or filter state changes.
+    ref.listen(pokemonSearchProvider, (_, __) => _resetPage());
+    ref.listen(pokedexFilterProvider, (_, __) => _resetPage());
+
     final listAsync = ref.watch(filteredPokemonListProvider);
 
     return Scaffold(
@@ -42,21 +73,65 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
           const Divider(height: 1),
           Expanded(
             child: listAsync.when(
-              data: (data) => data.isEmpty
-                  ? const EmptyState(
-                      icon: Icons.search_off,
-                      title: 'No Pokémon found',
-                      subtitle: 'Try adjusting your search or filters.',
-                    )
-                  : ListView.builder(
-                      itemCount: data.length,
-                      itemBuilder: (_, i) => PokemonListTile(pokemon: data[i]),
+              data: (data) {
+                if (data.isEmpty) {
+                  return const EmptyState(
+                    icon: Icons.search_off,
+                    title: 'No Pokémon found',
+                    subtitle: 'Try adjusting your search or filters.',
+                  );
+                }
+
+                // Slice to the current page.
+                final visible = data.length <= _visibleCount
+                    ? data
+                    : data.sublist(0, _visibleCount);
+                final hasMore = data.length > visible.length;
+
+                return Column(
+                  children: [
+                    // Results count
+                    if (data.length < 1025)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 4),
+                        child: Row(
+                          children: [
+                            Text(
+                              '${data.length} Pokémon',
+                              style:
+                                  Theme.of(context).textTheme.labelSmall?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        // +1 for the load-more footer when there are more pages.
+                        itemCount: visible.length + (hasMore ? 1 : 0),
+                        itemBuilder: (_, i) {
+                          if (i == visible.length) {
+                            // Load-more footer — auto-triggers next page.
+                            return const _LoadMoreFooter();
+                          }
+                          return PokemonListTile(pokemon: visible[i]);
+                        },
+                      ),
                     ),
+                  ],
+                );
+              },
               error: (e, _) => ErrorState(
                 error: e,
                 onRetry: () => ref.invalidate(pokemonListProvider),
               ),
-              loading: () => const LoadingState(message: 'Loading Pokédex…'),
+              loading: () =>
+                  const LoadingState(message: 'Loading Pokédex…'),
             ),
           ),
         ],
@@ -65,7 +140,43 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
   }
 }
 
-// ── Search bar ──────────────────────────────────────────────────────────────
+// ── Load-more footer ──────────────────────────────────────────────────────────
+
+/// Shown at the bottom of the list while more pages remain.
+/// Displays a spinner and triggers the parent's scroll listener
+/// simply by being in the layout — the scroll listener fires when
+/// this item is near-visible.
+class _LoadMoreFooter extends StatelessWidget {
+  const _LoadMoreFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Loading more…',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Search bar ────────────────────────────────────────────────────────────────
 
 class _SearchBar extends ConsumerWidget {
   final TextEditingController controller;
@@ -94,7 +205,7 @@ class _SearchBar extends ConsumerWidget {
   }
 }
 
-// ── Filter bar ───────────────────────────────────────────────────────────────
+// ── Filter bar ────────────────────────────────────────────────────────────────
 
 class _FilterBar extends ConsumerWidget {
   @override
@@ -107,15 +218,11 @@ class _FilterBar extends ConsumerWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         children: [
-          // Sort
           _SortChip(current: filter.sort),
           const SizedBox(width: 6),
-          // Generation picker
           _GenerationChip(selected: filter.generation),
           const SizedBox(width: 6),
-          // Type picker
           _TypeChip(selected: filter.type),
-          // Clear filters
           if (!filter.isDefault) ...[
             const SizedBox(width: 6),
             ActionChip(
@@ -156,12 +263,16 @@ class _GenerationChip extends ConsumerWidget {
   final int? selected;
   const _GenerationChip({required this.selected});
 
-  static const _romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
+  static const _romanNumerals = [
+    'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'
+  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return FilterChip(
-      label: Text(selected != null ? 'Gen ${_romanNumerals[selected! - 1]}' : 'Generation'),
+      label: Text(selected != null
+          ? 'Gen ${_romanNumerals[selected! - 1]}'
+          : 'Generation'),
       avatar: const Icon(Icons.layers, size: 16),
       selected: selected != null,
       onSelected: (_) => _showPicker(context, ref),
@@ -208,7 +319,8 @@ class _GenerationPicker extends StatelessWidget {
       children: [
         const Padding(
           padding: EdgeInsets.all(16),
-          child: Text('Select Generation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          child: Text('Select Generation',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         ),
         ...List.generate(9, (i) {
           final gen = i + 1;
@@ -237,7 +349,8 @@ class _TypeChip extends ConsumerWidget {
       avatar: const Icon(Icons.category, size: 16),
       selected: selected != null,
       selectedColor: selected != null
-          ? (PokemonTypeColors.colors[selected!] ?? Colors.grey).withValues(alpha: 0.3)
+          ? (PokemonTypeColors.colors[selected!] ?? Colors.grey)
+              .withValues(alpha: 0.3)
           : null,
       onSelected: (_) => _showPicker(context, ref),
     );
@@ -266,13 +379,16 @@ class _TypePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final types = PokemonTypeColors.colors.keys.where((t) => t != 'unknown').toList()..sort();
+    final types =
+        PokemonTypeColors.colors.keys.where((t) => t != 'unknown').toList()
+          ..sort();
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         const Padding(
           padding: EdgeInsets.all(16),
-          child: Text('Select Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          child: Text('Select Type',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         ),
         Flexible(
           child: GridView.builder(
