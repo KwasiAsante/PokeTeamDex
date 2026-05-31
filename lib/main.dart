@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -115,6 +116,8 @@ class MyApp extends ConsumerStatefulWidget {
 }
 
 class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
+  Timer? _periodicSync;
+
   @override
   void initState() {
     super.initState();
@@ -124,6 +127,14 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(authTokenProvider.notifier).state = widget.initialToken ?? '';
     });
+
+    // Periodic in-process sync (covers app minimized / backgrounded).
+    // WorkManager handles the truly-closed case on Android/iOS; this timer
+    // runs while the app process is alive on every platform including desktop.
+    _periodicSync = Timer.periodic(
+      const Duration(minutes: 15),
+      (_) => _triggerSync(),
+    );
 
     // Auto-sync when connectivity is restored
     if (!kIsWeb) {
@@ -136,12 +147,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _periodicSync?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  // On desktop there is no WorkManager background sync, so we trigger sync
-  // whenever the app is foregrounded (equivalent to app-resume behaviour).
+  // Sync when the app is foregrounded (covers lock-screen unlock, tab switch, etc.)
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) _triggerSync();
