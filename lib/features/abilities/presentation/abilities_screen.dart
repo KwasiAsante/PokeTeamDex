@@ -17,6 +17,15 @@ class _AbilitiesScreenState extends ConsumerState<AbilitiesScreen> {
   final _searchController = SearchController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final saved = ref.read(abilitiesSearchProvider);
+      if (saved.isNotEmpty) _searchController.text = saved;
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();

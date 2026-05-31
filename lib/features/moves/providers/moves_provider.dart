@@ -7,15 +7,17 @@ final movesListProvider = FutureProvider<List<String>>((ref) async {
   return repo.fetchMoveList();
 });
 
-final movesSearchProvider = StateProvider.autoDispose<String>((ref) => '');
+// Not autoDispose — persists across tab switches so search/filter state
+// is restored when the user returns to the Moves tab.
+final movesSearchProvider = StateProvider<String>((ref) => '');
 
-final movesDamageClassFilterProvider =
-    StateProvider.autoDispose<String?>((ref) => null);
+final movesDamageClassFilterProvider = StateProvider<String?>((ref) => null);
 
-final filteredMovesProvider = Provider.autoDispose<AsyncValue<List<String>>>((ref) {
+final filteredMovesProvider = Provider<AsyncValue<List<String>>>((ref) {
   final listAsync = ref.watch(movesListProvider);
   final search = ref.watch(movesSearchProvider).trim().toLowerCase();
-
+  // Damage class filter is applied per-tile in the screen (requires detail
+  // fetch); the provider just handles text search for now.
   return listAsync.whenData((names) {
     if (search.isEmpty) return names;
     return names

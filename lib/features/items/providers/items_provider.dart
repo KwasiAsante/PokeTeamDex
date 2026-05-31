@@ -8,16 +8,17 @@ final itemsListProvider = FutureProvider<List<String>>((ref) async {
   return repo.fetchItemList();
 });
 
-final itemsSearchProvider = StateProvider.autoDispose<String>((ref) => '');
+// Not autoDispose — persists across tab switches.
+final itemsSearchProvider = StateProvider<String>((ref) => '');
 
+// Per-item detail stays autoDispose since it's a large family cache.
 final itemProvider =
     FutureProvider.autoDispose.family<ItemEntry, String>((ref, name) async {
   final repo = ref.read(pokeApiRepositoryProvider);
   return repo.fetchItem(name);
 });
 
-final filteredItemsProvider =
-    Provider.autoDispose<AsyncValue<List<String>>>((ref) {
+final filteredItemsProvider = Provider<AsyncValue<List<String>>>((ref) {
   final listAsync = ref.watch(itemsListProvider);
   final search = ref.watch(itemsSearchProvider).trim().toLowerCase();
 
