@@ -13,7 +13,7 @@ final itemsSearchProvider = StateProvider<String>((ref) => '');
 
 // ── Filtering & sorting ───────────────────────────────────────────────────────
 
-enum ItemSort { nameAZ, nameZA }
+enum ItemSort { nameAZ, nameZA, idAscending, idDescending }
 
 /// Selected item pocket filter (null = all items).
 final itemPocketFilterProvider = StateProvider<String?>((ref) => null);
@@ -56,12 +56,21 @@ final filteredItemsProvider = Provider<AsyncValue<List<String>>>((ref) {
   final sort   = ref.watch(itemSortProvider);
   final search = ref.watch(itemsSearchProvider).trim().toLowerCase();
 
+  // For ID sorting we need the full list order as a reference index.
+  final fullListAsync = ref.watch(itemsListProvider);
+  final fullList = fullListAsync.asData?.value ?? const [];
+  final idOrder = <String, int>{
+    for (int i = 0; i < fullList.length; i++) fullList[i]: i,
+  };
+
   // Use pocket-specific list when filtered, otherwise the full list.
   final AsyncValue<List<String>> listAsync = pocket != null
       ? ref.watch(itemsByPocketProvider(pocket))
-      : ref.watch(itemsListProvider);
+      : fullListAsync;
 
-  if (listAsync is AsyncLoading) return const AsyncValue.loading();
+  if (listAsync is AsyncLoading || fullListAsync is AsyncLoading) {
+    return const AsyncValue.loading();
+  }
   if (listAsync is AsyncError) {
     return AsyncValue.error(
         (listAsync as AsyncError).error,
@@ -81,6 +90,12 @@ final filteredItemsProvider = Provider<AsyncValue<List<String>>>((ref) {
       items.sort();
     case ItemSort.nameZA:
       items.sort((a, b) => b.compareTo(a));
+    case ItemSort.idAscending:
+      items.sort((a, b) =>
+          (idOrder[a] ?? 999999).compareTo(idOrder[b] ?? 999999));
+    case ItemSort.idDescending:
+      items.sort((a, b) =>
+          (idOrder[b] ?? 999999).compareTo(idOrder[a] ?? 999999));
   }
 
   return AsyncValue.data(items);

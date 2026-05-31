@@ -79,19 +79,8 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 4),
                   children: [
-                    // Sort toggle
-                    FilterChip(
-                      label: Text(sort == ItemSort.nameAZ
-                          ? 'A → Z'
-                          : 'Z → A'),
-                      avatar: const Icon(Icons.sort, size: 16),
-                      selected: sort == ItemSort.nameZA,
-                      onSelected: (_) => ref
-                          .read(itemSortProvider.notifier)
-                          .state = sort == ItemSort.nameAZ
-                          ? ItemSort.nameZA
-                          : ItemSort.nameAZ,
-                    ),
+                    // Sort picker chip
+                    _SortChip(current: sort),
                     const SizedBox(width: 6),
                     // Pocket filter chips
                     for (final entry in kItemPockets.entries) ...[
@@ -145,6 +134,71 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
             itemBuilder: (_, i) => _ItemTile(name: names[i]),
           );
         },
+      ),
+    );
+  }
+}
+
+// ── Sort picker chip ──────────────────────────────────────────────────────────
+
+class _SortChip extends ConsumerWidget {
+  final ItemSort current;
+  const _SortChip({required this.current});
+
+  static const _options = [
+    (ItemSort.idAscending,  'ID ↑',      'Lowest ID first'),
+    (ItemSort.idDescending, 'ID ↓',      'Highest ID first'),
+    (ItemSort.nameAZ,       'Name A → Z', 'Alphabetical'),
+    (ItemSort.nameZA,       'Name Z → A', 'Reverse alphabetical'),
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final label = _options
+        .firstWhere((o) => o.$1 == current,
+            orElse: () => _options.first)
+        .$2;
+
+    return FilterChip(
+      label: Text(label),
+      avatar: const Icon(Icons.sort, size: 16),
+      selected: current != ItemSort.idAscending,
+      onSelected: (_) => _showPicker(context, ref),
+    );
+  }
+
+  void _showPicker(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (_) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('Sort by',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
+          const Divider(height: 1),
+          for (final (sort, label, subtitle) in _options)
+            ListTile(
+              title: Text(label),
+              subtitle: Text(subtitle,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurfaceVariant)),
+              trailing: current == sort
+                  ? const Icon(Icons.check)
+                  : null,
+              onTap: () {
+                ref.read(itemSortProvider.notifier).state = sort;
+                Navigator.pop(context);
+              },
+            ),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }
