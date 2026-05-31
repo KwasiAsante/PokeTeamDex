@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/items/providers/items_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
@@ -160,12 +161,7 @@ class _ItemListItem extends StatelessWidget {
           ],
         ],
       ),
-      onTap: () => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        builder: (_) => _ItemDetailSheet(item: item),
-      ),
+      onTap: () => context.push('/items/${item.name}'),
     );
   }
 }
@@ -193,110 +189,3 @@ class _CategoryChip extends StatelessWidget {
   }
 }
 
-// ── Item detail bottom sheet ──────────────────────────────────────────────────
-
-class _ItemDetailSheet extends StatelessWidget {
-  final ItemEntry item;
-  const _ItemDetailSheet({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.45,
-      minChildSize: 0.3,
-      maxChildSize: 0.75,
-      builder: (_, controller) => ListView(
-        controller: controller,
-        padding: const EdgeInsets.all(20),
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (item.spriteUrl != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: CachedNetworkImage(
-                    imageUrl: item.spriteUrl!,
-                    width: 64,
-                    height: 64,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.displayName,
-                      style: textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    if (item.categoryLabel.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      _CategoryChip(label: item.categoryLabel),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          if (item.cost != null && item.cost! > 0) ...[
-            _DetailRow(label: 'Buy price', value: '₽${item.cost}'),
-            const SizedBox(height: 4),
-          ],
-          if (item.shortEffect != null) ...[
-            const Divider(height: 24),
-            Text(
-              'Effect',
-              style:
-                  textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            Text(item.shortEffect!, style: textTheme.bodyMedium),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _DetailRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Row(
-      children: [
-        SizedBox(
-          width: 90,
-          child: Text(
-            label,
-            style: textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        Text(value, style: textTheme.bodyMedium),
-      ],
-    );
-  }
-}

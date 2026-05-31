@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/abilities/presentation/abilities_screen.dart';
 import 'package:poke_team_dex/features/auth/presentation/login_screen.dart';
 import 'package:poke_team_dex/features/auth/presentation/register_screen.dart';
+import 'package:poke_team_dex/features/items/presentation/item_detail_screen.dart';
 import 'package:poke_team_dex/features/items/presentation/items_screen.dart';
 import 'package:poke_team_dex/features/moves/presentation/moves_screen.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/pokedex_screen.dart';
@@ -75,6 +76,14 @@ GoRouter buildAppRouter(String? initialToken) {
               GoRoute(
                 path: '/items',
                 builder: (context, state) => const ItemsScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':name',
+                    builder: (context, state) => ItemDetailScreen(
+                      itemName: state.pathParameters['name']!,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
