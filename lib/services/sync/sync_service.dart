@@ -111,7 +111,10 @@ class SyncService {
       case 'team:update':
         final team = await teamRepo.getById(op.entityId);
         if (team.remoteId == null) return;
-        await api.updateTeam(team.remoteId!, payload['name'] as String);
+        // payload['name'] may be absent if only format_label changed — fall
+        // back to the current name from the DB so the API call is always valid.
+        final teamName = payload['name'] as String? ?? team.name;
+        await api.updateTeam(team.remoteId!, teamName);
 
       case 'team:delete':
         final remoteId = payload['remote_id'] as String?;
