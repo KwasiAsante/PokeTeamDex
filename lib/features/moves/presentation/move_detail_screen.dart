@@ -453,24 +453,17 @@ class _LearnedByGridState extends State<_LearnedByGrid> {
 
     return Column(
       children: [
-        GridView.builder(
+        ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            childAspectRatio: 0.8,
-            mainAxisSpacing: 4,
-            crossAxisSpacing: 4,
-          ),
           itemCount: visible.length,
-          itemBuilder: (_, i) => _PokemonCell(pokemon: visible[i]),
+          itemBuilder: (_, i) => _PokemonListTile(pokemon: visible[i]),
         ),
         if (remaining > 0) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           TextButton(
-            onPressed: () =>
-                setState(() => _shown = (_shown + _pageSize)
-                    .clamp(0, widget.pokemon.length)),
+            onPressed: () => setState(() =>
+                _shown = (_shown + _pageSize).clamp(0, widget.pokemon.length)),
             child: Text('Show more ($remaining remaining)'),
           ),
         ],
@@ -479,41 +472,43 @@ class _LearnedByGridState extends State<_LearnedByGrid> {
   }
 }
 
-class _PokemonCell extends StatelessWidget {
+class _PokemonListTile extends StatelessWidget {
   final MovePokemonRef pokemon;
-  const _PokemonCell({required this.pokemon});
+  const _PokemonListTile({required this.pokemon});
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final spriteUrl =
+    final colorScheme = Theme.of(context).colorScheme;
+    final iconUrl =
+        'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
+        'sprites/pokemon/versions/generation-viii/icons/${pokemon.id}.png';
+    final fallbackUrl =
         'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
         'sprites/pokemon/${pokemon.id}.png';
 
-    return GestureDetector(
-      onTap: () => context.push('/pokedex/${pokemon.id}'),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CachedNetworkImage(
-            imageUrl: spriteUrl,
-            width: 56,
-            height: 56,
-            fit: BoxFit.contain,
-            errorWidget: (_, __, ___) =>
-                const Icon(Icons.catching_pokemon, size: 40),
+    return ListTile(
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+      leading: CachedNetworkImage(
+        imageUrl: iconUrl,
+        width: 40,
+        height: 30,
+        fit: BoxFit.contain,
+        errorWidget: (_, __, ___) => CachedNetworkImage(
+          imageUrl: fallbackUrl,
+          width: 40,
+          height: 30,
+          fit: BoxFit.contain,
+          errorWidget: (_, __, ___) => Icon(
+            Icons.catching_pokemon,
+            size: 28,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
           ),
-          Flexible(
-            child: Text(
-              pokemon.displayName,
-              style: textTheme.labelSmall,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
+        ),
       ),
+      title: Text(pokemon.displayName),
+      trailing: const Icon(Icons.chevron_right, size: 18),
+      onTap: () => context.push('/pokedex/${pokemon.id}'),
     );
   }
 }
