@@ -18,6 +18,16 @@ class _MovesScreenState extends ConsumerState<MovesScreen> {
   final _searchController = SearchController();
 
   @override
+  void initState() {
+    super.initState();
+    // Restore persisted search text so the controller matches the provider.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final saved = ref.read(movesSearchProvider);
+      if (saved.isNotEmpty) _searchController.text = saved;
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();

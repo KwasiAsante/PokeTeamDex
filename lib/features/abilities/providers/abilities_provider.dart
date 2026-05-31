@@ -7,10 +7,10 @@ final abilitiesListProvider = FutureProvider<List<String>>((ref) async {
   return repo.fetchAbilityList();
 });
 
-final abilitiesSearchProvider = StateProvider.autoDispose<String>((ref) => '');
+// Not autoDispose — persists across tab switches.
+final abilitiesSearchProvider = StateProvider<String>((ref) => '');
 
-final filteredAbilitiesProvider =
-    Provider.autoDispose<AsyncValue<List<String>>>((ref) {
+final filteredAbilitiesProvider = Provider<AsyncValue<List<String>>>((ref) {
   final listAsync = ref.watch(abilitiesListProvider);
   final search = ref.watch(abilitiesSearchProvider).trim().toLowerCase();
 
