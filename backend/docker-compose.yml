@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:16
+    container_name: poketeamdex_db
     environment:
       POSTGRES_USER: dev
       POSTGRES_PASSWORD: dev
@@ -17,6 +18,7 @@ services:
 
   api:
     build: .
+    container_name: poketeamdex_api
     ports:
       - "8000:8000"
     environment:
