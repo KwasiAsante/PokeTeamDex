@@ -494,22 +494,22 @@ class _FilledSlotCard extends ConsumerWidget {
                     children: [
                       // Col 1 — Sprite + item icon + species
                       SizedBox(
-                        width: 80,
+                        width: 100,
                         child: Column(
                           children: [
                             PokemonSprite(
                               defaultUrl: spriteUrls.defaultUrl,
                               shinyUrl: spriteUrls.shinyUrl,
                               shiny: slot.isShiny,
-                              size: 72,
+                              size: 96,
                             ),
                             if (itemEntry?.spriteUrl != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
                                 child: CachedNetworkImage(
                                   imageUrl: itemEntry!.spriteUrl!,
-                                  width: 24,
-                                  height: 24,
+                                  width: 36,
+                                  height: 36,
                                   errorWidget: (_, __, ___) =>
                                       const SizedBox.shrink(),
                                 ),

@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +14,9 @@ import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/connectivity/connectivity_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:poke_team_dex/features/teams/presentation/team_detail_screen.dart'
+    show teamSlotsProvider;
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
@@ -213,8 +219,21 @@ class _TeamsList extends ConsumerWidget {
           );
         }
 
-        return CustomScrollView(
+        return RefreshIndicator(
+          onRefresh: () => ref.read(syncServiceProvider).run(),
+          child: CustomScrollView(
+          // AlwaysScrollableScrollPhysics lets RefreshIndicator trigger
+          // even when the content is short; on desktop (no touch) the sync
+          // button in the AppBar is the primary refresh mechanism.
+          physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
+            // Desktop refresh header — shown instead of pull gesture
+            if (!_isTouchPlatform())
+              SliverToBoxAdapter(
+                child: _DesktopRefreshBar(
+                  onRefresh: () => ref.read(syncServiceProvider).run(),
+                ),
+              ),
             // Reorderable folder list
             if (folders.isNotEmpty)
               SliverReorderableList(
@@ -249,6 +268,7 @@ class _TeamsList extends ConsumerWidget {
             ],
             const SliverToBoxAdapter(child: SizedBox(height: 88)),
           ],
+        ),
         );
       },
     );
@@ -524,22 +544,29 @@ class _TeamTile extends ConsumerWidget {
         ],
       ),
       title: Text(team.name),
-      subtitle: hasError
-          ? Text(
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Mini sprite row — 6 slots, Poké Ball for empty
+          _TeamSpriteRow(teamId: team.id),
+          if (hasError)
+            Text(
               'Sync issue — check sync monitor',
-              style: TextStyle(color: colorScheme.error, fontSize: 12),
+              style: TextStyle(color: colorScheme.error, fontSize: 11),
             )
-          : team.formatLabel != null
-              ? Text(
-                  ref.watch(formatServiceProvider)
-                          .formatById(team.formatLabel!)?.name ??
-                      team.formatLabel!,
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
-                )
-              : null,
+          else if (team.formatLabel != null)
+            Text(
+              ref.watch(formatServiceProvider)
+                      .formatById(team.formatLabel!)?.name ??
+                  team.formatLabel!,
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 11,
+              ),
+            ),
+        ],
+      ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -723,5 +750,108 @@ class _CreateTeamDialogState extends ConsumerState<_CreateTeamDialog> {
       name: _ctrl.text.trim(),
       formatId: _selectedFormat?.id, // store format id (e.g. "gen9")
     ));
+  }
+}
+
+// ── Platform helpers ──────────────────────────────────────────────────────────
+
+bool _isTouchPlatform() {
+  if (kIsWeb) return false;
+  return Platform.isAndroid || Platform.isIOS;
+}
+
+// ── Desktop refresh bar ───────────────────────────────────────────────────────
+
+class _DesktopRefreshBar extends ConsumerWidget {
+  final Future<void> Function() onRefresh;
+  const _DesktopRefreshBar({required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final syncState = ref.watch(syncStateProvider);
+    final isSyncing = syncState.status == SyncStatus.syncing;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
+        children: [
+          Icon(Icons.sync, size: 14, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Text(
+            'Pull-to-refresh unavailable on desktop',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: isSyncing ? null : onRefresh,
+            icon: isSyncing
+                ? SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh, size: 14),
+            label: const Text('Sync now'),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Team sprite row (6 mini sprites) ─────────────────────────────────────────
+
+class _TeamSpriteRow extends ConsumerWidget {
+  final int teamId;
+  const _TeamSpriteRow({required this.teamId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final slotsAsync = ref.watch(teamSlotsProvider(teamId));
+    final slots = slotsAsync.asData?.value ?? [];
+    final slotMap = {for (final s in slots) s.slot: s};
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 2),
+      child: Row(
+        children: List.generate(6, (i) {
+          final slot = slotMap[i + 1];
+          if (slot == null) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 2),
+              child: Icon(
+                Icons.catching_pokemon,
+                size: 36,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+              ),
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.only(right: 2),
+            child: CachedNetworkImage(
+              imageUrl:
+                  'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
+                  'sprites/pokemon/${slot.pokemonId}.png',
+              width: 36,
+              height: 36,
+              fit: BoxFit.contain,
+              errorWidget: (_, __, ___) => Icon(
+                Icons.catching_pokemon,
+                size: 36,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
   }
 }
