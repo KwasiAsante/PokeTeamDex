@@ -87,7 +87,10 @@ class _MovesScreenState extends ConsumerState<MovesScreen> {
           }
           return ListView.builder(
             itemCount: names.length,
-            itemExtent: 72,
+            // itemExtent gives a performance boost for unfiltered lists, but
+            // must be null when a damage class filter is active — SizedBox.shrink()
+            // needs zero height, which itemExtent overrides to 72px leaving gaps.
+            itemExtent: damageClass == null ? 72.0 : null,
             itemBuilder: (_, i) => _MoveTile(name: names[i]),
           );
         },
