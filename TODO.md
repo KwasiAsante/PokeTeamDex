@@ -168,7 +168,7 @@
 
 - [ ] **Skeleton placeholders** — replace `LinearProgressIndicator` in tile subtitles with a shimmer skeleton while per-item detail loads
 - [ ] **Move/Item/Ability list layout** — 2-column grid on tablet+
-- [ ] **Filter persistence** — remember search query and filter chips across tab switches (currently resets because search state is `autoDispose`)
+- [x] **Filter persistence** — search/filter providers changed to non-autoDispose; SearchController text restored in initState on tab return
 
 ### Team Builder
 
