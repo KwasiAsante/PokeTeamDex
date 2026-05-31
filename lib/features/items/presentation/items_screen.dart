@@ -7,6 +7,7 @@ import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
+
 class ItemsScreen extends ConsumerStatefulWidget {
   const ItemsScreen({super.key});
 
@@ -35,47 +36,107 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredAsync = ref.watch(filteredItemsProvider);
+    final pocket = ref.watch(itemPocketFilterProvider);
+    final sort = ref.watch(itemSortProvider);
+
+    // Persist filter/sort state across tab switches
+    ref.listen(itemPocketFilterProvider, (_, __) {});
+    ref.listen(itemSortProvider, (_, __) {});
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Items'),
         actions: [const SettingsButton()],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(64),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-            child: SearchBar(
-              controller: _searchController,
-              hintText: 'Search items…',
-              leading: const Icon(Icons.search),
-              trailing: [
-                if (_searchController.text.isNotEmpty)
-                  IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      _searchController.clear();
-                      ref.read(itemsSearchProvider.notifier).state = '';
-                    },
-                  ),
-              ],
-              onChanged: (v) =>
-                  ref.read(itemsSearchProvider.notifier).state = v,
-            ),
+          preferredSize: const Size.fromHeight(108),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                child: SearchBar(
+                  controller: _searchController,
+                  hintText: 'Search items…',
+                  leading: const Icon(Icons.search),
+                  trailing: [
+                    if (_searchController.text.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          ref.read(itemsSearchProvider.notifier).state = '';
+                        },
+                      ),
+                  ],
+                  onChanged: (v) =>
+                      ref.read(itemsSearchProvider.notifier).state = v,
+                ),
+              ),
+              // Sort + category filter chips
+              SizedBox(
+                height: 44,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 4),
+                  children: [
+                    // Sort toggle
+                    FilterChip(
+                      label: Text(sort == ItemSort.nameAZ
+                          ? 'A → Z'
+                          : 'Z → A'),
+                      avatar: const Icon(Icons.sort, size: 16),
+                      selected: sort == ItemSort.nameZA,
+                      onSelected: (_) => ref
+                          .read(itemSortProvider.notifier)
+                          .state = sort == ItemSort.nameAZ
+                          ? ItemSort.nameZA
+                          : ItemSort.nameAZ,
+                    ),
+                    const SizedBox(width: 6),
+                    // Pocket filter chips
+                    for (final entry in kItemPockets.entries) ...[
+                      FilterChip(
+                        label: Text(entry.value),
+                        selected: pocket == entry.key,
+                        onSelected: (_) => ref
+                            .read(itemPocketFilterProvider.notifier)
+                            .state = pocket == entry.key
+                            ? null
+                            : entry.key,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    // Clear filter
+                    if (pocket != null)
+                      ActionChip(
+                        avatar: const Icon(Icons.close, size: 16),
+                        label: const Text('Clear'),
+                        onPressed: () => ref
+                            .read(itemPocketFilterProvider.notifier)
+                            .state = null,
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
       body: filteredAsync.when(
-        loading: () => const LoadingState(),
+        loading: () => const LoadingState(message: 'Loading items…'),
         error: (e, _) => ErrorState(
           error: e,
-          onRetry: () => ref.invalidate(itemsListProvider),
+          onRetry: () {
+            ref.invalidate(itemsListProvider);
+            if (pocket != null) ref.invalidate(itemsByPocketProvider(pocket));
+          },
         ),
         data: (names) {
           if (names.isEmpty) {
             return const EmptyState(
               icon: Icons.search_off,
               title: 'No items found',
-              subtitle: 'Try adjusting your search.',
+              subtitle: 'Try adjusting your search or filter.',
             );
           }
           return ListView.builder(
