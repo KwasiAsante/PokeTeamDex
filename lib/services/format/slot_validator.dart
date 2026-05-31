@@ -43,8 +43,9 @@ Future<SlotValidation> validateSlot(
     if (!m.hasAbilities) {
       violations['ability'] = 'Abilities don\'t exist in Gen $gen';
     } else {
+      final psId = _toPsId(slot.abilityName!);
       final available = service.abilitiesForGen(gen);
-      if (!available.any((a) => a.id == slot.abilityName)) {
+      if (!available.any((a) => a.id == psId)) {
         violations['ability'] =
             '${_display(slot.abilityName!)} not available in Gen $gen';
       }
@@ -56,8 +57,9 @@ Future<SlotValidation> validateSlot(
     if (!m.hasItems) {
       violations['item'] = 'Held items don\'t exist in Gen $gen';
     } else {
+      final psId = _toPsId(slot.heldItemName!);
       final available = service.itemsForGen(gen);
-      if (!available.any((i) => i.id == slot.heldItemName)) {
+      if (!available.any((i) => i.id == psId)) {
         violations['item'] =
             '${_display(slot.heldItemName!)} not available in Gen $gen';
       }
@@ -101,7 +103,7 @@ SlotValidation validateSlotSync(
   if (abilityName != null) {
     if (!m.hasAbilities) {
       violations['ability'] = 'Abilities don\'t exist in Gen $gen';
-    } else if (!service.abilitiesForGen(gen).any((a) => a.id == abilityName)) {
+    } else if (!service.abilitiesForGen(gen).any((a) => a.id == _toPsId(abilityName))) {
       violations['ability'] = '${_display(abilityName)} not available in Gen $gen';
     }
   }
@@ -109,7 +111,7 @@ SlotValidation validateSlotSync(
   if (heldItemName != null) {
     if (!m.hasItems) {
       violations['item'] = 'Held items don\'t exist in Gen $gen';
-    } else if (!service.itemsForGen(gen).any((i) => i.id == heldItemName)) {
+    } else if (!service.itemsForGen(gen).any((i) => i.id == _toPsId(heldItemName))) {
       violations['item'] = '${_display(heldItemName)} not available in Gen $gen';
     }
   }
@@ -162,6 +164,9 @@ Set<String> _buildLearnset(
 
   return result;
 }
+
+/// PokéAPI uses hyphenated names ("choice-specs"); PS ids strip hyphens ("choicespecs").
+String _toPsId(String pokeApiName) => pokeApiName.replaceAll('-', '').toLowerCase();
 
 String _display(String id) => id
     .split('-')
