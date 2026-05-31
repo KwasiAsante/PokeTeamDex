@@ -280,7 +280,7 @@ class _AreaTileState extends ConsumerState<_AreaTile> {
         padding: const EdgeInsets.fromLTRB(24, 4, 16, 2),
         child: Row(
           children: [
-            const SizedBox(width: 60),
+            const SizedBox(width: 100),
             Expanded(
               child: Text('Pokémon',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -375,11 +375,11 @@ class _EncounterListTile extends StatelessWidget {
           // Sprite
           CachedNetworkImage(
             imageUrl: spriteUrl,
-            width: 56,
-            height: 56,
+            width: 80,
+            height: 80,
             fit: BoxFit.contain,
             errorWidget: (_, __, ___) => const Icon(Icons.catching_pokemon,
-                size: 40),
+                size: 60),
           ),
           const SizedBox(width: 4),
           // Name
@@ -392,7 +392,7 @@ class _EncounterListTile extends StatelessWidget {
           ),
           // Method badge
           SizedBox(
-            width: 80,
+            width: 100,
             child: Text(
               _methodLabel(row.method),
               style: textTheme.labelSmall
