@@ -79,7 +79,19 @@
 - [x] **Local DB slot config columns** — schema v3: all slot config fields + `is_deleted` + `sync_status` on all entity tables, `format_label` + `sort_order` on teams, `sort_order` on folders
 - [x] **Stat preview** — real-time Gen III+ calculator updating as EVs/IVs/nature/level change
 - [x] **Drag-reorder** — slots within a team; teams within a folder; folders (all `ReorderableListView` / `SliverReorderableList`)
-- [ ] **`format_label` UI** — game/format label field (e.g. "VGC 2025") exists in DB but not surfaced in team create/edit UI yet
+- [x] **`format_label` UI** — format picker in Create Team dialog + tune button on Team Detail; 32 formats (Gen 1–9 general + 22 mainline games)
+
+---
+
+## Format Engine Epic (format-engine/*)
+
+- [x] **data-layer** — PS data sync script (`sync_ps_data.py`), bundled learnsets/moves/items/abilities JSON, `GET /ps-data/version` backend endpoint, `FormatService` with Hive cache + background update
+- [x] **format-picker** — format selection on team create/edit, format display on team tile + detail AppBar, `updateTeamFormat` action, sync null-cast + stale-op fixes
+- [x] **gen-mechanics** — slot config UI gates sections by generation: abilities/nature hidden Gen 1–2, held item hidden Gen 1, shiny toggle hidden Gen 1, friendship hidden Gen 1, EVs labelled "Stat Experience" Gen 1–2, IVs renamed "DVs" with max 15, Gen 1 shows 5 stats (HP/Atk/Def/Spc/Spe)
+- [x] **gen-sprites** — PS transparent sprites for Gen 1–5 (gen5ani animated GIFs for BW), HOME/official artwork for Gen 6+; "Use generation sprites" toggle in Settings
+- [x] **gen-learnsets** — move picker filtered by format version groups; game formats check exact version-group, gen formats union all groups in that gen; validation flags illegal moves/abilities/items
+- [ ] **banlist** — Layer 2 competitive ban checking (Ubers, clause violations, format-specific bans) *(deferred)*
+- [ ] **custom-formats** — custom format builder UI *(deferred)*
 
 ---
 
