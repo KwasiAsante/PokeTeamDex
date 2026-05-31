@@ -512,7 +512,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               defaultUrl: spriteUrls.defaultUrl,
               shinyUrl: spriteUrls.shinyUrl,
               shiny: _isShiny,
-              size: 100,
+              size: 140,
             ),
             if (mechanics == null || mechanics.hasShiny)
             GestureDetector(
