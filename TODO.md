@@ -109,9 +109,9 @@
 - [x] Auto-sync on login and register
 - [x] WorkManager registered with 1-hour periodic task (non-web)
 - [x] `is_deleted` + `sync_status` columns on all entity tables (schema v3)
-- [ ] **WorkManager background sync callback** — registered but callback is a no-op stub; needs to call `SyncService.run()`
+- [x] **WorkManager background sync callback** — bootstraps standalone DB + API stack and calls `SyncService.run()` in the background isolate
 - [ ] **Soft-delete propagation** — `is_deleted` column exists in local Drift schema but sync engine still hard-deletes; deletions made on device A don't reach device B via pull
-- [ ] **Pull-to-refresh on Teams screen** — PRD §7.2 specifies this as a sync trigger *(not implemented)*
+- [x] **Pull-to-refresh on Teams screen** — `RefreshIndicator` on mobile; compact "Sync now" bar on desktop
 
 ---
 
@@ -125,7 +125,7 @@
 - [x] **Shiny sprite** — shiny artwork shown when slot `is_shiny = true`
 - [x] Performance pass — list providers no longer `autoDispose`; survive tab navigation
 - [x] **Drag-reorder** — reorder slots within team; reorder teams within folder; reorder folders
-- [ ] **Team list card sprites** — show row of 6 mini sprites (Poké Ball for empty slots) on team tile per PRD §6.1.2
+- [x] **Team list card sprites** — 6 mini sprites (36px) on team tile; Poké Ball icon for empty slots
 
 ---
 
