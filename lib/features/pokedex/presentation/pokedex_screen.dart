@@ -367,14 +367,21 @@ class _GameChip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Get games for this generation from the format service
-    final service = ref.watch(formatServiceProvider);
-    final games = service.isInitialized
-        ? service
-            .formatsOfType(FormatType.game)
-            .where((f) => f.gen == generation)
-            .toList()
-        : <GameFormat>[];
+    // Watch allFormatsProvider to trigger initialization; rebuilds when ready.
+    final formatsAsync = ref.watch(allFormatsProvider);
+    final games = (formatsAsync.asData?.value ?? [])
+        .where((f) => f.type == FormatType.game && f.gen == generation)
+        .toList();
+
+    // Show a placeholder chip while formats are loading so the bar width
+    // doesn't jump once data arrives.
+    if (formatsAsync.isLoading) {
+      return const FilterChip(
+        label: Text('Game'),
+        avatar: Icon(Icons.videogame_asset_outlined, size: 16),
+        onSelected: null,
+      );
+    }
 
     if (games.isEmpty) return const SizedBox.shrink();
 
