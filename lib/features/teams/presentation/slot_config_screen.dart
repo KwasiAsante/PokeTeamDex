@@ -361,12 +361,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         )).toList()
           ..sort((a, b) => a.abilitySlot.compareTo(b.abilitySlot));
 
-        final learnableMoves = pokemon.moves
-            .map((m) => m['move']['name'] as String)
-            .toSet()
-            .toList()
-          ..sort();
-
         final baseStats = <String, int>{
           for (final s in pokemon.stats)
             s['stat']['name'] as String: s['base_stat'] as int,
@@ -384,6 +378,16 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final violations = format != null
             ? _computeViolations(formatService, format, pokemon.name, pokemonMoves)
             : <String, String>{};
+
+        // Learnable moves filtered by format version groups.
+        // No format → show everything the Pokémon can ever learn.
+        final learnableMoves = (format != null
+                ? buildLearnsetForFormat(pokemonMoves, format)
+                : pokemon.moves
+                    .map((m) => m['move']['name'] as String)
+                    .toSet())
+            .toList()
+          ..sort();
 
         // Sprite resolution
         final useFormatSprites =

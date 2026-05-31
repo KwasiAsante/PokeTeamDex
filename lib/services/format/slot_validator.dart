@@ -130,7 +130,15 @@ SlotValidation validateSlotSync(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// Build the set of moves learnable in [format] from PokéAPI version-group data.
+/// Returns the set of move names (PokéAPI hyphenated format) that [pokemonMoves]
+/// shows as learnable in [format].
+///
+/// Use this to pre-filter the move picker so only legal moves are shown.
+Set<String> buildLearnsetForFormat(
+  List<Map<String, dynamic>> pokemonMoves,
+  GameFormat format,
+) => _buildLearnset(pokemonMoves, format);
+
 Set<String> _buildLearnset(
   List<Map<String, dynamic>> pokemonMoves,
   GameFormat format,
