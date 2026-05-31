@@ -169,11 +169,25 @@ class SyncService {
   Future<void> _mergeFolders(List remote) async {
     for (final rf in remote.cast<Map<String, dynamic>>()) {
       final remoteId = rf['id'].toString();
-      final remoteName = rf['name'] as String;
+      final remoteDeleted = rf['is_deleted'] as bool? ?? false;
       final remoteUpdatedAt =
           DateTime.parse(rf['updated_at'] as String).toUtc();
 
       final existing = await folderRepo.getByRemoteId(remoteId);
+
+      if (remoteDeleted) {
+        // Soft-deleted on server — hard-delete locally if present.
+        if (existing != null) {
+          // Move orphaned teams to ungrouped before deleting the folder.
+          await (db.update(db.teams)
+                ..where((t) => t.folderId.equals(existing.id)))
+              .write(const TeamsCompanion(folderId: Value(null)));
+          await folderRepo.delete(existing.id);
+        }
+        continue;
+      }
+
+      final remoteName = rf['name'] as String;
       if (existing == null) {
         await folderRepo.insert(TeamFoldersCompanion(
           name: Value(remoteName),
@@ -194,9 +208,22 @@ class SyncService {
   Future<void> _mergeTeams(List remote) async {
     for (final rt in remote.cast<Map<String, dynamic>>()) {
       final remoteId = rt['id'].toString();
-      final remoteName = rt['name'] as String;
+      final remoteDeleted = rt['is_deleted'] as bool? ?? false;
       final remoteUpdatedAt =
           DateTime.parse(rt['updated_at'] as String).toUtc();
+
+      final existing = await teamRepo.getByRemoteId(remoteId);
+
+      if (remoteDeleted) {
+        // Soft-deleted on server — hard-delete locally including all slots.
+        if (existing != null) {
+          await slotRepo.deleteAllForTeam(existing.id);
+          await teamRepo.delete(existing.id);
+        }
+        continue;
+      }
+
+      final remoteName = rt['name'] as String;
       final remoteFolderId = rt['folder_id'];
 
       // Resolve remote folder_id → local folder
@@ -207,7 +234,6 @@ class SyncService {
         localFolderId = localFolder?.id;
       }
 
-      final existing = await teamRepo.getByRemoteId(remoteId);
       if (existing == null) {
         await teamRepo.insert(TeamsCompanion(
           name: Value(remoteName),
@@ -230,8 +256,7 @@ class SyncService {
     for (final rs in remote.cast<Map<String, dynamic>>()) {
       final remoteTeamId = rs['team_id'].toString();
       final slotNumber = rs['slot'] as int;
-      final pokemonId = rs['pokemon_id'] as int;
-      final nickname = rs['nickname'] as String?;
+      final remoteDeleted = rs['is_deleted'] as bool? ?? false;
       final remoteUpdatedAt =
           DateTime.parse(rs['updated_at'] as String).toUtc();
 
@@ -240,6 +265,18 @@ class SyncService {
 
       final existing =
           await slotRepo.getByTeamAndSlot(localTeam.id, slotNumber);
+
+      if (remoteDeleted) {
+        // Soft-deleted on server — hard-delete locally if present.
+        if (existing != null) {
+          await slotRepo.deleteSlot(localTeam.id, slotNumber);
+        }
+        continue;
+      }
+
+      final pokemonId = rs['pokemon_id'] as int;
+      final nickname = rs['nickname'] as String?;
+
       if (existing == null) {
         await slotRepo.insert(TeamSlotsCompanion(
           teamId: Value(localTeam.id),

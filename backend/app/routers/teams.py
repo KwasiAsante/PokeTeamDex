@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 from app.core.deps import CurrentUser, DB
 from app.models.team import Team, TeamFolder, TeamSlot
@@ -14,7 +13,10 @@ router = APIRouter(prefix="/teams", tags=["teams"])
 @router.get("", response_model=list[TeamResponse])
 async def list_teams(current_user: CurrentUser, db: DB) -> list[TeamResponse]:
     result = await db.execute(
-        select(Team).where(Team.user_id == current_user.id)
+        select(Team).where(
+            Team.user_id == current_user.id,
+            Team.is_deleted == False,  # noqa: E712
+        )
     )
     return [TeamResponse.model_validate(t) for t in result.scalars()]
 
@@ -44,7 +46,15 @@ async def rename_team(
 @router.delete("/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_team(team_id: int, current_user: CurrentUser, db: DB) -> None:
     team = await _get_owned_team(team_id, current_user.id, db)
-    await db.delete(team)
+    team.is_deleted = True
+
+    # Cascade soft-delete to slots.
+    slots_result = await db.execute(
+        select(TeamSlot).where(TeamSlot.team_id == team.id, TeamSlot.is_deleted == False)  # noqa: E712
+    )
+    for slot in slots_result.scalars():
+        slot.is_deleted = True
+
     await db.commit()
 
 
@@ -54,7 +64,10 @@ async def delete_team(team_id: int, current_user: CurrentUser, db: DB) -> None:
 async def list_slots(team_id: int, current_user: CurrentUser, db: DB) -> list[SlotResponse]:
     await _get_owned_team(team_id, current_user.id, db)
     result = await db.execute(
-        select(TeamSlot).where(TeamSlot.team_id == team_id)
+        select(TeamSlot).where(
+            TeamSlot.team_id == team_id,
+            TeamSlot.is_deleted == False,  # noqa: E712
+        )
     )
     return [SlotResponse.model_validate(s) for s in result.scalars()]
 
@@ -76,6 +89,7 @@ async def upsert_slot(
     else:
         slot.pokemon_id = body.pokemon_id
         slot.nickname = body.nickname
+        slot.is_deleted = False  # un-delete if previously soft-deleted
 
     await db.commit()
     await db.refresh(slot)
@@ -86,12 +100,16 @@ async def upsert_slot(
 async def delete_slot(team_id: int, slot_number: int, current_user: CurrentUser, db: DB) -> None:
     await _get_owned_team(team_id, current_user.id, db)
     result = await db.execute(
-        select(TeamSlot).where(TeamSlot.team_id == team_id, TeamSlot.slot == slot_number)
+        select(TeamSlot).where(
+            TeamSlot.team_id == team_id,
+            TeamSlot.slot == slot_number,
+            TeamSlot.is_deleted == False,  # noqa: E712
+        )
     )
     slot = result.scalar_one_or_none()
     if slot is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Slot not found")
-    await db.delete(slot)
+    slot.is_deleted = True
     await db.commit()
 
 
@@ -99,7 +117,11 @@ async def delete_slot(team_id: int, slot_number: int, current_user: CurrentUser,
 
 async def _get_owned_folder(folder_id: int, user_id: int, db: DB) -> TeamFolder:
     result = await db.execute(
-        select(TeamFolder).where(TeamFolder.id == folder_id, TeamFolder.user_id == user_id)
+        select(TeamFolder).where(
+            TeamFolder.id == folder_id,
+            TeamFolder.user_id == user_id,
+            TeamFolder.is_deleted == False,  # noqa: E712
+        )
     )
     folder = result.scalar_one_or_none()
     if folder is None:
@@ -109,7 +131,11 @@ async def _get_owned_folder(folder_id: int, user_id: int, db: DB) -> TeamFolder:
 
 async def _get_owned_team(team_id: int, user_id: int, db: DB) -> Team:
     result = await db.execute(
-        select(Team).where(Team.id == team_id, Team.user_id == user_id)
+        select(Team).where(
+            Team.id == team_id,
+            Team.user_id == user_id,
+            Team.is_deleted == False,  # noqa: E712
+        )
     )
     team = result.scalar_one_or_none()
     if team is None:

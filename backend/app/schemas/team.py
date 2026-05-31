@@ -16,6 +16,7 @@ class FolderUpdate(BaseModel):
 class FolderResponse(BaseModel):
     id: int
     name: str
+    is_deleted: bool
     created_at: datetime
     updated_at: datetime
 
@@ -38,6 +39,7 @@ class TeamResponse(BaseModel):
     user_id: int
     folder_id: int | None
     name: str
+    is_deleted: bool
     created_at: datetime
     updated_at: datetime
 
@@ -58,6 +60,7 @@ class SlotResponse(BaseModel):
     slot: int
     pokemon_id: int
     nickname: str | None
+    is_deleted: bool
     created_at: datetime
     updated_at: datetime
 
