@@ -110,7 +110,7 @@
 - [x] WorkManager registered with 1-hour periodic task (non-web)
 - [x] `is_deleted` + `sync_status` columns on all entity tables (schema v3)
 - [x] **WorkManager background sync callback** — bootstraps standalone DB + API stack and calls `SyncService.run()` in the background isolate
-- [ ] **Soft-delete propagation** — `is_deleted` column exists in local Drift schema but sync engine still hard-deletes; deletions made on device A don't reach device B via pull
+- [x] **Soft-delete propagation** — backend soft-deletes (migration 0003); pull merge handles `is_deleted: true` by hard-deleting locally; folder delete cascades to teams + slots; CORS headers added to all error responses
 - [x] **Pull-to-refresh on Teams screen** — `RefreshIndicator` on mobile; compact "Sync now" bar on desktop
 
 ---
