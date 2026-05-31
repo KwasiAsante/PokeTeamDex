@@ -176,6 +176,10 @@
 - [ ] **Empty-state illustrations** — replace generic icon + text with a more polished empty state (e.g. Poké Ball graphic for empty team list)
 - [ ] **Folder drag-and-drop** — reorder folders with long-press drag
 
+### Bug Fixes Applied
+
+- [x] Moves damage class filter no longer leaves blank gaps — `itemExtent` disabled when filter active so `SizedBox.shrink()` collapses correctly
+
 ### Theming & Visual Consistency
 
 - [ ] **Colour-scheme seeding** — allow user to choose accent colour in Settings (fed into `ColorScheme.fromSeed`); current red is hardcoded
