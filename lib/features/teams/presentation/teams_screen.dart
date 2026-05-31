@@ -834,19 +834,40 @@ class _TeamSpriteRow extends ConsumerWidget {
               ),
             );
           }
+          // Use PokéAPI icon sprites — small, pixel-art icons designed for
+          // party/box views. Gen VIII icons cover the widest Pokémon range;
+          // fall back to Gen VII then the regular front sprite.
+          final id = slot.pokemonId;
+          const base = 'https://raw.githubusercontent.com/PokeAPI/sprites'
+              '/master/sprites/pokemon/versions';
+          final iconGen8  = '$base/generation-viii/icons/$id.png';
+          final iconGen7  = '$base/generation-vii/icons/$id.png';
+          final fallback  = 'https://raw.githubusercontent.com/PokeAPI/'
+              'sprites/master/sprites/pokemon/$id.png';
+
           return Padding(
             padding: const EdgeInsets.only(right: 2),
             child: CachedNetworkImage(
-              imageUrl:
-                  'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-                  'sprites/pokemon/${slot.pokemonId}.png',
-              width: 36,
-              height: 36,
+              imageUrl: iconGen8,
+              width: 40,
+              height: 30,
               fit: BoxFit.contain,
-              errorWidget: (_, __, ___) => Icon(
-                Icons.catching_pokemon,
-                size: 36,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+              errorWidget: (_, __, ___) => CachedNetworkImage(
+                imageUrl: iconGen7,
+                width: 40,
+                height: 30,
+                fit: BoxFit.contain,
+                errorWidget: (_, __, ___) => CachedNetworkImage(
+                  imageUrl: fallback,
+                  width: 36,
+                  height: 36,
+                  fit: BoxFit.contain,
+                  errorWidget: (_, __, ___) => Icon(
+                    Icons.catching_pokemon,
+                    size: 36,
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                  ),
+                ),
               ),
             ),
           );
