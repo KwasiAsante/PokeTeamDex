@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from app.core.deps import CurrentUser, DB
-from app.models.team import TeamFolder
+from app.models.team import Team, TeamFolder, TeamSlot
 from app.schemas.team import FolderCreate, FolderResponse, FolderUpdate
 
 router = APIRouter(prefix="/folders", tags=["folders"])
@@ -11,7 +11,10 @@ router = APIRouter(prefix="/folders", tags=["folders"])
 @router.get("", response_model=list[FolderResponse])
 async def list_folders(current_user: CurrentUser, db: DB) -> list[FolderResponse]:
     result = await db.execute(
-        select(TeamFolder).where(TeamFolder.user_id == current_user.id)
+        select(TeamFolder).where(
+            TeamFolder.user_id == current_user.id,
+            TeamFolder.is_deleted == False,  # noqa: E712
+        )
     )
     return [FolderResponse.model_validate(f) for f in result.scalars()]
 
@@ -39,14 +42,30 @@ async def rename_folder(
 @router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_folder(folder_id: int, current_user: CurrentUser, db: DB) -> None:
     folder = await _get_owned_folder(folder_id, current_user.id, db)
-    await db.delete(folder)
+    folder.is_deleted = True
+
+    # Cascade soft-delete to all teams and their slots so Device B can
+    # pick up the full deletion tree via the pull endpoint.
+    teams_result = await db.execute(
+        select(Team).where(Team.folder_id == folder.id, Team.is_deleted == False)  # noqa: E712
+    )
+    for team in teams_result.scalars():
+        team.is_deleted = True
+        slots_result = await db.execute(
+            select(TeamSlot).where(TeamSlot.team_id == team.id, TeamSlot.is_deleted == False)  # noqa: E712
+        )
+        for slot in slots_result.scalars():
+            slot.is_deleted = True
+
     await db.commit()
 
 
 async def _get_owned_folder(folder_id: int, user_id: int, db: DB) -> TeamFolder:
     result = await db.execute(
         select(TeamFolder).where(
-            TeamFolder.id == folder_id, TeamFolder.user_id == user_id
+            TeamFolder.id == folder_id,
+            TeamFolder.user_id == user_id,
+            TeamFolder.is_deleted == False,  # noqa: E712
         )
     )
     folder = result.scalar_one_or_none()
