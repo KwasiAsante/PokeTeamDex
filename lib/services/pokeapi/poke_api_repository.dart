@@ -317,6 +317,74 @@ class PokeApiRepository {
     return result;
   }
 
+  // ── Location / Region ─────────────────────────────────────────────────────
+
+  /// Returns a map of {regionName: [locationName, ...]} for all regions.
+  /// Performs one request per region (~10 total); cached 7 days.
+  Future<Map<String, List<String>>> fetchAllRegionLocations() async {
+    const cacheKey = 'all_region_locations';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is Map) {
+      return {
+        for (final e in cached.entries)
+          e.key as String: (e.value as List).cast<String>(),
+      };
+    }
+
+    final regResp = await _pokeApiClient.client
+        .get('/region', queryParameters: {'limit': 100, 'offset': 0});
+    if (regResp.statusCode != 200) {
+      throw Exception('Failed to fetch regions: ${regResp.statusCode}');
+    }
+
+    final regionNames = (regResp.data['results'] as List)
+        .map((r) => r['name'] as String)
+        .toList();
+
+    final result = <String, List<String>>{};
+    for (final regionName in regionNames) {
+      final r = await _pokeApiClient.client.get('/region/$regionName');
+      if (r.statusCode == 200) {
+        final locs = (r.data['locations'] as List)
+            .map((l) => l['name'] as String)
+            .toList()
+          ..sort();
+        result[regionName] = locs;
+      }
+    }
+
+    _pokeApiCache.putWithTTL(cacheKey, result, const Duration(days: 7));
+    return result;
+  }
+
+  /// Fetches a single location — returns its display name, region, and areas.
+  Future<Map<String, dynamic>> fetchLocation(String name) async {
+    final cacheKey = 'location_$name';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is Map<String, dynamic>) return cached;
+    final r = await _pokeApiClient.client.get('/location/$name');
+    if (r.statusCode != 200) {
+      throw Exception('Failed to fetch location $name: ${r.statusCode}');
+    }
+    final data = Map<String, dynamic>.from(r.data);
+    _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
+    return data;
+  }
+
+  /// Fetches a location area — returns its pokemon_encounters list.
+  Future<Map<String, dynamic>> fetchLocationArea(String name) async {
+    final cacheKey = 'location_area_$name';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is Map<String, dynamic>) return cached;
+    final r = await _pokeApiClient.client.get('/location-area/$name');
+    if (r.statusCode != 200) {
+      throw Exception('Failed to fetch location area $name: ${r.statusCode}');
+    }
+    final data = Map<String, dynamic>.from(r.data);
+    _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
+    return data;
+  }
+
   List<PokemonListEntry> _parseList(Map<String, dynamic> raw) {
     final results = raw['results'] as List;
     return results

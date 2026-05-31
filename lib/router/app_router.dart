@@ -10,6 +10,8 @@ import 'package:poke_team_dex/features/pokedex/presentation/pokemon_detail_scree
 import 'package:poke_team_dex/features/natures/presentation/natures_screen.dart';
 import 'package:poke_team_dex/features/reference/presentation/reference_hub_screen.dart';
 import 'package:poke_team_dex/features/teams/presentation/slot_config_screen.dart';
+import 'package:poke_team_dex/features/locations/presentation/location_detail_screen.dart';
+import 'package:poke_team_dex/features/locations/presentation/locations_screen.dart';
 import 'package:poke_team_dex/features/teams/presentation/slot_picker_screen.dart';
 import 'package:poke_team_dex/features/teams/presentation/team_detail_screen.dart';
 import 'package:poke_team_dex/features/teams/presentation/teams_screen.dart';
@@ -82,6 +84,19 @@ GoRouter buildAppRouter(String? initialToken) {
                 path: '/reference',
                 builder: (context, state) => const ReferenceHubScreen(),
                 routes: [
+                  GoRoute(
+                    path: 'locations',
+                    builder: (context, state) => const LocationsScreen(),
+                    routes: [
+                      GoRoute(
+                        path: ':location',
+                        builder: (context, state) => LocationDetailScreen(
+                          locationName:
+                              state.pathParameters['location']!,
+                        ),
+                      ),
+                    ],
+                  ),
                   GoRoute(
                     path: 'abilities',
                     builder: (context, state) => const AbilitiesScreen(),
