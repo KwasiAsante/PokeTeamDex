@@ -116,6 +116,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const Divider(),
           const SizedBox(height: 16),
 
+          // ── Sprites ────────────────────────────────────────────────────────
+          _SectionHeader('Sprites'),
+          const SizedBox(height: 8),
+          ref.watch(useFormatSpritesProvider).when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (useFormatSprites) => SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Use generation sprites'),
+              subtitle: const Text(
+                'When a team has a format assigned, show sprites '
+                'from that generation. Off = always use HOME / official artwork.',
+              ),
+              value: useFormatSprites,
+              onChanged: (v) => ref
+                  .read(appConfigRepositoryProvider)
+                  .setUseFormatSprites(v),
+            ),
+          ),
+          const SizedBox(height: 32),
+          const Divider(),
+          const SizedBox(height: 16),
+
           // ── Sync ───────────────────────────────────────────────────────────
           _SectionHeader('Sync'),
           const SizedBox(height: 8),

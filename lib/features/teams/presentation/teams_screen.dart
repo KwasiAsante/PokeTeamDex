@@ -6,6 +6,7 @@ import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
+import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/connectivity/connectivity_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
@@ -530,7 +531,9 @@ class _TeamTile extends ConsumerWidget {
             )
           : team.formatLabel != null
               ? Text(
-                  team.formatLabel!,
+                  ref.watch(formatServiceProvider)
+                          .formatById(team.formatLabel!)?.name ??
+                      team.formatLabel!,
                   style: TextStyle(
                     color: colorScheme.onSurfaceVariant,
                     fontSize: 12,
@@ -718,7 +721,7 @@ class _CreateTeamDialogState extends ConsumerState<_CreateTeamDialog> {
   void _submit() {
     Navigator.pop(context, (
       name: _ctrl.text.trim(),
-      formatId: _selectedFormat?.name, // store display name (e.g. "Generation 9")
+      formatId: _selectedFormat?.id, // store format id (e.g. "gen9")
     ));
   }
 }

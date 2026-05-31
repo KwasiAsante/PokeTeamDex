@@ -40,3 +40,7 @@ final appConfigRepositoryProvider = Provider<AppConfigRepository>((ref) {
 final apiBaseUrlProvider = StreamProvider<String>((ref) {
   return ref.watch(appConfigRepositoryProvider).watchApiBaseUrl();
 });
+
+final useFormatSpritesProvider = StreamProvider<bool>((ref) {
+  return ref.watch(appConfigRepositoryProvider).watchUseFormatSprites();
+});

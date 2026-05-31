@@ -11,7 +11,11 @@ import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/teams/presentation/team_detail_screen.dart'
-    show teamSlotsProvider;
+    show teamByIdProvider, teamSlotsProvider;
+import 'package:poke_team_dex/services/format/format_models.dart';
+import 'package:poke_team_dex/services/format/format_providers.dart';
+import 'package:poke_team_dex/services/format/format_service.dart';
+import 'package:poke_team_dex/services/format/sprite_resolver.dart';
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
@@ -209,6 +213,40 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   int get _evTotal =>
       _evCtrls.fold(0, (sum, c) => sum + (int.tryParse(c.text) ?? 0));
 
+  /// Compute real-time violations against [format] for current form values.
+  Map<String, String> _computeViolations(
+      FormatService service, GameFormat format, String pokemonName) {
+    final gen = format.gen;
+    final m = GenerationMechanics.forGen(gen);
+    final v = <String, String>{};
+
+    if (_abilityName != null) {
+      if (!m.hasAbilities) {
+        v['ability'] = 'Abilities don\'t exist in Gen $gen';
+      } else if (!service.abilitiesForGen(gen).any((a) => a.id == _abilityName)) {
+        v['ability'] = 'Not available in Gen $gen';
+      }
+    }
+
+    if (_heldItemName != null) {
+      if (!m.hasItems) {
+        v['item'] = 'Held items don\'t exist in Gen $gen';
+      } else if (!service.itemsForGen(gen).any((i) => i.id == _heldItemName)) {
+        v['item'] = 'Not available in Gen $gen';
+      }
+    }
+
+    final learnset = service.learnsetForGen(pokemonName, gen).toSet();
+    for (int i = 0; i < 4; i++) {
+      final move = _moves[i];
+      if (move != null && !learnset.contains(move)) {
+        v['move${i + 1}'] = 'Not learnable in Gen $gen';
+      }
+    }
+
+    return v;
+  }
+
   Future<void> _save(TeamSlot existing) async {
     if (_evTotal > 510) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -347,6 +385,25 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             s['stat']['name'] as String: s['base_stat'] as int,
         };
 
+        // Format + validation
+        final team = ref.watch(teamByIdProvider(widget.teamId)).asData?.value;
+        final formatId = team?.formatLabel;
+        final formatService = ref.watch(formatServiceProvider);
+        final format = formatId != null ? formatService.formatById(formatId) : null;
+        final violations = format != null
+            ? _computeViolations(formatService, format, pokemon.name)
+            : <String, String>{};
+
+        // Sprite resolution
+        final useFormatSprites =
+            ref.watch(useFormatSpritesProvider).asData?.value ?? true;
+        final spriteUrls = resolveSprite(
+          sprites: pokemon.sprites,
+          pokemonId: slot.pokemonId,
+          format: format,
+          useFormatSprites: useFormatSprites,
+        );
+
         return Scaffold(
           appBar: AppBar(
             title: Text('Slot ${widget.slotNumber} — $speciesName'),
@@ -369,13 +426,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(slot),
+                _buildHeader(slot, spriteUrls),
                 const SizedBox(height: 24),
                 _buildBasics(),
                 const SizedBox(height: 24),
                 _SectionTitle('Ability'),
                 const SizedBox(height: 8),
-                _buildAbility(abilities),
+                _buildAbility(abilities, violations['ability']),
                 const SizedBox(height: 24),
                 _SectionTitle('Nature'),
                 const SizedBox(height: 8),
@@ -383,11 +440,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 const SizedBox(height: 24),
                 _SectionTitle('Held Item'),
                 const SizedBox(height: 8),
-                _buildHeldItem(),
+                _buildHeldItem(violation: violations['item']),
                 const SizedBox(height: 24),
                 _SectionTitle('Moves'),
                 const SizedBox(height: 8),
-                _buildMoves(learnableMoves),
+                _buildMoves(learnableMoves, violations: violations),
                 const SizedBox(height: 24),
                 _SectionTitle('Effort Values (EVs)'),
                 const SizedBox(height: 4),
@@ -412,10 +469,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // ── Header ────────────────────────────────────────────────────────────────
 
-  Widget _buildHeader(TeamSlot slot) {
+  Widget _buildHeader(
+    TeamSlot slot,
+    ({String? defaultUrl, String? shinyUrl}) spriteUrls,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final id = slot.pokemonId;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -424,10 +483,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           alignment: Alignment.bottomRight,
           children: [
             PokemonSprite(
-              defaultUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/'
-                  'master/sprites/pokemon/$id.png',
-              shinyUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/'
-                  'master/sprites/pokemon/shiny/$id.png',
+              defaultUrl: spriteUrls.defaultUrl,
+              shinyUrl: spriteUrls.shinyUrl,
               shiny: _isShiny,
               size: 100,
             ),
@@ -540,10 +597,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   Widget _buildAbility(
     List<({String name, bool isHidden, int abilitySlot})> abilities,
+    String? violation,
   ) {
     if (abilities.isEmpty) return const Text('No abilities available');
 
-    return Column(
+    final cards = Column(
       children: abilities.map((a) {
         final detailAsync = ref.watch(_abilityDetailProvider(a.name));
         final isSelected = _abilityName == a.name;
@@ -629,6 +687,37 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         );
       }).toList(),
     );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        cards,
+        _buildViolationBanner(violation),
+      ],
+    );
+  }
+
+  // violation banner shown below the whole ability section
+  Widget _buildViolationBanner(String? violation) {
+    if (violation == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded,
+              size: 14, color: Theme.of(context).colorScheme.error),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              violation,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ── Nature ────────────────────────────────────────────────────────────────
@@ -661,7 +750,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // ── Held item — picker + description ──────────────────────────────────────
 
-  Widget _buildHeldItem() {
+  Widget _buildHeldItem({String? violation}) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -709,13 +798,17 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 style: textTheme.bodySmall
                     ?.copyWith(color: colorScheme.onSurfaceVariant)),
           ),
+        _buildViolationBanner(violation),
       ],
     );
   }
 
   // ── Moves — picker + description per selected move ────────────────────────
 
-  Widget _buildMoves(List<String> learnableMoves) {
+  Widget _buildMoves(
+    List<String> learnableMoves, {
+    Map<String, String> violations = const {},
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -793,6 +886,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                       style: textTheme.bodySmall
                           ?.copyWith(color: colorScheme.onSurfaceVariant)),
                 ),
+              // Violation banner
+              _buildViolationBanner(violations['move${i + 1}']),
             ],
           ),
         );

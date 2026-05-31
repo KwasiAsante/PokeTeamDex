@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/services/api/api_client.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_service.dart';
+import 'package:poke_team_dex/services/format/slot_validator.dart';
 
 final formatServiceProvider = Provider<FormatService>((ref) {
   return FormatService(ref.read(apiClientProvider));
@@ -48,4 +50,16 @@ final abilitiesForGenProvider =
   final svc = ref.watch(formatServiceProvider);
   await svc.initialize();
   return svc.abilitiesForGen(gen);
+});
+
+/// Validates a single slot against the team's format (Layer 1 only).
+/// Returns [SlotValidation] with per-field violation messages.
+final slotValidationProvider = FutureProvider.autoDispose
+    .family<SlotValidation, ({TeamSlot slot, String pokemonName, String formatId})>(
+        (ref, args) async {
+  final svc = ref.watch(formatServiceProvider);
+  await svc.initialize();
+  final format = svc.formatById(args.formatId);
+  if (format == null) return const SlotValidation({});
+  return validateSlot(args.slot, args.pokemonName, format, svc);
 });
