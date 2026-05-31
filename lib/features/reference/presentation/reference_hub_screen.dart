@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
+
 class ReferenceHubScreen extends StatelessWidget {
   const ReferenceHubScreen({super.key});
 
@@ -12,6 +13,13 @@ class ReferenceHubScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _HubTile(
+            icon: Icons.place_outlined,
+            title: 'Locations',
+            subtitle: 'Browse locations by region with wild encounter data',
+            onTap: () => context.go('/reference/locations'),
+          ),
+          const SizedBox(height: 12),
           _HubTile(
             icon: Icons.auto_awesome,
             title: 'Abilities',
