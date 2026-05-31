@@ -38,7 +38,7 @@
 - [x] Items — list (search), detail bottom sheet (sprite, category, price, effect)
 - [x] Types — type effectiveness grid + detail sheet (2× / ½× / 0×)
 - [x] Natures — table of 25 natures with +/− stat columns, neutral labelled
-- [ ] **Locations browser** — browse by region/game; location detail with wild encounters and methods *(not implemented)*
+- [x] **Locations browser** — browse by region + search; location detail with collapsible areas, version filter chips, encounter table (sprite, method, level range, chance %)
 
 ---
 
