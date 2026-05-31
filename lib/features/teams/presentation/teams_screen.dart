@@ -838,33 +838,33 @@ class _TeamSpriteRow extends ConsumerWidget {
           // party/box views. Gen VIII icons cover the widest Pokémon range;
           // fall back to Gen VII then the regular front sprite.
           final id = slot.pokemonId;
-          const base = 'https://raw.githubusercontent.com/PokeAPI/sprites'
-              '/master/sprites/pokemon/versions';
+          const base = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions';
           final iconGen8  = '$base/generation-viii/icons/$id.png';
           final iconGen7  = '$base/generation-vii/icons/$id.png';
-          final fallback  = 'https://raw.githubusercontent.com/PokeAPI/'
-              'sprites/master/sprites/pokemon/$id.png';
+          final fallback  = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$id.png';
+          final width = 60.0;
+          final height = 50.0;
 
           return Padding(
             padding: const EdgeInsets.only(right: 2),
             child: CachedNetworkImage(
-              imageUrl: iconGen8,
-              width: 40,
-              height: 30,
+              imageUrl: iconGen7,
+              width: width,
+              height: height,
               fit: BoxFit.contain,
               errorWidget: (_, __, ___) => CachedNetworkImage(
-                imageUrl: iconGen7,
-                width: 40,
-                height: 30,
+                imageUrl: iconGen8,
+                width: width,
+                height: height,
                 fit: BoxFit.contain,
                 errorWidget: (_, __, ___) => CachedNetworkImage(
                   imageUrl: fallback,
-                  width: 36,
-                  height: 36,
+                  width: width,
+                  height: height,
                   fit: BoxFit.contain,
                   errorWidget: (_, __, ___) => Icon(
                     Icons.catching_pokemon,
-                    size: 36,
+                    size: 60,
                     color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                   ),
                 ),
