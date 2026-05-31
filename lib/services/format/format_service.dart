@@ -20,6 +20,8 @@ class FormatService {
   Map<String, PsAbilityEntry> _abilities = {};
   bool _initialized = false;
 
+  bool get isInitialized => _initialized;
+
   // Hive box keys
   static const _boxName = 'ps_data';
   static const _keyLearnsets  = 'learnsets';

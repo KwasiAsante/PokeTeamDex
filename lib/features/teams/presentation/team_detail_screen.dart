@@ -409,6 +409,7 @@ class _FilledSlotCard extends ConsumerWidget {
         final spriteUrls = resolveSprite(
           sprites: pokemon.sprites,
           pokemonId: slot.pokemonId,
+          pokemonName: pokemon.name,
           format: format,
           useFormatSprites: useFormatSprites,
         );
@@ -418,7 +419,6 @@ class _FilledSlotCard extends ConsumerWidget {
             ? ref
                 .watch(slotValidationProvider((
                   slot: slot,
-                  pokemonName: pokemon.name,
                   formatId: formatId!,
                 )))
                 .asData

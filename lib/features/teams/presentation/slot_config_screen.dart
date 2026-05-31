@@ -15,6 +15,7 @@ import 'package:poke_team_dex/features/teams/presentation/team_detail_screen.dar
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/services/format/format_service.dart';
+import 'package:poke_team_dex/services/format/slot_validator.dart';
 import 'package:poke_team_dex/services/format/sprite_resolver.dart';
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
@@ -214,37 +215,23 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       _evCtrls.fold(0, (sum, c) => sum + (int.tryParse(c.text) ?? 0));
 
   /// Compute real-time violations against [format] for current form values.
+  /// Uses PokéAPI version-group learnsets for game-specific accuracy.
   Map<String, String> _computeViolations(
-      FormatService service, GameFormat format, String pokemonName) {
-    final gen = format.gen;
-    final m = GenerationMechanics.forGen(gen);
-    final v = <String, String>{};
-
-    if (_abilityName != null) {
-      if (!m.hasAbilities) {
-        v['ability'] = 'Abilities don\'t exist in Gen $gen';
-      } else if (!service.abilitiesForGen(gen).any((a) => a.id == _abilityName)) {
-        v['ability'] = 'Not available in Gen $gen';
-      }
-    }
-
-    if (_heldItemName != null) {
-      if (!m.hasItems) {
-        v['item'] = 'Held items don\'t exist in Gen $gen';
-      } else if (!service.itemsForGen(gen).any((i) => i.id == _heldItemName)) {
-        v['item'] = 'Not available in Gen $gen';
-      }
-    }
-
-    final learnset = service.learnsetForGen(pokemonName, gen).toSet();
-    for (int i = 0; i < 4; i++) {
-      final move = _moves[i];
-      if (move != null && !learnset.contains(move)) {
-        v['move${i + 1}'] = 'Not learnable in Gen $gen';
-      }
-    }
-
-    return v;
+    FormatService service,
+    GameFormat format,
+    String pokemonName,
+    List<Map<String, dynamic>> pokemonMoves,
+  ) {
+    if (!service.isInitialized) return {};
+    return validateSlotSync(
+      _abilityName,
+      _heldItemName,
+      _moves,
+      pokemonName,
+      pokemonMoves,
+      format,
+      service,
+    ).violations;
   }
 
   Future<void> _save(TeamSlot existing) async {
@@ -385,13 +372,17 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             s['stat']['name'] as String: s['base_stat'] as int,
         };
 
-        // Format + validation
+        // Format + mechanics + validation
         final team = ref.watch(teamByIdProvider(widget.teamId)).asData?.value;
         final formatId = team?.formatLabel;
         final formatService = ref.watch(formatServiceProvider);
         final format = formatId != null ? formatService.formatById(formatId) : null;
+        final mechanics = format != null
+            ? GenerationMechanics.forGen(format.gen)
+            : null;
+        final pokemonMoves = pokemon.moves.cast<Map<String, dynamic>>();
         final violations = format != null
-            ? _computeViolations(formatService, format, pokemon.name)
+            ? _computeViolations(formatService, format, pokemon.name, pokemonMoves)
             : <String, String>{};
 
         // Sprite resolution
@@ -400,6 +391,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final spriteUrls = resolveSprite(
           sprites: pokemon.sprites,
           pokemonId: slot.pokemonId,
+          pokemonName: pokemon.name,
           format: format,
           useFormatSprites: useFormatSprites,
         );
@@ -426,39 +418,68 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(slot, spriteUrls),
+                _buildHeader(slot, spriteUrls, mechanics),
                 const SizedBox(height: 24),
-                _buildBasics(),
-                const SizedBox(height: 24),
-                _SectionTitle('Ability'),
-                const SizedBox(height: 8),
-                _buildAbility(abilities, violations['ability']),
-                const SizedBox(height: 24),
-                _SectionTitle('Nature'),
-                const SizedBox(height: 8),
-                _buildNature(),
-                const SizedBox(height: 24),
-                _SectionTitle('Held Item'),
-                const SizedBox(height: 8),
-                _buildHeldItem(violation: violations['item']),
+                _buildBasics(mechanics),
+                // ── Ability (Gen 3+) ──
+                if (mechanics == null || mechanics.hasAbilities) ...[
+                  const SizedBox(height: 24),
+                  _SectionTitle('Ability'),
+                  const SizedBox(height: 8),
+                  _buildAbility(abilities, violations['ability']),
+                ],
+                // ── Nature (Gen 3+) ──
+                if (mechanics == null || mechanics.hasAbilities) ...[
+                  const SizedBox(height: 24),
+                  _SectionTitle('Nature'),
+                  const SizedBox(height: 8),
+                  _buildNature(),
+                ],
+                // ── Held item (Gen 2+) ──
+                if (mechanics == null || mechanics.hasItems) ...[
+                  const SizedBox(height: 24),
+                  _SectionTitle('Held Item'),
+                  const SizedBox(height: 8),
+                  _buildHeldItem(violation: violations['item']),
+                ],
                 const SizedBox(height: 24),
                 _SectionTitle('Moves'),
                 const SizedBox(height: 8),
                 _buildMoves(learnableMoves, violations: violations),
                 const SizedBox(height: 24),
-                _SectionTitle('Effort Values (EVs)'),
-                const SizedBox(height: 4),
-                _buildEvTotal(),
+                // ── EVs / Stat Exp. ──
+                _SectionTitle(
+                  mechanics?.statMode == StatValueMode.dvs
+                      ? 'Stat Experience'
+                      : 'Effort Values (EVs)',
+                ),
+                if (mechanics?.statMode != StatValueMode.dvs) ...[
+                  const SizedBox(height: 4),
+                  _buildEvTotal(),
+                ],
                 const SizedBox(height: 8),
-                _buildStatGrid(_evCtrls, maxVal: 252),
+                _buildStatGrid(
+                  _evCtrls,
+                  maxVal: 252,
+                  gen1Mode: format?.gen == 1,
+                ),
                 const SizedBox(height: 24),
-                _SectionTitle('Individual Values (IVs)'),
+                // ── IVs / DVs ──
+                _SectionTitle(
+                  mechanics?.statMode == StatValueMode.dvs
+                      ? 'Determinant Values (DVs)  max ${mechanics!.statMax}'
+                      : 'Individual Values (IVs)',
+                ),
                 const SizedBox(height: 8),
-                _buildStatGrid(_ivCtrls, maxVal: 31),
+                _buildStatGrid(
+                  _ivCtrls,
+                  maxVal: mechanics?.statMax ?? 31,
+                  gen1Mode: format?.gen == 1,
+                ),
                 const SizedBox(height: 24),
                 _SectionTitle('Stat Preview (Lv $_level)'),
                 const SizedBox(height: 8),
-                _buildStatPreview(baseStats),
+                _buildStatPreview(baseStats, mechanics),
               ],
             ),
           ),
@@ -472,6 +493,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   Widget _buildHeader(
     TeamSlot slot,
     ({String? defaultUrl, String? shinyUrl}) spriteUrls,
+    GenerationMechanics? mechanics,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -488,6 +510,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               shiny: _isShiny,
               size: 100,
             ),
+            if (mechanics == null || mechanics.hasShiny)
             GestureDetector(
               onTap: () => setState(() => _isShiny = !_isShiny),
               child: Container(
@@ -532,7 +555,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // ── Basics ────────────────────────────────────────────────────────────────
 
-  Widget _buildBasics() {
+  Widget _buildBasics(GenerationMechanics? mechanics) {
+    // Friendship exists from Gen 2 onward; Gen 1 has no friendship mechanic.
+    final showFriendship = mechanics == null || mechanics.gen >= 2;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -571,24 +596,26 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               ),
           ],
         ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            SizedBox(
-              width: 72,
-              child: Text('Friendly\n$_friendship',
-                  style: Theme.of(context).textTheme.bodySmall),
-            ),
-            Expanded(
-              child: Slider(
-                value: _friendship.toDouble(),
-                min: 0, max: 255, divisions: 255,
-                label: '$_friendship',
-                onChanged: (v) => setState(() => _friendship = v.round()),
+        if (showFriendship) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              SizedBox(
+                width: 72,
+                child: Text('Friendly\n$_friendship',
+                    style: Theme.of(context).textTheme.bodySmall),
               ),
-            ),
-          ],
-        ),
+              Expanded(
+                child: Slider(
+                  value: _friendship.toDouble(),
+                  min: 0, max: 255, divisions: 255,
+                  label: '$_friendship',
+                  onChanged: (v) => setState(() => _friendship = v.round()),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -920,7 +947,18 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // ── EV / IV grid ──────────────────────────────────────────────────────────
 
-  Widget _buildStatGrid(List<TextEditingController> ctrls, {required int maxVal}) {
+  // Gen 1: 5 stats — HP, Atk, Def, Spc (combined Special), Spe (no SpD).
+  static const _gen1StatLabels  = ['HP', 'Atk', 'Def', 'Spc', 'Spe'];
+  static const _gen1StatIndices = [0, 1, 2, 3, 5]; // skip SpD (controller index 4)
+
+  Widget _buildStatGrid(
+    List<TextEditingController> ctrls, {
+    required int maxVal,
+    bool gen1Mode = false,
+  }) {
+    final labels  = gen1Mode ? _gen1StatLabels  : _statLabels;
+    final indices = gen1Mode ? _gen1StatIndices : List.generate(6, (i) => i);
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -929,28 +967,36 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         crossAxisSpacing: 8, mainAxisSpacing: 8,
         childAspectRatio: 2.4,
       ),
-      itemCount: 6,
-      itemBuilder: (_, i) => TextField(
-        controller: ctrls[i],
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        decoration: InputDecoration(
-          labelText: _statLabels[i],
-          border: const OutlineInputBorder(),
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        ),
-        onChanged: (_) => setState(() {}),
-      ),
+      itemCount: indices.length,
+      itemBuilder: (_, i) {
+        final ctrlIdx = indices[i];
+        return TextField(
+          controller: ctrls[ctrlIdx],
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(
+            labelText: labels[i],
+            border: const OutlineInputBorder(),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          ),
+          onChanged: (_) => setState(() {}),
+        );
+      },
     );
   }
 
   // ── Stat preview ──────────────────────────────────────────────────────────
 
-  Widget _buildStatPreview(Map<String, int> baseStats) {
+  Widget _buildStatPreview(Map<String, int> baseStats, GenerationMechanics? mechanics) {
     if (baseStats.isEmpty) return const SizedBox.shrink();
+    final maxIv = mechanics?.statMax ?? 31;
     final evs = _evCtrls.map((c) => (int.tryParse(c.text) ?? 0).clamp(0, 252)).toList();
-    final ivs = _ivCtrls.map((c) => (int.tryParse(c.text) ?? 31).clamp(0, 31)).toList();
+    final ivs = _ivCtrls
+        .map((c) => (int.tryParse(c.text) ?? maxIv).clamp(0, maxIv))
+        .toList();
+    // Gen 1: nature modifiers don't apply
+    final useNature = mechanics == null || mechanics.hasAbilities;
 
     return Column(
       children: [
@@ -959,8 +1005,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             label: _statLabels[i],
             value: _statKeys[i] == 'hp'
                 ? _calcHP(baseStats['hp'] ?? 0, ivs[0], evs[0], _level)
-                : _calcStat(baseStats[_statKeys[i]] ?? 0, ivs[i], evs[i], _level,
-                    _natureMod(_natureName, _statKeys[i])),
+                : _calcStat(
+                    baseStats[_statKeys[i]] ?? 0, ivs[i], evs[i], _level,
+                    useNature ? _natureMod(_natureName, _statKeys[i]) : 1.0),
             maxValue: 700,
           ),
       ],

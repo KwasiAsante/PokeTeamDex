@@ -1,45 +1,44 @@
 import 'package:poke_team_dex/services/format/format_models.dart';
 
-// Maps format game id → path segments into PokéAPI sprites.versions object.
-// PokéAPI only has game sprites up to Gen 5; Gen 6+ falls back to HOME/artwork.
-const _gameToVersionPath = <String, List<String>>{
-  'rb':       ['generation-i',   'red-blue'],
-  'yellow':   ['generation-i',   'yellow'],
-  'gs':       ['generation-ii',  'gold'],
-  'crystal':  ['generation-ii',  'crystal'],
-  'rs':       ['generation-iii', 'ruby-sapphire'],
-  'emerald':  ['generation-iii', 'emerald'],
-  'frlg':     ['generation-iii', 'firered-leafgreen'],
-  'dp':       ['generation-iv',  'diamond-pearl'],
-  'platinum': ['generation-iv',  'platinum'],
-  'hgss':     ['generation-iv',  'heartgold-soulsilver'],
-  'bw':       ['generation-v',   'black-white'],
-  'b2w2':     ['generation-v',   'black-white'], // same sprites as BW
+const _psBase = 'https://play.pokemonshowdown.com/sprites';
+
+// Maps format game id → PS sprite directory name (for Gen 1-5 where PS
+// sprites have transparent backgrounds unlike PokéAPI's white-bg originals).
+const _gameIdToPsDir = <String, String>{
+  'rb':       'gen1',
+  'yellow':   'gen1',
+  'gs':       'gen2',
+  'crystal':  'gen2',
+  'rs':       'gen3',
+  'emerald':  'gen3',
+  'frlg':     'gen3',
+  'dp':       'gen4',
+  'platinum': 'gen4',
+  'hgss':     'gen4',
+  'bw':       'gen5ani',  // animated GIFs
+  'b2w2':     'gen5ani',
 };
 
-// For general gen formats, use the latest game that has PokéAPI sprites.
+// For general gen formats — use the latest game in that gen's PS sprites.
 const _genToDefaultGameId = <int, String>{
   1: 'yellow',
   2: 'crystal',
   3: 'emerald',
   4: 'hgss',
   5: 'bw',
-  // Gen 6+ → no PokéAPI game sprites; falls through to HOME/artwork
 };
 
 /// Resolves the correct sprite URLs for a Pokémon given the team's format
 /// and the user's sprite-style preference.
 ///
-/// Returns a record `(defaultUrl, shinyUrl)` where either value may be null.
+/// Gen 1-5 uses Pokémon Showdown sprites (transparent backgrounds).
+/// Gen 6+ uses PokéAPI HOME / official artwork.
 ///
-/// [sprites] is the raw `sprites` map from PokéAPI's `/pokemon/{id}` response,
-/// as stored in `PokemonEntry.sprites`.
-/// [pokemonId] is used as a raw-GitHub fallback when PokéAPI sprites are absent.
-/// [format] is the team's assigned format, or null for "no format".
-/// [useFormatSprites] — when false, always use HOME/official artwork.
+/// [pokemonName] must be the PokéAPI/PS name (e.g. "umbreon", "charizard-mega-x").
 ({String? defaultUrl, String? shinyUrl}) resolveSprite({
   required Map<String, dynamic>? sprites,
   required int pokemonId,
+  required String pokemonName,
   required GameFormat? format,
   required bool useFormatSprites,
 }) {
@@ -48,38 +47,29 @@ const _genToDefaultGameId = <int, String>{
   final rawShiny = 'https://raw.githubusercontent.com/PokeAPI/sprites/'
       'master/sprites/pokemon/shiny/$pokemonId.png';
 
-  // When no format is set or the toggle is off → HOME > official artwork > raw
-  if (!useFormatSprites || format == null || sprites == null) {
+  if (!useFormatSprites || format == null) {
     return _homeOrArtwork(sprites, rawDefault, rawShiny);
   }
 
-  // Determine which game id to look up
   final gameId = format.type == FormatType.game
       ? format.id
       : _genToDefaultGameId[format.gen];
 
   if (gameId != null) {
-    final path = _gameToVersionPath[gameId];
-    if (path != null) {
-      final section = _nav(sprites['versions'], path);
-      if (section != null) {
-        // Gen 5 has animated sprites — prefer them
-        if (gameId == 'bw' || gameId == 'b2w2') {
-          final anim = section['animated'];
-          if (anim is Map) {
-            final d = anim['front_default'] as String?;
-            final s = anim['front_shiny'] as String?;
-            if (d != null) return (defaultUrl: d, shinyUrl: s ?? rawShiny);
-          }
-        }
-        final d = section['front_default'] as String?;
-        final s = section['front_shiny'] as String?;
-        if (d != null) return (defaultUrl: d, shinyUrl: s ?? rawShiny);
-      }
+    final psDir = _gameIdToPsDir[gameId];
+    if (psDir != null) {
+      // Gen 1 has no shiny mechanic — use same sprite
+      final noShiny = format.gen == 1;
+      final ext = psDir.contains('ani') ? '.gif' : '.png';
+      final shinyDir = noShiny ? psDir : '$psDir-shiny';
+      return (
+        defaultUrl: '$_psBase/$psDir/$pokemonName$ext',
+        shinyUrl: '$_psBase/$shinyDir/$pokemonName$ext',
+      );
     }
   }
 
-  // Gen 6+ or game sprite unavailable → HOME > official artwork > raw
+  // Gen 6+ — PokéAPI HOME / official artwork
   return _homeOrArtwork(sprites, rawDefault, rawShiny);
 }
 
@@ -88,10 +78,8 @@ const _genToDefaultGameId = <int, String>{
   String rawDefault,
   String rawShiny,
 ) {
-  final home = sprites == null ? null : _nav(sprites['other'], ['home']);
-  final artwork = sprites == null
-      ? null
-      : _nav(sprites['other'], ['official-artwork']);
+  final home    = sprites == null ? null : _nav(sprites['other'], ['home']);
+  final artwork = sprites == null ? null : _nav(sprites['other'], ['official-artwork']);
   return (
     defaultUrl: home?['front_default'] as String? ??
         artwork?['front_default'] as String? ??
@@ -102,7 +90,6 @@ const _genToDefaultGameId = <int, String>{
   );
 }
 
-/// Navigate a nested map structure safely.
 Map<String, dynamic>? _nav(dynamic root, List<String> path) {
   dynamic cur = root;
   for (final key in path) {
