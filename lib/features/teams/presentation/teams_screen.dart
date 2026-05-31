@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -219,7 +222,18 @@ class _TeamsList extends ConsumerWidget {
         return RefreshIndicator(
           onRefresh: () => ref.read(syncServiceProvider).run(),
           child: CustomScrollView(
+          // AlwaysScrollableScrollPhysics lets RefreshIndicator trigger
+          // even when the content is short; on desktop (no touch) the sync
+          // button in the AppBar is the primary refresh mechanism.
+          physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
+            // Desktop refresh header — shown instead of pull gesture
+            if (!_isTouchPlatform())
+              SliverToBoxAdapter(
+                child: _DesktopRefreshBar(
+                  onRefresh: () => ref.read(syncServiceProvider).run(),
+                ),
+              ),
             // Reorderable folder list
             if (folders.isNotEmpty)
               SliverReorderableList(
@@ -739,6 +753,59 @@ class _CreateTeamDialogState extends ConsumerState<_CreateTeamDialog> {
   }
 }
 
+// ── Platform helpers ──────────────────────────────────────────────────────────
+
+bool _isTouchPlatform() {
+  if (kIsWeb) return false;
+  return Platform.isAndroid || Platform.isIOS;
+}
+
+// ── Desktop refresh bar ───────────────────────────────────────────────────────
+
+class _DesktopRefreshBar extends ConsumerWidget {
+  final Future<void> Function() onRefresh;
+  const _DesktopRefreshBar({required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final syncState = ref.watch(syncStateProvider);
+    final isSyncing = syncState.status == SyncStatus.syncing;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
+        children: [
+          Icon(Icons.sync, size: 14, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Text(
+            'Pull-to-refresh unavailable on desktop',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: isSyncing ? null : onRefresh,
+            icon: isSyncing
+                ? SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh, size: 14),
+            label: const Text('Sync now'),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Team sprite row (6 mini sprites) ─────────────────────────────────────────
 
 class _TeamSpriteRow extends ConsumerWidget {
@@ -762,7 +829,7 @@ class _TeamSpriteRow extends ConsumerWidget {
               padding: const EdgeInsets.only(right: 2),
               child: Icon(
                 Icons.catching_pokemon,
-                size: 24,
+                size: 36,
                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
               ),
             );
@@ -773,12 +840,12 @@ class _TeamSpriteRow extends ConsumerWidget {
               imageUrl:
                   'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
                   'sprites/pokemon/${slot.pokemonId}.png',
-              width: 24,
-              height: 24,
+              width: 36,
+              height: 36,
               fit: BoxFit.contain,
               errorWidget: (_, __, ___) => Icon(
                 Icons.catching_pokemon,
-                size: 24,
+                size: 36,
                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
               ),
             ),

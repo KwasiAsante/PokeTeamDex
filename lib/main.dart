@@ -114,10 +114,11 @@ class MyApp extends ConsumerStatefulWidget {
   ConsumerState<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends ConsumerState<MyApp> {
+class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     // Seed auth state from persisted token
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -131,6 +132,19 @@ class _MyAppState extends ConsumerState<MyApp> {
         if (online) _triggerSync();
       });
     }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // On desktop there is no WorkManager background sync, so we trigger sync
+  // whenever the app is foregrounded (equivalent to app-resume behaviour).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _triggerSync();
   }
 
   void _triggerSync() {
