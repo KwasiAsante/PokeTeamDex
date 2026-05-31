@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/features/pokedex/models/pokedex_filter.dart';
+import 'package:poke_team_dex/services/format/format_models.dart';
+import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/pokemon_list_tile.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -221,6 +223,14 @@ class _FilterBar extends ConsumerWidget {
           _SortChip(current: filter.sort),
           const SizedBox(width: 6),
           _GenerationChip(selected: filter.generation),
+          // Game chip only visible when a generation is selected
+          if (filter.generation != null) ...[
+            const SizedBox(width: 6),
+            _GameChip(
+              generation: filter.generation!,
+              selected: filter.game,
+            ),
+          ],
           const SizedBox(width: 6),
           _TypeChip(selected: filter.type),
           if (!filter.isDefault) ...[
@@ -286,7 +296,11 @@ class _GenerationChip extends ConsumerWidget {
         current: selected,
         onSelected: (gen) {
           ref.read(pokedexFilterProvider.notifier).update(
-                (s) => s.copyWith(generation: gen == selected ? null : gen),
+                (s) => s.copyWith(
+                  generation: gen == selected ? null : gen,
+                  // Clear game filter when generation changes
+                  game: null,
+                ),
               );
           Navigator.pop(context);
         },
@@ -343,6 +357,94 @@ class _GenerationPicker extends StatelessWidget {
     );
   }
 }
+
+// ── Game filter chip ─────────────────────────────────────────────────────────
+
+class _GameChip extends ConsumerWidget {
+  final int generation;
+  final String? selected;
+  const _GameChip({required this.generation, required this.selected});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Get games for this generation from the format service
+    final service = ref.watch(formatServiceProvider);
+    final games = service.isInitialized
+        ? service
+            .formatsOfType(FormatType.game)
+            .where((f) => f.gen == generation)
+            .toList()
+        : <GameFormat>[];
+
+    if (games.isEmpty) return const SizedBox.shrink();
+
+    final selectedGame = games.where((g) => g.id == selected).firstOrNull;
+
+    return FilterChip(
+      label: Text(selectedGame?.short ?? 'Game'),
+      avatar: const Icon(Icons.videogame_asset_outlined, size: 16),
+      selected: selected != null,
+      onSelected: (_) => _showPicker(context, ref, games),
+    );
+  }
+
+  void _showPicker(BuildContext context, WidgetRef ref, List<GameFormat> games) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (_) => _GamePicker(
+        games: games,
+        current: selected,
+        onSelected: (gameId) {
+          ref.read(pokedexFilterProvider.notifier).update(
+                (s) => s.copyWith(game: gameId == selected ? null : gameId),
+              );
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+}
+
+class _GamePicker extends StatelessWidget {
+  final List<GameFormat> games;
+  final String? current;
+  final void Function(String) onSelected;
+  const _GamePicker({
+    required this.games,
+    required this.current,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('Select Game',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        ),
+        const Divider(height: 1),
+        Flexible(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              ...games.map((g) => ListTile(
+                    title: Text(g.name),
+                    trailing: current == g.id ? const Icon(Icons.check) : null,
+                    onTap: () => onSelected(g.id),
+                  )),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Type filter chip ──────────────────────────────────────────────────────────
 
 class _TypeChip extends ConsumerWidget {
   final String? selected;

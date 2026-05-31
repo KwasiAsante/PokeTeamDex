@@ -294,6 +294,29 @@ class PokeApiRepository {
     return TypeEntry.fromJson(data);
   }
 
+  /// Fetches a named regional Pokédex and returns {speciesName: entryNumber}.
+  /// Used to filter and sort the Pokédex list by a specific game's regional dex.
+  Future<Map<String, int>> fetchRegionalPokedex(String name) async {
+    final cacheKey = 'regional_pokedex_$name';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is Map) {
+      return Map<String, int>.from(cached.cast<String, int>());
+    }
+    final response = await _pokeApiClient.client.get('/pokedex/$name');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch pokedex $name: ${response.statusCode}');
+    }
+    final entries = (response.data['pokemon_entries'] as List).map((e) {
+      return MapEntry(
+        e['pokemon_species']['name'] as String,
+        e['entry_number'] as int,
+      );
+    }).toList();
+    final result = Map<String, int>.fromEntries(entries);
+    _pokeApiCache.putWithTTL(cacheKey, result, const Duration(days: 7));
+    return result;
+  }
+
   List<PokemonListEntry> _parseList(Map<String, dynamic> raw) {
     final results = raw['results'] as List;
     return results
