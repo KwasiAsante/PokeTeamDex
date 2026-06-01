@@ -29,14 +29,15 @@ const _kVgToSubpath = <String, String?>{
   'heartgold-soulsilver':            'versions/generation-iv/heartgold-soulsilver',
   'black-white':                     'versions/generation-v/black-white',
   'black-2-white-2':                 'versions/generation-v/black-white', // BW2 shares BW sprites
+  // Gen VI–IX: 3D games — no pixel-art sprite sheets exist, use standard sprite
   'x-y':                             null,
   'omega-ruby-alpha-sapphire':       null,
-  'sun-moon':                        'versions/generation-vii/icons',
-  'ultra-sun-ultra-moon':            'versions/generation-vii/icons',
+  'sun-moon':                        null,
+  'ultra-sun-ultra-moon':            null,
   'lets-go-pikachu-lets-go-eevee':   null,
-  'sword-shield':                    'versions/generation-viii/icons',
-  'brilliant-diamond-and-shining-pearl': 'versions/generation-viii/icons',
-  'legends-arceus':                  'versions/generation-viii/icons',
+  'sword-shield':                    null,
+  'brilliant-diamond-and-shining-pearl': null,
+  'legends-arceus':                  null,
   'scarlet-violet':                  null,
 };
 
