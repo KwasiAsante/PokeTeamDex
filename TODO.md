@@ -169,7 +169,7 @@
 
 ### Reference Browsers (Moves / Items / Abilities)
 
-- [ ] **Skeleton placeholders** — replace `LinearProgressIndicator` in tile subtitles with a shimmer skeleton while per-item detail loads
+- [x] **Skeleton placeholders** — replace `LinearProgressIndicator` in tile subtitles with a shimmer skeleton while per-item detail loads
 - [ ] **Move/Item/Ability list layout** — 2-column grid on tablet+
 - [x] **Filter persistence** — search/filter providers changed to non-autoDispose; SearchController text restored in initState on tab return
 
