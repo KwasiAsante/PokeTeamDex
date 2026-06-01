@@ -75,8 +75,16 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
     // Compact screens always use list; larger screens respect the toggle.
     final useGrid = !isCompact && viewMode == PokedexViewMode.grid;
 
+    // Image tier — same breakpoints for both list and grid.
+    final PokedexImageType? listImageType = isCompact
+        ? null // compact → icon sprites
+        : width >= 840
+            ? PokedexImageType.artwork
+            : PokedexImageType.sprite;
+
     final crossAxisCount = width >= 840 ? 3 : 2;
-    final imageType = width >= 840 ? PokedexImageType.artwork : PokedexImageType.sprite;
+    final gridImageType =
+        width >= 840 ? PokedexImageType.artwork : PokedexImageType.sprite;
 
     return Scaffold(
       appBar: AppBar(
@@ -149,18 +157,23 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
                       ),
                     Expanded(
                       child: !useGrid
-                          // ── List mode (default) or compact ──
+                          // ── List mode (default or compact) ──
                           ? ListView.builder(
                               controller: _scrollController,
+                              // No fixed itemExtent — tile height varies by
+                              // image tier (icon < sprite < artwork).
                               itemCount: visible.length + (hasMore ? 1 : 0),
                               itemBuilder: (_, i) {
                                 if (i == visible.length) {
                                   return const _LoadMoreFooter();
                                 }
-                                return PokemonListTile(pokemon: visible[i]);
+                                return PokemonListTile(
+                                  pokemon: visible[i],
+                                  imageType: listImageType,
+                                );
                               },
                             )
-                          // ── Medium / Expanded: grid ──
+                          // ── Grid mode ──
                           : GridView.builder(
                               controller: _scrollController,
                               padding: const EdgeInsets.all(8),
@@ -169,10 +182,8 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
                                 crossAxisCount: crossAxisCount,
                                 crossAxisSpacing: 8,
                                 mainAxisSpacing: 8,
-                                // Portrait-ish cards: artwork needs more vertical
-                                // space than sprites.
                                 childAspectRatio:
-                                    imageType == PokedexImageType.artwork
+                                    gridImageType == PokedexImageType.artwork
                                         ? 0.62
                                         : 0.75,
                               ),
@@ -183,7 +194,7 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
                                 }
                                 return PokemonGridCard(
                                   pokemon: visible[i],
-                                  imageType: imageType,
+                                  imageType: gridImageType,
                                 );
                               },
                             ),
