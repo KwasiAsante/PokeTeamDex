@@ -153,7 +153,7 @@
 
 - [x] **Adaptive nav** — `BottomNavigationBar` < 600dp, `NavigationRail` 600–840dp, permanent `NavigationDrawer` > 840dp; overflow fixes for team tile sprites, slot card type badges, location encounter table
 - [ ] **App-wide back gesture / breadcrumb** — on wide layouts the detail screen should open in a side panel rather than pushing a new route (master-detail pattern for Pokédex, Teams)
-- [x] **Pokéathlon tab** — pentagon radar chart + stat bars; fetches all 5 `/pokeathlon-stat/` resources in parallel (cached 7d); shows "no data" empty state for Gen V+ Pokémon
+- [ ] **Pokéathlon tab** — removed; PokéAPI `/pokeathlon-stat/` only returns nature-affinity data, not per-Pokémon base values — no data source available
 - [x] **Teams tab** — replaces old stub "Add" tab; shows "On your teams" list (team name, slot #, nickname, format label, tap to navigate); "Add to a team" sheet with team picker → slot grid showing current occupants; replacement confirmation dialog; inserts slot with defaults (L50, IVs 31) and queues sync op
 
 ### Pokédex

@@ -1,4 +1,3 @@
-import 'dart:math';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:change_case/change_case.dart';
@@ -39,7 +38,6 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
   static const _tabs = [
     Tab(text: 'Overview'),
     Tab(text: 'Stats'),
-    Tab(text: 'Pokéathlon'),
     Tab(text: 'Abilities'),
     Tab(text: 'Moves'),
     Tab(text: 'Evolutions'),
@@ -99,7 +97,6 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
               children: [
                 _OverviewTab(pokemon: pokemon, speciesAsync: speciesAsync),
                 _StatsTab(pokemon: pokemon),
-                _PokeathlonTab(pokemonId: widget.pokemonId, pokemon: pokemon),
                 _AbilitiesTab(pokemon: pokemon),
                 _MovesTab(pokemon: pokemon),
                 _EvolutionsTab(speciesAsync: speciesAsync),
@@ -1379,249 +1376,6 @@ class _LocationTile extends StatelessWidget {
   }
 }
 
-// ── Pokéathlon Tab ────────────────────────────────────────────────────────────
-
-class _PokeathlonTab extends ConsumerWidget {
-  final int pokemonId;
-  final PokemonEntry pokemon;
-  const _PokeathlonTab({required this.pokemonId, required this.pokemon});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final statsAsync = ref.watch(pokeathlonStatsProvider(pokemonId));
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final primaryType =
-        pokemon.types[1] ?? pokemon.types.values.first;
-    final typeColor =
-        PokemonTypeColors.colors[primaryType] ?? colorScheme.primary;
-
-    return statsAsync.when(
-      loading: () => const LoadingState(),
-      error: (e, _) => ErrorState(
-        error: e,
-        onRetry: () => ref.invalidate(pokeathlonStatsProvider(pokemonId)),
-      ),
-      data: (stats) {
-        if (stats == null) {
-          return const EmptyState(
-            icon: Icons.sports_score_outlined,
-            title: 'No Pokéathlon data',
-            subtitle:
-                'Pokéathlon stats are only available for Pokémon from Generations I–IV.',
-          );
-        }
-
-        const labels = ['Speed', 'Power', 'Skill', 'Stamina', 'Jump'];
-        const keys = ['speed', 'power', 'skill', 'stamina', 'jump'];
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-              Text(
-                'Pokéathlon Stats',
-                style: textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'HeartGold / SoulSilver only',
-                style: textTheme.bodySmall
-                    ?.copyWith(color: colorScheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: 260,
-                height: 260,
-                child: CustomPaint(
-                  painter: _PentagonChartPainter(
-                    stats: stats,
-                    fillColor: typeColor,
-                    gridColor: colorScheme.outlineVariant,
-                    labelColor: colorScheme.onSurface,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              // Stat bars below the chart for precise values
-              ...List.generate(keys.length, (i) {
-                final value = stats[keys[i]] ?? 0;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 68,
-                        child: Text(
-                          labels[i],
-                          style: textTheme.bodySmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 28,
-                        child: Text(
-                          '$value',
-                          textAlign: TextAlign.end,
-                          style: textTheme.bodySmall,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: value / 10,
-                            minHeight: 10,
-                            backgroundColor:
-                                colorScheme.surfaceContainerHighest,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(typeColor),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _PentagonChartPainter extends CustomPainter {
-  final Map<String, int> stats;
-  final Color fillColor;
-  final Color gridColor;
-  final Color labelColor;
-
-  static const _keys = ['speed', 'power', 'skill', 'stamina', 'jump'];
-  static const _labels = ['Speed', 'Power', 'Skill', 'Stamina', 'Jump'];
-  static const _maxValue = 10;
-  static const _rings = 5; // grid rings at 2, 4, 6, 8, 10
-
-  const _PentagonChartPainter({
-    required this.stats,
-    required this.fillColor,
-    required this.gridColor,
-    required this.labelColor,
-  });
-
-  /// Point on the chart at [fraction] of max radius, on [angleIndex] axis.
-  Offset _point(Offset center, double maxRadius, int angleIndex,
-      double fraction) {
-    final angle = -pi / 2 + 2 * pi * angleIndex / 5;
-    final r = maxRadius * fraction;
-    return Offset(center.dx + r * cos(angle), center.dy + r * sin(angle));
-  }
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final maxRadius = size.width / 2 - 36; // leave room for labels
-
-    final gridPaint = Paint()
-      ..color = gridColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8;
-
-    final axisPaint = Paint()
-      ..color = gridColor.withValues(alpha: 0.6)
-      ..strokeWidth = 0.8;
-
-    // Draw grid rings
-    for (int ring = 1; ring <= _rings; ring++) {
-      final fraction = ring / _rings;
-      final path = Path();
-      for (int i = 0; i < 5; i++) {
-        final pt = _point(center, maxRadius, i, fraction);
-        if (i == 0) {
-          path.moveTo(pt.dx, pt.dy);
-        } else {
-          path.lineTo(pt.dx, pt.dy);
-        }
-      }
-      path.close();
-      canvas.drawPath(path, gridPaint);
-    }
-
-    // Draw axes from center to each vertex
-    for (int i = 0; i < 5; i++) {
-      final outer = _point(center, maxRadius, i, 1.0);
-      canvas.drawLine(center, outer, axisPaint);
-    }
-
-    // Draw filled stat polygon
-    final values = _keys.map((k) => (stats[k] ?? 0) / _maxValue).toList();
-
-    final fillPaint = Paint()
-      ..color = fillColor.withValues(alpha: 0.25)
-      ..style = PaintingStyle.fill;
-    final strokePaint = Paint()
-      ..color = fillColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-
-    final statPath = Path();
-    for (int i = 0; i < 5; i++) {
-      final pt = _point(center, maxRadius, i, values[i]);
-      if (i == 0) {
-        statPath.moveTo(pt.dx, pt.dy);
-      } else {
-        statPath.lineTo(pt.dx, pt.dy);
-      }
-    }
-    statPath.close();
-    canvas.drawPath(statPath, fillPaint);
-    canvas.drawPath(statPath, strokePaint);
-
-    // Vertex dots
-    final dotPaint = Paint()
-      ..color = fillColor
-      ..style = PaintingStyle.fill;
-    for (int i = 0; i < 5; i++) {
-      final pt = _point(center, maxRadius, i, values[i]);
-      canvas.drawCircle(pt, 4, dotPaint);
-    }
-
-    // Labels outside the outermost ring
-    for (int i = 0; i < 5; i++) {
-      final angle = -pi / 2 + 2 * pi * i / 5;
-      final labelRadius = maxRadius + 22;
-      final pt = Offset(
-        center.dx + labelRadius * cos(angle),
-        center.dy + labelRadius * sin(angle),
-      );
-
-      final tp = TextPainter(
-        text: TextSpan(
-          text: _labels[i],
-          style: TextStyle(
-            color: labelColor,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      tp.paint(
-        canvas,
-        Offset(pt.dx - tp.width / 2, pt.dy - tp.height / 2),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_PentagonChartPainter old) =>
-      old.stats != stats || old.fillColor != fillColor;
-}
-
 // ── Teams Tab ─────────────────────────────────────────────────────────────────
 
 class _TeamsTab extends ConsumerWidget {
@@ -1960,22 +1714,22 @@ class _TeamPicker extends ConsumerWidget {
     final nameCtrl = TextEditingController();
     final name = await showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('New team'),
         content: TextField(
           controller: nameCtrl,
           autofocus: true,
           decoration: const InputDecoration(hintText: 'Team name'),
           textCapitalization: TextCapitalization.words,
-          onSubmitted: (v) => Navigator.pop(context, v.trim()),
+          onSubmitted: (v) => Navigator.pop(dialogContext, v.trim()),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, nameCtrl.text.trim()),
+            onPressed: () => Navigator.pop(dialogContext, nameCtrl.text.trim()),
             child: const Text('Create'),
           ),
         ],
