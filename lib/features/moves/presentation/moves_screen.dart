@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/moves/providers/moves_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
@@ -224,16 +225,7 @@ class _MoveListItem extends StatelessWidget {
           ],
         ],
       ),
-      onTap: () => _showMoveDetail(context, move),
-    );
-  }
-
-  void _showMoveDetail(BuildContext context, MoveEntry move) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => _MoveDetailSheet(move: move),
+      onTap: () => context.push('/moves/${move.name}'),
     );
   }
 }
@@ -262,103 +254,3 @@ class _TypeChip extends StatelessWidget {
   }
 }
 
-// ── Move detail bottom sheet ──────────────────────────────────────────────────
-
-class _MoveDetailSheet extends StatelessWidget {
-  final MoveEntry move;
-  const _MoveDetailSheet({required this.move});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final typeColor = move.typeName != null
-        ? (PokemonTypeColors.colors[move.typeName] ?? colorScheme.primary)
-        : colorScheme.primary;
-
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.5,
-      minChildSize: 0.3,
-      maxChildSize: 0.85,
-      builder: (_, controller) => ListView(
-        controller: controller,
-        padding: const EdgeInsets.all(20),
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            move.displayName,
-            style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              if (move.typeName != null)
-                _TypeChip(type: move.typeName!, color: typeColor),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  border: Border.all(color: colorScheme.outline),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '${move.categoryIcon} ${move.damageClass ?? '—'}',
-                  style: textTheme.labelSmall,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _StatRow(label: 'Power', value: move.power?.toString() ?? '—'),
-          _StatRow(label: 'Accuracy', value: move.accuracy != null ? '${move.accuracy}%' : '—'),
-          _StatRow(label: 'PP', value: move.pp?.toString() ?? '—'),
-          const Divider(height: 28),
-          if (move.shortEffect != null) ...[
-            Text('Effect', style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            Text(move.shortEffect!, style: textTheme.bodyMedium),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _StatRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _StatRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              label,
-              style: textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          Text(value, style: textTheme.bodyMedium),
-        ],
-      ),
-    );
-  }
-}

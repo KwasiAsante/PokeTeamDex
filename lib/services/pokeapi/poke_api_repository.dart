@@ -294,6 +294,31 @@ class PokeApiRepository {
     return TypeEntry.fromJson(data);
   }
 
+  /// Fetches a machine by its full PokéAPI URL.
+  /// Returns {item_name, item_url} for display and linking.
+  Future<Map<String, String>> fetchMachineByUrl(String url) async {
+    final id = url.split('/').where((s) => s.isNotEmpty).last;
+    final cacheKey = 'machine_$id';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is Map) return Map<String, String>.from(cached.cast<String, String>());
+
+    // Strip the base URL so the Dio client (which has baseUrl set) handles it
+    final path = url.contains('api/v2')
+        ? url.substring(url.indexOf('api/v2') + 6)  // "/machine/{id}/"
+        : '/machine/$id/';
+    final r = await _pokeApiClient.client.get(path);
+    if (r.statusCode != 200) {
+      throw Exception('Failed to fetch machine $id: ${r.statusCode}');
+    }
+    final itemMap = r.data['item'] as Map<String, dynamic>;
+    final result = <String, String>{
+      'name': itemMap['name'] as String,
+      'url':  itemMap['url'] as String,
+    };
+    _pokeApiCache.putWithTTL(cacheKey, result, const Duration(days: 7));
+    return result;
+  }
+
   /// Fetches a named regional Pokédex and returns {speciesName: entryNumber}.
   /// Used to filter and sort the Pokédex list by a specific game's regional dex.
   Future<Map<String, int>> fetchRegionalPokedex(String name) async {
