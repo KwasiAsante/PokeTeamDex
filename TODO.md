@@ -206,10 +206,10 @@
 
 ### Accessibility
 
-- [ ] **Semantic labels** — add `Semantics` / `tooltip` to icon-only buttons (sync, export, settings)
-- [ ] **Minimum touch targets** — audit all tappable widgets for 48 × 48 dp minimum
-- [ ] **Text scaling** — verify layouts don't break at large (1.3×) and extra-large (1.5×) system font sizes
-- [ ] **Screen reader order** — ensure tab order on wide layouts is logical (left-to-right, top-to-bottom)
+- [x] **Semantic labels** — add `Semantics` / `tooltip` to icon-only buttons (sync, export, settings)
+- [x] **Minimum touch targets** — audit all tappable widgets for 48 × 48 dp minimum
+- [x] **Text scaling** — verify layouts don't break at large (1.3×) and extra-large (1.5×) system font sizes
+- [x] **Screen reader order** — ensure tab order on wide layouts is logical (left-to-right, top-to-bottom)
 
 ### Responsive Breakpoints (reference)
 
