@@ -85,8 +85,9 @@ final filteredPokemonListProvider =
 
   List<PokemonListEntry> items = listAsync.requireValue;
 
-  // Generation filter (applied automatically when a game is chosen too)
-  if (filter.generation != null) {
+  // Generation filter — skip when a game is active; the game's regional dex
+  // already defines which Pokémon appear (remakes like ORAS span multiple gens).
+  if (filter.generation != null && filter.game == null) {
     final range = generationRanges[filter.generation!]!;
     items = items.where((p) => p.id >= range.$1 && p.id <= range.$2).toList();
   }
