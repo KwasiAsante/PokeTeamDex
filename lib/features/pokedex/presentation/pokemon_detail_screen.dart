@@ -575,11 +575,11 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
       ..sort((a, b) {
         final ai = _vgOrder.indexOf(a);
         final bi = _vgOrder.indexOf(b);
-        // Known entries sort by position; unknown entries go to the end alphabetically.
+        // Known entries sort by position (descending); unknown entries go to the end.
         if (ai == -1 && bi == -1) return a.compareTo(b);
         if (ai == -1) return 1;
         if (bi == -1) return -1;
-        return ai.compareTo(bi);
+        return bi.compareTo(ai); // reversed: latest first
       });
   }
 
@@ -608,7 +608,7 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
   @override
   Widget build(BuildContext context) {
     final versions = _versions;
-    _selectedVersion ??= versions.isNotEmpty ? versions.last : null;
+    _selectedVersion ??= versions.isNotEmpty ? versions.first : null;
     final grouped = _grouped(_selectedVersion);
 
     return Column(
