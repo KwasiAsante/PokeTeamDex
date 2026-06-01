@@ -7,6 +7,7 @@ import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
+import 'package:poke_team_dex/shared/widgets/skeleton_box.dart';
 
 class AbilitiesScreen extends ConsumerStatefulWidget {
   const AbilitiesScreen({super.key});
@@ -164,7 +165,7 @@ class _AbilityTile extends ConsumerWidget {
     return abilityAsync.when(
       loading: () => ListTile(
         title: Text(_fmt(name)),
-        subtitle: const LinearProgressIndicator(),
+        subtitle: const SkeletonBox(width: 200),
       ),
       error: (_, __) => ListTile(
         title: Text(_fmt(name)),
