@@ -196,7 +196,7 @@
 - [x] **Type badge sizing** — standardised badge to `labelSmall` (11sp, w600, 0.3 letter-spacing), capitalized; consistent across Pokédex list, detail tabs, and team slot cards
 - [x] **Pokédex pagination** — virtual infinite scroll (50 per page); filter/search operate on full dataset; resets to page 1 on filter change
 - [x] **Pokédex game filter** — game chip appears when generation is active; filters to that game's regional dex; Dex # sort uses regional entry numbers; generation change clears game filter
-- [ ] **Loading states** — replace full-screen `CircularProgressIndicator` on list screens with a paginated skeleton list
+- [x] **Loading states** — replace full-screen `CircularProgressIndicator` on list screens with a paginated skeleton list
 - [x] **Error states** — themed error colours (errorContainer/onErrorContainer), friendly "Something went wrong" copy, detail in bodySmall, "Try again" FilledButton; EmptyState now uses a surfaceContainerHighest circle icon container
 - [x] **Skeleton loaders in machine tiles** — replaced `LinearProgressIndicator` with `SkeletonBox` in move and item detail `_MachineTile`
 - [x] **Snackbar → floating** — `SnackBarBehavior.floating` applied to all 12 `showSnackBar` calls across settings, sync monitor, teams, slot picker, slot config, team detail screens
