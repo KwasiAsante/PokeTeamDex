@@ -36,6 +36,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
   late TabController _tabController;
   bool _shiny = false;
 
+  // Narrow layout — horizontal TabBar
   static const _tabs = [
     Tab(text: 'Overview'),
     Tab(text: 'Stats'),
@@ -45,6 +46,22 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     Tab(text: 'Forms'),
     Tab(text: 'Locations'),
     Tab(text: 'Teams'),
+  ];
+
+  // Wide layout — left rail labels + icons
+  static const _railLabels = [
+    'Overview', 'Stats', 'Abilities', 'Moves',
+    'Evolutions', 'Forms', 'Locations', 'Teams',
+  ];
+  static const _railIcons = [
+    Icons.info_outline,
+    Icons.bar_chart_outlined,
+    Icons.psychology_outlined,
+    Icons.bolt_outlined,
+    Icons.account_tree_outlined,
+    Icons.style_outlined,
+    Icons.location_on_outlined,
+    Icons.groups_outlined,
   ];
 
   @override
@@ -59,10 +76,25 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     super.dispose();
   }
 
+  List<Widget> _tabChildren(
+    PokemonEntry pokemon,
+    AsyncValue<PokemonSpeciesEntry> speciesAsync,
+  ) => [
+    _OverviewTab(pokemon: pokemon, speciesAsync: speciesAsync),
+    _StatsTab(pokemon: pokemon),
+    _AbilitiesTab(pokemon: pokemon),
+    _MovesTab(pokemon: pokemon),
+    _EvolutionsTab(speciesAsync: speciesAsync),
+    _FormsTab(speciesAsync: speciesAsync),
+    _LocationsTab(pokemonId: widget.pokemonId),
+    _TeamsTab(pokemonId: widget.pokemonId, pokemon: pokemon),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final pokemonAsync = ref.watch(pokemonDetailProvider(widget.pokemonId));
     final speciesAsync = ref.watch(pokemonSpeciesProvider(widget.pokemonId));
+    final isWide = MediaQuery.sizeOf(context).width > 840;
 
     return pokemonAsync.when(
       loading: () => Scaffold(
@@ -81,34 +113,173 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         final headerColor =
             PokemonTypeColors.colors[primaryType] ?? Theme.of(context).colorScheme.primary;
 
-        return Scaffold(
-          body: NestedScrollView(
-            headerSliverBuilder: (context, _) => [
-              _DetailSliverAppBar(
-                pokemon: pokemon,
-                headerColor: headerColor,
-                shiny: _shiny,
-                onShinyToggle: () => setState(() => _shiny = !_shiny),
-                tabController: _tabController,
-                tabs: _tabs,
-              ),
-            ],
-            body: TabBarView(
-              controller: _tabController,
+        return isWide
+            ? _buildWideLayout(context, pokemon, speciesAsync, headerColor)
+            : _buildNarrowLayout(context, pokemon, speciesAsync, headerColor);
+      },
+    );
+  }
+
+  // ── Narrow layout (≤ 840dp) ── SliverAppBar + horizontal TabBar ──────────────
+
+  Widget _buildNarrowLayout(
+    BuildContext context,
+    PokemonEntry pokemon,
+    AsyncValue<PokemonSpeciesEntry> speciesAsync,
+    Color headerColor,
+  ) {
+    return Scaffold(
+      body: NestedScrollView(
+        headerSliverBuilder: (context, _) => [
+          _DetailSliverAppBar(
+            pokemon: pokemon,
+            headerColor: headerColor,
+            shiny: _shiny,
+            onShinyToggle: () => setState(() => _shiny = !_shiny),
+            tabController: _tabController,
+            tabs: _tabs,
+          ),
+        ],
+        body: TabBarView(
+          controller: _tabController,
+          children: _tabChildren(pokemon, speciesAsync),
+        ),
+      ),
+    );
+  }
+
+  // ── Wide layout (> 840dp) ── AppBar + left rail + content panel ──────────────
+
+  Widget _buildWideLayout(
+    BuildContext context,
+    PokemonEntry pokemon,
+    AsyncValue<PokemonSpeciesEntry> speciesAsync,
+    Color headerColor,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: headerColor,
+        foregroundColor: Colors.white,
+        leading: BackButton(onPressed: () => context.pop()),
+        title: Text(
+          '${pokemon.displayId()}  ${pokemon.name.toCapitalCase()}',
+          style: const TextStyle(color: Colors.white),
+        ),
+        actions: [
+          IconButton(
+            tooltip: _shiny ? 'Show default' : 'Show shiny',
+            icon: Icon(
+              Icons.auto_awesome,
+              color: _shiny ? Colors.yellowAccent : Colors.white70,
+            ),
+            onPressed: () => setState(() => _shiny = !_shiny),
+          ),
+          const ConnectivityStatusButton(),
+          const SettingsButton(),
+        ],
+      ),
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Left rail ────────────────────────────────────────────────────────
+          SizedBox(
+            width: 220,
+            child: Column(
               children: [
-                _OverviewTab(pokemon: pokemon, speciesAsync: speciesAsync),
-                _StatsTab(pokemon: pokemon),
-                _AbilitiesTab(pokemon: pokemon),
-                _MovesTab(pokemon: pokemon),
-                _EvolutionsTab(speciesAsync: speciesAsync),
-                _FormsTab(speciesAsync: speciesAsync),
-                _LocationsTab(pokemonId: widget.pokemonId),
-                _TeamsTab(pokemonId: widget.pokemonId, pokemon: pokemon),
+                // Sprite + type header
+                Container(
+                  width: double.infinity,
+                  color: headerColor.withValues(alpha: 0.12),
+                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  child: Column(
+                    children: [
+                      Hero(
+                        tag: 'pokemon-sprite-${pokemon.id}',
+                        child: PokemonSprite(
+                          defaultUrl: pokemon.officialArtworkUrl,
+                          shinyUrl: pokemon.sprites?['other']
+                              ?['official-artwork']?['front_shiny'] as String?,
+                          shiny: _shiny,
+                          size: 140,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        pokemon.name.toCapitalCase(),
+                        style: textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        alignment: WrapAlignment.center,
+                        children: pokemon.types.values
+                            .map((t) => TypeBadge(type: t))
+                            .toList(),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, thickness: 1),
+                // Tab list
+                Expanded(
+                  child: ListenableBuilder(
+                    listenable: _tabController,
+                    builder: (context, _) {
+                      return ListView(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        children: List.generate(_railLabels.length, (i) {
+                          final selected = _tabController.index == i;
+                          return ListTile(
+                            selected: selected,
+                            selectedTileColor:
+                                colorScheme.primaryContainer.withValues(alpha: 0.35),
+                            selectedColor: colorScheme.primary,
+                            leading: Icon(
+                              _railIcons[i],
+                              size: 20,
+                              color: selected
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                            title: Text(
+                              _railLabels[i],
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: selected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 2),
+                            onTap: () => _tabController.animateTo(i),
+                          );
+                        }),
+                      );
+                    },
+                  ),
+                ),
               ],
             ),
           ),
-        );
-      },
+          const VerticalDivider(width: 1, thickness: 1),
+          // ── Content panel ─────────────────────────────────────────────────────
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: _tabChildren(pokemon, speciesAsync),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
