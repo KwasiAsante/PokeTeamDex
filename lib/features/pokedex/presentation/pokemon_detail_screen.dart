@@ -371,9 +371,13 @@ class _StatsTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Stat bars
+          // Stat bars — staggered fill animation
           ...List.generate(_statMeta.length, (i) {
-            return StatBar(label: _statMeta[i].$2, value: bases[i]);
+            return StatBar(
+              label: _statMeta[i].$2,
+              value: bases[i],
+              delay: Duration(milliseconds: i * 70),
+            );
           }),
 
           Padding(
@@ -890,38 +894,89 @@ class _EvolutionsTab extends ConsumerWidget {
   }
 }
 
-/// Recursively renders the evolution chain as a vertical tree.
-/// Branching evolutions (e.g. Eevee) are rendered side-by-side.
+/// Recursively renders the evolution chain.
+/// Linear chains stay vertical; branching chains (e.g. Eevee) spread
+/// horizontally in a Wrap so they don't all stack into a single tall column.
 class _EvolutionTree extends StatelessWidget {
   final EvolutionNode node;
   const _EvolutionTree({required this.node});
 
   @override
   Widget build(BuildContext context) {
+    if (node.evolvesTo.isEmpty) {
+      return _EvolutionNodeCard(node: node);
+    }
+
+    if (node.evolvesTo.length == 1) {
+      // Linear chain — vertical layout
+      final child = node.evolvesTo.first;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _EvolutionNodeCard(node: node),
+          const SizedBox(height: 6),
+          _EvolutionArrow(details: child.details),
+          const SizedBox(height: 6),
+          _EvolutionTree(node: child),
+        ],
+      );
+    }
+
+    // Branching — show branches side-by-side in a Wrap
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         _EvolutionNodeCard(node: node),
-        if (node.evolvesTo.isNotEmpty) ...[
-          const Icon(Icons.arrow_downward, size: 20, color: Colors.grey),
-          if (node.evolvesTo.length == 1) ...[
-            _ConditionChip(details: node.evolvesTo.first.details),
-            const SizedBox(height: 4),
-            _EvolutionTree(node: node.evolvesTo.first),
-          ] else
-            // Branching (e.g. Eevee evolutions)
-            Column(
-              children: node.evolvesTo.map((child) {
-                return Column(
-                  children: [
-                    _ConditionChip(details: child.details),
-                    const SizedBox(height: 4),
-                    _EvolutionTree(node: child),
-                    const SizedBox(height: 8),
-                  ],
-                );
-              }).toList(),
-            ),
-        ],
+        const SizedBox(height: 6),
+        const Icon(
+          Icons.call_split_rounded,
+          size: 22,
+          color: Colors.grey,
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 12,
+          runSpacing: 16,
+          children: node.evolvesTo.map((child) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ConditionChip(details: child.details),
+                const SizedBox(height: 4),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 20,
+                  color: Colors.grey.shade400,
+                ),
+                const SizedBox(height: 4),
+                _EvolutionTree(node: child),
+              ],
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+/// Arrow + condition chip between two evolution stages.
+class _EvolutionArrow extends StatelessWidget {
+  final List<EvolutionDetail> details;
+  const _EvolutionArrow({required this.details});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ConditionChip(details: details),
+        if (details.isNotEmpty) const SizedBox(height: 4),
+        Icon(
+          Icons.keyboard_arrow_down_rounded,
+          size: 28,
+          color: Colors.grey.shade400,
+        ),
       ],
     );
   }
@@ -933,34 +988,50 @@ class _EvolutionNodeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return GestureDetector(
       onTap: () => context.push('/pokedex/${node.speciesId}'),
-      child: Column(
-        children: [
-          CachedNetworkImage(
-            imageUrl: node.spriteUrl,
-            width: 80,
-            height: 80,
-            placeholder: (_, __) => const SizedBox(
-              width: 80,
-              height: 80,
-              child: Icon(Icons.catching_pokemon, color: Colors.grey),
+      child: Container(
+        width: 96,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CachedNetworkImage(
+              imageUrl: node.spriteUrl,
+              width: 72,
+              height: 72,
+              placeholder: (_, __) => const SizedBox(
+                width: 72,
+                height: 72,
+                child: Icon(Icons.catching_pokemon, color: Colors.grey),
+              ),
+              errorWidget: (_, __, ___) =>
+                  const Icon(Icons.broken_image_outlined),
             ),
-            errorWidget: (_, __, ___) => const Icon(Icons.broken_image_outlined),
-          ),
-          Text(
-            node.displayName,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          Text(
-            '#${node.speciesId.toString().padLeft(3, '0')}',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              node.displayName,
+              textAlign: TextAlign.center,
+              style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            Text(
+              '#${node.speciesId.toString().padLeft(3, '0')}',
+              style: textTheme.labelSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -977,10 +1048,16 @@ class _ConditionChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: Theme.of(context).colorScheme.secondaryContainer,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(label, style: Theme.of(context).textTheme.labelSmall),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSecondaryContainer,
+            ),
+      ),
     );
   }
 }
@@ -1075,11 +1152,17 @@ class _FormCard extends ConsumerWidget {
             ),
             if (pokemon.stats.isNotEmpty) ...[
               const SizedBox(height: 12),
-              ...pokemon.stats.map((s) {
+              ...pokemon.stats.indexed.map((entry) {
+                final i = entry.$1;
+                final s = entry.$2;
                 final statName = (s['stat'] as Map)['name'] as String;
                 final value = s['base_stat'] as int;
                 final label = _shortStatLabel(statName);
-                return StatBar(label: label, value: value);
+                return StatBar(
+                  label: label,
+                  value: value,
+                  delay: Duration(milliseconds: i * 70),
+                );
               }),
             ],
           ],
