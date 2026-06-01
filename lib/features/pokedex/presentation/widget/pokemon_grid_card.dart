@@ -78,16 +78,19 @@ class PokemonGridCard extends ConsumerWidget {
                     ],
                   ),
                 ),
-                child: CachedNetworkImage(
-                  imageUrl: imageUrl,
-                  fit: BoxFit.contain,
-                  placeholder: (_, __) => const Center(
-                    child: Icon(Icons.catching_pokemon,
-                        size: 48, color: Colors.white30),
-                  ),
-                  errorWidget: (_, __, ___) => const Center(
-                    child: Icon(Icons.catching_pokemon,
-                        size: 48, color: Colors.white30),
+                child: Hero(
+                  tag: 'pokemon-sprite-${pokemon.id}',
+                  child: CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.contain,
+                    placeholder: (_, __) => const Center(
+                      child: Icon(Icons.catching_pokemon,
+                          size: 48, color: Colors.white30),
+                    ),
+                    errorWidget: (_, __, ___) => const Center(
+                      child: Icon(Icons.catching_pokemon,
+                          size: 48, color: Colors.white30),
+                    ),
                   ),
                 ),
               ),

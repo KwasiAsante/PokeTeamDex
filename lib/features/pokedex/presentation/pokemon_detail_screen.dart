@@ -160,11 +160,14 @@ class _DetailSliverAppBar extends StatelessWidget {
         background: Container(
           color: headerColor.withValues(alpha: 0.85),
           child: Center(
-            child: PokemonSprite(
-              defaultUrl: pokemon.officialArtworkUrl,
-              shinyUrl: pokemon.sprites?['other']?['official-artwork']?['front_shiny'] as String?,
-              shiny: shiny,
-              size: 200,
+            child: Hero(
+              tag: 'pokemon-sprite-${pokemon.id}',
+              child: PokemonSprite(
+                defaultUrl: pokemon.officialArtworkUrl,
+                shinyUrl: pokemon.sprites?['other']?['official-artwork']?['front_shiny'] as String?,
+                shiny: shiny,
+                size: 200,
+              ),
             ),
           ),
         ),
