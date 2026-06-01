@@ -154,7 +154,8 @@
 - [x] **Adaptive nav** — `BottomNavigationBar` < 600dp, `NavigationRail` 600–840dp, permanent `NavigationDrawer` > 840dp; overflow fixes for team tile sprites, slot card type badges, location encounter table
 - [ ] **App-wide back gesture / breadcrumb** — on wide layouts the detail screen should open in a side panel rather than pushing a new route (master-detail pattern for Pokédex, Teams)
 - [ ] **Pokéathlon tab** — removed; PokéAPI `/pokeathlon-stat/` only returns nature-affinity data, not per-Pokémon base values — no data source available
-- [x] **Teams tab** — replaces old stub "Add" tab; shows "On your teams" list (team name, slot #, nickname, format label, tap to navigate); "Add to a team" sheet with team picker → slot grid showing current occupants; replacement confirmation dialog; inserts slot with defaults (L50, IVs 31) and queues sync op
+- [x] **Connectivity status button** — wifi icon + coloured dot on every screen's AppBar; green = online + signed in, amber = online + not signed in, red = offline; tapping opens sheet with live Device / PokéAPI / Backend API / Account status rows + refresh button
+- [x] **Teams tab** — shows "On your teams" list (team name, slot #, nickname, format label, tap to navigate); "Add to a team" sheet with team picker → slot grid showing current occupants; replacement confirmation dialog; "New team" creation from the sheet; inserts slot with defaults (L50, IVs 31) and queues sync op
 
 ### Pokédex
 
