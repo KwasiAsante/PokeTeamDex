@@ -2,11 +2,74 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poke_team_dex/features/pokedex/models/pokedex_filter.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/pokemon_grid_card.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
+import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
+
+const _kBase =
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
+
+/// Maps a PokéAPI version-group name → sprite sub-path under [_kBase].
+/// null = no game-specific pixel-art folder exists (Gen VI, IX) → use standard.
+const _kVgToSubpath = <String, String?>{
+  'red-blue':                        'versions/generation-i/red-blue',
+  'yellow':                          'versions/generation-i/yellow',
+  'gold-silver':                     'versions/generation-ii/gold',
+  'crystal':                         'versions/generation-ii/crystal',
+  'ruby-sapphire':                   'versions/generation-iii/ruby-sapphire',
+  'emerald':                         'versions/generation-iii/emerald',
+  'firered-leafgreen':               'versions/generation-iii/firered-leafgreen',
+  'diamond-pearl':                   'versions/generation-iv/diamond-pearl',
+  'platinum':                        'versions/generation-iv/platinum',
+  'heartgold-soulsilver':            'versions/generation-iv/heartgold-soulsilver',
+  'black-white':                     'versions/generation-v/black-white',
+  'black-2-white-2':                 'versions/generation-v/black-white', // BW2 shares BW sprites
+  'x-y':                             null,
+  'omega-ruby-alpha-sapphire':       null,
+  'sun-moon':                        'versions/generation-vii/icons',
+  'ultra-sun-ultra-moon':            'versions/generation-vii/icons',
+  'lets-go-pikachu-lets-go-eevee':   null,
+  'sword-shield':                    'versions/generation-viii/icons',
+  'brilliant-diamond-and-shining-pearl': 'versions/generation-viii/icons',
+  'legends-arceus':                  'versions/generation-viii/icons',
+  'scarlet-violet':                  null,
+};
+
+/// The last released version-group per generation (used when only gen is set).
+const _kGenToLastVg = <int, String>{
+  1: 'yellow',
+  2: 'crystal',
+  3: 'emerald',
+  4: 'heartgold-soulsilver',
+  5: 'black-white',
+  6: 'omega-ruby-alpha-sapphire',
+  7: 'ultra-sun-ultra-moon',
+  8: 'sword-shield',
+  9: 'scarlet-violet',
+};
+
+/// Returns the compact icon URL for [pokemonId] given the active [filter].
+/// Falls back to the Gen VIII icon sprite when no specific path is available.
+String _compactIconUrl(int pokemonId, PokedexFilter filter) {
+  String? vg;
+  if (filter.game != null) {
+    vg = kFormatToVersionGroup[filter.game];
+  } else if (filter.generation != null) {
+    vg = _kGenToLastVg[filter.generation];
+  }
+
+  final subpath = vg != null ? _kVgToSubpath[vg] : null;
+  if (subpath == null) {
+    // Gen VI / IX have no pixel-art folder — standard front-default
+    return '$_kBase$pokemonId.png';
+  }
+  return '$_kBase$subpath/$pokemonId.png';
+}
 
 /// List-mode tile for the Pokédex.
 ///
@@ -33,6 +96,7 @@ class PokemonListTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final filter = ref.watch(pokedexFilterProvider);
 
     // Lazy type fetch — instant from cache after first detail view
     final detailAsync = ref.watch(pokemonDetailProvider(pokemon.id));
@@ -50,18 +114,12 @@ class PokemonListTile extends ConsumerWidget {
     // Image URL and size per tier
     final imageUrl = switch (imageType) {
       PokedexImageType.artwork =>
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-        'sprites/pokemon/other/official-artwork/${pokemon.id}.png',
+        '${_kBase}other/official-artwork/${pokemon.id}.png',
       PokedexImageType.sprite =>
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-        'sprites/pokemon/${pokemon.id}.png',
-      null =>
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-        'sprites/pokemon/versions/generation-viii/icons/${pokemon.id}.png',
+        '$_kBase${pokemon.id}.png',
+      null => _compactIconUrl(pokemon.id, filter),
     };
-    final fallbackUrl =
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-        'sprites/pokemon/${pokemon.id}.png';
+    final fallbackUrl = '$_kBase${pokemon.id}.png';
 
     final imageSize = switch (imageType) {
       PokedexImageType.artwork => 180.0,
