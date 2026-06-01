@@ -135,7 +135,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           // ── Appearance ────────────────────────────────────────────────────
           _SectionHeader('Appearance'),
+          const SizedBox(height: 16),
+          Text(
+            'Theme',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
           const SizedBox(height: 8),
+          _ThemeModePicker(),
+          const SizedBox(height: 20),
           Text(
             'Accent colour',
             style: Theme.of(context).textTheme.labelLarge,
@@ -284,6 +291,41 @@ class _SyncStatusTile extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ThemeModePicker extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(themeModeProvider).when(
+          data: (v) => v,
+          loading: () => ThemeMode.system,
+          error: (_, __) => ThemeMode.system,
+        );
+
+    return SegmentedButton<ThemeMode>(
+      segments: const [
+        ButtonSegment(
+          value: ThemeMode.light,
+          icon: Icon(Icons.light_mode_outlined),
+          label: Text('Light'),
+        ),
+        ButtonSegment(
+          value: ThemeMode.system,
+          icon: Icon(Icons.brightness_auto_outlined),
+          label: Text('System'),
+        ),
+        ButtonSegment(
+          value: ThemeMode.dark,
+          icon: Icon(Icons.dark_mode_outlined),
+          label: Text('Dark'),
+        ),
+      ],
+      selected: {current},
+      onSelectionChanged: (selection) => ref
+          .read(appConfigRepositoryProvider)
+          .setThemeMode(selection.first),
     );
   }
 }

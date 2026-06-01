@@ -176,12 +176,17 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           loading: () => kDefaultSeedColor,
           error: (_, __) => kDefaultSeedColor,
         );
+    final themeMode = ref.watch(themeModeProvider).when(
+          data: (v) => v,
+          loading: () => ThemeMode.system,
+          error: (_, __) => ThemeMode.system,
+        );
     final seed = Color(seedValue);
     return MaterialApp.router(
       title: 'PokeTeamDex',
       theme: AppTheme.light(seed),
       darkTheme: AppTheme.dark(seed),
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       routerConfig: buildAppRouter(token),
     );
   }

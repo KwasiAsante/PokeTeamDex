@@ -1,9 +1,11 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/material.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 
 const _kApiBaseUrl = 'api_base_url';
 const _kUseFormatSprites = 'use_format_sprites';
 const _kSeedColor = 'seed_color';
+const _kThemeMode = 'theme_mode';
 const kDefaultApiBaseUrl = 'http://localhost:8000';
 // Default seed colour — Pokéball red
 const kDefaultSeedColor = 0xFFCC0000;
@@ -68,4 +70,21 @@ class AppConfigRepository {
 
   Stream<int> watchSeedColor() =>
       watch(_kSeedColor).map((v) => int.tryParse(v ?? '') ?? kDefaultSeedColor);
+
+  // ── Theme mode ────────────────────────────────────────────────────────────
+
+  static ThemeMode _parseThemeMode(String? v) => switch (v) {
+        'light' => ThemeMode.light,
+        'dark'  => ThemeMode.dark,
+        _       => ThemeMode.system,
+      };
+
+  Future<ThemeMode> getThemeMode() async =>
+      _parseThemeMode(await get(_kThemeMode));
+
+  Future<void> setThemeMode(ThemeMode mode) =>
+      set(_kThemeMode, mode.name); // 'system' | 'light' | 'dark'
+
+  Stream<ThemeMode> watchThemeMode() =>
+      watch(_kThemeMode).map(_parseThemeMode);
 }
