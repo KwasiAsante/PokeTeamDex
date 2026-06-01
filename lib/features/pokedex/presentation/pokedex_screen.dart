@@ -4,6 +4,7 @@ import 'package:poke_team_dex/features/pokedex/models/pokedex_filter.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
+import 'package:poke_team_dex/features/pokedex/presentation/widget/pokemon_grid_card.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/pokemon_list_tile.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
@@ -66,6 +67,13 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
 
     final listAsync = ref.watch(filteredPokemonListProvider);
 
+    // Adaptive layout based on screen width
+    final width = MediaQuery.sizeOf(context).width;
+    final crossAxisCount = width >= 840 ? 3 : width >= 600 ? 2 : 1;
+    final imageType = width >= 600
+        ? (width >= 840 ? PokedexImageType.artwork : PokedexImageType.sprite)
+        : null; // null = compact list, use PokemonListTile with icon sprite
+
     return Scaffold(
       appBar: AppBar(title: const Text('Pokédex'), actions: [const SettingsButton()]),
       body: Column(
@@ -101,29 +109,58 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
                           children: [
                             Text(
                               '${data.length} Pokémon',
-                              style:
-                                  Theme.of(context).textTheme.labelSmall?.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                      ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
                             ),
                           ],
                         ),
                       ),
                     Expanded(
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        // +1 for the load-more footer when there are more pages.
-                        itemCount: visible.length + (hasMore ? 1 : 0),
-                        itemBuilder: (_, i) {
-                          if (i == visible.length) {
-                            // Load-more footer — auto-triggers next page.
-                            return const _LoadMoreFooter();
-                          }
-                          return PokemonListTile(pokemon: visible[i]);
-                        },
-                      ),
+                      child: imageType == null
+                          // ── Compact: single-column list ──
+                          ? ListView.builder(
+                              controller: _scrollController,
+                              itemCount: visible.length + (hasMore ? 1 : 0),
+                              itemBuilder: (_, i) {
+                                if (i == visible.length) {
+                                  return const _LoadMoreFooter();
+                                }
+                                return PokemonListTile(pokemon: visible[i]);
+                              },
+                            )
+                          // ── Medium / Expanded: grid ──
+                          : GridView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.all(8),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                crossAxisSpacing: 8,
+                                mainAxisSpacing: 8,
+                                // Portrait-ish cards: artwork needs more vertical
+                                // space than sprites.
+                                childAspectRatio:
+                                    imageType == PokedexImageType.artwork
+                                        ? 0.62
+                                        : 0.75,
+                              ),
+                              itemCount: visible.length + (hasMore ? 1 : 0),
+                              itemBuilder: (_, i) {
+                                if (i == visible.length) {
+                                  return const _LoadMoreFooter();
+                                }
+                                return PokemonGridCard(
+                                  pokemon: visible[i],
+                                  imageType: imageType,
+                                );
+                              },
+                            ),
                     ),
                   ],
                 );
