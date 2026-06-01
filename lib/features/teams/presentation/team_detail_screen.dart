@@ -8,12 +8,13 @@ import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
+import 'package:poke_team_dex/features/teams/presentation/slot_config_screen.dart';
+import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/services/format/sprite_resolver.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
 import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
-import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
@@ -21,24 +22,6 @@ import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
-
-// ── Providers ─────────────────────────────────────────────────────────────────
-
-final teamSlotsProvider =
-    StreamProvider.autoDispose.family<List<TeamSlot>, int>((ref, teamId) {
-  return ref.watch(teamSlotRepositoryProvider).watchByTeam(teamId);
-});
-
-final teamByIdProvider =
-    StreamProvider.autoDispose.family<Team?, int>((ref, teamId) {
-  final db = ref.watch(appDatabaseProvider);
-  return (db.select(db.teams)..where((t) => t.id.equals(teamId)))
-      .watchSingleOrNull();
-});
-
-final _slotItemDetailProvider =
-    FutureProvider.autoDispose.family<ItemEntry, String>((ref, name) =>
-        ref.read(pokeApiRepositoryProvider).fetchItem(name));
 
 // ── Stat calculator (Gen III+ formula) ───────────────────────────────────────
 
@@ -75,14 +58,29 @@ double _natureMod(String? nature, String key) {
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class TeamDetailScreen extends ConsumerWidget {
+class TeamDetailScreen extends ConsumerStatefulWidget {
   final int teamId;
   const TeamDetailScreen({super.key, required this.teamId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final teamAsync = ref.watch(teamByIdProvider(teamId));
-    final slotsAsync = ref.watch(teamSlotsProvider(teamId));
+  ConsumerState<TeamDetailScreen> createState() => _TeamDetailScreenState();
+}
+
+class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
+  int? _selectedSlot;
+
+  @override
+  Widget build(BuildContext context) {
+    final isWide = MediaQuery.sizeOf(context).width > 840;
+    final teamAsync = ref.watch(teamByIdProvider(widget.teamId));
+    final slotsAsync = ref.watch(teamSlotsProvider(widget.teamId));
+
+    // Reset selected slot when switching to narrow layout
+    if (!isWide && _selectedSlot != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _selectedSlot = null);
+      });
+    }
 
     return teamAsync.when(
       loading: () => Scaffold(appBar: AppBar(), body: const LoadingState()),
@@ -104,23 +102,23 @@ class TeamDetailScreen extends ConsumerWidget {
               IconButton(
                 icon: const Icon(Icons.edit_outlined),
                 tooltip: 'Rename',
-                onPressed: () => _renameTeam(context, ref, team),
+                onPressed: () => _renameTeam(context, team),
               ),
               IconButton(
                 icon: const Icon(Icons.tune_outlined),
                 tooltip: 'Change format',
-                onPressed: () => _editFormat(context, ref, team),
+                onPressed: () => _editFormat(context, team),
               ),
               if (slots.isNotEmpty)
                 IconButton(
                   icon: const Icon(Icons.upload_outlined),
                   tooltip: 'Export to Showdown',
-                  onPressed: () => _exportShowdown(context, ref, slots),
+                  onPressed: () => _exportShowdown(context, slots),
                 ),
               IconButton(
                 icon: const Icon(Icons.delete_outline),
                 tooltip: 'Delete team',
-                onPressed: () => _deleteTeam(context, ref, team),
+                onPressed: () => _deleteTeam(context, team),
               ),
               const ConnectivityStatusButton(),
               const SettingsButton(),
@@ -129,19 +127,56 @@ class TeamDetailScreen extends ConsumerWidget {
           body: slotsAsync.when(
             loading: () => const LoadingState(),
             error: (e, _) => ErrorState(error: e),
-            data: (slots) => _SlotList(
-              teamId: teamId,
-              slots: slots,
-              formatId: team.formatLabel,
-            ),
+            data: (slots) => isWide
+                ? _buildWideLayout(slots, team)
+                : _SlotList(
+                    teamId: widget.teamId,
+                    slots: slots,
+                    formatId: team.formatLabel,
+                  ),
           ),
         );
       },
     );
   }
 
+  Widget _buildWideLayout(List<TeamSlot> slots, Team team) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 380,
+          child: _SlotList(
+            teamId: widget.teamId,
+            slots: slots,
+            formatId: team.formatLabel,
+            selectedSlot: _selectedSlot,
+            onSlotTap: (slotNumber) =>
+                setState(() => _selectedSlot = slotNumber),
+          ),
+        ),
+        const VerticalDivider(width: 1, thickness: 1),
+        Expanded(
+          child: _selectedSlot == null
+              ? const EmptyState(
+                  icon: Icons.tune_outlined,
+                  title: 'Select a slot to configure',
+                  subtitle:
+                      'Tap a Pokémon in your team to edit its details here.',
+                )
+              : SlotConfigScreen(
+                  key: ValueKey(_selectedSlot),
+                  teamId: widget.teamId,
+                  slotNumber: _selectedSlot!,
+                  embedded: true,
+                  onClose: () => setState(() => _selectedSlot = null),
+                ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _exportShowdown(
-      BuildContext context, WidgetRef ref, List<TeamSlot> slots) async {
+      BuildContext context, List<TeamSlot> slots) async {
     final pokeApi = ref.read(pokeApiRepositoryProvider);
     try {
       final text = await buildShowdownExport(slots, pokeApi);
@@ -167,20 +202,18 @@ class TeamDetailScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _editFormat(
-      BuildContext context, WidgetRef ref, Team team) async {
+  Future<void> _editFormat(BuildContext context, Team team) async {
     final result = await showModalBottomSheet<dynamic>(
       context: context,
       isScrollControlled: true,
       builder: (_) => FormatPickerSheet(current: team.formatLabel),
     );
-    if (result == null) return; // dismissed
+    if (result == null) return;
     final newLabel = isFormatCleared(result) ? null : (result as GameFormat).id;
     await updateTeamFormat(ref, team.id, newLabel);
   }
 
-  Future<void> _renameTeam(
-      BuildContext context, WidgetRef ref, Team team) async {
+  Future<void> _renameTeam(BuildContext context, Team team) async {
     final controller = TextEditingController(text: team.name);
     final name = await showDialog<String>(
       context: context,
@@ -204,8 +237,7 @@ class TeamDetailScreen extends ConsumerWidget {
     if (name != null && name.isNotEmpty) await renameTeam(ref, team.id, name);
   }
 
-  Future<void> _deleteTeam(
-      BuildContext context, WidgetRef ref, Team team) async {
+  Future<void> _deleteTeam(BuildContext context, Team team) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -268,11 +300,15 @@ class _SlotList extends ConsumerWidget {
   final int teamId;
   final List<TeamSlot> slots;
   final String? formatId;
+  final int? selectedSlot;
+  final void Function(int slotNumber)? onSlotTap;
 
   const _SlotList({
     required this.teamId,
     required this.slots,
     this.formatId,
+    this.selectedSlot,
+    this.onSlotTap,
   });
 
   // Build a 6-element growable list keyed by position (0-based); null = empty slot.
@@ -319,6 +355,10 @@ class _SlotList extends ConsumerWidget {
                   teamId: teamId,
                   dragIndex: i,
                   formatId: formatId,
+                  selected: selectedSlot == slot.slot,
+                  onTap: onSlotTap != null
+                      ? () => onSlotTap!(slot.slot)
+                      : null,
                 )
               : _EmptySlotCard(teamId: teamId, slotNumber: i + 1, dragIndex: i),
         );
@@ -334,12 +374,16 @@ class _FilledSlotCard extends ConsumerWidget {
   final int teamId;
   final int dragIndex;
   final String? formatId;
+  final bool selected;
+  final VoidCallback? onTap;
 
   const _FilledSlotCard({
     required this.slot,
     required this.teamId,
     required this.dragIndex,
     this.formatId,
+    this.selected = false,
+    this.onTap,
   });
 
   static const _statLabels = ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe'];
@@ -351,7 +395,7 @@ class _FilledSlotCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final pokemonAsync = ref.watch(pokemonDetailProvider(slot.pokemonId));
     final itemAsync = slot.heldItemName != null
-        ? ref.watch(_slotItemDetailProvider(slot.heldItemName!))
+        ? ref.watch(slotItemDetailProvider(slot.heldItemName!))
         : null;
 
     final colorScheme = Theme.of(context).colorScheme;
@@ -442,9 +486,17 @@ class _FilledSlotCard extends ConsumerWidget {
 
         return Card(
           clipBehavior: Clip.antiAlias,
+          shape: selected
+              ? RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: colorScheme.primary,
+                    width: 2,
+                  ),
+                )
+              : null,
           child: InkWell(
-            onTap: () =>
-                context.push('/teams/$teamId/config/${slot.slot}'),
+            onTap: onTap ?? () => context.push('/teams/$teamId/config/${slot.slot}'),
             onLongPress: () {
               HapticFeedback.mediumImpact();
               _showSlotMenu(context, ref);
@@ -683,7 +735,11 @@ class _FilledSlotCard extends ConsumerWidget {
     if (!context.mounted) return;
 
     if (action == 'config') {
-      context.push('/teams/$teamId/config/${slot.slot}');
+      if (onTap != null) {
+        onTap!();
+      } else {
+        context.push('/teams/$teamId/config/${slot.slot}');
+      }
     } else if (action == 'replace') {
       context.push('/teams/$teamId/pick/${slot.slot}');
     } else if (action == 'remove') {

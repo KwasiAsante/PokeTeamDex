@@ -10,7 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
-import 'package:poke_team_dex/features/teams/presentation/team_detail_screen.dart'
+import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
     show teamByIdProvider, teamSlotsProvider;
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
@@ -133,11 +133,15 @@ final _itemDetailProvider =
 class SlotConfigScreen extends ConsumerStatefulWidget {
   final int teamId;
   final int slotNumber;
+  final bool embedded;
+  final VoidCallback? onClose;
 
   const SlotConfigScreen({
     super.key,
     required this.teamId,
     required this.slotNumber,
+    this.embedded = false,
+    this.onClose,
   });
 
   @override
@@ -307,7 +311,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             content: Text('Saved'),
           ),
         );
-        context.pop();
+        if (!widget.embedded) context.pop();
       }
     } catch (e) {
       if (mounted) {
@@ -332,23 +336,32 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
     final slotsAsync = ref.watch(teamSlotsProvider(widget.teamId));
     return slotsAsync.when(
-      loading: () => Scaffold(appBar: AppBar(), body: const Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(appBar: AppBar(), body: Center(child: Text('$e'))),
+      loading: () => widget.embedded
+          ? const Center(child: CircularProgressIndicator())
+          : Scaffold(appBar: AppBar(), body: const Center(child: CircularProgressIndicator())),
+      error: (e, _) => widget.embedded
+          ? Center(child: Text('$e'))
+          : Scaffold(appBar: AppBar(), body: Center(child: Text('$e'))),
       data: (slots) {
         final slot = slots.where((s) => s.slot == widget.slotNumber).firstOrNull;
         if (slot == null) {
-          // Only pop if we were already showing data — this guards against the
-          // race where the stream emits before the insert is visible (e.g. when
-          // navigating here immediately after the slot picker creates the row).
+          // Only pop/close if we were already showing data — this guards against
+          // the race where the stream emits before the insert is visible.
           if (_initialized) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (context.canPop()) context.pop();
+              if (widget.embedded) {
+                widget.onClose?.call();
+              } else if (context.canPop()) {
+                context.pop();
+              }
             });
           }
-          return Scaffold(
-            appBar: AppBar(),
-            body: const Center(child: CircularProgressIndicator()),
-          );
+          return widget.embedded
+              ? const Center(child: CircularProgressIndicator())
+              : Scaffold(
+                  appBar: AppBar(),
+                  body: const Center(child: CircularProgressIndicator()),
+                );
         }
         _initFromSlot(slot);
         return _buildWithPokemon(slot);
@@ -359,8 +372,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   Widget _buildWithPokemon(TeamSlot slot) {
     final pokemonAsync = ref.watch(pokemonDetailProvider(slot.pokemonId));
     return pokemonAsync.when(
-      loading: () => Scaffold(appBar: AppBar(), body: const Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(appBar: AppBar(), body: Center(child: Text('$e'))),
+      loading: () => widget.embedded
+          ? const Center(child: CircularProgressIndicator())
+          : Scaffold(appBar: AppBar(), body: const Center(child: CircularProgressIndicator())),
+      error: (e, _) => widget.embedded
+          ? Center(child: Text('$e'))
+          : Scaffold(appBar: AppBar(), body: Center(child: Text('$e'))),
       data: (pokemon) {
         final speciesName = pokemon.name.toCapitalCase();
 
@@ -410,6 +427,119 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           useFormatSprites: useFormatSprites,
         );
 
+        final scrollBody = SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(slot, spriteUrls, mechanics),
+              const SizedBox(height: 24),
+              _buildBasics(mechanics),
+              // ── Ability (Gen 3+) ──
+              if (mechanics == null || mechanics.hasAbilities) ...[
+                const SizedBox(height: 24),
+                _SectionTitle('Ability'),
+                const SizedBox(height: 8),
+                _buildAbility(abilities, violations['ability']),
+              ],
+              // ── Nature (Gen 3+) ──
+              if (mechanics == null || mechanics.hasAbilities) ...[
+                const SizedBox(height: 24),
+                _SectionTitle('Nature'),
+                const SizedBox(height: 8),
+                _buildNature(),
+              ],
+              // ── Held item (Gen 2+) ──
+              if (mechanics == null || mechanics.hasItems) ...[
+                const SizedBox(height: 24),
+                _SectionTitle('Held Item'),
+                const SizedBox(height: 8),
+                _buildHeldItem(violation: violations['item']),
+              ],
+              const SizedBox(height: 24),
+              _SectionTitle('Moves'),
+              const SizedBox(height: 8),
+              _buildMoves(learnableMoves, violations: violations),
+              const SizedBox(height: 24),
+              // ── EVs / Stat Exp. ──
+              _SectionTitle(
+                mechanics?.statMode == StatValueMode.dvs
+                    ? 'Stat Experience'
+                    : 'Effort Values (EVs)',
+              ),
+              if (mechanics?.statMode != StatValueMode.dvs) ...[
+                const SizedBox(height: 4),
+                _buildEvTotal(),
+              ],
+              const SizedBox(height: 8),
+              _buildStatGrid(
+                _evCtrls,
+                maxVal: 252,
+                gen1Mode: format?.gen == 1,
+              ),
+              const SizedBox(height: 24),
+              // ── IVs / DVs ──
+              _SectionTitle(
+                mechanics?.statMode == StatValueMode.dvs
+                    ? 'Determinant Values (DVs)  max ${mechanics!.statMax}'
+                    : 'Individual Values (IVs)',
+              ),
+              const SizedBox(height: 8),
+              _buildStatGrid(
+                _ivCtrls,
+                maxVal: mechanics?.statMax ?? 31,
+                gen1Mode: format?.gen == 1,
+              ),
+              const SizedBox(height: 24),
+              _SectionTitle('Stat Preview (Lv $_level)'),
+              const SizedBox(height: 8),
+              _buildStatPreview(baseStats, mechanics),
+            ],
+          ),
+        );
+
+        if (widget.embedded) {
+          return Column(
+            children: [
+              // ── Panel header ──
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Slot ${widget.slotNumber} — $speciesName',
+                        style: Theme.of(context).textTheme.titleMedium,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (_saving)
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else
+                      TextButton(
+                        onPressed: () => _save(slot),
+                        child: const Text('Save'),
+                      ),
+                    if (widget.onClose != null)
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        tooltip: 'Close',
+                        onPressed: widget.onClose,
+                      ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(child: scrollBody),
+            ],
+          );
+        }
+
         return Scaffold(
           appBar: AppBar(
             title: Text('Slot ${widget.slotNumber} — $speciesName'),
@@ -428,76 +558,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 ),
             ],
           ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(slot, spriteUrls, mechanics),
-                const SizedBox(height: 24),
-                _buildBasics(mechanics),
-                // ── Ability (Gen 3+) ──
-                if (mechanics == null || mechanics.hasAbilities) ...[
-                  const SizedBox(height: 24),
-                  _SectionTitle('Ability'),
-                  const SizedBox(height: 8),
-                  _buildAbility(abilities, violations['ability']),
-                ],
-                // ── Nature (Gen 3+) ──
-                if (mechanics == null || mechanics.hasAbilities) ...[
-                  const SizedBox(height: 24),
-                  _SectionTitle('Nature'),
-                  const SizedBox(height: 8),
-                  _buildNature(),
-                ],
-                // ── Held item (Gen 2+) ──
-                if (mechanics == null || mechanics.hasItems) ...[
-                  const SizedBox(height: 24),
-                  _SectionTitle('Held Item'),
-                  const SizedBox(height: 8),
-                  _buildHeldItem(violation: violations['item']),
-                ],
-                const SizedBox(height: 24),
-                _SectionTitle('Moves'),
-                const SizedBox(height: 8),
-                _buildMoves(learnableMoves, violations: violations),
-                const SizedBox(height: 24),
-                // ── EVs / Stat Exp. ──
-                _SectionTitle(
-                  mechanics?.statMode == StatValueMode.dvs
-                      ? 'Stat Experience'
-                      : 'Effort Values (EVs)',
-                ),
-                if (mechanics?.statMode != StatValueMode.dvs) ...[
-                  const SizedBox(height: 4),
-                  _buildEvTotal(),
-                ],
-                const SizedBox(height: 8),
-                _buildStatGrid(
-                  _evCtrls,
-                  maxVal: 252,
-                  gen1Mode: format?.gen == 1,
-                ),
-                const SizedBox(height: 24),
-                // ── IVs / DVs ──
-                _SectionTitle(
-                  mechanics?.statMode == StatValueMode.dvs
-                      ? 'Determinant Values (DVs)  max ${mechanics!.statMax}'
-                      : 'Individual Values (IVs)',
-                ),
-                const SizedBox(height: 8),
-                _buildStatGrid(
-                  _ivCtrls,
-                  maxVal: mechanics?.statMax ?? 31,
-                  gen1Mode: format?.gen == 1,
-                ),
-                const SizedBox(height: 24),
-                _SectionTitle('Stat Preview (Lv $_level)'),
-                const SizedBox(height: 8),
-                _buildStatPreview(baseStats, mechanics),
-              ],
-            ),
-          ),
+          body: scrollBody,
         );
       },
     );
