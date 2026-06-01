@@ -525,12 +525,11 @@ class _FilledSlotCard extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Types
-                            Row(
+                            Wrap(
+                              spacing: 4,
+                              runSpacing: 2,
                               children: pokemon.types.values
-                                  .map((t) => Padding(
-                                        padding: const EdgeInsets.only(right: 4),
-                                        child: TypeBadge(type: t),
-                                      ))
+                                  .map((t) => TypeBadge(type: t))
                                   .toList(),
                             ),
                             const SizedBox(height: 4),

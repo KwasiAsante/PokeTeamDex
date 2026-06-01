@@ -821,7 +821,9 @@ class _TeamSpriteRow extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 2),
-      child: Row(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
         children: List.generate(6, (i) {
           final slot = slotMap[i + 1];
           if (slot == null) {
@@ -872,6 +874,7 @@ class _TeamSpriteRow extends ConsumerWidget {
             ),
           );
         }),
+        ),
       ),
     );
   }
