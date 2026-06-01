@@ -189,55 +189,99 @@ class LoadingState extends StatelessWidget {
 }
 
 /// Full-screen error display with an optional [onRetry] callback.
+///
+/// Automatically distinguishes network errors from generic errors and shows
+/// context-appropriate copy and icon. The raw error string is never surfaced
+/// to the user.
 class ErrorState extends StatelessWidget {
   final Object error;
   final VoidCallback? onRetry;
 
   const ErrorState({super.key, required this.error, this.onRetry});
 
+  bool get _isNetworkError {
+    final msg = error.toString().toLowerCase();
+    return msg.contains('socketexception') ||
+        msg.contains('failed host lookup') ||
+        msg.contains('connection refused') ||
+        msg.contains('dioexception') ||
+        msg.contains('network is unreachable') ||
+        msg.contains('connection timeout') ||
+        msg.contains('receive timeout') ||
+        msg.contains('send timeout');
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isNetwork = _isNetworkError;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: colorScheme.errorContainer,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.wifi_off_rounded,
-                size: 36,
-                color: colorScheme.onErrorContainer,
-              ),
+            // Illustration — outer decorative ring + filled inner circle
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 92,
+                  height: 92,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: colorScheme.errorContainer,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: colorScheme.errorContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isNetwork
+                        ? Icons.wifi_off_rounded
+                        : Icons.error_outline_rounded,
+                    size: 34,
+                    color: colorScheme.onErrorContainer,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             Text(
-              'Something went wrong',
-              style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              isNetwork ? 'No connection' : 'Something went wrong',
+              style: textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              error.toString(),
-              textAlign: TextAlign.center,
-              style: textTheme.bodySmall?.copyWith(
+              isNetwork
+                  ? 'Check your internet connection and try again.'
+                  : 'An unexpected error occurred. Please try again.',
+              style: textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
+              textAlign: TextAlign.center,
             ),
             if (onRetry != null) ...[
               const SizedBox(height: 24),
               FilledButton.icon(
                 onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Try again'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.error,
+                  foregroundColor: colorScheme.onError,
+                ),
               ),
             ],
           ],
