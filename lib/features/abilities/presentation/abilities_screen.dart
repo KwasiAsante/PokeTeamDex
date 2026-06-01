@@ -122,8 +122,18 @@ class _AbilitiesScreenState extends ConsumerState<AbilitiesScreen> {
         ),
       ),
       body: filteredAsync.when(
-        loading: () =>
-            const LoadingState(message: 'Loading abilities…'),
+        loading: () => LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth >= 600) {
+              return SkeletonGridView(count: 12, mainAxisExtent: 96);
+            }
+            return const SkeletonListView(
+              count: 12,
+              itemExtent: 88,
+              subtitleLines: 2,
+            );
+          },
+        ),
         error: (e, _) => ErrorState(
           error: e,
           onRetry: () {

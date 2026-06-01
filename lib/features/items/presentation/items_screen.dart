@@ -114,7 +114,18 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
         ),
       ),
       body: filteredAsync.when(
-        loading: () => const LoadingState(message: 'Loading items…'),
+        loading: () => LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth >= 600) {
+              return SkeletonGridView(count: 12, mainAxisExtent: 72);
+            }
+            return const SkeletonListView(
+              count: 12,
+              itemExtent: 72,
+              leading: SkeletonLeading.square,
+            );
+          },
+        ),
         error: (e, _) => ErrorState(
           error: e,
           onRetry: () {
