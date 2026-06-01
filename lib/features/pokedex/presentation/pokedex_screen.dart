@@ -4,6 +4,7 @@ import 'package:poke_team_dex/features/pokedex/models/pokedex_filter.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
+import 'package:poke_team_dex/features/pokedex/presentation/widget/pokemon_grid_card.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/pokemon_list_tile.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
@@ -66,8 +67,49 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
 
     final listAsync = ref.watch(filteredPokemonListProvider);
 
+    // Adaptive layout
+    final width = MediaQuery.sizeOf(context).width;
+    final isCompact = width < 600;
+    final viewMode = ref.watch(pokedexViewProvider);
+
+    // Compact screens always use list; larger screens respect the toggle.
+    final useGrid = !isCompact && viewMode == PokedexViewMode.grid;
+
+    // Image tier — same breakpoints for both list and grid.
+    final PokedexImageType? listImageType = isCompact
+        ? null // compact → icon sprites
+        : width >= 840
+            ? PokedexImageType.artwork
+            : PokedexImageType.sprite;
+
+    final crossAxisCount = width >= 840 ? 3 : 2;
+    final gridImageType =
+        width >= 840 ? PokedexImageType.artwork : PokedexImageType.sprite;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Pokédex'), actions: [const SettingsButton()]),
+      appBar: AppBar(
+        title: const Text('Pokédex'),
+        actions: [
+          // View toggle — hidden on compact (always list there)
+          if (!isCompact)
+            IconButton(
+              icon: Icon(
+                viewMode == PokedexViewMode.grid
+                    ? Icons.view_list_rounded
+                    : Icons.grid_view_rounded,
+              ),
+              tooltip: viewMode == PokedexViewMode.grid
+                  ? 'Switch to list'
+                  : 'Switch to grid',
+              onPressed: () => ref
+                  .read(pokedexViewProvider.notifier)
+                  .state = viewMode == PokedexViewMode.grid
+                  ? PokedexViewMode.list
+                  : PokedexViewMode.grid,
+            ),
+          const SettingsButton(),
+        ],
+      ),
       body: Column(
         children: [
           _SearchBar(controller: _searchController),
@@ -101,29 +143,61 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
                           children: [
                             Text(
                               '${data.length} Pokémon',
-                              style:
-                                  Theme.of(context).textTheme.labelSmall?.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                      ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
                             ),
                           ],
                         ),
                       ),
                     Expanded(
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        // +1 for the load-more footer when there are more pages.
-                        itemCount: visible.length + (hasMore ? 1 : 0),
-                        itemBuilder: (_, i) {
-                          if (i == visible.length) {
-                            // Load-more footer — auto-triggers next page.
-                            return const _LoadMoreFooter();
-                          }
-                          return PokemonListTile(pokemon: visible[i]);
-                        },
-                      ),
+                      child: !useGrid
+                          // ── List mode (default or compact) ──
+                          ? ListView.builder(
+                              controller: _scrollController,
+                              // No fixed itemExtent — tile height varies by
+                              // image tier (icon < sprite < artwork).
+                              itemCount: visible.length + (hasMore ? 1 : 0),
+                              itemBuilder: (_, i) {
+                                if (i == visible.length) {
+                                  return const _LoadMoreFooter();
+                                }
+                                return PokemonListTile(
+                                  pokemon: visible[i],
+                                  imageType: listImageType,
+                                );
+                              },
+                            )
+                          // ── Grid mode ──
+                          : GridView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.all(8),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                crossAxisSpacing: 8,
+                                mainAxisSpacing: 8,
+                                childAspectRatio:
+                                    gridImageType == PokedexImageType.artwork
+                                        ? 0.62
+                                        : 0.75,
+                              ),
+                              itemCount: visible.length + (hasMore ? 1 : 0),
+                              itemBuilder: (_, i) {
+                                if (i == visible.length) {
+                                  return const _LoadMoreFooter();
+                                }
+                                return PokemonGridCard(
+                                  pokemon: visible[i],
+                                  imageType: gridImageType,
+                                );
+                              },
+                            ),
                     ),
                   ],
                 );
