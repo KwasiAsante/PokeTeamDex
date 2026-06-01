@@ -64,14 +64,14 @@ class PokemonListTile extends ConsumerWidget {
         'sprites/pokemon/${pokemon.id}.png';
 
     final imageSize = switch (imageType) {
-      PokedexImageType.artwork => 80.0,
+      PokedexImageType.artwork => 180.0,
       PokedexImageType.sprite  => 64.0,
-      null                     => 40.0,
+      null                     => 60.0,
     };
     final imageHeight = switch (imageType) {
-      PokedexImageType.artwork => 80.0,
+      PokedexImageType.artwork => 180.0,
       PokedexImageType.sprite  => 64.0,
-      null                     => 30.0, // icon aspect ratio
+      null                     => 50.0, // icon aspect ratio
     };
 
     final displayName = pokemon.name
