@@ -35,6 +35,7 @@ class FormatPickerSheet extends ConsumerWidget {
                 Text('Select Format', style: textTheme.titleMedium),
                 const Spacer(),
                 IconButton(
+                  tooltip: 'Close',
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.pop(context),
                 ),

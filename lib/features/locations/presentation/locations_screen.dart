@@ -56,6 +56,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                   trailing: [
                     if (_searchController.text.isNotEmpty)
                       IconButton(
+                        tooltip: 'Clear search',
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _searchController.clear();

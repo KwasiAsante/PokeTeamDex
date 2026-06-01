@@ -894,16 +894,24 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   ),
                 ),
                 if (_heldItemName != null) ...[
-                  GestureDetector(
-                    onTap: () => context.push('/items/$_heldItemName'),
-                    child: Icon(Icons.info_outline,
+                  IconButton(
+                    tooltip: 'View item details',
+                    icon: Icon(Icons.info_outline,
                         size: 18,
                         color: colorScheme.onSurfaceVariant),
+                    iconSize: 18,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => context.push('/items/$_heldItemName'),
                   ),
                   const SizedBox(width: 4),
-                  GestureDetector(
-                    onTap: () => setState(() => _heldItemName = null),
-                    child: const Icon(Icons.clear, size: 18),
+                  IconButton(
+                    tooltip: 'Remove item',
+                    icon: const Icon(Icons.clear, size: 18),
+                    iconSize: 18,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => setState(() => _heldItemName = null),
                   ),
                 ],
                 const SizedBox(width: 4),
@@ -989,18 +997,26 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                         const SizedBox(width: 4),
                       ],
                       if (_moves[i] != null) ...[
-                        GestureDetector(
-                          onTap: () => context.push('/moves/${_moves[i]}'),
-                          child: Icon(Icons.info_outline,
+                        IconButton(
+                          tooltip: 'View move details',
+                          icon: Icon(Icons.info_outline,
                               size: 18,
                               color: colorScheme.onSurfaceVariant),
+                          iconSize: 18,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () => context.push('/moves/${_moves[i]}'),
                         ),
                         const SizedBox(width: 2),
                       ],
                       if (_moves[i] != null)
-                        GestureDetector(
-                          onTap: () => setState(() => _moves[i] = null),
-                          child: const Icon(Icons.clear, size: 18),
+                        IconButton(
+                          tooltip: 'Remove move',
+                          icon: const Icon(Icons.clear, size: 18),
+                          iconSize: 18,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () => setState(() => _moves[i] = null),
                         ),
                       const SizedBox(width: 4),
                       const Icon(Icons.chevron_right),
@@ -1239,6 +1255,7 @@ class _MovePickerSheetState extends ConsumerState<_MovePickerSheet> {
                 isDense: true,
                 suffixIcon: _ctrl.text.isNotEmpty
                     ? IconButton(
+                        tooltip: 'Clear search',
                         icon: const Icon(Icons.clear),
                         onPressed: () { _ctrl.clear(); _filter(''); },
                       )
@@ -1406,6 +1423,7 @@ class _ItemPickerSheetState extends ConsumerState<_ItemPickerSheet> {
                 isDense: true,
                 suffixIcon: _ctrl.text.isNotEmpty
                     ? IconButton(
+                        tooltip: 'Clear search',
                         icon: const Icon(Icons.clear),
                         onPressed: () { _ctrl.clear(); _filter(''); },
                       )
