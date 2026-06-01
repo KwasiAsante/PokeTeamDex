@@ -8,6 +8,7 @@ import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
+import 'package:poke_team_dex/shared/widgets/skeleton_box.dart';
 
 class MovesScreen extends ConsumerStatefulWidget {
   const MovesScreen({super.key});
@@ -201,7 +202,7 @@ class _MoveTile extends ConsumerWidget {
     return moveAsync.when(
       loading: () => ListTile(
         title: Text(_fmt(name)),
-        subtitle: const LinearProgressIndicator(),
+        subtitle: const SkeletonBox(width: 140),
       ),
       error: (_, __) => ListTile(
         title: Text(_fmt(name)),
