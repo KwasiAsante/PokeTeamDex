@@ -53,8 +53,8 @@ const _kGenToLastVg = <int, String>{
   9: 'scarlet-violet',
 };
 
-/// Returns the compact icon URL for [pokemonId] given the active [filter].
-/// Falls back to the Gen VIII icon sprite when no specific path is available.
+/// Returns the generation/game-aware sprite URL for [pokemonId].
+/// Falls back to the standard front-default sprite when no specific path exists.
 String _compactIconUrl(int pokemonId, PokedexFilter filter) {
   String? vg;
   if (filter.game != null) {
@@ -76,7 +76,7 @@ String _compactIconUrl(int pokemonId, PokedexFilter filter) {
 /// [imageType] controls which image is shown:
 /// - null (compact < 600dp) → Gen VIII icon sprite (small, icon-style)
 /// - [PokedexImageType.sprite] (medium 600–840dp) → front-default sprite
-/// - [PokedexImageType.artwork] (expanded > 840dp) → HOME / official artwork
+/// - [PokedexImageType.artwork] (expanded >840dp) → HOME / official artwork
 ///
 /// All widths get a type-gradient background that animates in as the
 /// type loads from [pokemonDetailProvider].
@@ -116,8 +116,9 @@ class PokemonListTile extends ConsumerWidget {
       PokedexImageType.artwork =>
         '${_kBase}other/official-artwork/${pokemon.id}.png',
       PokedexImageType.sprite =>
-        '$_kBase${pokemon.id}.png',
-      null => _compactIconUrl(pokemon.id, filter),
+        _compactIconUrl(pokemon.id, filter),
+      null =>
+        '${_kBase}versions/generation-viii/icons/${pokemon.id}.png',
     };
     final fallbackUrl = '$_kBase${pokemon.id}.png';
 
