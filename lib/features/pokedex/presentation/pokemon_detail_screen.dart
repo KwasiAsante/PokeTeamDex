@@ -8,7 +8,7 @@ import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart'
     show teamRepositoryProvider, teamSlotRepositoryProvider;
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
-import 'package:poke_team_dex/features/teams/presentation/team_detail_screen.dart'
+import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
     show teamSlotsProvider;
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/encounter_entry.dart';
