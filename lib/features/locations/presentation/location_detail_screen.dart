@@ -280,7 +280,7 @@ class _AreaTileState extends ConsumerState<_AreaTile> {
         padding: const EdgeInsets.fromLTRB(24, 4, 16, 2),
         child: Row(
           children: [
-            const SizedBox(width: 100),
+            const SizedBox(width: 52), // matches sprite width + gap
             Expanded(
               child: Text('Pokémon',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -291,7 +291,7 @@ class _AreaTileState extends ConsumerState<_AreaTile> {
                       )),
             ),
             SizedBox(
-              width: 80,
+              width: 64,
               child: Text('Method',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.bold,
@@ -301,7 +301,7 @@ class _AreaTileState extends ConsumerState<_AreaTile> {
                       )),
             ),
             SizedBox(
-              width: 48,
+              width: 36,
               child: Text('Lv.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -312,7 +312,7 @@ class _AreaTileState extends ConsumerState<_AreaTile> {
                       )),
             ),
             SizedBox(
-              width: 36,
+              width: 28,
               child: Text('%',
                   textAlign: TextAlign.right,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -372,14 +372,14 @@ class _EncounterListTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
       child: Row(
         children: [
-          // Sprite
+          // Sprite (48×36 — icon aspect ratio)
           CachedNetworkImage(
             imageUrl: spriteUrl,
-            width: 80,
-            height: 80,
+            width: 48,
+            height: 36,
             fit: BoxFit.contain,
             errorWidget: (_, __, ___) => const Icon(Icons.catching_pokemon,
-                size: 60),
+                size: 32),
           ),
           const SizedBox(width: 4),
           // Name
@@ -392,7 +392,7 @@ class _EncounterListTile extends StatelessWidget {
           ),
           // Method badge
           SizedBox(
-            width: 100,
+            width: 64,
             child: Text(
               _methodLabel(row.method),
               style: textTheme.labelSmall
@@ -402,7 +402,7 @@ class _EncounterListTile extends StatelessWidget {
           ),
           // Level
           SizedBox(
-            width: 48,
+            width: 36,
             child: Text(
               levelStr,
               textAlign: TextAlign.center,
@@ -411,7 +411,7 @@ class _EncounterListTile extends StatelessWidget {
           ),
           // Chance
           SizedBox(
-            width: 36,
+            width: 28,
             child: Text(
               '${row.chance}%',
               textAlign: TextAlign.right,
