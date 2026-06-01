@@ -14,6 +14,13 @@ final pokemonListProvider = FutureProvider<List<PokemonListEntry>>((ref) async {
 /// Current search string.
 final pokemonSearchProvider = StateProvider<String>((ref) => '');
 
+/// Whether the Pokédex list is in grid or list mode.
+/// Persists across tab switches; compact layouts always use list regardless.
+enum PokedexViewMode { list, grid }
+
+final pokedexViewProvider =
+    StateProvider<PokedexViewMode>((ref) => PokedexViewMode.list);
+
 /// Current filter + sort state.
 final pokedexFilterProvider = StateProvider<PokedexFilter>((ref) => const PokedexFilter());
 

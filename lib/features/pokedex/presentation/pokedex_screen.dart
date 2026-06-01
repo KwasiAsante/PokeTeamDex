@@ -67,15 +67,41 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
 
     final listAsync = ref.watch(filteredPokemonListProvider);
 
-    // Adaptive layout based on screen width
+    // Adaptive layout
     final width = MediaQuery.sizeOf(context).width;
-    final crossAxisCount = width >= 840 ? 3 : width >= 600 ? 2 : 1;
-    final imageType = width >= 600
-        ? (width >= 840 ? PokedexImageType.artwork : PokedexImageType.sprite)
-        : null; // null = compact list, use PokemonListTile with icon sprite
+    final isCompact = width < 600;
+    final viewMode = ref.watch(pokedexViewProvider);
+
+    // Compact screens always use list; larger screens respect the toggle.
+    final useGrid = !isCompact && viewMode == PokedexViewMode.grid;
+
+    final crossAxisCount = width >= 840 ? 3 : 2;
+    final imageType = width >= 840 ? PokedexImageType.artwork : PokedexImageType.sprite;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Pokédex'), actions: [const SettingsButton()]),
+      appBar: AppBar(
+        title: const Text('Pokédex'),
+        actions: [
+          // View toggle — hidden on compact (always list there)
+          if (!isCompact)
+            IconButton(
+              icon: Icon(
+                viewMode == PokedexViewMode.grid
+                    ? Icons.view_list_rounded
+                    : Icons.grid_view_rounded,
+              ),
+              tooltip: viewMode == PokedexViewMode.grid
+                  ? 'Switch to list'
+                  : 'Switch to grid',
+              onPressed: () => ref
+                  .read(pokedexViewProvider.notifier)
+                  .state = viewMode == PokedexViewMode.grid
+                  ? PokedexViewMode.list
+                  : PokedexViewMode.grid,
+            ),
+          const SettingsButton(),
+        ],
+      ),
       body: Column(
         children: [
           _SearchBar(controller: _searchController),
@@ -122,8 +148,8 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
                         ),
                       ),
                     Expanded(
-                      child: imageType == null
-                          // ── Compact: single-column list ──
+                      child: !useGrid
+                          // ── List mode (default) or compact ──
                           ? ListView.builder(
                               controller: _scrollController,
                               itemCount: visible.length + (hasMore ? 1 : 0),
