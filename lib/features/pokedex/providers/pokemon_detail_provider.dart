@@ -48,3 +48,11 @@ final pokemonEncountersProvider =
   final repo = ref.read(pokeApiRepositoryProvider);
   return repo.fetchPokemonEncounters(id);
 });
+
+/// Pokéathlon stats map (speed/power/skill/stamina/jump → 1–10).
+/// Returns null for Pokémon outside Gen I–IV (no data on PokéAPI).
+final pokeathlonStatsProvider =
+    FutureProvider.autoDispose.family<Map<String, int>?, int>((ref, pokemonId) async {
+  final repo = ref.read(pokeApiRepositoryProvider);
+  return repo.fetchPokeathlonStats(pokemonId);
+});

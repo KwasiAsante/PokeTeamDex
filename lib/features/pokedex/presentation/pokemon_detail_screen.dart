@@ -1,9 +1,17 @@
+import 'dart:math';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:change_case/change_case.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poke_team_dex/database/app_database.dart';
+import 'package:poke_team_dex/database/database_providers.dart'
+    show teamSlotRepositoryProvider;
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/teams/presentation/team_detail_screen.dart'
+    show teamSlotsProvider;
+import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/encounter_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
@@ -31,12 +39,13 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
   static const _tabs = [
     Tab(text: 'Overview'),
     Tab(text: 'Stats'),
+    Tab(text: 'Pokéathlon'),
     Tab(text: 'Abilities'),
     Tab(text: 'Moves'),
     Tab(text: 'Evolutions'),
     Tab(text: 'Forms'),
     Tab(text: 'Locations'),
-    Tab(text: 'Add'),
+    Tab(text: 'Teams'),
   ];
 
   @override
@@ -90,12 +99,13 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
               children: [
                 _OverviewTab(pokemon: pokemon, speciesAsync: speciesAsync),
                 _StatsTab(pokemon: pokemon),
+                _PokeathlonTab(pokemonId: widget.pokemonId, pokemon: pokemon),
                 _AbilitiesTab(pokemon: pokemon),
                 _MovesTab(pokemon: pokemon),
                 _EvolutionsTab(speciesAsync: speciesAsync),
                 _FormsTab(speciesAsync: speciesAsync),
                 _LocationsTab(pokemonId: widget.pokemonId),
-                _AddToTeamTab(pokemon: pokemon),
+                _TeamsTab(pokemonId: widget.pokemonId, pokemon: pokemon),
               ],
             ),
           ),
@@ -1369,7 +1379,778 @@ class _LocationTile extends StatelessWidget {
   }
 }
 
-// ── Add to Team Tab ───────────────────────────────────────────────────────────
+// ── Pokéathlon Tab ────────────────────────────────────────────────────────────
+
+class _PokeathlonTab extends ConsumerWidget {
+  final int pokemonId;
+  final PokemonEntry pokemon;
+  const _PokeathlonTab({required this.pokemonId, required this.pokemon});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(pokeathlonStatsProvider(pokemonId));
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final primaryType =
+        pokemon.types[1] ?? pokemon.types.values.first;
+    final typeColor =
+        PokemonTypeColors.colors[primaryType] ?? colorScheme.primary;
+
+    return statsAsync.when(
+      loading: () => const LoadingState(),
+      error: (e, _) => ErrorState(
+        error: e,
+        onRetry: () => ref.invalidate(pokeathlonStatsProvider(pokemonId)),
+      ),
+      data: (stats) {
+        if (stats == null) {
+          return const EmptyState(
+            icon: Icons.sports_score_outlined,
+            title: 'No Pokéathlon data',
+            subtitle:
+                'Pokéathlon stats are only available for Pokémon from Generations I–IV.',
+          );
+        }
+
+        const labels = ['Speed', 'Power', 'Skill', 'Stamina', 'Jump'];
+        const keys = ['speed', 'power', 'skill', 'stamina', 'jump'];
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              const SizedBox(height: 8),
+              Text(
+                'Pokéathlon Stats',
+                style: textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'HeartGold / SoulSilver only',
+                style: textTheme.bodySmall
+                    ?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: 260,
+                height: 260,
+                child: CustomPaint(
+                  painter: _PentagonChartPainter(
+                    stats: stats,
+                    fillColor: typeColor,
+                    gridColor: colorScheme.outlineVariant,
+                    labelColor: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              // Stat bars below the chart for precise values
+              ...List.generate(keys.length, (i) {
+                final value = stats[keys[i]] ?? 0;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 68,
+                        child: Text(
+                          labels[i],
+                          style: textTheme.bodySmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 28,
+                        child: Text(
+                          '$value',
+                          textAlign: TextAlign.end,
+                          style: textTheme.bodySmall,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: value / 10,
+                            minHeight: 10,
+                            backgroundColor:
+                                colorScheme.surfaceContainerHighest,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(typeColor),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PentagonChartPainter extends CustomPainter {
+  final Map<String, int> stats;
+  final Color fillColor;
+  final Color gridColor;
+  final Color labelColor;
+
+  static const _keys = ['speed', 'power', 'skill', 'stamina', 'jump'];
+  static const _labels = ['Speed', 'Power', 'Skill', 'Stamina', 'Jump'];
+  static const _maxValue = 10;
+  static const _rings = 5; // grid rings at 2, 4, 6, 8, 10
+
+  const _PentagonChartPainter({
+    required this.stats,
+    required this.fillColor,
+    required this.gridColor,
+    required this.labelColor,
+  });
+
+  /// Point on the chart at [fraction] of max radius, on [angleIndex] axis.
+  Offset _point(Offset center, double maxRadius, int angleIndex,
+      double fraction) {
+    final angle = -pi / 2 + 2 * pi * angleIndex / 5;
+    final r = maxRadius * fraction;
+    return Offset(center.dx + r * cos(angle), center.dy + r * sin(angle));
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final maxRadius = size.width / 2 - 36; // leave room for labels
+
+    final gridPaint = Paint()
+      ..color = gridColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+
+    final axisPaint = Paint()
+      ..color = gridColor.withValues(alpha: 0.6)
+      ..strokeWidth = 0.8;
+
+    // Draw grid rings
+    for (int ring = 1; ring <= _rings; ring++) {
+      final fraction = ring / _rings;
+      final path = Path();
+      for (int i = 0; i < 5; i++) {
+        final pt = _point(center, maxRadius, i, fraction);
+        if (i == 0) {
+          path.moveTo(pt.dx, pt.dy);
+        } else {
+          path.lineTo(pt.dx, pt.dy);
+        }
+      }
+      path.close();
+      canvas.drawPath(path, gridPaint);
+    }
+
+    // Draw axes from center to each vertex
+    for (int i = 0; i < 5; i++) {
+      final outer = _point(center, maxRadius, i, 1.0);
+      canvas.drawLine(center, outer, axisPaint);
+    }
+
+    // Draw filled stat polygon
+    final values = _keys.map((k) => (stats[k] ?? 0) / _maxValue).toList();
+
+    final fillPaint = Paint()
+      ..color = fillColor.withValues(alpha: 0.25)
+      ..style = PaintingStyle.fill;
+    final strokePaint = Paint()
+      ..color = fillColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    final statPath = Path();
+    for (int i = 0; i < 5; i++) {
+      final pt = _point(center, maxRadius, i, values[i]);
+      if (i == 0) {
+        statPath.moveTo(pt.dx, pt.dy);
+      } else {
+        statPath.lineTo(pt.dx, pt.dy);
+      }
+    }
+    statPath.close();
+    canvas.drawPath(statPath, fillPaint);
+    canvas.drawPath(statPath, strokePaint);
+
+    // Vertex dots
+    final dotPaint = Paint()
+      ..color = fillColor
+      ..style = PaintingStyle.fill;
+    for (int i = 0; i < 5; i++) {
+      final pt = _point(center, maxRadius, i, values[i]);
+      canvas.drawCircle(pt, 4, dotPaint);
+    }
+
+    // Labels outside the outermost ring
+    for (int i = 0; i < 5; i++) {
+      final angle = -pi / 2 + 2 * pi * i / 5;
+      final labelRadius = maxRadius + 22;
+      final pt = Offset(
+        center.dx + labelRadius * cos(angle),
+        center.dy + labelRadius * sin(angle),
+      );
+
+      final tp = TextPainter(
+        text: TextSpan(
+          text: _labels[i],
+          style: TextStyle(
+            color: labelColor,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      tp.paint(
+        canvas,
+        Offset(pt.dx - tp.width / 2, pt.dy - tp.height / 2),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PentagonChartPainter old) =>
+      old.stats != stats || old.fillColor != fillColor;
+}
+
+// ── Teams Tab ─────────────────────────────────────────────────────────────────
+
+class _TeamsTab extends ConsumerWidget {
+  final int pokemonId;
+  final PokemonEntry pokemon;
+  const _TeamsTab({required this.pokemonId, required this.pokemon});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pairsAsync = ref.watch(teamsForPokemonProvider(pokemonId));
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return pairsAsync.when(
+      loading: () => const LoadingState(),
+      error: (e, _) => ErrorState(error: e),
+      data: (pairs) => CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            sliver: SliverToBoxAdapter(
+              child: Row(
+                children: [
+                  Text(
+                    'On your teams',
+                    style: textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(width: 8),
+                  if (pairs.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${pairs.length}',
+                        style: textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          if (pairs.isEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.catching_pokemon_outlined,
+                      size: 48,
+                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Not on any team yet',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              sliver: SliverList.separated(
+                itemCount: pairs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, i) {
+                  final (team, slot) = pairs[i];
+                  return _OnTeamTile(
+                    team: team,
+                    slot: slot,
+                    pokemon: pokemon,
+                  );
+                },
+              ),
+            ),
+          // Add to a team
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+            sliver: SliverToBoxAdapter(
+              child: Text(
+                'Add to a team',
+                style: textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+            sliver: SliverToBoxAdapter(
+              child: FilledButton.icon(
+                onPressed: () => _showAddSheet(context, ref),
+                icon: const Icon(Icons.add),
+                label: const Text('Add to a team'),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => _AddToTeamSheet(
+        pokemon: pokemon,
+        ref: ref,
+      ),
+    );
+  }
+}
+
+/// Tile showing a team that already contains this Pokémon.
+class _OnTeamTile extends StatelessWidget {
+  final Team team;
+  final TeamSlot slot;
+  final PokemonEntry pokemon;
+  const _OnTeamTile(
+      {required this.team, required this.slot, required this.pokemon});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: CircleAvatar(
+          backgroundColor: colorScheme.primaryContainer,
+          child: Text(
+            '${slot.slot}',
+            style: textTheme.titleSmall?.copyWith(
+              color: colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        title: Text(team.name, style: textTheme.bodyLarge),
+        subtitle: Text(
+          [
+            'Slot ${slot.slot}',
+            if (slot.nickname != null && slot.nickname!.isNotEmpty)
+              '· "${slot.nickname}"',
+            if (team.formatLabel != null) '· ${team.formatLabel}',
+          ].join(' '),
+          style: textTheme.bodySmall
+              ?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => context.push('/teams/${team.id}'),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet: pick a team → pick a slot → add.
+class _AddToTeamSheet extends StatefulWidget {
+  final PokemonEntry pokemon;
+  final WidgetRef ref;
+  const _AddToTeamSheet({required this.pokemon, required this.ref});
+
+  @override
+  State<_AddToTeamSheet> createState() => _AddToTeamSheetState();
+}
+
+class _AddToTeamSheetState extends State<_AddToTeamSheet> {
+  Team? _selectedTeam;
+  bool _loading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      builder: (_, controller) => Column(
+        children: [
+          // Handle
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Row(
+              children: [
+                if (_selectedTeam != null)
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => setState(() => _selectedTeam = null),
+                  ),
+                Expanded(
+                  child: Text(
+                    _selectedTeam == null
+                        ? 'Select a team'
+                        : 'Select a slot — ${_selectedTeam!.name}',
+                    style: textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: _selectedTeam == null
+                ? _TeamPicker(
+                    ref: widget.ref,
+                    scrollController: controller,
+                    onTeamSelected: (t) =>
+                        setState(() => _selectedTeam = t),
+                  )
+                : _SlotPicker(
+                    team: _selectedTeam!,
+                    pokemon: widget.pokemon,
+                    ref: widget.ref,
+                    loading: _loading,
+                    onSlotSelected: (slot) => _addToSlot(context, slot),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addToSlot(BuildContext context, int slot) async {
+    final existing = await widget.ref
+        .read(teamSlotRepositoryProvider)
+        .getByTeamAndSlot(_selectedTeam!.id, slot);
+
+    if (existing != null && context.mounted) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Replace slot?'),
+          content: Text(
+            'Slot $slot already has a Pokémon. Replace it with '
+            '${widget.pokemon.name.toCapitalCase()}?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Replace'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      await addPokemonToSlot(
+        widget.ref,
+        teamId: _selectedTeam!.id,
+        slot: slot,
+        pokemonId: widget.pokemon.id,
+      );
+      if (context.mounted) {
+        Navigator.pop(context); // close sheet
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${widget.pokemon.name.toCapitalCase()} added to '
+              '${_selectedTeam!.name} · Slot $slot',
+            ),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'View team',
+              onPressed: () =>
+                  context.push('/teams/${_selectedTeam!.id}'),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+}
+
+/// Step 1 of the add sheet: choose a team.
+class _TeamPicker extends ConsumerWidget {
+  final WidgetRef ref;
+  final ScrollController scrollController;
+  final ValueChanged<Team> onTeamSelected;
+  const _TeamPicker({
+    required this.ref,
+    required this.scrollController,
+    required this.onTeamSelected,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final teamsAsync = ref.watch(allTeamsProvider);
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return teamsAsync.when(
+      loading: () => const LoadingState(),
+      error: (e, _) => ErrorState(error: e),
+      data: (teams) {
+        final active = teams.where((t) => !t.isDeleted).toList();
+        if (active.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.group_work_outlined,
+                    size: 48,
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
+                const SizedBox(height: 12),
+                Text(
+                  'No teams yet.\nCreate a team first.',
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodyMedium
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          );
+        }
+        return ListView.separated(
+          controller: scrollController,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          itemCount: active.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (_, i) {
+            final team = active[i];
+            return Card(
+              margin: EdgeInsets.zero,
+              child: ListTile(
+                title: Text(team.name, style: textTheme.bodyLarge),
+                subtitle: team.formatLabel != null
+                    ? Text(team.formatLabel!,
+                        style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant))
+                    : null,
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => onTeamSelected(team),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+/// Step 2 of the add sheet: choose a slot within [team].
+class _SlotPicker extends ConsumerWidget {
+  final Team team;
+  final PokemonEntry pokemon;
+  final WidgetRef ref;
+  final bool loading;
+  final ValueChanged<int> onSlotSelected;
+  const _SlotPicker({
+    required this.team,
+    required this.pokemon,
+    required this.ref,
+    required this.loading,
+    required this.onSlotSelected,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef widgetRef) {
+    final slotsAsync = widgetRef.watch(teamSlotsProvider(team.id));
+    final colorScheme = Theme.of(context).colorScheme;
+    final primaryType =
+        pokemon.types[1] ?? pokemon.types.values.first;
+    final typeColor =
+        PokemonTypeColors.colors[primaryType] ?? colorScheme.primary;
+
+    return slotsAsync.when(
+      loading: () => const LoadingState(),
+      error: (e, _) => ErrorState(error: e),
+      data: (slots) {
+        final slotMap = {for (final s in slots) s.slot: s};
+
+        return Stack(
+          children: [
+            GridView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 0.85,
+              ),
+              itemCount: 6,
+              itemBuilder: (_, i) {
+                final slotNum = i + 1;
+                final occupied = slotMap[slotNum];
+                return _SlotCard(
+                  slotNum: slotNum,
+                  occupied: occupied,
+                  typeColor: typeColor,
+                  onTap: loading ? null : () => onSlotSelected(slotNum),
+                );
+              },
+            ),
+            if (loading)
+              const Center(child: CircularProgressIndicator()),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _SlotCard extends StatelessWidget {
+  final int slotNum;
+  final TeamSlot? occupied;
+  final Color typeColor;
+  final VoidCallback? onTap;
+  const _SlotCard({
+    required this.slotNum,
+    required this.occupied,
+    required this.typeColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final isOccupied = occupied != null;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isOccupied
+              ? colorScheme.surfaceContainerHighest
+              : typeColor.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isOccupied
+                ? colorScheme.outlineVariant
+                : typeColor.withValues(alpha: 0.6),
+            width: isOccupied ? 1 : 1.5,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (isOccupied)
+              CachedNetworkImage(
+                imageUrl:
+                    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${occupied!.pokemonId}.png',
+                width: 52,
+                height: 52,
+                placeholder: (_, __) => Icon(Icons.catching_pokemon,
+                    size: 40, color: colorScheme.onSurfaceVariant),
+                errorWidget: (_, __, ___) => Icon(Icons.catching_pokemon,
+                    size: 40, color: colorScheme.onSurfaceVariant),
+              )
+            else
+              Icon(
+                Icons.add_circle_outline,
+                size: 32,
+                color: typeColor.withValues(alpha: 0.7),
+              ),
+            const SizedBox(height: 4),
+            Text(
+              isOccupied
+                  ? (occupied!.nickname?.isNotEmpty == true
+                      ? occupied!.nickname!
+                      : 'Slot $slotNum')
+                  : 'Slot $slotNum',
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: isOccupied
+                    ? colorScheme.onSurface
+                    : typeColor,
+              ),
+            ),
+            if (isOccupied)
+              Text(
+                'Tap to replace',
+                style: textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 9,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Old Add to Team Tab (replaced) ───────────────────────────────────────────
 
 class _AddToTeamTab extends StatefulWidget {
   final PokemonEntry pokemon;

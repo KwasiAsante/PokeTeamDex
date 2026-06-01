@@ -494,6 +494,46 @@ class PokeApiRepository {
     return moveName;
   }
 
+  /// Fetches Pokéathlon stats for [pokemonId] (Gen I–IV Pokémon only).
+  /// Returns a map of stat name → value (1–10), or null if no data exists.
+  /// Fetches all 5 stat resources in parallel and caches each for 7 days.
+  Future<Map<String, int>?> fetchPokeathlonStats(int pokemonId) async {
+    const statKeys = ['speed', 'power', 'skill', 'stamina', 'jump'];
+
+    final responses = await Future.wait(
+      List.generate(5, (i) async {
+        final id = i + 1;
+        final cacheKey = 'pokeathlon_stat_$id';
+        final cached = _pokeApiCache.getIfValid(cacheKey);
+        if (cached is Map<String, dynamic>) return cached;
+        try {
+          final r = await _pokeApiClient.client.get('/pokeathlon-stat/$id/');
+          if (r.statusCode == 200) {
+            final data = Map<String, dynamic>.from(r.data as Map);
+            _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
+            return data;
+          }
+        } catch (_) {}
+        return <String, dynamic>{};
+      }),
+    );
+
+    final result = <String, int>{};
+    for (var i = 0; i < responses.length; i++) {
+      final pokemonStats = responses[i]['pokemon_stats'] as List? ?? [];
+      for (final entry in pokemonStats) {
+        final url = ((entry as Map)['pokemon'] as Map)['url'] as String;
+        // The URL ends with /pokemon/{id}/ — match by ID
+        if (url.split('/').reversed.skip(1).first == '$pokemonId') {
+          result[statKeys[i]] = entry['base_stat'] as int;
+          break;
+        }
+      }
+    }
+
+    return result.isEmpty ? null : result;
+  }
+
   List<PokemonListEntry> _parseList(Map<String, dynamic> raw) {
     final results = raw['results'] as List;
     return results
