@@ -410,6 +410,55 @@ class PokeApiRepository {
     return data;
   }
 
+  /// Fetches a machine by URL and returns the name of the MOVE it teaches.
+  /// Returns all item names belonging to an item pocket (e.g. "berries").
+  /// Fetches the pocket → its categories → item names; cached 7 days.
+  Future<List<String>> fetchItemsByPocket(String pocketName) async {
+    final cacheKey = 'item_pocket_$pocketName';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is List) return cached.cast<String>();
+
+    final pocketResp =
+        await _pokeApiClient.client.get('/item-pocket/$pocketName');
+    if (pocketResp.statusCode != 200) {
+      throw Exception('Failed to fetch pocket $pocketName');
+    }
+    final categoryNames = (pocketResp.data['categories'] as List)
+        .map((c) => (c as Map)['name'] as String)
+        .toList();
+
+    final allItems = <String>[];
+    for (final cat in categoryNames) {
+      final catResp =
+          await _pokeApiClient.client.get('/item-category/$cat');
+      if (catResp.statusCode == 200) {
+        final items = (catResp.data['items'] as List)
+            .map((i) => (i as Map)['name'] as String)
+            .toList();
+        allItems.addAll(items);
+      }
+    }
+    allItems.sort();
+    _pokeApiCache.putWithTTL(cacheKey, allItems, const Duration(days: 7));
+    return allItems;
+  }
+
+  Future<String?> fetchMachineMove(String url) async {
+    final id = url.split('/').where((s) => s.isNotEmpty).last;
+    final cacheKey = 'machine_move_$id';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is String) return cached;
+    final path = url.contains('api/v2')
+        ? url.substring(url.indexOf('api/v2') + 6)
+        : '/machine/$id/';
+    final r = await _pokeApiClient.client.get(path);
+    if (r.statusCode != 200) return null;
+    final moveName =
+        (r.data['move'] as Map<String, dynamic>)['name'] as String;
+    _pokeApiCache.putWithTTL(cacheKey, moveName, const Duration(days: 7));
+    return moveName;
+  }
+
   List<PokemonListEntry> _parseList(Map<String, dynamic> raw) {
     final results = raw['results'] as List;
     return results
