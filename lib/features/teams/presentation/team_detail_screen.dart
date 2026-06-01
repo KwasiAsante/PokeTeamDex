@@ -143,33 +143,41 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
   Widget _buildWideLayout(List<TeamSlot> slots, Team team) {
     return Row(
       children: [
-        SizedBox(
-          width: 380,
-          child: _SlotList(
-            teamId: widget.teamId,
-            slots: slots,
-            formatId: team.formatLabel,
-            selectedSlot: _selectedSlot,
-            onSlotTap: (slotNumber) =>
-                setState(() => _selectedSlot = slotNumber),
+        Semantics(
+          container: true,
+          label: 'Team slots',
+          child: SizedBox(
+            width: 380,
+            child: _SlotList(
+              teamId: widget.teamId,
+              slots: slots,
+              formatId: team.formatLabel,
+              selectedSlot: _selectedSlot,
+              onSlotTap: (slotNumber) =>
+                  setState(() => _selectedSlot = slotNumber),
+            ),
           ),
         ),
         const VerticalDivider(width: 1, thickness: 1),
         Expanded(
-          child: _selectedSlot == null
-              ? const EmptyState(
-                  icon: Icons.tune_outlined,
-                  title: 'Select a slot to configure',
-                  subtitle:
-                      'Tap a Pokémon in your team to edit its details here.',
-                )
-              : SlotConfigScreen(
-                  key: ValueKey(_selectedSlot),
-                  teamId: widget.teamId,
-                  slotNumber: _selectedSlot!,
-                  embedded: true,
-                  onClose: () => setState(() => _selectedSlot = null),
-                ),
+          child: Semantics(
+            container: true,
+            label: 'Slot configuration',
+            child: _selectedSlot == null
+                ? const EmptyState(
+                    icon: Icons.tune_outlined,
+                    title: 'Select a slot to configure',
+                    subtitle:
+                        'Tap a Pokémon in your team to edit its details here.',
+                  )
+                : SlotConfigScreen(
+                    key: ValueKey(_selectedSlot),
+                    teamId: widget.teamId,
+                    slotNumber: _selectedSlot!,
+                    embedded: true,
+                    onClose: () => setState(() => _selectedSlot = null),
+                  ),
+          ),
         ),
       ],
     );

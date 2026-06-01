@@ -62,6 +62,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                   trailing: [
                     if (_searchController.text.isNotEmpty)
                       IconButton(
+                        tooltip: 'Clear search',
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _searchController.clear();

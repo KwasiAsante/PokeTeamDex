@@ -284,6 +284,7 @@ class _SearchBar extends ConsumerWidget {
         trailing: [
           if (controller.text.isNotEmpty)
             IconButton(
+              tooltip: 'Clear search',
               icon: const Icon(Icons.clear),
               onPressed: () {
                 controller.clear();

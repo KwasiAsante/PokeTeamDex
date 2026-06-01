@@ -188,6 +188,13 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       darkTheme: AppTheme.dark(seed),
       themeMode: themeMode,
       routerConfig: buildAppRouter(token),
+      // Cap text scaling at 1.3× to prevent overflow in fixed-height
+      // list tiles and grid cells throughout the app.
+      builder: (context, child) => MediaQuery.withClampedTextScaling(
+        minScaleFactor: 0.8,
+        maxScaleFactor: 1.3,
+        child: child!,
+      ),
     );
   }
 }

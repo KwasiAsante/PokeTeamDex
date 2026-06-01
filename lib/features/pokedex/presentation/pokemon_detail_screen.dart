@@ -185,7 +185,10 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Left rail ────────────────────────────────────────────────────────
-          SizedBox(
+          Semantics(
+            container: true,
+            label: 'Pokémon navigation',
+            child: SizedBox(
             width: 220,
             child: Column(
               children: [
@@ -268,14 +271,19 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                 ),
               ],
             ),
+            ), // closes Semantics 'Pokémon navigation'
           ),
           const VerticalDivider(width: 1, thickness: 1),
           // ── Content panel ─────────────────────────────────────────────────────
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              physics: const NeverScrollableScrollPhysics(),
-              children: _tabChildren(pokemon, speciesAsync),
+            child: Semantics(
+              container: true,
+              label: 'Pokémon details',
+              child: TabBarView(
+                controller: _tabController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: _tabChildren(pokemon, speciesAsync),
+              ),
             ),
           ),
         ],
