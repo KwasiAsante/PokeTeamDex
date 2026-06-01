@@ -38,13 +38,15 @@ class _MovesScreenState extends ConsumerState<MovesScreen> {
   Widget build(BuildContext context) {
     final filteredAsync = ref.watch(filteredMovesProvider);
     final damageClass = ref.watch(movesDamageClassFilterProvider);
+    final typeFilter  = ref.watch(movesTypeFilterProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Moves'),
         actions: [const SettingsButton()],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(108),
+          // Search (60) + damage class row (44) + type row (44)
+          preferredSize: const Size.fromHeight(148),
           child: Column(
             children: [
               Padding(
@@ -68,30 +70,36 @@ class _MovesScreenState extends ConsumerState<MovesScreen> {
                 ),
               ),
               _DamageClassFilter(selected: damageClass),
+              _TypeFilter(selected: typeFilter),
             ],
           ),
         ),
       ),
       body: filteredAsync.when(
-        loading: () => const LoadingState(),
+        loading: () => const LoadingState(message: 'Loading moves…'),
         error: (e, _) => ErrorState(
           error: e,
-          onRetry: () => ref.invalidate(movesListProvider),
+          onRetry: () {
+            ref.invalidate(movesListProvider);
+            if (typeFilter != null) {
+              ref.invalidate(movesByTypeProvider(typeFilter));
+            }
+          },
         ),
         data: (names) {
           if (names.isEmpty) {
             return const EmptyState(
               icon: Icons.search_off,
               title: 'No moves found',
-              subtitle: 'Try adjusting your search.',
+              subtitle: 'Try adjusting your search or filter.',
             );
           }
           return ListView.builder(
             itemCount: names.length,
-            // itemExtent gives a performance boost for unfiltered lists, but
-            // must be null when a damage class filter is active — SizedBox.shrink()
-            // needs zero height, which itemExtent overrides to 72px leaving gaps.
-            itemExtent: damageClass == null ? 72.0 : null,
+            // itemExtent must be null when either filter is active because
+            // the damage class filter returns SizedBox.shrink() for non-matching
+            // tiles, which would otherwise still occupy the fixed height.
+            itemExtent: (damageClass == null && typeFilter == null) ? 72.0 : null,
             itemBuilder: (_, i) => _MoveTile(name: names[i]),
           );
         },
@@ -135,6 +143,47 @@ class _DamageClassFilter extends ConsumerWidget {
 
   static String _label(String c) =>
       '${c[0].toUpperCase()}${c.substring(1)}';
+}
+
+// ── Type filter chips ─────────────────────────────────────────────────────────
+
+class _TypeFilter extends ConsumerWidget {
+  final String? selected;
+  const _TypeFilter({required this.selected});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final types = PokemonTypeColors.colors.keys
+        .where((t) => t != 'unknown')
+        .toList()
+      ..sort();
+
+    return SizedBox(
+      height: 44,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        children: [
+          for (final type in types) ...[
+            FilterChip(
+              label: Text(
+                  '${type[0].toUpperCase()}${type.substring(1)}'),
+              selected: selected == type,
+              selectedColor: (PokemonTypeColors.colors[type] ??
+                      Theme.of(context).colorScheme.primary)
+                  .withValues(alpha: 0.3),
+              onSelected: (_) =>
+                  ref.read(movesTypeFilterProvider.notifier).state =
+                      selected == type ? null : type,
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              visualDensity: VisualDensity.compact,
+            ),
+            const SizedBox(width: 6),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 // ── Move tile (lazy detail fetch) ─────────────────────────────────────────────

@@ -176,9 +176,14 @@
 - [ ] **Empty-state illustrations** — replace generic icon + text with a more polished empty state (e.g. Poké Ball graphic for empty team list)
 - [ ] **Folder drag-and-drop** — reorder folders with long-press drag
 
-### Bug Fixes Applied
+### Bug Fixes & Polish Applied
 
-- [x] Moves damage class filter no longer leaves blank gaps — `itemExtent` disabled when filter active so `SizedBox.shrink()` collapses correctly
+- [x] Moves damage class filter no longer leaves blank gaps — `itemExtent` disabled when filter active
+- [x] Move Detail screen — type, stats, effect, flavor text, past values, contest, TM/HM/TR (→ Item Detail), Learned by (→ Pokédex)
+- [x] Item Detail screen — sprite, fling, attributes, effect, flavor text, baby trigger, move taught (→ Move Detail), Held by Pokémon (→ Pokédex)
+- [x] Ability Detail screen — generation, main series badge, effect changes, flavor text, Pokémon list (→ Pokédex)
+- [x] Items list: pocket filter + sort (A→Z / Z→A / ID↑ / ID↓)
+- [x] Abilities list: generation filter (Gen III–IX) + sort toggle
 
 ### Theming & Visual Consistency
 
