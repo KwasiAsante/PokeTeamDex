@@ -294,6 +294,31 @@ class PokeApiRepository {
     return TypeEntry.fromJson(data);
   }
 
+  /// Fetches a machine by its full PokéAPI URL.
+  /// Returns {item_name, item_url} for display and linking.
+  Future<Map<String, String>> fetchMachineByUrl(String url) async {
+    final id = url.split('/').where((s) => s.isNotEmpty).last;
+    final cacheKey = 'machine_$id';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is Map) return Map<String, String>.from(cached.cast<String, String>());
+
+    // Strip the base URL so the Dio client (which has baseUrl set) handles it
+    final path = url.contains('api/v2')
+        ? url.substring(url.indexOf('api/v2') + 6)  // "/machine/{id}/"
+        : '/machine/$id/';
+    final r = await _pokeApiClient.client.get(path);
+    if (r.statusCode != 200) {
+      throw Exception('Failed to fetch machine $id: ${r.statusCode}');
+    }
+    final itemMap = r.data['item'] as Map<String, dynamic>;
+    final result = <String, String>{
+      'name': itemMap['name'] as String,
+      'url':  itemMap['url'] as String,
+    };
+    _pokeApiCache.putWithTTL(cacheKey, result, const Duration(days: 7));
+    return result;
+  }
+
   /// Fetches a named regional Pokédex and returns {speciesName: entryNumber}.
   /// Used to filter and sort the Pokédex list by a specific game's regional dex.
   Future<Map<String, int>> fetchRegionalPokedex(String name) async {
@@ -401,6 +426,55 @@ class PokeApiRepository {
       ..sort();
     _pokeApiCache.putWithTTL(cacheKey, names, const Duration(days: 7));
     return names;
+  }
+  
+  /// Fetches a machine by URL and returns the name of the MOVE it teaches.
+  /// Returns all item names belonging to an item pocket (e.g. "berries").
+  /// Fetches the pocket → its categories → item names; cached 7 days.
+  Future<List<String>> fetchItemsByPocket(String pocketName) async {
+    final cacheKey = 'item_pocket_$pocketName';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is List) return cached.cast<String>();
+
+    final pocketResp =
+        await _pokeApiClient.client.get('/item-pocket/$pocketName');
+    if (pocketResp.statusCode != 200) {
+      throw Exception('Failed to fetch pocket $pocketName');
+    }
+    final categoryNames = (pocketResp.data['categories'] as List)
+        .map((c) => (c as Map)['name'] as String)
+        .toList();
+
+    final allItems = <String>[];
+    for (final cat in categoryNames) {
+      final catResp =
+          await _pokeApiClient.client.get('/item-category/$cat');
+      if (catResp.statusCode == 200) {
+        final items = (catResp.data['items'] as List)
+            .map((i) => (i as Map)['name'] as String)
+            .toList();
+        allItems.addAll(items);
+      }
+    }
+    allItems.sort();
+    _pokeApiCache.putWithTTL(cacheKey, allItems, const Duration(days: 7));
+    return allItems;
+  }
+
+  Future<String?> fetchMachineMove(String url) async {
+    final id = url.split('/').where((s) => s.isNotEmpty).last;
+    final cacheKey = 'machine_move_$id';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is String) return cached;
+    final path = url.contains('api/v2')
+        ? url.substring(url.indexOf('api/v2') + 6)
+        : '/machine/$id/';
+    final r = await _pokeApiClient.client.get(path);
+    if (r.statusCode != 200) return null;
+    final moveName =
+        (r.data['move'] as Map<String, dynamic>)['name'] as String;
+    _pokeApiCache.putWithTTL(cacheKey, moveName, const Duration(days: 7));
+    return moveName;
   }
 
   List<PokemonListEntry> _parseList(Map<String, dynamic> raw) {

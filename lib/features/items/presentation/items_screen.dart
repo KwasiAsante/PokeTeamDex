@@ -1,10 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/items/providers/items_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
+
 
 class ItemsScreen extends ConsumerStatefulWidget {
   const ItemsScreen({super.key});
@@ -34,47 +36,96 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredAsync = ref.watch(filteredItemsProvider);
+    final pocket = ref.watch(itemPocketFilterProvider);
+    final sort = ref.watch(itemSortProvider);
+
+    // Persist filter/sort state across tab switches
+    ref.listen(itemPocketFilterProvider, (_, __) {});
+    ref.listen(itemSortProvider, (_, __) {});
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Items'),
         actions: [const SettingsButton()],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(64),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-            child: SearchBar(
-              controller: _searchController,
-              hintText: 'Search items…',
-              leading: const Icon(Icons.search),
-              trailing: [
-                if (_searchController.text.isNotEmpty)
-                  IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      _searchController.clear();
-                      ref.read(itemsSearchProvider.notifier).state = '';
-                    },
-                  ),
-              ],
-              onChanged: (v) =>
-                  ref.read(itemsSearchProvider.notifier).state = v,
-            ),
+          preferredSize: const Size.fromHeight(108),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                child: SearchBar(
+                  controller: _searchController,
+                  hintText: 'Search items…',
+                  leading: const Icon(Icons.search),
+                  trailing: [
+                    if (_searchController.text.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          ref.read(itemsSearchProvider.notifier).state = '';
+                        },
+                      ),
+                  ],
+                  onChanged: (v) =>
+                      ref.read(itemsSearchProvider.notifier).state = v,
+                ),
+              ),
+              // Sort + category filter chips
+              SizedBox(
+                height: 44,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 4),
+                  children: [
+                    // Sort picker chip
+                    _SortChip(current: sort),
+                    const SizedBox(width: 6),
+                    // Pocket filter chips
+                    for (final entry in kItemPockets.entries) ...[
+                      FilterChip(
+                        label: Text(entry.value),
+                        selected: pocket == entry.key,
+                        onSelected: (_) => ref
+                            .read(itemPocketFilterProvider.notifier)
+                            .state = pocket == entry.key
+                            ? null
+                            : entry.key,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    // Clear filter
+                    if (pocket != null)
+                      ActionChip(
+                        avatar: const Icon(Icons.close, size: 16),
+                        label: const Text('Clear'),
+                        onPressed: () => ref
+                            .read(itemPocketFilterProvider.notifier)
+                            .state = null,
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
       body: filteredAsync.when(
-        loading: () => const LoadingState(),
+        loading: () => const LoadingState(message: 'Loading items…'),
         error: (e, _) => ErrorState(
           error: e,
-          onRetry: () => ref.invalidate(itemsListProvider),
+          onRetry: () {
+            ref.invalidate(itemsListProvider);
+            if (pocket != null) ref.invalidate(itemsByPocketProvider(pocket));
+          },
         ),
         data: (names) {
           if (names.isEmpty) {
             return const EmptyState(
               icon: Icons.search_off,
               title: 'No items found',
-              subtitle: 'Try adjusting your search.',
+              subtitle: 'Try adjusting your search or filter.',
             );
           }
           return ListView.builder(
@@ -83,6 +134,71 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
             itemBuilder: (_, i) => _ItemTile(name: names[i]),
           );
         },
+      ),
+    );
+  }
+}
+
+// ── Sort picker chip ──────────────────────────────────────────────────────────
+
+class _SortChip extends ConsumerWidget {
+  final ItemSort current;
+  const _SortChip({required this.current});
+
+  static const _options = [
+    (ItemSort.idAscending,  'ID ↑',      'Lowest ID first'),
+    (ItemSort.idDescending, 'ID ↓',      'Highest ID first'),
+    (ItemSort.nameAZ,       'Name A → Z', 'Alphabetical'),
+    (ItemSort.nameZA,       'Name Z → A', 'Reverse alphabetical'),
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final label = _options
+        .firstWhere((o) => o.$1 == current,
+            orElse: () => _options.first)
+        .$2;
+
+    return FilterChip(
+      label: Text(label),
+      avatar: const Icon(Icons.sort, size: 16),
+      selected: current != ItemSort.idAscending,
+      onSelected: (_) => _showPicker(context, ref),
+    );
+  }
+
+  void _showPicker(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (_) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('Sort by',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
+          const Divider(height: 1),
+          for (final (sort, label, subtitle) in _options)
+            ListTile(
+              title: Text(label),
+              subtitle: Text(subtitle,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurfaceVariant)),
+              trailing: current == sort
+                  ? const Icon(Icons.check)
+                  : null,
+              onTap: () {
+                ref.read(itemSortProvider.notifier).state = sort;
+                Navigator.pop(context);
+              },
+            ),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }
@@ -160,12 +276,7 @@ class _ItemListItem extends StatelessWidget {
           ],
         ],
       ),
-      onTap: () => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        builder: (_) => _ItemDetailSheet(item: item),
-      ),
+      onTap: () => context.push('/items/${item.name}'),
     );
   }
 }
@@ -193,110 +304,3 @@ class _CategoryChip extends StatelessWidget {
   }
 }
 
-// ── Item detail bottom sheet ──────────────────────────────────────────────────
-
-class _ItemDetailSheet extends StatelessWidget {
-  final ItemEntry item;
-  const _ItemDetailSheet({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.45,
-      minChildSize: 0.3,
-      maxChildSize: 0.75,
-      builder: (_, controller) => ListView(
-        controller: controller,
-        padding: const EdgeInsets.all(20),
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (item.spriteUrl != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: CachedNetworkImage(
-                    imageUrl: item.spriteUrl!,
-                    width: 64,
-                    height: 64,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.displayName,
-                      style: textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    if (item.categoryLabel.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      _CategoryChip(label: item.categoryLabel),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          if (item.cost != null && item.cost! > 0) ...[
-            _DetailRow(label: 'Buy price', value: '₽${item.cost}'),
-            const SizedBox(height: 4),
-          ],
-          if (item.shortEffect != null) ...[
-            const Divider(height: 24),
-            Text(
-              'Effect',
-              style:
-                  textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            Text(item.shortEffect!, style: textTheme.bodyMedium),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _DetailRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Row(
-      children: [
-        SizedBox(
-          width: 90,
-          child: Text(
-            label,
-            style: textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        Text(value, style: textTheme.bodyMedium),
-      ],
-    );
-  }
-}

@@ -25,3 +25,12 @@ final filteredMovesProvider = Provider<AsyncValue<List<String>>>((ref) {
         .toList();
   });
 });
+
+/// Fetches a machine's item name and URL by the machine's full PokéAPI URL.
+/// Used in the Move Detail screen to resolve TM/HM/TR names.
+final machineProvider =
+    FutureProvider.autoDispose.family<Map<String, String>, String>(
+        (ref, url) async {
+  final repo = ref.read(pokeApiRepositoryProvider);
+  return repo.fetchMachineByUrl(url);
+});
