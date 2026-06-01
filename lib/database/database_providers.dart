@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/repositories/app_config_repository.dart';
@@ -43,4 +44,12 @@ final apiBaseUrlProvider = StreamProvider<String>((ref) {
 
 final useFormatSpritesProvider = StreamProvider<bool>((ref) {
   return ref.watch(appConfigRepositoryProvider).watchUseFormatSprites();
+});
+
+final seedColorProvider = StreamProvider<int>((ref) {
+  return ref.watch(appConfigRepositoryProvider).watchSeedColor();
+});
+
+final themeModeProvider = StreamProvider<ThemeMode>((ref) {
+  return ref.watch(appConfigRepositoryProvider).watchThemeMode();
 });

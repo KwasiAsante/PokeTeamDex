@@ -8,6 +8,19 @@ import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
 
+// Preset accent colours shown in the Appearance section.
+const _kPresetColors = [
+  (label: 'Red',    value: 0xFFCC0000), // default — Pokéball
+  (label: 'Blue',   value: 0xFF1565C0), // Water
+  (label: 'Green',  value: 0xFF2E7D32), // Grass
+  (label: 'Yellow', value: 0xFFF9A825), // Electric
+  (label: 'Purple', value: 0xFF6A1B9A), // Psychic
+  (label: 'Pink',   value: 0xFFAD1457), // Fairy
+  (label: 'Orange', value: 0xFFE65100), // Fire
+  (label: 'Teal',   value: 0xFF00695C), // Dragon
+  (label: 'Indigo', value: 0xFF283593), // Dark
+];
+
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -116,6 +129,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
 
+          const SizedBox(height: 32),
+          const Divider(),
+          const SizedBox(height: 16),
+
+          // ── Appearance ────────────────────────────────────────────────────
+          _SectionHeader('Appearance'),
+          const SizedBox(height: 16),
+          Text(
+            'Theme',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: 8),
+          _ThemeModePicker(),
+          const SizedBox(height: 20),
+          Text(
+            'Accent colour',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: 12),
+          _AccentColorPicker(),
           const SizedBox(height: 32),
           const Divider(),
           const SizedBox(height: 16),
@@ -257,6 +290,113 @@ class _SyncStatusTile extends ConsumerWidget {
             onPressed: () => context.push('/sync-monitor'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ThemeModePicker extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(themeModeProvider).when(
+          data: (v) => v,
+          loading: () => ThemeMode.system,
+          error: (_, __) => ThemeMode.system,
+        );
+
+    return SegmentedButton<ThemeMode>(
+      segments: const [
+        ButtonSegment(
+          value: ThemeMode.light,
+          icon: Icon(Icons.light_mode_outlined),
+          label: Text('Light'),
+        ),
+        ButtonSegment(
+          value: ThemeMode.system,
+          icon: Icon(Icons.brightness_auto_outlined),
+          label: Text('System'),
+        ),
+        ButtonSegment(
+          value: ThemeMode.dark,
+          icon: Icon(Icons.dark_mode_outlined),
+          label: Text('Dark'),
+        ),
+      ],
+      selected: {current},
+      onSelectionChanged: (selection) => ref
+          .read(appConfigRepositoryProvider)
+          .setThemeMode(selection.first),
+    );
+  }
+}
+
+class _AccentColorPicker extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentValue = ref.watch(seedColorProvider).when(
+          data: (v) => v,
+          loading: () => kDefaultSeedColor,
+          error: (_, __) => kDefaultSeedColor,
+        );
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        for (final preset in _kPresetColors)
+          _ColorSwatch(
+            color: Color(preset.value),
+            label: preset.label,
+            selected: currentValue == preset.value,
+            onTap: () => ref
+                .read(appConfigRepositoryProvider)
+                .setSeedColor(preset.value),
+          ),
+      ],
+    );
+  }
+}
+
+class _ColorSwatch extends StatelessWidget {
+  final Color color;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ColorSwatch({
+    required this.color,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: label,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected
+                  ? Theme.of(context).colorScheme.onSurface
+                  : Colors.transparent,
+              width: 3,
+            ),
+            boxShadow: selected
+                ? [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 8)]
+                : null,
+          ),
+          child: selected
+              ? const Icon(Icons.check, color: Colors.white, size: 20)
+              : null,
+        ),
       ),
     );
   }

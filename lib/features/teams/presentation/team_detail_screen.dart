@@ -146,6 +146,7 @@ class TeamDetailScreen extends ConsumerWidget {
     try {
       final text = await buildShowdownExport(slots, pokeApi);
       await Clipboard.setData(ClipboardData(text: text));
+      HapticFeedback.lightImpact();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Showdown export copied to clipboard')),
@@ -438,7 +439,10 @@ class _FilledSlotCard extends ConsumerWidget {
           child: InkWell(
             onTap: () =>
                 context.push('/teams/$teamId/config/${slot.slot}'),
-            onLongPress: () => _showSlotMenu(context, ref),
+            onLongPress: () {
+              HapticFeedback.mediumImpact();
+              _showSlotMenu(context, ref);
+            },
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
