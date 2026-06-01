@@ -14,6 +14,7 @@ import 'package:poke_team_dex/database/repositories/sync_queue_repository.dart';
 import 'package:poke_team_dex/database/repositories/team_folder_repository.dart';
 import 'package:poke_team_dex/database/repositories/team_repository.dart';
 import 'package:poke_team_dex/database/repositories/team_slot_repository.dart';
+import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/router/app_router.dart';
 import 'package:poke_team_dex/services/api/team_sync_api.dart';
@@ -170,10 +171,16 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     // Rebuild router when auth state changes so redirect logic re-evaluates
     final token = ref.watch(authTokenProvider);
+    final seedValue = ref.watch(seedColorProvider).when(
+          data: (v) => v,
+          loading: () => kDefaultSeedColor,
+          error: (_, __) => kDefaultSeedColor,
+        );
+    final seed = Color(seedValue);
     return MaterialApp.router(
       title: 'PokeTeamDex',
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.light(seed),
+      darkTheme: AppTheme.dark(seed),
       themeMode: ThemeMode.system,
       routerConfig: buildAppRouter(token),
     );

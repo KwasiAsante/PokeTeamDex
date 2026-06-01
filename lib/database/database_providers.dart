@@ -44,3 +44,7 @@ final apiBaseUrlProvider = StreamProvider<String>((ref) {
 final useFormatSpritesProvider = StreamProvider<bool>((ref) {
   return ref.watch(appConfigRepositoryProvider).watchUseFormatSprites();
 });
+
+final seedColorProvider = StreamProvider<int>((ref) {
+  return ref.watch(appConfigRepositoryProvider).watchSeedColor();
+});

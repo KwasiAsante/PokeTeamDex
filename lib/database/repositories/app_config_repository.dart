@@ -3,7 +3,10 @@ import 'package:poke_team_dex/database/app_database.dart';
 
 const _kApiBaseUrl = 'api_base_url';
 const _kUseFormatSprites = 'use_format_sprites';
+const _kSeedColor = 'seed_color';
 const kDefaultApiBaseUrl = 'http://localhost:8000';
+// Default seed colour — Pokéball red
+const kDefaultSeedColor = 0xFFCC0000;
 
 class AppConfigRepository {
   AppConfigRepository(this._db);
@@ -54,4 +57,15 @@ class AppConfigRepository {
 
   Stream<bool> watchUseFormatSprites() =>
       watch(_kUseFormatSprites).map((v) => v != 'false');
+
+  // ── Accent / seed colour ──────────────────────────────────────────────────
+
+  Future<int> getSeedColor() async =>
+      int.tryParse(await get(_kSeedColor) ?? '') ?? kDefaultSeedColor;
+
+  Future<void> setSeedColor(int colorValue) =>
+      set(_kSeedColor, colorValue.toString());
+
+  Stream<int> watchSeedColor() =>
+      watch(_kSeedColor).map((v) => int.tryParse(v ?? '') ?? kDefaultSeedColor);
 }
