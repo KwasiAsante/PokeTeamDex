@@ -186,47 +186,152 @@ GoRouter buildAppRouter(String? initialToken) {
 // main.dart will call buildAppRouter(token) and use that instance instead.
 final appRouter = buildAppRouter(null);
 
+// ── Navigation destinations shared across all layout variants ─────────────────
+
+typedef _NavDest = ({
+  IconData icon,
+  IconData activeIcon,
+  String label,
+});
+
+const List<_NavDest> _destinations = [
+  (icon: Icons.catching_pokemon_outlined, activeIcon: Icons.catching_pokemon,         label: 'Pokédex'),
+  (icon: Icons.sports_martial_arts_outlined, activeIcon: Icons.sports_martial_arts,   label: 'Moves'),
+  (icon: Icons.inventory_2_outlined, activeIcon: Icons.inventory_2,                   label: 'Items'),
+  (icon: Icons.menu_book_outlined, activeIcon: Icons.menu_book,                       label: 'Reference'),
+  (icon: Icons.groups_outlined, activeIcon: Icons.groups,                             label: 'My Teams'),
+];
+
+// Breakpoints from PRD §Responsive Breakpoints
+const double _kMedium   = 600;
+const double _kExpanded = 840;
+
+// ── Adaptive shell ────────────────────────────────────────────────────────────
+
 class ScaffoldWithNavBar extends StatelessWidget {
   const ScaffoldWithNavBar({super.key, required this.navigationShell});
-
   final StatefulNavigationShell navigationShell;
+
+  void _go(int index) => navigationShell.goBranch(
+        index,
+        initialLocation: index == navigationShell.currentIndex,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+
+    if (width >= _kExpanded) return _ExpandedLayout(shell: navigationShell, onTap: _go);
+    if (width >= _kMedium)   return _MediumLayout(shell: navigationShell,   onTap: _go);
+    return                          _CompactLayout(shell: navigationShell,   onTap: _go);
+  }
+}
+
+// ── Compact (< 600dp) — bottom navigation bar ─────────────────────────────────
+
+class _CompactLayout extends StatelessWidget {
+  final StatefulNavigationShell shell;
+  final ValueChanged<int> onTap;
+  const _CompactLayout({required this.shell, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: navigationShell,
+      body: shell,
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: navigationShell.currentIndex,
-        onTap: (index) => navigationShell.goBranch(
-          index,
-          initialLocation: index == navigationShell.currentIndex,
-        ),
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.catching_pokemon_outlined),
-            activeIcon: Icon(Icons.catching_pokemon),
-            label: 'Pokédex',
+        currentIndex: shell.currentIndex,
+        onTap: onTap,
+        items: [
+          for (final d in _destinations)
+            BottomNavigationBarItem(
+              icon: Icon(d.icon),
+              activeIcon: Icon(d.activeIcon),
+              label: d.label,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Medium (600–840dp) — navigation rail ──────────────────────────────────────
+
+class _MediumLayout extends StatelessWidget {
+  final StatefulNavigationShell shell;
+  final ValueChanged<int> onTap;
+  const _MediumLayout({required this.shell, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: Row(
+        children: [
+          NavigationRail(
+            selectedIndex: shell.currentIndex,
+            onDestinationSelected: onTap,
+            labelType: NavigationRailLabelType.all,
+            useIndicator: true,
+            backgroundColor: colorScheme.surface,
+            destinations: [
+              for (final d in _destinations)
+                NavigationRailDestination(
+                  icon: Icon(d.icon),
+                  selectedIcon: Icon(d.activeIcon),
+                  label: Text(d.label),
+                ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.sports_martial_arts_outlined),
-            activeIcon: Icon(Icons.sports_martial_arts),
-            label: 'Moves',
+          const VerticalDivider(thickness: 1, width: 1),
+          Expanded(child: shell),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Expanded (> 840dp) — permanent navigation drawer ─────────────────────────
+
+class _ExpandedLayout extends StatelessWidget {
+  final StatefulNavigationShell shell;
+  final ValueChanged<int> onTap;
+  const _ExpandedLayout({required this.shell, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Row(
+        children: [
+          // Permanent sidebar using NavigationDrawer
+          SizedBox(
+            width: 260,
+            child: NavigationDrawer(
+              selectedIndex: shell.currentIndex,
+              onDestinationSelected: onTap,
+              children: [
+                // App name header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 20, 16, 16),
+                  child: Text(
+                    'PokeTeamDex',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ),
+                const Divider(height: 1),
+                const SizedBox(height: 4),
+                for (final d in _destinations)
+                  NavigationDrawerDestination(
+                    icon: Icon(d.icon),
+                    selectedIcon: Icon(d.activeIcon),
+                    label: Text(d.label),
+                  ),
+              ],
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2_outlined),
-            activeIcon: Icon(Icons.inventory_2),
-            label: 'Items',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.menu_book_outlined),
-            activeIcon: Icon(Icons.menu_book),
-            label: 'Reference',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.groups_outlined),
-            activeIcon: Icon(Icons.groups),
-            label: 'My Teams',
-          ),
+          const VerticalDivider(thickness: 1, width: 1),
+          Expanded(child: shell),
         ],
       ),
     );
