@@ -165,7 +165,7 @@
 - [x] **Stat bars** — staggered animated fill on first render (70ms per stat, `AnimationController` + `Curves.easeOut`)
 - [x] **Evolution chain** — card-style nodes with border/background; linear chains use `_EvolutionArrow` with condition chip + arrow icon; branching chains (Eevee etc.) spread horizontally in a `Wrap` with `Icons.call_split_rounded` at branch point
 - [x] **Type effectiveness grid** — full 18×18 matrix (Chart tab); 2×/½×/0×/1× colour-coded cells; scrollable; Types tab keeps existing detail sheet
-- [ ] **Hero animation** — shared element transition (sprite) from list card to detail screen
+- [x] **Hero animation** — shared element transition (sprite) from list card to detail screen
 
 ### Reference Browsers (Moves / Items / Abilities)
 
