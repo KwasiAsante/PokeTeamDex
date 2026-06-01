@@ -224,6 +224,23 @@ class PokeApiRepository {
     return names;
   }
 
+  /// Returns move names of a given type using /type/{name}.moves; cached 7 days.
+  Future<List<String>> fetchMovesByType(String typeName) async {
+    final cacheKey = 'moves_type_$typeName';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is List) return cached.cast<String>();
+    final r = await _pokeApiClient.client.get('/type/$typeName');
+    if (r.statusCode != 200) {
+      throw Exception('Failed to fetch type $typeName: ${r.statusCode}');
+    }
+    final names = (r.data['moves'] as List)
+        .map((m) => (m as Map)['name'] as String)
+        .toList()
+      ..sort();
+    _pokeApiCache.putWithTTL(cacheKey, names, const Duration(days: 7));
+    return names;
+  }
+
   Future<List<String>> fetchAbilityList() async {
     const cacheKey = 'ability_list';
     final cached = _pokeApiCache.getIfValid(cacheKey);

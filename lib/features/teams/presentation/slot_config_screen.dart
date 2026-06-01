@@ -676,11 +676,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                       children: [
                         Row(
                           children: [
-                            Text(a.name.toCapitalCase(),
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            Expanded(
+                              child: Text(a.name.toCapitalCase(),
+                                  style: textTheme.bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600)),
+                            ),
                             if (a.isHidden) ...[
-                              const SizedBox(width: 6),
+                              const SizedBox(width: 4),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 5, vertical: 1),
@@ -693,6 +695,14 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                                         color: colorScheme.onTertiaryContainer)),
                               ),
                             ],
+                            const SizedBox(width: 4),
+                            GestureDetector(
+                              onTap: () => context.push(
+                                  '/reference/abilities/${a.name}'),
+                              child: Icon(Icons.info_outline,
+                                  size: 18,
+                                  color: colorScheme.onSurfaceVariant),
+                            ),
                           ],
                         ),
                         if (description != null) ...[
@@ -811,11 +821,19 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     style: textTheme.bodyMedium,
                   ),
                 ),
-                if (_heldItemName != null)
+                if (_heldItemName != null) ...[
+                  GestureDetector(
+                    onTap: () => context.push('/items/$_heldItemName'),
+                    child: Icon(Icons.info_outline,
+                        size: 18,
+                        color: colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(width: 4),
                   GestureDetector(
                     onTap: () => setState(() => _heldItemName = null),
                     child: const Icon(Icons.clear, size: 18),
                   ),
+                ],
                 const SizedBox(width: 4),
                 const Icon(Icons.chevron_right),
               ],
@@ -897,6 +915,15 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                               ?.copyWith(color: colorScheme.onSurfaceVariant),
                         ),
                         const SizedBox(width: 4),
+                      ],
+                      if (_moves[i] != null) ...[
+                        GestureDetector(
+                          onTap: () => context.push('/moves/${_moves[i]}'),
+                          child: Icon(Icons.info_outline,
+                              size: 18,
+                              color: colorScheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(width: 2),
                       ],
                       if (_moves[i] != null)
                         GestureDetector(
