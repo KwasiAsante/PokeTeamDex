@@ -39,9 +39,7 @@ class _AbilityDetailBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(ability.displayName),
@@ -52,62 +50,7 @@ class _AbilityDetailBody extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Header ──
-            Container(
-              width: double.infinity,
-              color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.auto_awesome,
-                        color: colorScheme.onPrimaryContainer, size: 30),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(ability.displayName,
-                            style: textTheme.headlineMedium
-                                ?.copyWith(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: [
-                            if (ability.generationLabel.isNotEmpty)
-                              _Chip(
-                                label: ability.generationLabel,
-                                color: colorScheme.secondaryContainer,
-                                textColor:
-                                    colorScheme.onSecondaryContainer,
-                              ),
-                            _Chip(
-                              label: ability.isMainSeries
-                                  ? 'Main series'
-                                  : 'Side game',
-                              color: ability.isMainSeries
-                                  ? colorScheme.tertiaryContainer
-                                  : colorScheme.surfaceContainerHighest,
-                              textColor: ability.isMainSeries
-                                  ? colorScheme.onTertiaryContainer
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _AbilityHeader(ability: ability),
 
             // ── Effect ──
             if (ability.longEffect != null)
@@ -322,6 +265,77 @@ class _PokemonTile extends StatelessWidget {
           : null,
       trailing: const Icon(Icons.chevron_right, size: 18),
       onTap: () => context.push('/pokedex/${pokemon.pokemonId}'),
+    );
+  }
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+
+class _AbilityHeader extends StatelessWidget {
+  final AbilityEntry ability;
+  const _AbilityHeader({required this.ability});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      width: double.infinity,
+      color: colorScheme.primaryContainer.withValues(alpha: 0.25),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.auto_awesome,
+              color: colorScheme.onPrimaryContainer,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  ability.displayName,
+                  style: textTheme.headlineMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    if (ability.generationLabel.isNotEmpty)
+                      _Chip(
+                        label: ability.generationLabel,
+                        color: colorScheme.secondaryContainer,
+                        textColor: colorScheme.onSecondaryContainer,
+                      ),
+                    _Chip(
+                      label: ability.isMainSeries ? 'Main series' : 'Side game',
+                      color: ability.isMainSeries
+                          ? colorScheme.tertiaryContainer
+                          : colorScheme.surfaceContainerHighest,
+                      textColor: ability.isMainSeries
+                          ? colorScheme.onTertiaryContainer
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

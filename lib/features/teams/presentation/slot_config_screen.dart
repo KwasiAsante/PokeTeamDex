@@ -238,7 +238,10 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   Future<void> _save(TeamSlot existing) async {
     if (_evTotal > 510) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('EV total exceeds 510 — reduce before saving.')),
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text('EV total exceeds 510 — reduce before saving.'),
+        ),
       );
       return;
     }
@@ -299,14 +302,20 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Saved')),
+          const SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('Saved'),
+          ),
         );
         context.pop();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Save failed: $e')),
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('Save failed: $e'),
+          ),
         );
       }
     } finally {

@@ -118,7 +118,10 @@ class _SlotPickerScreenState extends ConsumerState<SlotPickerScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add Pokémon: $e')),
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('Failed to add Pokémon: $e'),
+          ),
         );
         setState(() => _saving = false);
       }

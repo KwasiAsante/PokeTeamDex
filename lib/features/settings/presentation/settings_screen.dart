@@ -60,7 +60,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) {
       setState(() { _saving = false; _urlDirty = false; });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('API URL saved')),
+        const SnackBar(
+          content: Text('API URL saved'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
   }
@@ -230,6 +233,7 @@ void _syncNow(BuildContext context, WidgetRef ref) {
     final router = GoRouter.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        behavior: SnackBarBehavior.floating,
         content: const Text('Sign in to sync your teams to the cloud.'),
         action: SnackBarAction(
           label: 'Sign In',
