@@ -70,6 +70,19 @@ class TeamSyncApi {
     await _dio.delete('/teams/$teamRemoteId/slots/$slot');
   }
 
+  // ── Batch push ───────────────────────────────────────────────────────────────
+
+  /// Sends all queued ops in a single request. Returns the server-assigned IDs
+  /// for any entities created in the batch.
+  Future<Map<String, dynamic>> pushBatch(
+      List<Map<String, dynamic>> ops) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/sync/push',
+      data: {'ops': ops},
+    );
+    return res.data!;
+  }
+
   // ── Pull ─────────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> pullSince(DateTime? since) async {
