@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart'
-    show teamSlotRepositoryProvider;
+    show teamRepositoryProvider, teamSlotRepositoryProvider;
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/teams/presentation/team_detail_screen.dart'
     show teamSlotsProvider;
@@ -1914,18 +1914,27 @@ class _AddToTeamSheetState extends State<_AddToTeamSheet> {
         pokemonId: widget.pokemon.id,
       );
       if (context.mounted) {
+        // Capture router and messenger BEFORE popping — the sheet's context
+        // is deactivated after Navigator.pop and cannot be used for routing.
+        final router = GoRouter.of(context);
+        final messenger = ScaffoldMessenger.of(context);
+        final teamId = _selectedTeam!.id;
+        final teamName = _selectedTeam!.name;
+
         Navigator.pop(context); // close sheet
-        ScaffoldMessenger.of(context).showSnackBar(
+
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
           SnackBar(
             content: Text(
               '${widget.pokemon.name.toCapitalCase()} added to '
-              '${_selectedTeam!.name} · Slot $slot',
+              '$teamName · Slot $slot',
             ),
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
             action: SnackBarAction(
               label: 'View team',
-              onPressed: () =>
-                  context.push('/teams/${_selectedTeam!.id}'),
+              onPressed: () => router.push('/teams/$teamId'),
             ),
           ),
         );
@@ -1936,7 +1945,7 @@ class _AddToTeamSheetState extends State<_AddToTeamSheet> {
   }
 }
 
-/// Step 1 of the add sheet: choose a team.
+/// Step 1 of the add sheet: choose a team, or create a new one inline.
 class _TeamPicker extends ConsumerWidget {
   final WidgetRef ref;
   final ScrollController scrollController;
@@ -1947,51 +1956,103 @@ class _TeamPicker extends ConsumerWidget {
     required this.onTeamSelected,
   });
 
+  Future<void> _createAndSelect(BuildContext context, WidgetRef ref) async {
+    final nameCtrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('New team'),
+        content: TextField(
+          controller: nameCtrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Team name'),
+          textCapitalization: TextCapitalization.words,
+          onSubmitted: (v) => Navigator.pop(context, v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, nameCtrl.text.trim()),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+    nameCtrl.dispose();
+    if (name == null || name.isEmpty) return;
+
+    // createTeam returns the local ID; fetch the full Team record to pass back
+    final localId = await createTeam(ref, name);
+    final team = await ref.read(teamRepositoryProvider).getById(localId);
+    onTeamSelected(team);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final teamsAsync = ref.watch(allTeamsProvider);
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
+    // "New team" tile — always shown at the top
+    final newTeamTile = Card(
+      margin: EdgeInsets.zero,
+      color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
+      child: ListTile(
+        leading: Icon(Icons.add, color: colorScheme.secondary),
+        title: Text(
+          'New team',
+          style: textTheme.bodyLarge
+              ?.copyWith(color: colorScheme.secondary, fontWeight: FontWeight.w600),
+        ),
+        onTap: () => _createAndSelect(context, ref),
+      ),
+    );
+
     return teamsAsync.when(
       loading: () => const LoadingState(),
       error: (e, _) => ErrorState(error: e),
       data: (teams) {
         final active = teams.where((t) => !t.isDeleted).toList();
+
         if (active.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.group_work_outlined,
-                    size: 48,
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
-                const SizedBox(height: 12),
-                Text(
-                  'No teams yet.\nCreate a team first.',
-                  textAlign: TextAlign.center,
-                  style: textTheme.bodyMedium
+          // No teams yet — show create prompt
+          return ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            children: [
+              newTeamTile,
+              const SizedBox(height: 24),
+              Center(
+                child: Text(
+                  'No teams yet — create one above.',
+                  style: textTheme.bodySmall
                       ?.copyWith(color: colorScheme.onSurfaceVariant),
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         }
+
+        // Existing teams + new-team option at top
         return ListView.separated(
           controller: scrollController,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          itemCount: active.length,
+          itemCount: active.length + 1, // +1 for the new-team tile
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (_, i) {
-            final team = active[i];
+            if (i == 0) return newTeamTile;
+            final team = active[i - 1];
             return Card(
               margin: EdgeInsets.zero,
               child: ListTile(
                 title: Text(team.name, style: textTheme.bodyLarge),
                 subtitle: team.formatLabel != null
                     ? Text(team.formatLabel!,
-                        style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant))
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: colorScheme.onSurfaceVariant))
                     : null,
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => onTeamSelected(team),

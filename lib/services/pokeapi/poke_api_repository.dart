@@ -7,6 +7,7 @@ import 'package:poke_team_dex/services/pokeapi/models/type_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
+import 'package:dio/dio.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_cache.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_client.dart';
 
@@ -497,23 +498,35 @@ class PokeApiRepository {
   /// Fetches Pokéathlon stats for [pokemonId] (Gen I–IV Pokémon only).
   /// Returns a map of stat name → value (1–10), or null if no data exists.
   /// Fetches all 5 stat resources in parallel and caches each for 7 days.
+  /// Fetches Pokéathlon stats for [pokemonId] (Gen I–IV Pokémon only).
+  /// Returns a map of stat name → value (1–10), or null if no data exists.
+  /// Fetches all 5 stat resources in parallel and caches each for 7 days.
+  ///
+  /// Uses a 30-second receive timeout because each resource contains stats
+  /// for all ~494 HGSS Pokémon and is too large for the default 3-second window.
   Future<Map<String, int>?> fetchPokeathlonStats(int pokemonId) async {
     const statKeys = ['speed', 'power', 'skill', 'stamina', 'jump'];
+    // Generous timeout — responses are large (494 entries each)
+    final options = Options(receiveTimeout: const Duration(seconds: 30));
 
     final responses = await Future.wait(
       List.generate(5, (i) async {
         final id = i + 1;
         final cacheKey = 'pokeathlon_stat_$id';
         final cached = _pokeApiCache.getIfValid(cacheKey);
-        if (cached is Map<String, dynamic>) return cached;
-        try {
-          final r = await _pokeApiClient.client.get('/pokeathlon-stat/$id/');
-          if (r.statusCode == 200) {
-            final data = Map<String, dynamic>.from(r.data as Map);
-            _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
-            return data;
-          }
-        } catch (_) {}
+        // Hive may deserialize as Map<dynamic,dynamic>, accept either
+        if (cached is Map) {
+          return Map<String, dynamic>.from(cached);
+        }
+        final r = await _pokeApiClient.client.get(
+          '/pokeathlon-stat/$id/',
+          options: options,
+        );
+        if (r.statusCode == 200) {
+          final data = Map<String, dynamic>.from(r.data as Map);
+          _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
+          return data;
+        }
         return <String, dynamic>{};
       }),
     );
@@ -522,10 +535,12 @@ class PokeApiRepository {
     for (var i = 0; i < responses.length; i++) {
       final pokemonStats = responses[i]['pokemon_stats'] as List? ?? [];
       for (final entry in pokemonStats) {
-        final url = ((entry as Map)['pokemon'] as Map)['url'] as String;
-        // The URL ends with /pokemon/{id}/ — match by ID
-        if (url.split('/').reversed.skip(1).first == '$pokemonId') {
-          result[statKeys[i]] = entry['base_stat'] as int;
+        final entryMap = entry as Map;
+        final url =
+            ((entryMap['pokemon'] as Map)['url'] as String);
+        // URL format: .../pokemon/{id}/ — match the numeric segment
+        if (url.endsWith('/$pokemonId/')) {
+          result[statKeys[i]] = entryMap['base_stat'] as int;
           break;
         }
       }
