@@ -130,10 +130,28 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
               subtitle: 'Try adjusting your search or filter.',
             );
           }
-          return ListView.builder(
-            itemCount: names.length,
-            itemExtent: 72,
-            itemBuilder: (_, i) => _ItemTile(name: names[i]),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final isGrid = constraints.maxWidth >= 600;
+              if (isGrid) {
+                return GridView.builder(
+                  padding: const EdgeInsets.all(8),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisExtent: 72,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: names.length,
+                  itemBuilder: (_, i) => _ItemTile(name: names[i], isGrid: true),
+                );
+              }
+              return ListView.builder(
+                itemCount: names.length,
+                itemExtent: 72,
+                itemBuilder: (_, i) => _ItemTile(name: names[i]),
+              );
+            },
           );
         },
       ),
@@ -210,22 +228,24 @@ class _SortChip extends ConsumerWidget {
 
 class _ItemTile extends ConsumerWidget {
   final String name;
-  const _ItemTile({required this.name});
+  final bool isGrid;
+  const _ItemTile({required this.name, this.isGrid = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final itemAsync = ref.watch(itemProvider(name));
 
     return itemAsync.when(
-      loading: () => ListTile(
-        title: Text(_fmt(name)),
-        subtitle: const SkeletonBox(width: 120),
-      ),
-      error: (_, __) => ListTile(
-        title: Text(_fmt(name)),
-        subtitle: const Text('—'),
-      ),
-      data: (item) => _ItemListItem(item: item),
+      loading: () => isGrid
+          ? _ItemGridCardSkeleton(name: _fmt(name))
+          : ListTile(
+              title: Text(_fmt(name)),
+              subtitle: const SkeletonBox(width: 120),
+            ),
+      error: (_, __) => isGrid
+          ? Card(margin: EdgeInsets.zero, child: Center(child: Text(_fmt(name))))
+          : ListTile(title: Text(_fmt(name)), subtitle: const Text('—')),
+      data: (item) => isGrid ? _ItemGridCard(item: item) : _ItemListItem(item: item),
     );
   }
 
@@ -279,6 +299,119 @@ class _ItemListItem extends StatelessWidget {
         ],
       ),
       onTap: () => context.push('/items/${item.name}'),
+    );
+  }
+}
+
+// ── Item grid card ────────────────────────────────────────────────────────────
+
+class _ItemGridCardSkeleton extends StatelessWidget {
+  final String name;
+  const _ItemGridCardSkeleton({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            const SkeletonBox(width: 36, height: 36),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(name,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  const SkeletonBox(width: 60, height: 14),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ItemGridCard extends StatelessWidget {
+  final ItemEntry item;
+  const _ItemGridCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push('/items/${item.name}'),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 36,
+                height: 36,
+                child: item.spriteUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: item.spriteUrl!,
+                        fit: BoxFit.contain,
+                        errorWidget: (_, __, ___) => Icon(
+                          Icons.inventory_2_outlined,
+                          color: colorScheme.onSurfaceVariant,
+                          size: 20,
+                        ),
+                      )
+                    : Icon(Icons.inventory_2_outlined,
+                        color: colorScheme.onSurfaceVariant, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      item.displayName,
+                      style: textTheme.bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        if (item.categoryLabel.isNotEmpty)
+                          _CategoryChip(label: item.categoryLabel),
+                        if (item.cost != null && item.cost! > 0) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '₽${item.cost}',
+                            style: textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

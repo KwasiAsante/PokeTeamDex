@@ -96,13 +96,30 @@ class _MovesScreenState extends ConsumerState<MovesScreen> {
               subtitle: 'Try adjusting your search or filter.',
             );
           }
-          return ListView.builder(
-            itemCount: names.length,
-            // itemExtent must be null when either filter is active because
-            // the damage class filter returns SizedBox.shrink() for non-matching
-            // tiles, which would otherwise still occupy the fixed height.
-            itemExtent: (damageClass == null && typeFilter == null) ? 72.0 : null,
-            itemBuilder: (_, i) => _MoveTile(name: names[i]),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              // Damage class filter is applied lazily after fetch, so grid
+              // mode would leave empty cells — fall back to list when active.
+              final isGrid = constraints.maxWidth >= 600 && damageClass == null;
+              if (isGrid) {
+                return GridView.builder(
+                  padding: const EdgeInsets.all(8),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisExtent: 84,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: names.length,
+                  itemBuilder: (_, i) => _MoveTile(name: names[i], isGrid: true),
+                );
+              }
+              return ListView.builder(
+                itemCount: names.length,
+                itemExtent: (damageClass == null && typeFilter == null) ? 72.0 : null,
+                itemBuilder: (_, i) => _MoveTile(name: names[i]),
+              );
+            },
           );
         },
       ),
@@ -192,7 +209,8 @@ class _TypeFilter extends ConsumerWidget {
 
 class _MoveTile extends ConsumerWidget {
   final String name;
-  const _MoveTile({required this.name});
+  final bool isGrid;
+  const _MoveTile({required this.name, this.isGrid = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -200,20 +218,21 @@ class _MoveTile extends ConsumerWidget {
     final damageClass = ref.watch(movesDamageClassFilterProvider);
 
     return moveAsync.when(
-      loading: () => ListTile(
-        title: Text(_fmt(name)),
-        subtitle: const SkeletonBox(width: 140),
-      ),
-      error: (_, __) => ListTile(
-        title: Text(_fmt(name)),
-        subtitle: const Text('—'),
-      ),
+      loading: () => isGrid
+          ? _MoveGridCardSkeleton(name: _fmt(name))
+          : ListTile(
+              title: Text(_fmt(name)),
+              subtitle: const SkeletonBox(width: 140),
+            ),
+      error: (_, __) => isGrid
+          ? Card(margin: EdgeInsets.zero, child: Center(child: Text(_fmt(name))))
+          : ListTile(title: Text(_fmt(name)), subtitle: const Text('—')),
       data: (move) {
         // Client-side damage class filter (applied after lazy fetch)
         if (damageClass != null && move.damageClass != damageClass) {
           return const SizedBox.shrink();
         }
-        return _MoveListItem(move: move);
+        return isGrid ? _MoveGridCard(move: move) : _MoveListItem(move: move);
       },
     );
   }
@@ -277,6 +296,121 @@ class _MoveListItem extends StatelessWidget {
         ],
       ),
       onTap: () => context.push('/moves/${move.name}'),
+    );
+  }
+}
+
+// ── Move grid card ────────────────────────────────────────────────────────────
+
+class _MoveGridCardSkeleton extends StatelessWidget {
+  final String name;
+  const _MoveGridCardSkeleton({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SkeletonBox(width: 60, height: 18),
+            const SizedBox(height: 6),
+            Text(name,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
+            const SkeletonBox(width: 80, height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MoveGridCard extends StatelessWidget {
+  final MoveEntry move;
+  const _MoveGridCard({required this.move});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final typeColor = move.typeName != null
+        ? (PokemonTypeColors.colors[move.typeName] ?? colorScheme.primary)
+        : colorScheme.outlineVariant;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push('/moves/${move.name}'),
+        child: Row(
+          children: [
+            Container(width: 4, color: typeColor),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        if (move.typeName != null)
+                          _TypeChip(type: move.typeName!, color: typeColor),
+                        const Spacer(),
+                        Text(
+                          move.categoryIcon,
+                          style:
+                              textTheme.bodySmall?.copyWith(color: typeColor),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      move.displayName,
+                      style: textTheme.bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        if (move.power != null)
+                          Text('Pwr ${move.power}',
+                              style: textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant)),
+                        if (move.power != null && move.accuracy != null)
+                          const SizedBox(width: 6),
+                        if (move.accuracy != null)
+                          Text('Acc ${move.accuracy}%',
+                              style: textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant)),
+                        if (move.pp != null) ...[
+                          const SizedBox(width: 6),
+                          Text('PP ${move.pp}',
+                              style: textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant)),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
