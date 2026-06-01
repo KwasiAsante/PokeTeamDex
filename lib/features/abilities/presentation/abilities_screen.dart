@@ -141,10 +141,28 @@ class _AbilitiesScreenState extends ConsumerState<AbilitiesScreen> {
               subtitle: 'Try adjusting your search or filter.',
             );
           }
-          return ListView.builder(
-            itemCount: names.length,
-            itemExtent: 88,
-            itemBuilder: (_, i) => _AbilityTile(name: names[i]),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final isGrid = constraints.maxWidth >= 600;
+              if (isGrid) {
+                return GridView.builder(
+                  padding: const EdgeInsets.all(8),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisExtent: 96,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: names.length,
+                  itemBuilder: (_, i) => _AbilityTile(name: names[i], isGrid: true),
+                );
+              }
+              return ListView.builder(
+                itemCount: names.length,
+                itemExtent: 88,
+                itemBuilder: (_, i) => _AbilityTile(name: names[i]),
+              );
+            },
           );
         },
       ),
@@ -156,22 +174,25 @@ class _AbilitiesScreenState extends ConsumerState<AbilitiesScreen> {
 
 class _AbilityTile extends ConsumerWidget {
   final String name;
-  const _AbilityTile({required this.name});
+  final bool isGrid;
+  const _AbilityTile({required this.name, this.isGrid = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final abilityAsync = ref.watch(abilityProvider(name));
 
     return abilityAsync.when(
-      loading: () => ListTile(
-        title: Text(_fmt(name)),
-        subtitle: const SkeletonBox(width: 200),
-      ),
-      error: (_, __) => ListTile(
-        title: Text(_fmt(name)),
-        subtitle: const Text('—'),
-      ),
-      data: (ability) => _AbilityListItem(ability: ability),
+      loading: () => isGrid
+          ? _AbilityGridCardSkeleton(name: _fmt(name))
+          : ListTile(
+              title: Text(_fmt(name)),
+              subtitle: const SkeletonBox(width: 200),
+            ),
+      error: (_, __) => isGrid
+          ? Card(margin: EdgeInsets.zero, child: Center(child: Text(_fmt(name))))
+          : ListTile(title: Text(_fmt(name)), subtitle: const Text('—')),
+      data: (ability) =>
+          isGrid ? _AbilityGridCard(ability: ability) : _AbilityListItem(ability: ability),
     );
   }
 
@@ -226,6 +247,107 @@ class _AbilityListItem extends StatelessWidget {
             )
           : null,
       onTap: () => context.push('/reference/abilities/${ability.name}'),
+    );
+  }
+}
+
+// ── Ability grid card ─────────────────────────────────────────────────────────
+
+class _AbilityGridCardSkeleton extends StatelessWidget {
+  final String name;
+  const _AbilityGridCardSkeleton({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(name,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 6),
+            const SkeletonBox(width: double.infinity, height: 12),
+            const SizedBox(height: 4),
+            const SkeletonBox(width: 160, height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AbilityGridCard extends StatelessWidget {
+  final AbilityEntry ability;
+  const _AbilityGridCard({required this.ability});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push('/reference/abilities/${ability.name}'),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      ability.displayName,
+                      style: textTheme.bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (ability.generationLabel.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        ability.generationLabel,
+                        style: textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onSecondaryContainer),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              if (ability.shortEffect != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  ability.shortEffect!,
+                  style: textTheme.bodySmall
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
