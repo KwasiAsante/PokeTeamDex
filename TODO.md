@@ -161,7 +161,7 @@
 - [ ] **Detail screen layout** — on wide screens show tabs as a left sidebar (rail) rather than a horizontal `TabBar` that truncates
 - [ ] **Stat bars** — animate fill on first render (staggered per stat)
 - [ ] **Evolution chain** — style with connecting arrows/icons and evolution condition chips; currently text-only
-- [ ] **Type effectiveness grid** — full 18×18 visual matrix in the Types browser; currently only shows matchups for one type at a time
+- [x] **Type effectiveness grid** — full 18×18 matrix (Chart tab); 2×/½×/0×/1× colour-coded cells; scrollable; Types tab keeps existing detail sheet
 - [ ] **Hero animation** — shared element transition (sprite) from list card to detail screen
 
 ### Reference Browsers (Moves / Items / Abilities)
