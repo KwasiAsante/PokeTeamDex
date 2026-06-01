@@ -179,6 +179,8 @@
 ### Bug Fixes & Polish Applied
 
 - [x] Moves damage class filter no longer leaves blank gaps — `itemExtent` disabled when filter active
+- [x] Moves list: type filter chips (all 18 types, API-backed, cached)
+- [x] Slot Config: ⓘ info icons on ability cards, held item, move slots → link to detail screens
 - [x] Move Detail screen — type, stats, effect, flavor text, past values, contest, TM/HM/TR (→ Item Detail), Learned by (→ Pokédex)
 - [x] Item Detail screen — sprite, fling, attributes, effect, flavor text, baby trigger, move taught (→ Move Detail), Held by Pokémon (→ Pokédex)
 - [x] Ability Detail screen — generation, main series badge, effect changes, flavor text, Pokémon list (→ Pokédex)
