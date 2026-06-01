@@ -208,8 +208,21 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
                 error: e,
                 onRetry: () => ref.invalidate(pokemonListProvider),
               ),
-              loading: () =>
-                  const LoadingState(message: 'Loading Pokédex…'),
+              loading: () => useGrid
+                  ? SkeletonGridView(
+                      count: 12,
+                      crossAxisCount: crossAxisCount,
+                      childAspectRatio: gridImageType ==
+                              PokedexImageType.artwork
+                          ? 0.62
+                          : 0.75,
+                    )
+                  : SkeletonListView(
+                      count: 12,
+                      itemExtent: 72,
+                      leading: SkeletonLeading.square,
+                      leadingSize: 48,
+                    ),
             ),
           ),
         ],

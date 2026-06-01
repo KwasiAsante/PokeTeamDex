@@ -78,7 +78,14 @@ class _MovesScreenState extends ConsumerState<MovesScreen> {
         ),
       ),
       body: filteredAsync.when(
-        loading: () => const LoadingState(message: 'Loading moves…'),
+        loading: () => LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth >= 600) {
+              return SkeletonGridView(count: 12, mainAxisExtent: 84);
+            }
+            return const SkeletonListView(count: 12, itemExtent: 72);
+          },
+        ),
         error: (e, _) => ErrorState(
           error: e,
           onRetry: () {

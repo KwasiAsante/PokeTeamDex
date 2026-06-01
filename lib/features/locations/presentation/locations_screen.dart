@@ -100,7 +100,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         ),
       ),
       body: filteredAsync.when(
-        loading: () => const LoadingState(message: 'Loading locations…'),
+        loading: () => const SkeletonListView(
+          count: 14,
+          itemExtent: 56,
+          leading: SkeletonLeading.circle,
+        ),
         error: (e, _) => ErrorState(
           error: e,
           onRetry: () => ref.invalidate(regionLocationsProvider),
