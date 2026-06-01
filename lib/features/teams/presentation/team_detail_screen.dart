@@ -18,6 +18,7 @@ import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
+import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 
@@ -121,6 +122,7 @@ class TeamDetailScreen extends ConsumerWidget {
                 tooltip: 'Delete team',
                 onPressed: () => _deleteTeam(context, ref, team),
               ),
+              const ConnectivityStatusButton(),
               const SettingsButton(),
             ],
           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
 // ── Nature data ───────────────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ class NaturesScreen extends StatelessWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Natures'), actions: [const SettingsButton()]),
+      appBar: AppBar(title: const Text('Natures'), actions: [const ConnectivityStatusButton(), const SettingsButton()]),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(12),
         child: Column(

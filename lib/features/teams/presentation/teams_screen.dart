@@ -18,6 +18,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:poke_team_dex/features/teams/presentation/team_detail_screen.dart'
     show teamSlotsProvider;
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
 class TeamsScreen extends ConsumerWidget {
@@ -95,6 +96,7 @@ class TeamsScreen extends ConsumerWidget {
                 ),
             ],
           ),
+          const ConnectivityStatusButton(),
           const SettingsButton(),
         ],
       ),
