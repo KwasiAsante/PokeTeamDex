@@ -151,7 +151,7 @@
 
 ### Navigation & Shell
 
-- [ ] **Adaptive nav** — switch from bottom `NavigationBar` to a `NavigationRail` (tablet) or permanent `NavigationDrawer` (desktop/wide web) at ≥ 600 dp breakpoint
+- [x] **Adaptive nav** — `BottomNavigationBar` < 600dp, `NavigationRail` 600–840dp, permanent `NavigationDrawer` > 840dp; overflow fixes for team tile sprites, slot card type badges, location encounter table
 - [ ] **App-wide back gesture / breadcrumb** — on wide layouts the detail screen should open in a side panel rather than pushing a new route (master-detail pattern for Pokédex, Teams)
 
 ### Pokédex
