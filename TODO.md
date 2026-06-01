@@ -200,7 +200,7 @@
 - [x] **Error states** — themed error colours (errorContainer/onErrorContainer), friendly "Something went wrong" copy, detail in bodySmall, "Try again" FilledButton; EmptyState now uses a surfaceContainerHighest circle icon container
 - [x] **Skeleton loaders in machine tiles** — replaced `LinearProgressIndicator` with `SkeletonBox` in move and item detail `_MachineTile`
 - [x] **Snackbar → floating** — `SnackBarBehavior.floating` applied to all 12 `showSnackBar` calls across settings, sync monitor, teams, slot picker, slot config, team detail screens
-- [ ] **Error states** — add a branded error illustration and a clear retry CTA; current `ErrorState` widget is plain text
+- [x] **Error states** — add a branded error illustration and a clear retry CTA; current `ErrorState` widget is plain text
 - [ ] **Snackbar → toast migration** — use Material 3 `SnackBar` styling consistently; avoid stacking snackbars
 - [x] **Haptic feedback** — mediumImpact on slot card long-press; lightImpact on Showdown export copy
 
