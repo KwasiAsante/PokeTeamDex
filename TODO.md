@@ -175,9 +175,9 @@
 
 ### Team Builder
 
-- [ ] **Team detail — wide layout** — on tablet/desktop, show the 6-slot list alongside a detail panel so tapping a slot opens its config without full navigation
-- [ ] **Empty-state illustrations** — replace generic icon + text with a more polished empty state (e.g. Poké Ball graphic for empty team list)
-- [ ] **Folder drag-and-drop** — reorder folders with long-press drag
+- [x] **Team detail — wide layout** — on tablet/desktop, show the 6-slot list alongside a detail panel so tapping a slot opens its config without full navigation
+- [x] **Empty-state illustrations** — replace generic icon + text with a more polished empty state (e.g. Poké Ball graphic for empty team list)
+- [x] **Folder drag-and-drop** — reorder folders with long-press drag
 
 ### Bug Fixes & Polish Applied
 
