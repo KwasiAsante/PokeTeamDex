@@ -534,7 +534,36 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     'tutor': 'Move Tutor',
   };
 
-  /// All unique version-group names found in the moves list.
+  // Canonical release order for version-group chips.
+  static const _vgOrder = [
+    'red-blue',
+    'yellow',
+    'gold-silver',
+    'crystal',
+    'ruby-sapphire',
+    'firered-leafgreen',
+    'emerald',
+    'diamond-pearl',
+    'platinum',
+    'heartgold-soulsilver',
+    'black-white',
+    'black-2-white-2',
+    'x-y',
+    'omega-ruby-alpha-sapphire',
+    'sun-moon',
+    'ultra-sun-ultra-moon',
+    'lets-go-pikachu-lets-go-eevee',
+    'sword-shield',
+    'the-isle-of-armor',
+    'the-crown-tundra',
+    'brilliant-diamond-and-shining-pearl',
+    'legends-arceus',
+    'scarlet-violet',
+    'the-teal-mask',
+    'the-indigo-disk',
+  ];
+
+  /// All unique version-group names found in the moves list, sorted by release date.
   List<String> get _versions {
     final seen = <String>{};
     for (final m in widget.pokemon.moves) {
@@ -542,8 +571,16 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
         seen.add((vgd as Map)['version_group']['name'] as String);
       }
     }
-    final sorted = seen.toList()..sort();
-    return sorted;
+    return seen.toList()
+      ..sort((a, b) {
+        final ai = _vgOrder.indexOf(a);
+        final bi = _vgOrder.indexOf(b);
+        // Known entries sort by position (descending); unknown entries go to the end.
+        if (ai == -1 && bi == -1) return a.compareTo(b);
+        if (ai == -1) return 1;
+        if (bi == -1) return -1;
+        return bi.compareTo(ai); // reversed: latest first
+      });
   }
 
   /// Moves grouped by learn method for the selected version group.
@@ -571,7 +608,7 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
   @override
   Widget build(BuildContext context) {
     final versions = _versions;
-    _selectedVersion ??= versions.isNotEmpty ? versions.last : null;
+    _selectedVersion ??= versions.isNotEmpty ? versions.first : null;
     final grouped = _grouped(_selectedVersion);
 
     return Column(

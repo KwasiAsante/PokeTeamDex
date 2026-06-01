@@ -149,13 +149,19 @@ class TeamDetailScreen extends ConsumerWidget {
       HapticFeedback.lightImpact();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Showdown export copied to clipboard')),
+          const SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('Showdown export copied to clipboard'),
+          ),
         );
       }
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Export failed — try again')),
+          const SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('Export failed — try again'),
+          ),
         );
       }
     }

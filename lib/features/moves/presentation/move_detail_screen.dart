@@ -7,6 +7,7 @@ import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/skeleton_box.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
@@ -409,11 +410,7 @@ class _MachineTile extends ConsumerWidget {
                     ?.copyWith(color: colorScheme.onSurfaceVariant)),
           ),
           machineAsync.when(
-            loading: () => const SizedBox(
-              width: 80,
-              height: 10,
-              child: LinearProgressIndicator(minHeight: 2),
-            ),
+            loading: () => const SkeletonBox(width: 80, height: 12),
             error: (_, __) => Text('—', style: textTheme.bodySmall),
             data: (item) => GestureDetector(
               onTap: () => context.push('/items/${item['name']}'),
