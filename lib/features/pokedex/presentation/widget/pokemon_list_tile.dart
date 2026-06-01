@@ -103,31 +103,34 @@ class PokemonListTile extends ConsumerWidget {
             child: Row(
               children: [
                 // ── Image ──
-                SizedBox(
-                  width: imageSize,
-                  height: imageHeight,
-                  child: CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    fit: BoxFit.contain,
-                    errorWidget: (_, __, ___) => imageType == null
-                        ? CachedNetworkImage(
-                            imageUrl: fallbackUrl,
-                            width: imageSize,
-                            height: imageSize,
-                            fit: BoxFit.contain,
-                            errorWidget: (_, __, ___) => Icon(
+                Hero(
+                  tag: 'pokemon-sprite-${pokemon.id}',
+                  child: SizedBox(
+                    width: imageSize,
+                    height: imageHeight,
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.contain,
+                      errorWidget: (_, __, ___) => imageType == null
+                          ? CachedNetworkImage(
+                              imageUrl: fallbackUrl,
+                              width: imageSize,
+                              height: imageSize,
+                              fit: BoxFit.contain,
+                              errorWidget: (_, __, ___) => Icon(
+                                Icons.catching_pokemon,
+                                size: imageSize,
+                                color: colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.4),
+                              ),
+                            )
+                          : Icon(
                               Icons.catching_pokemon,
                               size: imageSize,
                               color: colorScheme.onSurfaceVariant
                                   .withValues(alpha: 0.4),
                             ),
-                          )
-                        : Icon(
-                            Icons.catching_pokemon,
-                            size: imageSize,
-                            color: colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.4),
-                          ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
