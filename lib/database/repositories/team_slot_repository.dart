@@ -36,6 +36,14 @@ class TeamSlotRepository {
   Future<int> deleteAllForTeam(int teamId) =>
       (_db.delete(_db.teamSlots)..where((s) => s.teamId.equals(teamId))).go();
 
+  /// All non-deleted slots that contain [pokemonId] across every team.
+  Stream<List<TeamSlot>> watchByPokemonId(int pokemonId) =>
+      (_db.select(_db.teamSlots)
+            ..where(
+              (s) => s.pokemonId.equals(pokemonId) & s.isDeleted.equals(false),
+            ))
+          .watch();
+
   /// Updates only the slot-position column — safe to call during reorder.
   Future<int> updateSlotPosition(int id, int newSlot) =>
       (_db.update(_db.teamSlots)..where((s) => s.id.equals(id)))

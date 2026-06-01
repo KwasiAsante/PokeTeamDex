@@ -8,6 +8,7 @@ import 'package:poke_team_dex/features/pokedex/presentation/widget/pokemon_grid_
 import 'package:poke_team_dex/features/pokedex/presentation/widget/pokemon_list_tile.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
 // How many Pokémon to render per page.
@@ -107,6 +108,7 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
                   ? PokedexViewMode.list
                   : PokedexViewMode.grid,
             ),
+          const ConnectivityStatusButton(),
           const SettingsButton(),
         ],
       ),

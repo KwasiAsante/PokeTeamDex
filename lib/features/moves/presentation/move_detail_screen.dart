@@ -7,6 +7,7 @@ import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 
@@ -52,7 +53,7 @@ class _MoveDetailBody extends StatelessWidget {
       appBar: AppBar(
         title: Text(move.displayName),
         backgroundColor: typeColor.withValues(alpha: 0.15),
-        actions: [const SettingsButton()],
+        actions: [const ConnectivityStatusButton(), const SettingsButton()],
       ),
       body: SingleChildScrollView(
         child: Column(
