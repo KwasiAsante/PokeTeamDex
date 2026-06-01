@@ -192,14 +192,14 @@
 
 ### Theming & Visual Consistency
 
-- [ ] **Colour-scheme seeding** — allow user to choose accent colour in Settings (fed into `ColorScheme.fromSeed`); current red is hardcoded
+- [x] **Colour-scheme seeding** — 9 preset accent colour swatches in Settings → Appearance; theme mode toggle (Light / System / Dark); both persist via Drift and apply instantly app-wide
 - [ ] **Type badge sizing** — standardise badge height and font size; currently slightly inconsistent between Pokédex list, detail tabs, and team slot cards
 - [x] **Pokédex pagination** — virtual infinite scroll (50 per page); filter/search operate on full dataset; resets to page 1 on filter change
 - [x] **Pokédex game filter** — game chip appears when generation is active; filters to that game's regional dex; Dex # sort uses regional entry numbers; generation change clears game filter
 - [ ] **Loading states** — replace full-screen `CircularProgressIndicator` on list screens with a paginated skeleton list
 - [ ] **Error states** — add a branded error illustration and a clear retry CTA; current `ErrorState` widget is plain text
 - [ ] **Snackbar → toast migration** — use Material 3 `SnackBar` styling consistently; avoid stacking snackbars
-- [ ] **Haptic feedback** — light impact on long-press (slot menu, folder actions), success notification on Showdown export copy
+- [x] **Haptic feedback** — mediumImpact on slot card long-press; lightImpact on Showdown export copy
 
 ### Accessibility
 
