@@ -161,7 +161,7 @@
 
 - [x] **List layout** — adaptive: list (1/row) default with view toggle chip → 2-col grid (600–840dp) or 3-col grid (>840dp)
 - [x] **Pokédex entry card** — type-gradient background; adaptive images: icon (<600dp) / sprite (600–840dp) / official artwork (>840dp); applies to both list tiles and grid cards
-- [ ] **Detail screen layout** — on wide screens show tabs as a left sidebar (rail) rather than a horizontal `TabBar` that truncates
+- [x] **Detail screen layout** — on wide screens (> 840dp) show tabs as a left sidebar (220dp rail with icon + label) rather than a horizontal `TabBar`; sprite + type badges shown in rail header
 - [x] **Stat bars** — staggered animated fill on first render (70ms per stat, `AnimationController` + `Curves.easeOut`)
 - [x] **Evolution chain** — card-style nodes with border/background; linear chains use `_EvolutionArrow` with condition chip + arrow icon; branching chains (Eevee etc.) spread horizontally in a `Wrap` with `Icons.call_split_rounded` at branch point
 - [x] **Type effectiveness grid** — full 18×18 matrix (Chart tab); 2×/½×/0×/1× colour-coded cells; scrollable; Types tab keeps existing detail sheet
