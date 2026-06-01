@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/locations/providers/locations_provider.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
 class LocationsScreen extends ConsumerStatefulWidget {
@@ -41,7 +42,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Locations'),
-        actions: [const SettingsButton()],
+        actions: [const ConnectivityStatusButton(), const SettingsButton()],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(108),
           child: Column(

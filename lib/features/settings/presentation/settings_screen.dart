@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/database/repositories/app_config_repository.dart';
@@ -58,7 +59,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final apiUrlAsync = ref.watch(apiBaseUrlProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        title: const Text('Settings'),
+        actions: [const ConnectivityStatusButton()],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
 
@@ -9,7 +10,7 @@ class ReferenceHubScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Reference'), actions: [const SettingsButton()]),
+      appBar: AppBar(title: const Text('Reference'), actions: [const ConnectivityStatusButton(), const SettingsButton()]),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

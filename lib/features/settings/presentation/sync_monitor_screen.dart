@@ -7,6 +7,7 @@ import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
+import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
 class SyncMonitorScreen extends ConsumerStatefulWidget {
@@ -76,6 +77,7 @@ class _SyncMonitorScreenState extends ConsumerState<SyncMonitorScreen> {
             tooltip: 'Refresh health checks',
             onPressed: _refreshHealth,
           ),
+          const ConnectivityStatusButton(),
           const SettingsButton(),
         ],
       ),

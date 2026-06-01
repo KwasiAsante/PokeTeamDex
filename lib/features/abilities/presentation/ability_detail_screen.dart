@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
 class AbilityDetailScreen extends ConsumerWidget {
@@ -44,7 +45,7 @@ class _AbilityDetailBody extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(ability.displayName),
-        actions: [const SettingsButton()],
+        actions: [const ConnectivityStatusButton(), const SettingsButton()],
       ),
       body: SingleChildScrollView(
         child: Column(
