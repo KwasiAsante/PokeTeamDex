@@ -156,9 +156,9 @@
 
 ### Pokédex
 
-- [ ] **List layout** — replace flat `ListView` with a 2-column grid on tablet / 3-column on desktop
+- [x] **List layout** — adaptive: list (1/row) default with view toggle chip → 2-col grid (600–840dp) or 3-col grid (>840dp)
+- [x] **Pokédex entry card** — type-gradient background; adaptive images: icon (<600dp) / sprite (600–840dp) / official artwork (>840dp); applies to both list tiles and grid cards
 - [ ] **Detail screen layout** — on wide screens show tabs as a left sidebar (rail) rather than a horizontal `TabBar` that truncates
-- [ ] **Pokédex entry card** — add subtle gradient using primary type colour; official artwork on card instead of small sprite
 - [ ] **Stat bars** — animate fill on first render (staggered per stat)
 - [ ] **Evolution chain** — style with connecting arrows/icons and evolution condition chips; currently text-only
 - [ ] **Type effectiveness grid** — full 18×18 visual matrix in the Types browser; currently only shows matchups for one type at a time
