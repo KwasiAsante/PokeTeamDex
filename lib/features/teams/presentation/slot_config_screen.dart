@@ -554,7 +554,22 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   s['stat']['name'] as String: s['base_stat'] as int,
               }
             : baseStats;
-        final megaArtworkUrl = megaPokemon?.officialArtworkUrl;
+        // Prefer HOME artwork (higher quality); fall back to official artwork.
+        final megaHomeUrl = megaPokemon != null
+            ? pokemonHomeUrl(megaPokemon.id)
+            : null;
+        final megaArtworkUrl = megaHomeUrl; // primary; official is the fallback
+
+        // Auto-set the ability to the mega form's fixed ability when evolved.
+        if (_isMegaEvolved && megaPokemon != null &&
+            megaPokemon.abilities.isNotEmpty) {
+          final megaAbilityName =
+              megaPokemon.abilities.first['ability']['name'] as String;
+          if (_abilityName != megaAbilityName) {
+            WidgetsBinding.instance.addPostFrameCallback(
+                (_) => setState(() => _abilityName = megaAbilityName));
+          }
+        }
 
         final scrollBody = SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -562,15 +577,32 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(slot, spriteUrls, mechanics,
-                  megaArtworkUrl: megaArtworkUrl),
+                  megaArtworkUrl: megaArtworkUrl,
+                  megaFallbackUrl: megaPokemon?.officialArtworkUrl),
               const SizedBox(height: 24),
               _buildBasics(mechanics),
-              // ── Ability (Gen 3+) ──
+              // ── Ability (Gen 3+) — shows mega form ability when evolved ──
               if (mechanics == null || mechanics.hasAbilities) ...[
                 const SizedBox(height: 24),
-                _SectionTitle('Ability'),
+                _SectionTitle(canMegaEvolve && _isMegaEvolved
+                    ? 'Ability (Mega Form)'
+                    : 'Ability'),
                 const SizedBox(height: 8),
-                _buildAbility(abilities, violations['ability']),
+                if (canMegaEvolve && _isMegaEvolved && megaPokemon != null) ...[
+                  // Mega forms have a single fixed ability — show read-only.
+                  _buildAbility(
+                    megaPokemon.abilities
+                        .map((a) => (
+                              name: a['ability']['name'] as String,
+                              isHidden: false,
+                              abilitySlot: a['slot'] as int,
+                            ))
+                        .toList()
+                      ..sort((a, b) => a.abilitySlot.compareTo(b.abilitySlot)),
+                    null, // no violation override for mega ability
+                  ),
+                ] else
+                  _buildAbility(abilities, violations['ability']),
               ],
               // ── Nature (Gen 3+) ──
               if (mechanics == null || mechanics.hasAbilities) ...[
@@ -726,6 +758,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     ({String? defaultUrl, String? shinyUrl}) spriteUrls,
     GenerationMechanics? mechanics, {
     String? megaArtworkUrl,
+    String? megaFallbackUrl,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -738,6 +771,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           children: [
             PokemonSprite(
               defaultUrl: megaArtworkUrl ?? spriteUrls.defaultUrl,
+              fallbackUrl: megaArtworkUrl != null ? megaFallbackUrl : null,
               shinyUrl: megaArtworkUrl != null ? null : spriteUrls.shinyUrl,
               shiny: megaArtworkUrl == null && _isShiny,
               size: 140,

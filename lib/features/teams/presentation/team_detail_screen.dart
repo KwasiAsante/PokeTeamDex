@@ -471,7 +471,12 @@ class _FilledSlotCard extends ConsumerWidget {
                   s['stat']['name'] as String: s['base_stat'] as int,
               }
             : baseStats;
-        final megaArtworkUrl = megaPokemon?.officialArtworkUrl;
+        // Prefer HOME artwork; fall back to official artwork.
+        final megaHomeUrl = megaPokemon != null
+            ? pokemonHomeUrl(megaPokemon.id)
+            : null;
+        final megaOfficialUrl = megaPokemon?.officialArtworkUrl;
+        final megaArtworkUrl = megaHomeUrl;
 
         // Calculate final stats (uses mega base stats when applicable)
         final level = slot.level ?? 50;
@@ -610,6 +615,9 @@ class _FilledSlotCard extends ConsumerWidget {
                           children: [
                             PokemonSprite(
                               defaultUrl: megaArtworkUrl ?? spriteUrls.defaultUrl,
+                              fallbackUrl: megaArtworkUrl != null
+                                  ? megaOfficialUrl
+                                  : null,
                               shinyUrl: megaArtworkUrl != null ? null : spriteUrls.shinyUrl,
                               shiny: megaArtworkUrl == null && slot.isShiny,
                               size: 96,
@@ -678,15 +686,23 @@ class _FilledSlotCard extends ConsumerWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            // Ability
-                            if (slot.abilityName != null)
-                              Text(
-                                slot.abilityName!.toCapitalCase(),
+                            // Ability — show mega form ability when evolved
+                            Builder(builder: (_) {
+                              final abilityName = (isMegaApplicable &&
+                                      megaPokemon != null &&
+                                      megaPokemon.abilities.isNotEmpty)
+                                  ? (megaPokemon.abilities.first['ability']
+                                          as Map)['name'] as String
+                                  : slot.abilityName;
+                              if (abilityName == null) return const SizedBox.shrink();
+                              return Text(
+                                abilityName.toCapitalCase(),
                                 style: textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                              ),
+                              );
+                            }),
                             // Nature
                             if (slot.natureName != null)
                               Text(

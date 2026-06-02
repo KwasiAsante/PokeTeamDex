@@ -7,6 +7,9 @@ import 'package:flutter/material.dart';
 class PokemonSprite extends StatelessWidget {
   final String? defaultUrl;
   final String? shinyUrl;
+  /// Shown when [defaultUrl] fails to load (e.g. official artwork as fallback
+  /// for HOME sprites that may not exist for all forms).
+  final String? fallbackUrl;
   final bool shiny;
   final double size;
   final BoxFit fit;
@@ -15,6 +18,7 @@ class PokemonSprite extends StatelessWidget {
     super.key,
     required this.defaultUrl,
     this.shinyUrl,
+    this.fallbackUrl,
     this.shiny = false,
     this.size = 96,
     this.fit = BoxFit.contain,
@@ -34,13 +38,24 @@ class PokemonSprite extends StatelessWidget {
       height: size,
       fit: fit,
       placeholder: (_, __) => _placeholder(size),
-      errorWidget: (_, __, ___) => SizedBox(
+      errorWidget: fallbackUrl != null
+          ? (_, __, ___) => CachedNetworkImage(
+                imageUrl: fallbackUrl!,
+                width: size,
+                height: size,
+                fit: fit,
+                placeholder: (_, __) => _placeholder(size),
+                errorWidget: (_, __, ___) => _broken(size),
+              )
+          : (_, __, ___) => _broken(size),
+    );
+  }
+
+  static Widget _broken(double size) => SizedBox(
         width: size,
         height: size,
         child: const Icon(Icons.broken_image_outlined),
-      ),
-    );
-  }
+      );
 
   static Widget _placeholder(double size) => SizedBox(
         width: size,
@@ -48,3 +63,8 @@ class PokemonSprite extends StatelessWidget {
         child: const Icon(Icons.catching_pokemon, color: Color(0xFFBDBDBD)),
       );
 }
+
+// Helper — build a PokéAPI HOME artwork URL from a numeric Pokémon id.
+// HOME sprites have higher quality than official artwork for most Pokémon.
+String pokemonHomeUrl(int id) =>
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/$id.png';
