@@ -33,18 +33,14 @@ const Map<String, String> kFormatToPsFormat = {
 };
 
 /// Generates a Pokémon Showdown-compatible export string for [slots].
-///
-/// When [teamName] is supplied the output is prefixed with the PS team header:
-///   `=== [psFormatId] Team Name ===`
-/// [formatLabel] should be the PokeTeamDex format id (e.g. "gen6", "swsh").
-/// It is looked up in [kFormatToPsFormat] to get the correct PS format string.
-/// If no mapping exists the header is omitted to avoid confusing PS.
+/// Produces only the Pokémon blocks — no header line.
+/// The PS format belongs in the filename, not the file body.
 Future<String> buildShowdownExport(
   List<TeamSlot> slots,
   PokeApiRepository pokeApi, {
+  // Unused — kept for API compatibility with callers that still pass these.
   String? teamName,
-  String? formatLabel, // PokeTeamDex format id, not the human-readable name
-  // Kept for backwards-compat but unused — callers should pass formatLabel.
+  String? formatLabel,
   String? formatName,
 }) async {
   final blocks = <String>[];
@@ -97,16 +93,5 @@ Future<String> buildShowdownExport(
     blocks.add(lines.join('\n'));
   }
 
-  final body = blocks.join('\n\n');
-
-  // Prepend header only when we have a team name AND a valid PS format ID.
-  if (teamName != null && teamName.isNotEmpty) {
-    final psFormat = formatLabel != null ? kFormatToPsFormat[formatLabel] : null;
-    final header = psFormat != null
-        ? '=== [$psFormat] $teamName ==='
-        : '=== $teamName ===';
-    return '$header\n\n$body';
-  }
-
-  return body;
+  return blocks.join('\n\n');
 }

@@ -12,10 +12,11 @@ class PsExportService {
       !kIsWeb &&
       (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
 
-  /// Exports [team] to `{psDirectory}/{folderName}/{teamName}.txt`
-  /// (or `{psDirectory}/{teamName}.txt` when [folder] is null).
-  /// Creates directories as needed. No-ops silently on unsupported platforms
-  /// or when slots is empty.
+  /// Exports [team] to:
+  ///   `{psDirectory}/{folderName}/[psFormat] {teamName}.txt`
+  ///   (or `{psDirectory}/{teamName}.txt` when [folder] or format is null)
+  /// The PS format prefix in the filename lets PS identify the tier without
+  /// needing a === ... === header inside the file (which breaks PS's parser).
   static Future<void> exportTeam({
     required Team team,
     required TeamFolder? folder,
@@ -26,14 +27,15 @@ class PsExportService {
   }) async {
     if (!isSupported || slots.isEmpty) return;
 
-    final text = await buildShowdownExport(
-      slots, pokeApi,
-      teamName: team.name,
-      formatLabel: formatLabel, // raw format id → PS format lookup
-    );
+    final text = await buildShowdownExport(slots, pokeApi);
     if (text.trim().isEmpty) return;
 
-    final teamFile = '${_sanitize(team.name)}.txt';
+    // Build filename: "[gen6anythinggoes] Team Name.txt" when format is known.
+    final psFormat = formatLabel != null ? kFormatToPsFormat[formatLabel] : null;
+    final baseName = psFormat != null
+        ? '[${_sanitize(psFormat)}] ${_sanitize(team.name)}'
+        : _sanitize(team.name);
+    final teamFile = '$baseName.txt';
     final dir = folder != null
         ? Directory('$psDirectory${Platform.pathSeparator}${_sanitize(folder.name)}')
         : Directory(psDirectory);
