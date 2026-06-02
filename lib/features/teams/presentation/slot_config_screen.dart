@@ -21,6 +21,7 @@ import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 import 'package:poke_team_dex/shared/widgets/move_type_chip.dart';
@@ -165,6 +166,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   late List<TextEditingController> _evCtrls;
   late List<TextEditingController> _ivCtrls;
 
+  // Contest conditions indexed [cool, beautiful, cute, clever, tough, sheen]
+  late List<TextEditingController> _contestCtrls;
+
   bool _initialized = false;
   bool _saving = false;
 
@@ -179,6 +183,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _nicknameCtrl = TextEditingController();
     _evCtrls = List.generate(6, (_) => TextEditingController(text: '0'));
     _ivCtrls = List.generate(6, (_) => TextEditingController(text: '31'));
+    _contestCtrls = List.generate(6, (_) => TextEditingController(text: '0'));
   }
 
   @override
@@ -186,6 +191,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _nicknameCtrl.dispose();
     for (final c in _evCtrls) { c.dispose(); }
     for (final c in _ivCtrls) { c.dispose(); }
+    for (final c in _contestCtrls) { c.dispose(); }
     super.dispose();
   }
 
@@ -216,6 +222,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _ivCtrls[3].text = (slot.ivSpa ?? 31).toString();
     _ivCtrls[4].text = (slot.ivSpd ?? 31).toString();
     _ivCtrls[5].text = (slot.ivSpe ?? 31).toString();
+    _contestCtrls[0].text = (slot.contestCool      ?? 0).toString();
+    _contestCtrls[1].text = (slot.contestBeautiful  ?? 0).toString();
+    _contestCtrls[2].text = (slot.contestCute       ?? 0).toString();
+    _contestCtrls[3].text = (slot.contestClever     ?? 0).toString();
+    _contestCtrls[4].text = (slot.contestTough      ?? 0).toString();
+    _contestCtrls[5].text = (slot.contestSheen      ?? 0).toString();
   }
 
   int get _evTotal =>
@@ -255,6 +267,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     try {
       final evs = _evCtrls.map((c) => (int.tryParse(c.text) ?? 0).clamp(0, 252)).toList();
       final ivs = _ivCtrls.map((c) => (int.tryParse(c.text) ?? 31).clamp(0, 31)).toList();
+      final contest = _contestCtrls.map((c) => (int.tryParse(c.text) ?? 0).clamp(0, 255)).toList();
       final nickname = _nicknameCtrl.text.trim();
 
       await ref.read(teamSlotRepositoryProvider).update(
@@ -287,6 +300,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           ivSpa: Value(ivs[3]),
           ivSpd: Value(ivs[4]),
           ivSpe: Value(ivs[5]),
+          contestCool:      Value(contest[0]),
+          contestBeautiful: Value(contest[1]),
+          contestCute:      Value(contest[2]),
+          contestClever:    Value(contest[3]),
+          contestTough:     Value(contest[4]),
+          contestSheen:     Value(contest[5]),
           syncStatus: const Value('pending'),
           updatedAt:  Value(DateTime.now()),
         ),
@@ -497,6 +516,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               _SectionTitle('Stat Preview (Lv $_level)'),
               const SizedBox(height: 8),
               _buildStatPreview(baseStats, mechanics),
+              // ── Contest conditions (Gen 3 / Gen 4 / no format) ──
+              if (mechanics == null || mechanics.gen == 3 || mechanics.gen == 4) ...[
+                const SizedBox(height: 24),
+                _SectionTitle('Contest Conditions'),
+                const SizedBox(height: 8),
+                _buildContestStats(),
+              ],
             ],
           ),
         );
@@ -1170,6 +1196,159 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       ),
     );
     if (result != null) setState(() => _moves[moveIndex] = result);
+  }
+
+  // ── Contest conditions ──────────────────────────────────────────────────────
+
+  static const _contestLabels = [
+    'Cool', 'Beautiful', 'Cute', 'Clever', 'Tough', 'Sheen',
+  ];
+  static const _contestColors = [
+    Color(0xFFE53935), // Cool — red
+    Color(0xFF1E88E5), // Beautiful — blue
+    Color(0xFFE91E63), // Cute — pink
+    Color(0xFF43A047), // Clever — green
+    Color(0xFF795548), // Tough — brown
+    Color(0xFF9E9E9E), // Sheen — grey
+  ];
+
+  Widget _buildContestStats() {
+    final vals = _contestCtrls
+        .map((c) => (int.tryParse(c.text) ?? 0).clamp(0, 255))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Radar chart for the 5 condition stats (not Sheen)
+        if (vals.take(5).any((v) => v > 0))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: AspectRatio(
+              aspectRatio: 1.4,
+              child: RadarChart(
+                RadarChartData(
+                  dataSets: [
+                    RadarDataSet(
+                      dataEntries: vals
+                          .take(5)
+                          .map((v) => RadarEntry(value: v.toDouble()))
+                          .toList(),
+                      borderColor: Theme.of(context).colorScheme.primary,
+                      fillColor: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.2),
+                      borderWidth: 2,
+                      entryRadius: 3,
+                    ),
+                  ],
+                  radarBackgroundColor: Colors.transparent,
+                  radarShape: RadarShape.polygon,
+                  tickCount: 4,
+                  ticksTextStyle: const TextStyle(fontSize: 0),
+                  tickBorderData: BorderSide(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .outlineVariant),
+                  gridBorderData: BorderSide(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .outlineVariant),
+                  radarBorderData: BorderSide(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .outlineVariant),
+                  getTitle: (index, angle) => RadarChartTitle(
+                    text: _contestLabels[index],
+                    positionPercentageOffset: 0.1,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        // Sliders for all 6 stats
+        for (int i = 0; i < 6; i++) ...[
+          _ContestStatRow(
+            label: _contestLabels[i],
+            color: _contestColors[i],
+            ctrl: _contestCtrls[i],
+            onChanged: () => setState(() {}),
+          ),
+          if (i < 5) const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+}
+
+// ── Contest stat row ──────────────────────────────────────────────────────────
+
+class _ContestStatRow extends StatelessWidget {
+  final String label;
+  final Color color;
+  final TextEditingController ctrl;
+  final VoidCallback onChanged;
+
+  const _ContestStatRow({
+    required this.label,
+    required this.color,
+    required this.ctrl,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final value = (int.tryParse(ctrl.text) ?? 0).clamp(0, 255);
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 70,
+          child: Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: color, fontWeight: FontWeight.w600),
+          ),
+        ),
+        Expanded(
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: color,
+              thumbColor: color,
+              inactiveTrackColor: color.withValues(alpha: 0.2),
+              overlayColor: color.withValues(alpha: 0.1),
+              trackHeight: 3,
+              thumbShape:
+                  const RoundSliderThumbShape(enabledThumbRadius: 7),
+            ),
+            child: Slider(
+              value: value.toDouble(),
+              min: 0,
+              max: 255,
+              divisions: 255,
+              onChanged: (v) {
+                ctrl.text = v.round().toString();
+                onChanged();
+              },
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 38,
+          child: Text(
+            '$value',
+            textAlign: TextAlign.end,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

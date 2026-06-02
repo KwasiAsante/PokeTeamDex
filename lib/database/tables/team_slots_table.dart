@@ -44,6 +44,14 @@ class TeamSlots extends Table {
   IntColumn get ivSpd => integer().nullable()();
   IntColumn get ivSpe => integer().nullable()();
 
+  // Contest conditions (Gen III+): 0–255 each
+  IntColumn get contestCool      => integer().nullable()();
+  IntColumn get contestBeautiful => integer().nullable()();
+  IntColumn get contestCute      => integer().nullable()();
+  IntColumn get contestClever    => integer().nullable()();
+  IntColumn get contestTough     => integer().nullable()();
+  IntColumn get contestSheen     => integer().nullable()();
+
   // Sync
   BoolColumn get isDeleted =>
       boolean().withDefault(const Constant(false))();
