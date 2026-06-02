@@ -51,7 +51,7 @@
 - [x] Teams CRUD (`GET/POST /teams`, `GET/PATCH/DELETE /teams/:id`)
 - [x] Slot endpoints (`POST/PUT/PATCH/DELETE /teams/:id/slots/:slotId`)
 - [x] `GET /sync/pull?since=` endpoint (returns folders + teams + slots updated after timestamp)
-- [ ] **`POST /sync/push` batch endpoint** — PRD §9 specifies a single batch-push; current client calls individual CRUD endpoints per queued op instead *(no `/sync/push` route exists)*
+- [x] **`POST /sync/push` batch endpoint** — PRD §9 specifies a single batch-push; current client calls individual CRUD endpoints per queued op instead *(no `/sync/push` route exists)*
 
 ---
 
