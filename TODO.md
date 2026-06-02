@@ -243,7 +243,7 @@
 ### Pokémon Showdown Sync
 - [x] **PS import** — parse PS team `.txt` format (Nickname (Species) @ Item, Ability, EVs, moves) → create teams + slots locally; folder mapping from PS subfolder structure
 - [x] **PS export to directory** — setting to point to PS teams directory (path picker); write/update `.txt` on every team save; subfolder per app folder
-- [ ] **PS export: format header** — include `=== [Format Name] Team Name ===` header in exported `.txt` files and Showdown copy when a format is assigned; format name mapped from `GameFormat.name` (e.g. `Gen 9 OU`) to match PS tier notation
+- [x] **PS export: format header** — PS format ID prefixed in exported filename (`[gen6anythinggoes] Team Name.txt`); file body is clean Pokémon blocks only (no header inside)
 
 ---
 
