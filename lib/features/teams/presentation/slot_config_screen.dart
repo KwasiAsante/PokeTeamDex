@@ -21,6 +21,8 @@ import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
@@ -1220,53 +1222,65 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Radar chart for the 5 condition stats (not Sheen)
-        if (vals.take(5).any((v) => v > 0))
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: AspectRatio(
-              aspectRatio: 1.4,
-              child: RadarChart(
-                RadarChartData(
-                  dataSets: [
-                    RadarDataSet(
-                      dataEntries: vals
-                          .take(5)
-                          .map((v) => RadarEntry(value: v.toDouble()))
-                          .toList(),
-                      borderColor: Theme.of(context).colorScheme.primary,
-                      fillColor: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.2),
-                      borderWidth: 2,
-                      entryRadius: 3,
+        // Radar chart — always visible; colored dots mark each stat's value.
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: AspectRatio(
+            aspectRatio: 1.4,
+            child: Stack(
+              children: [
+                RadarChart(
+                  RadarChartData(
+                    dataSets: [
+                      RadarDataSet(
+                        dataEntries: vals
+                            .take(5)
+                            .map((v) => RadarEntry(value: v.toDouble()))
+                            .toList(),
+                        borderColor: Theme.of(context).colorScheme.primary,
+                        fillColor: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.2),
+                        borderWidth: 2,
+                        entryRadius: 0, // dots handled by overlay
+                      ),
+                    ],
+                    radarBackgroundColor: Colors.transparent,
+                    radarShape: RadarShape.polygon,
+                    tickCount: 4,
+                    ticksTextStyle: const TextStyle(fontSize: 0),
+                    tickBorderData: BorderSide(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outlineVariant),
+                    gridBorderData: BorderSide(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outlineVariant),
+                    radarBorderData: BorderSide(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outlineVariant),
+                    getTitle: (index, angle) => RadarChartTitle(
+                      text: _contestLabels[index],
+                      positionPercentageOffset: 0.1,
                     ),
-                  ],
-                  radarBackgroundColor: Colors.transparent,
-                  radarShape: RadarShape.polygon,
-                  tickCount: 4,
-                  ticksTextStyle: const TextStyle(fontSize: 0),
-                  tickBorderData: BorderSide(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .outlineVariant),
-                  gridBorderData: BorderSide(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .outlineVariant),
-                  radarBorderData: BorderSide(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .outlineVariant),
-                  getTitle: (index, angle) => RadarChartTitle(
-                    text: _contestLabels[index],
-                    positionPercentageOffset: 0.1,
                   ),
                 ),
-              ),
+                // Colored vertex dots overlay
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _RadarDotsPainter(
+                      values: vals.take(5).toList(),
+                      colors: _contestColors.take(5).toList(),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+        ),
         // Sliders for all 6 stats
         for (int i = 0; i < 6; i++) ...[
           _ContestStatRow(
@@ -1349,6 +1363,56 @@ class _ContestStatRow extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+// ── Radar dots painter ────────────────────────────────────────────────────────
+
+/// Overlays colour-coded dots at each pentagon vertex proportional to the
+/// stat value.  fl_chart's RadarChart leaves ~22% of each side as label
+/// padding, so the inner circle radius ≈ shortestSide * 0.39.
+class _RadarDotsPainter extends CustomPainter {
+  final List<int> values;  // 5 values (0–255)
+  final List<Color> colors; // 5 colors
+
+  const _RadarDotsPainter({required this.values, required this.colors});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final innerRadius = size.shortestSide * 0.39;
+
+    for (int i = 0; i < 5; i++) {
+      final v = values[i];
+      if (v == 0) continue;
+      // Vertex 0 starts at the top (−π/2) and goes clockwise.
+      final angle = -math.pi / 2 + 2 * math.pi * i / 5;
+      final r = innerRadius * v / 255;
+      final pos = Offset(center.dx + r * math.cos(angle),
+                         center.dy + r * math.sin(angle));
+
+      canvas.drawCircle(pos, 5,
+          Paint()
+            ..color = colors[i]
+            ..style = PaintingStyle.fill);
+      canvas.drawCircle(pos, 5,
+          Paint()
+            ..color = Colors.white
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RadarDotsPainter old) =>
+      !_listEq(old.values, values);
+
+  static bool _listEq(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 }
 
