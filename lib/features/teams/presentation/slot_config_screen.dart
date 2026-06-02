@@ -560,16 +560,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             : null;
         final megaArtworkUrl = megaHomeUrl; // primary; official is the fallback
 
-        // Auto-set the ability to the mega form's fixed ability when evolved.
-        if (_isMegaEvolved && megaPokemon != null &&
-            megaPokemon.abilities.isNotEmpty) {
-          final megaAbilityName =
-              megaPokemon.abilities.first['ability']['name'] as String;
-          if (_abilityName != megaAbilityName) {
-            WidgetsBinding.instance.addPostFrameCallback(
-                (_) => setState(() => _abilityName = megaAbilityName));
-          }
-        }
 
         final scrollBody = SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -581,28 +571,18 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   megaFallbackUrl: megaPokemon?.officialArtworkUrl),
               const SizedBox(height: 24),
               _buildBasics(mechanics),
-              // ── Ability (Gen 3+) — shows mega form ability when evolved ──
+              // ── Ability (Gen 3+) ──
               if (mechanics == null || mechanics.hasAbilities) ...[
                 const SizedBox(height: 24),
-                _SectionTitle(canMegaEvolve && _isMegaEvolved
-                    ? 'Ability (Mega Form)'
-                    : 'Ability'),
+                _SectionTitle('Ability'),
                 const SizedBox(height: 8),
-                if (canMegaEvolve && _isMegaEvolved && megaPokemon != null) ...[
-                  // Mega forms have a single fixed ability — show read-only.
-                  _buildAbility(
-                    megaPokemon.abilities
-                        .map((a) => (
-                              name: a['ability']['name'] as String,
-                              isHidden: false,
-                              abilitySlot: a['slot'] as int,
-                            ))
-                        .toList()
-                      ..sort((a, b) => a.abilitySlot.compareTo(b.abilitySlot)),
-                    null, // no violation override for mega ability
-                  ),
-                ] else
-                  _buildAbility(abilities, violations['ability']),
+                _buildAbility(abilities, violations['ability']),
+                // Mega form ability shown as read-only info when evolved.
+                if (canMegaEvolve && _isMegaEvolved && megaPokemon != null &&
+                    megaPokemon.abilities.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _buildMegaAbilityInfo(megaPokemon.abilities),
+                ],
               ],
               // ── Nature (Gen 3+) ──
               if (mechanics == null || mechanics.hasAbilities) ...[
@@ -1440,6 +1420,46 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       ),
     );
     if (result != null) setState(() => _moves[moveIndex] = result);
+  }
+
+  // ── Mega ability info row ─────────────────────────────────────────────────
+
+  Widget _buildMegaAbilityInfo(List<dynamic> megaAbilities) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final abilityName = (megaAbilities.first['ability'] as Map)['name'] as String;
+    final displayName = abilityName
+        .split('-')
+        .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withValues(alpha: 0.25),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+            color: colorScheme.primary.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.auto_awesome,
+              size: 14, color: colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            'Mega form ability: ',
+            style: textTheme.bodySmall
+                ?.copyWith(color: colorScheme.onSurfaceVariant),
+          ),
+          Text(
+            displayName,
+            style: textTheme.bodySmall
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
   }
 
   // ── Mega Evolution ────────────────────────────────────────────────────────
