@@ -241,7 +241,7 @@
 - [x] **Ribbons** — hardcoded ribbon catalog by category (League, Contest, Tower, Memorial, Gift, Special) sourced from Bulbapedia; `ribbons` JSON column on `team_slots`; chip-grid picker in slot config
 
 ### Pokémon Showdown Sync
-- [ ] **PS import** — parse PS team `.txt` format (Nickname (Species) @ Item, Ability, EVs, moves) → create teams + slots locally; folder mapping from PS subfolder structure
+- [x] **PS import** — parse PS team `.txt` format (Nickname (Species) @ Item, Ability, EVs, moves) → create teams + slots locally; folder mapping from PS subfolder structure
 - [ ] **PS export to directory** — setting to point to PS teams directory (path picker); write/update `.txt` on every team save; subfolder per app folder
 
 ---
