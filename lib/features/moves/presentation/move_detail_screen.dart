@@ -7,9 +7,11 @@ import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
-import 'package:poke_team_dex/shared/widgets/skeleton_box.dart';
+import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
+import 'package:poke_team_dex/shared/widgets/move_type_chip.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
+import 'package:poke_team_dex/shared/widgets/skeleton_box.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 
 class MoveDetailScreen extends ConsumerWidget {
@@ -102,15 +104,16 @@ class _MoveDetailBody extends StatelessWidget {
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
-class _Header extends StatelessWidget {
+class _Header extends ConsumerWidget {
   final MoveEntry move;
   final Color typeColor;
   const _Header({required this.move, required this.typeColor});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final special = classifyMoveType(ref.watch(formatServiceProvider), move.name);
 
     return Container(
       width: double.infinity,
@@ -147,6 +150,7 @@ class _Header extends StatelessWidget {
                   children: [
                     if (move.typeName != null)
                       TypeBadge(type: move.typeName!),
+                    if (special != null) MoveTypeChip(type: special),
                     _InfoBadge(
                       label: _categoryLabel(move.damageClass),
                       color: colorScheme.surfaceContainerHighest,
