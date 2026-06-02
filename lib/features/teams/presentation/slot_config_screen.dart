@@ -21,6 +21,10 @@ import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
+import 'dart:math' as math;
+
+import 'package:fl_chart/fl_chart.dart';
+import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 import 'package:poke_team_dex/shared/widgets/move_type_chip.dart';
@@ -165,6 +169,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   late List<TextEditingController> _evCtrls;
   late List<TextEditingController> _ivCtrls;
 
+  // Contest conditions indexed [cool, beautiful, cute, clever, tough, sheen]
+  late List<TextEditingController> _contestCtrls;
+
   bool _initialized = false;
   bool _saving = false;
 
@@ -179,6 +186,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _nicknameCtrl = TextEditingController();
     _evCtrls = List.generate(6, (_) => TextEditingController(text: '0'));
     _ivCtrls = List.generate(6, (_) => TextEditingController(text: '31'));
+    _contestCtrls = List.generate(6, (_) => TextEditingController(text: '0'));
   }
 
   @override
@@ -186,6 +194,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _nicknameCtrl.dispose();
     for (final c in _evCtrls) { c.dispose(); }
     for (final c in _ivCtrls) { c.dispose(); }
+    for (final c in _contestCtrls) { c.dispose(); }
     super.dispose();
   }
 
@@ -216,6 +225,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _ivCtrls[3].text = (slot.ivSpa ?? 31).toString();
     _ivCtrls[4].text = (slot.ivSpd ?? 31).toString();
     _ivCtrls[5].text = (slot.ivSpe ?? 31).toString();
+    _contestCtrls[0].text = (slot.contestCool      ?? 0).toString();
+    _contestCtrls[1].text = (slot.contestBeautiful  ?? 0).toString();
+    _contestCtrls[2].text = (slot.contestCute       ?? 0).toString();
+    _contestCtrls[3].text = (slot.contestClever     ?? 0).toString();
+    _contestCtrls[4].text = (slot.contestTough      ?? 0).toString();
+    _contestCtrls[5].text = (slot.contestSheen      ?? 0).toString();
   }
 
   int get _evTotal =>
@@ -255,6 +270,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     try {
       final evs = _evCtrls.map((c) => (int.tryParse(c.text) ?? 0).clamp(0, 252)).toList();
       final ivs = _ivCtrls.map((c) => (int.tryParse(c.text) ?? 31).clamp(0, 31)).toList();
+      final contest = _contestCtrls.map((c) => (int.tryParse(c.text) ?? 0).clamp(0, 255)).toList();
       final nickname = _nicknameCtrl.text.trim();
 
       await ref.read(teamSlotRepositoryProvider).update(
@@ -287,6 +303,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           ivSpa: Value(ivs[3]),
           ivSpd: Value(ivs[4]),
           ivSpe: Value(ivs[5]),
+          contestCool:      Value(contest[0]),
+          contestBeautiful: Value(contest[1]),
+          contestCute:      Value(contest[2]),
+          contestClever:    Value(contest[3]),
+          contestTough:     Value(contest[4]),
+          contestSheen:     Value(contest[5]),
           syncStatus: const Value('pending'),
           updatedAt:  Value(DateTime.now()),
         ),
@@ -493,10 +515,22 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 maxVal: mechanics?.statMax ?? 31,
                 gen1Mode: format?.gen == 1,
               ),
+              // ── Hidden Power (Gen 2–7 only) ──
+              if (mechanics == null || mechanics.hasHiddenPower) ...[
+                const SizedBox(height: 12),
+                _buildHiddenPower(gen: format?.gen),
+              ],
               const SizedBox(height: 24),
               _SectionTitle('Stat Preview (Lv $_level)'),
               const SizedBox(height: 8),
               _buildStatPreview(baseStats, mechanics),
+              // ── Contest conditions (Gen 3 / Gen 4 / no format) ──
+              if (mechanics == null || mechanics.gen == 3 || mechanics.gen == 4) ...[
+                const SizedBox(height: 24),
+                _SectionTitle('Contest Conditions'),
+                const SizedBox(height: 8),
+                _buildContestStats(),
+              ],
             ],
           ),
         );
@@ -1078,6 +1112,91 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     );
   }
 
+  // ── Hidden Power ─────────────────────────────────────────────────────────
+
+  /// Type names for the 16 possible Hidden Power types (indices 0–15).
+  static const _hpTypeNames = [
+    'Fighting', 'Flying', 'Poison', 'Ground', 'Rock', 'Bug',
+    'Ghost',    'Steel',  'Fire',   'Water',  'Grass', 'Electric',
+    'Psychic',  'Ice',    'Dragon', 'Dark',
+  ];
+
+  /// Returns 0–15 index of the Hidden Power type from current IVs.
+  /// Uses the standard Gen 3+ formula.
+  int _hiddenPowerTypeIndex() {
+    final iv = _ivCtrls.map((c) => int.tryParse(c.text) ?? 31).toList();
+    // Bit order: HP, Atk, Def, Spe, SpA, SpD (note Spe=index 5, SpA=index 3, SpD=index 4)
+    final n = (iv[0] & 1) +
+        (iv[1] & 1) * 2 +
+        (iv[2] & 1) * 4 +
+        (iv[5] & 1) * 8 +
+        (iv[3] & 1) * 16 +
+        (iv[4] & 1) * 32;
+    return (n * 15) ~/ 63;
+  }
+
+  /// Returns the power of Hidden Power (30–70 in Gen 2–5; always 60 in Gen 6+).
+  int _hiddenPowerPower({int? gen}) {
+    if (gen != null && gen >= 6) return 60;
+    final iv = _ivCtrls.map((c) => int.tryParse(c.text) ?? 31).toList();
+    final u = ((iv[0] >> 1) & 1) +
+        ((iv[1] >> 1) & 1) * 2 +
+        ((iv[2] >> 1) & 1) * 4 +
+        ((iv[5] >> 1) & 1) * 8 +
+        ((iv[3] >> 1) & 1) * 16 +
+        ((iv[4] >> 1) & 1) * 32;
+    return (u * 40) ~/ 63 + 30;
+  }
+
+  Widget _buildHiddenPower({int? gen}) {
+    final typeIdx = _hiddenPowerTypeIndex();
+    final typeName = _hpTypeNames[typeIdx].toLowerCase();
+    final power = _hiddenPowerPower(gen: gen);
+    final typeColor = PokemonTypeColors.colors[typeName] ??
+        Theme.of(context).colorScheme.primary;
+
+    return Row(
+      children: [
+        Text('Hidden Power:',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                )),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+          decoration: BoxDecoration(
+            color: typeColor,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            _hpTypeNames[typeIdx],
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'Power $power',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        if (gen == null || gen < 6)
+          Text(
+            '  (Gen 6+: 60)',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurfaceVariant
+                      .withValues(alpha: 0.5),
+                ),
+          ),
+      ],
+    );
+  }
+
   // ── EV / IV grid ──────────────────────────────────────────────────────────
 
   // Gen 1: 5 stats — HP, Atk, Def, Spc (combined Special), Spe (no SpD).
@@ -1170,6 +1289,221 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       ),
     );
     if (result != null) setState(() => _moves[moveIndex] = result);
+  }
+
+  // ── Contest conditions ──────────────────────────────────────────────────────
+
+  static const _contestLabels = [
+    'Cool', 'Beautiful', 'Cute', 'Clever', 'Tough', 'Sheen',
+  ];
+  static const _contestColors = [
+    Color(0xFFE53935), // Cool — red
+    Color(0xFF1E88E5), // Beautiful — blue
+    Color(0xFFE91E63), // Cute — pink
+    Color(0xFF43A047), // Clever — green
+    Color(0xFFF9A825), // Tough — amber/yellow (Bulbapedia)
+    Color(0xFF9E9E9E), // Sheen — grey
+  ];
+
+  Widget _buildContestStats() {
+    final vals = _contestCtrls
+        .map((c) => (int.tryParse(c.text) ?? 0).clamp(0, 255))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Radar chart — always visible; colored dots mark each stat's value.
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: AspectRatio(
+            aspectRatio: 2.4,
+            child: Stack(
+              children: [
+                RadarChart(
+                  RadarChartData(
+                    dataSets: [
+                      RadarDataSet(
+                        dataEntries: vals
+                            .take(5)
+                            .map((v) => RadarEntry(value: v.toDouble()))
+                            .toList(),
+                        borderColor: Theme.of(context).colorScheme.primary,
+                        fillColor: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.2),
+                        borderWidth: 2,
+                        entryRadius: 0, // dots handled by overlay
+                      ),
+                    ],
+                    radarBackgroundColor: Colors.transparent,
+                    radarShape: RadarShape.polygon,
+                    tickCount: 4,
+                    ticksTextStyle: const TextStyle(fontSize: 0),
+                    tickBorderData: BorderSide(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outlineVariant),
+                    gridBorderData: BorderSide(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outlineVariant),
+                    radarBorderData: BorderSide(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outlineVariant),
+                    getTitle: (index, angle) => RadarChartTitle(
+                      text: _contestLabels[index],
+                      positionPercentageOffset: 0.1,
+                    ),
+                  ),
+                ),
+                // Colored vertex dots overlay
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _RadarDotsPainter(
+                      values: vals.take(5).toList(),
+                      colors: _contestColors.take(5).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Sliders for all 6 stats
+        for (int i = 0; i < 6; i++) ...[
+          _ContestStatRow(
+            label: _contestLabels[i],
+            color: _contestColors[i],
+            ctrl: _contestCtrls[i],
+            onChanged: () => setState(() {}),
+          ),
+          if (i < 5) const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+}
+
+// ── Contest stat row ──────────────────────────────────────────────────────────
+
+class _ContestStatRow extends StatelessWidget {
+  final String label;
+  final Color color;
+  final TextEditingController ctrl;
+  final VoidCallback onChanged;
+
+  const _ContestStatRow({
+    required this.label,
+    required this.color,
+    required this.ctrl,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final value = (int.tryParse(ctrl.text) ?? 0).clamp(0, 255);
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 70,
+          child: Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: color, fontWeight: FontWeight.w600),
+          ),
+        ),
+        Expanded(
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: color,
+              thumbColor: color,
+              inactiveTrackColor: color.withValues(alpha: 0.2),
+              overlayColor: color.withValues(alpha: 0.1),
+              trackHeight: 3,
+              thumbShape:
+                  const RoundSliderThumbShape(enabledThumbRadius: 7),
+            ),
+            child: Slider(
+              value: value.toDouble(),
+              min: 0,
+              max: 255,
+              divisions: 255,
+              onChanged: (v) {
+                ctrl.text = v.round().toString();
+                onChanged();
+              },
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 38,
+          child: Text(
+            '$value',
+            textAlign: TextAlign.end,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Radar dots painter ────────────────────────────────────────────────────────
+
+/// Overlays colour-coded dots at each pentagon vertex proportional to the
+/// stat value.  fl_chart's RadarChart leaves ~22% of each side as label
+/// padding, so the inner circle radius ≈ shortestSide * 0.39.
+class _RadarDotsPainter extends CustomPainter {
+  final List<int> values;  // 5 values (0–255)
+  final List<Color> colors; // 5 colors
+
+  const _RadarDotsPainter({required this.values, required this.colors});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final innerRadius = size.shortestSide * 0.39;
+
+    for (int i = 0; i < 5; i++) {
+      final v = values[i];
+      if (v == 0) continue;
+      // Vertex 0 starts at the top (−π/2) and goes clockwise.
+      final angle = -math.pi / 2 + 2 * math.pi * i / 5;
+      final r = innerRadius * v / 255;
+      final pos = Offset(center.dx + r * math.cos(angle),
+                         center.dy + r * math.sin(angle));
+
+      canvas.drawCircle(pos, 5,
+          Paint()
+            ..color = colors[i]
+            ..style = PaintingStyle.fill);
+      canvas.drawCircle(pos, 5,
+          Paint()
+            ..color = Colors.white
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RadarDotsPainter old) =>
+      !_listEq(old.values, values);
+
+  static bool _listEq(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 }
 

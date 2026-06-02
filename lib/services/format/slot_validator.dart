@@ -143,29 +143,31 @@ Set<String> _buildLearnset(
   List<Map<String, dynamic>> pokemonMoves,
   GameFormat format,
 ) {
-  final result = <String>{};
-
-  // Determine which version groups to accept
-  final List<String> acceptedGroups;
-  if (format.type == FormatType.game) {
-    final vg = kFormatToVersionGroup[format.id];
-    acceptedGroups = vg != null ? [vg] : [];
-  } else {
-    // General gen format: accept any version group in this generation.
-    acceptedGroups = kGenToVersionGroups[format.gen] ?? [];
+  // For the move PICKER we accept any move the Pokémon could ever have learned
+  // in generations 1 through format.gen.  A move learned by breeding/tutoring/
+  // event in an earlier generation can be transferred to the current format,
+  // so restricting to a single version-group would incorrectly exclude legal
+  // egg/tutor/prior-evolution moves.
+  //
+  // Strict legality checking (e.g. "does this specific game allow this move?")
+  // is left to the validation layer which shows warning badges separately.
+  final allAcceptedGroups = <String>{};
+  for (int g = 1; g <= format.gen; g++) {
+    allAcceptedGroups.addAll(kGenToVersionGroups[g] ?? []);
   }
 
-  if (acceptedGroups.isEmpty) {
-    // Unknown format — fall back to accepting everything
+  if (allAcceptedGroups.isEmpty) {
+    // Unknown generation — fall back to accepting everything.
     return pokemonMoves.map((m) => m['move']['name'] as String).toSet();
   }
 
+  final result = <String>{};
   for (final moveData in pokemonMoves) {
     final moveName = (moveData['move'] as Map)['name'] as String;
     final details = moveData['version_group_details'] as List;
     final learnable = details.any((d) {
       final vg = ((d as Map)['version_group'] as Map)['name'] as String;
-      return acceptedGroups.contains(vg);
+      return allAcceptedGroups.contains(vg);
     });
     if (learnable) result.add(moveName);
   }

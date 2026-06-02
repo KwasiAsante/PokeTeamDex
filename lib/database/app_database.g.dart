@@ -1394,6 +1394,72 @@ class $TeamSlotsTable extends TeamSlots
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _contestCoolMeta = const VerificationMeta(
+    'contestCool',
+  );
+  @override
+  late final GeneratedColumn<int> contestCool = GeneratedColumn<int>(
+    'contest_cool',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contestBeautifulMeta = const VerificationMeta(
+    'contestBeautiful',
+  );
+  @override
+  late final GeneratedColumn<int> contestBeautiful = GeneratedColumn<int>(
+    'contest_beautiful',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contestCuteMeta = const VerificationMeta(
+    'contestCute',
+  );
+  @override
+  late final GeneratedColumn<int> contestCute = GeneratedColumn<int>(
+    'contest_cute',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contestCleverMeta = const VerificationMeta(
+    'contestClever',
+  );
+  @override
+  late final GeneratedColumn<int> contestClever = GeneratedColumn<int>(
+    'contest_clever',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contestToughMeta = const VerificationMeta(
+    'contestTough',
+  );
+  @override
+  late final GeneratedColumn<int> contestTough = GeneratedColumn<int>(
+    'contest_tough',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contestSheenMeta = const VerificationMeta(
+    'contestSheen',
+  );
+  @override
+  late final GeneratedColumn<int> contestSheen = GeneratedColumn<int>(
+    'contest_sheen',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isDeletedMeta = const VerificationMeta(
     'isDeleted',
   );
@@ -1476,6 +1542,12 @@ class $TeamSlotsTable extends TeamSlots
     ivSpa,
     ivSpd,
     ivSpe,
+    contestCool,
+    contestBeautiful,
+    contestCute,
+    contestClever,
+    contestTough,
+    contestSheen,
     isDeleted,
     syncStatus,
     createdAt,
@@ -1676,6 +1748,60 @@ class $TeamSlotsTable extends TeamSlots
         ivSpe.isAcceptableOrUnknown(data['iv_spe']!, _ivSpeMeta),
       );
     }
+    if (data.containsKey('contest_cool')) {
+      context.handle(
+        _contestCoolMeta,
+        contestCool.isAcceptableOrUnknown(
+          data['contest_cool']!,
+          _contestCoolMeta,
+        ),
+      );
+    }
+    if (data.containsKey('contest_beautiful')) {
+      context.handle(
+        _contestBeautifulMeta,
+        contestBeautiful.isAcceptableOrUnknown(
+          data['contest_beautiful']!,
+          _contestBeautifulMeta,
+        ),
+      );
+    }
+    if (data.containsKey('contest_cute')) {
+      context.handle(
+        _contestCuteMeta,
+        contestCute.isAcceptableOrUnknown(
+          data['contest_cute']!,
+          _contestCuteMeta,
+        ),
+      );
+    }
+    if (data.containsKey('contest_clever')) {
+      context.handle(
+        _contestCleverMeta,
+        contestClever.isAcceptableOrUnknown(
+          data['contest_clever']!,
+          _contestCleverMeta,
+        ),
+      );
+    }
+    if (data.containsKey('contest_tough')) {
+      context.handle(
+        _contestToughMeta,
+        contestTough.isAcceptableOrUnknown(
+          data['contest_tough']!,
+          _contestToughMeta,
+        ),
+      );
+    }
+    if (data.containsKey('contest_sheen')) {
+      context.handle(
+        _contestSheenMeta,
+        contestSheen.isAcceptableOrUnknown(
+          data['contest_sheen']!,
+          _contestSheenMeta,
+        ),
+      );
+    }
     if (data.containsKey('is_deleted')) {
       context.handle(
         _isDeletedMeta,
@@ -1825,6 +1951,30 @@ class $TeamSlotsTable extends TeamSlots
         DriftSqlType.int,
         data['${effectivePrefix}iv_spe'],
       ),
+      contestCool: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}contest_cool'],
+      ),
+      contestBeautiful: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}contest_beautiful'],
+      ),
+      contestCute: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}contest_cute'],
+      ),
+      contestClever: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}contest_clever'],
+      ),
+      contestTough: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}contest_tough'],
+      ),
+      contestSheen: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}contest_sheen'],
+      ),
       isDeleted: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_deleted'],
@@ -1880,6 +2030,12 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
   final int? ivSpa;
   final int? ivSpd;
   final int? ivSpe;
+  final int? contestCool;
+  final int? contestBeautiful;
+  final int? contestCute;
+  final int? contestClever;
+  final int? contestTough;
+  final int? contestSheen;
   final bool isDeleted;
   final String syncStatus;
   final DateTime createdAt;
@@ -1914,6 +2070,12 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     this.ivSpa,
     this.ivSpd,
     this.ivSpe,
+    this.contestCool,
+    this.contestBeautiful,
+    this.contestCute,
+    this.contestClever,
+    this.contestTough,
+    this.contestSheen,
     required this.isDeleted,
     required this.syncStatus,
     required this.createdAt,
@@ -1999,6 +2161,24 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     if (!nullToAbsent || ivSpe != null) {
       map['iv_spe'] = Variable<int>(ivSpe);
     }
+    if (!nullToAbsent || contestCool != null) {
+      map['contest_cool'] = Variable<int>(contestCool);
+    }
+    if (!nullToAbsent || contestBeautiful != null) {
+      map['contest_beautiful'] = Variable<int>(contestBeautiful);
+    }
+    if (!nullToAbsent || contestCute != null) {
+      map['contest_cute'] = Variable<int>(contestCute);
+    }
+    if (!nullToAbsent || contestClever != null) {
+      map['contest_clever'] = Variable<int>(contestClever);
+    }
+    if (!nullToAbsent || contestTough != null) {
+      map['contest_tough'] = Variable<int>(contestTough);
+    }
+    if (!nullToAbsent || contestSheen != null) {
+      map['contest_sheen'] = Variable<int>(contestSheen);
+    }
     map['is_deleted'] = Variable<bool>(isDeleted);
     map['sync_status'] = Variable<String>(syncStatus);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -2081,6 +2261,24 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       ivSpe: ivSpe == null && nullToAbsent
           ? const Value.absent()
           : Value(ivSpe),
+      contestCool: contestCool == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contestCool),
+      contestBeautiful: contestBeautiful == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contestBeautiful),
+      contestCute: contestCute == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contestCute),
+      contestClever: contestClever == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contestClever),
+      contestTough: contestTough == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contestTough),
+      contestSheen: contestSheen == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contestSheen),
       isDeleted: Value(isDeleted),
       syncStatus: Value(syncStatus),
       createdAt: Value(createdAt),
@@ -2123,6 +2321,12 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       ivSpa: serializer.fromJson<int?>(json['ivSpa']),
       ivSpd: serializer.fromJson<int?>(json['ivSpd']),
       ivSpe: serializer.fromJson<int?>(json['ivSpe']),
+      contestCool: serializer.fromJson<int?>(json['contestCool']),
+      contestBeautiful: serializer.fromJson<int?>(json['contestBeautiful']),
+      contestCute: serializer.fromJson<int?>(json['contestCute']),
+      contestClever: serializer.fromJson<int?>(json['contestClever']),
+      contestTough: serializer.fromJson<int?>(json['contestTough']),
+      contestSheen: serializer.fromJson<int?>(json['contestSheen']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
       syncStatus: serializer.fromJson<String>(json['syncStatus']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -2162,6 +2366,12 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       'ivSpa': serializer.toJson<int?>(ivSpa),
       'ivSpd': serializer.toJson<int?>(ivSpd),
       'ivSpe': serializer.toJson<int?>(ivSpe),
+      'contestCool': serializer.toJson<int?>(contestCool),
+      'contestBeautiful': serializer.toJson<int?>(contestBeautiful),
+      'contestCute': serializer.toJson<int?>(contestCute),
+      'contestClever': serializer.toJson<int?>(contestClever),
+      'contestTough': serializer.toJson<int?>(contestTough),
+      'contestSheen': serializer.toJson<int?>(contestSheen),
       'isDeleted': serializer.toJson<bool>(isDeleted),
       'syncStatus': serializer.toJson<String>(syncStatus),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -2199,6 +2409,12 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     Value<int?> ivSpa = const Value.absent(),
     Value<int?> ivSpd = const Value.absent(),
     Value<int?> ivSpe = const Value.absent(),
+    Value<int?> contestCool = const Value.absent(),
+    Value<int?> contestBeautiful = const Value.absent(),
+    Value<int?> contestCute = const Value.absent(),
+    Value<int?> contestClever = const Value.absent(),
+    Value<int?> contestTough = const Value.absent(),
+    Value<int?> contestSheen = const Value.absent(),
     bool? isDeleted,
     String? syncStatus,
     DateTime? createdAt,
@@ -2233,6 +2449,16 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     ivSpa: ivSpa.present ? ivSpa.value : this.ivSpa,
     ivSpd: ivSpd.present ? ivSpd.value : this.ivSpd,
     ivSpe: ivSpe.present ? ivSpe.value : this.ivSpe,
+    contestCool: contestCool.present ? contestCool.value : this.contestCool,
+    contestBeautiful: contestBeautiful.present
+        ? contestBeautiful.value
+        : this.contestBeautiful,
+    contestCute: contestCute.present ? contestCute.value : this.contestCute,
+    contestClever: contestClever.present
+        ? contestClever.value
+        : this.contestClever,
+    contestTough: contestTough.present ? contestTough.value : this.contestTough,
+    contestSheen: contestSheen.present ? contestSheen.value : this.contestSheen,
     isDeleted: isDeleted ?? this.isDeleted,
     syncStatus: syncStatus ?? this.syncStatus,
     createdAt: createdAt ?? this.createdAt,
@@ -2277,6 +2503,24 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       ivSpa: data.ivSpa.present ? data.ivSpa.value : this.ivSpa,
       ivSpd: data.ivSpd.present ? data.ivSpd.value : this.ivSpd,
       ivSpe: data.ivSpe.present ? data.ivSpe.value : this.ivSpe,
+      contestCool: data.contestCool.present
+          ? data.contestCool.value
+          : this.contestCool,
+      contestBeautiful: data.contestBeautiful.present
+          ? data.contestBeautiful.value
+          : this.contestBeautiful,
+      contestCute: data.contestCute.present
+          ? data.contestCute.value
+          : this.contestCute,
+      contestClever: data.contestClever.present
+          ? data.contestClever.value
+          : this.contestClever,
+      contestTough: data.contestTough.present
+          ? data.contestTough.value
+          : this.contestTough,
+      contestSheen: data.contestSheen.present
+          ? data.contestSheen.value
+          : this.contestSheen,
       isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
       syncStatus: data.syncStatus.present
           ? data.syncStatus.value
@@ -2318,6 +2562,12 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
           ..write('ivSpa: $ivSpa, ')
           ..write('ivSpd: $ivSpd, ')
           ..write('ivSpe: $ivSpe, ')
+          ..write('contestCool: $contestCool, ')
+          ..write('contestBeautiful: $contestBeautiful, ')
+          ..write('contestCute: $contestCute, ')
+          ..write('contestClever: $contestClever, ')
+          ..write('contestTough: $contestTough, ')
+          ..write('contestSheen: $contestSheen, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('createdAt: $createdAt, ')
@@ -2357,6 +2607,12 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     ivSpa,
     ivSpd,
     ivSpe,
+    contestCool,
+    contestBeautiful,
+    contestCute,
+    contestClever,
+    contestTough,
+    contestSheen,
     isDeleted,
     syncStatus,
     createdAt,
@@ -2395,6 +2651,12 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
           other.ivSpa == this.ivSpa &&
           other.ivSpd == this.ivSpd &&
           other.ivSpe == this.ivSpe &&
+          other.contestCool == this.contestCool &&
+          other.contestBeautiful == this.contestBeautiful &&
+          other.contestCute == this.contestCute &&
+          other.contestClever == this.contestClever &&
+          other.contestTough == this.contestTough &&
+          other.contestSheen == this.contestSheen &&
           other.isDeleted == this.isDeleted &&
           other.syncStatus == this.syncStatus &&
           other.createdAt == this.createdAt &&
@@ -2431,6 +2693,12 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
   final Value<int?> ivSpa;
   final Value<int?> ivSpd;
   final Value<int?> ivSpe;
+  final Value<int?> contestCool;
+  final Value<int?> contestBeautiful;
+  final Value<int?> contestCute;
+  final Value<int?> contestClever;
+  final Value<int?> contestTough;
+  final Value<int?> contestSheen;
   final Value<bool> isDeleted;
   final Value<String> syncStatus;
   final Value<DateTime> createdAt;
@@ -2465,6 +2733,12 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     this.ivSpa = const Value.absent(),
     this.ivSpd = const Value.absent(),
     this.ivSpe = const Value.absent(),
+    this.contestCool = const Value.absent(),
+    this.contestBeautiful = const Value.absent(),
+    this.contestCute = const Value.absent(),
+    this.contestClever = const Value.absent(),
+    this.contestTough = const Value.absent(),
+    this.contestSheen = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -2500,6 +2774,12 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     this.ivSpa = const Value.absent(),
     this.ivSpd = const Value.absent(),
     this.ivSpe = const Value.absent(),
+    this.contestCool = const Value.absent(),
+    this.contestBeautiful = const Value.absent(),
+    this.contestCute = const Value.absent(),
+    this.contestClever = const Value.absent(),
+    this.contestTough = const Value.absent(),
+    this.contestSheen = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -2537,6 +2817,12 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     Expression<int>? ivSpa,
     Expression<int>? ivSpd,
     Expression<int>? ivSpe,
+    Expression<int>? contestCool,
+    Expression<int>? contestBeautiful,
+    Expression<int>? contestCute,
+    Expression<int>? contestClever,
+    Expression<int>? contestTough,
+    Expression<int>? contestSheen,
     Expression<bool>? isDeleted,
     Expression<String>? syncStatus,
     Expression<DateTime>? createdAt,
@@ -2572,6 +2858,12 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
       if (ivSpa != null) 'iv_spa': ivSpa,
       if (ivSpd != null) 'iv_spd': ivSpd,
       if (ivSpe != null) 'iv_spe': ivSpe,
+      if (contestCool != null) 'contest_cool': contestCool,
+      if (contestBeautiful != null) 'contest_beautiful': contestBeautiful,
+      if (contestCute != null) 'contest_cute': contestCute,
+      if (contestClever != null) 'contest_clever': contestClever,
+      if (contestTough != null) 'contest_tough': contestTough,
+      if (contestSheen != null) 'contest_sheen': contestSheen,
       if (isDeleted != null) 'is_deleted': isDeleted,
       if (syncStatus != null) 'sync_status': syncStatus,
       if (createdAt != null) 'created_at': createdAt,
@@ -2609,6 +2901,12 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     Value<int?>? ivSpa,
     Value<int?>? ivSpd,
     Value<int?>? ivSpe,
+    Value<int?>? contestCool,
+    Value<int?>? contestBeautiful,
+    Value<int?>? contestCute,
+    Value<int?>? contestClever,
+    Value<int?>? contestTough,
+    Value<int?>? contestSheen,
     Value<bool>? isDeleted,
     Value<String>? syncStatus,
     Value<DateTime>? createdAt,
@@ -2644,6 +2942,12 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
       ivSpa: ivSpa ?? this.ivSpa,
       ivSpd: ivSpd ?? this.ivSpd,
       ivSpe: ivSpe ?? this.ivSpe,
+      contestCool: contestCool ?? this.contestCool,
+      contestBeautiful: contestBeautiful ?? this.contestBeautiful,
+      contestCute: contestCute ?? this.contestCute,
+      contestClever: contestClever ?? this.contestClever,
+      contestTough: contestTough ?? this.contestTough,
+      contestSheen: contestSheen ?? this.contestSheen,
       isDeleted: isDeleted ?? this.isDeleted,
       syncStatus: syncStatus ?? this.syncStatus,
       createdAt: createdAt ?? this.createdAt,
@@ -2741,6 +3045,24 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     if (ivSpe.present) {
       map['iv_spe'] = Variable<int>(ivSpe.value);
     }
+    if (contestCool.present) {
+      map['contest_cool'] = Variable<int>(contestCool.value);
+    }
+    if (contestBeautiful.present) {
+      map['contest_beautiful'] = Variable<int>(contestBeautiful.value);
+    }
+    if (contestCute.present) {
+      map['contest_cute'] = Variable<int>(contestCute.value);
+    }
+    if (contestClever.present) {
+      map['contest_clever'] = Variable<int>(contestClever.value);
+    }
+    if (contestTough.present) {
+      map['contest_tough'] = Variable<int>(contestTough.value);
+    }
+    if (contestSheen.present) {
+      map['contest_sheen'] = Variable<int>(contestSheen.value);
+    }
     if (isDeleted.present) {
       map['is_deleted'] = Variable<bool>(isDeleted.value);
     }
@@ -2788,6 +3110,12 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
           ..write('ivSpa: $ivSpa, ')
           ..write('ivSpd: $ivSpd, ')
           ..write('ivSpe: $ivSpe, ')
+          ..write('contestCool: $contestCool, ')
+          ..write('contestBeautiful: $contestBeautiful, ')
+          ..write('contestCute: $contestCute, ')
+          ..write('contestClever: $contestClever, ')
+          ..write('contestTough: $contestTough, ')
+          ..write('contestSheen: $contestSheen, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('createdAt: $createdAt, ')
@@ -4754,6 +5082,12 @@ typedef $$TeamSlotsTableCreateCompanionBuilder =
       Value<int?> ivSpa,
       Value<int?> ivSpd,
       Value<int?> ivSpe,
+      Value<int?> contestCool,
+      Value<int?> contestBeautiful,
+      Value<int?> contestCute,
+      Value<int?> contestClever,
+      Value<int?> contestTough,
+      Value<int?> contestSheen,
       Value<bool> isDeleted,
       Value<String> syncStatus,
       Value<DateTime> createdAt,
@@ -4790,6 +5124,12 @@ typedef $$TeamSlotsTableUpdateCompanionBuilder =
       Value<int?> ivSpa,
       Value<int?> ivSpd,
       Value<int?> ivSpe,
+      Value<int?> contestCool,
+      Value<int?> contestBeautiful,
+      Value<int?> contestCute,
+      Value<int?> contestClever,
+      Value<int?> contestTough,
+      Value<int?> contestSheen,
       Value<bool> isDeleted,
       Value<String> syncStatus,
       Value<DateTime> createdAt,
@@ -4965,6 +5305,36 @@ class $$TeamSlotsTableFilterComposer
 
   ColumnFilters<int> get ivSpe => $composableBuilder(
     column: $table.ivSpe,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get contestCool => $composableBuilder(
+    column: $table.contestCool,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get contestBeautiful => $composableBuilder(
+    column: $table.contestBeautiful,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get contestCute => $composableBuilder(
+    column: $table.contestCute,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get contestClever => $composableBuilder(
+    column: $table.contestClever,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get contestTough => $composableBuilder(
+    column: $table.contestTough,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get contestSheen => $composableBuilder(
+    column: $table.contestSheen,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5161,6 +5531,36 @@ class $$TeamSlotsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get contestCool => $composableBuilder(
+    column: $table.contestCool,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get contestBeautiful => $composableBuilder(
+    column: $table.contestBeautiful,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get contestCute => $composableBuilder(
+    column: $table.contestCute,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get contestClever => $composableBuilder(
+    column: $table.contestClever,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get contestTough => $composableBuilder(
+    column: $table.contestTough,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get contestSheen => $composableBuilder(
+    column: $table.contestSheen,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isDeleted => $composableBuilder(
     column: $table.isDeleted,
     builder: (column) => ColumnOrderings(column),
@@ -5306,6 +5706,36 @@ class $$TeamSlotsTableAnnotationComposer
   GeneratedColumn<int> get ivSpe =>
       $composableBuilder(column: $table.ivSpe, builder: (column) => column);
 
+  GeneratedColumn<int> get contestCool => $composableBuilder(
+    column: $table.contestCool,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get contestBeautiful => $composableBuilder(
+    column: $table.contestBeautiful,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get contestCute => $composableBuilder(
+    column: $table.contestCute,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get contestClever => $composableBuilder(
+    column: $table.contestClever,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get contestTough => $composableBuilder(
+    column: $table.contestTough,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get contestSheen => $composableBuilder(
+    column: $table.contestSheen,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<bool> get isDeleted =>
       $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 
@@ -5401,6 +5831,12 @@ class $$TeamSlotsTableTableManager
                 Value<int?> ivSpa = const Value.absent(),
                 Value<int?> ivSpd = const Value.absent(),
                 Value<int?> ivSpe = const Value.absent(),
+                Value<int?> contestCool = const Value.absent(),
+                Value<int?> contestBeautiful = const Value.absent(),
+                Value<int?> contestCute = const Value.absent(),
+                Value<int?> contestClever = const Value.absent(),
+                Value<int?> contestTough = const Value.absent(),
+                Value<int?> contestSheen = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -5435,6 +5871,12 @@ class $$TeamSlotsTableTableManager
                 ivSpa: ivSpa,
                 ivSpd: ivSpd,
                 ivSpe: ivSpe,
+                contestCool: contestCool,
+                contestBeautiful: contestBeautiful,
+                contestCute: contestCute,
+                contestClever: contestClever,
+                contestTough: contestTough,
+                contestSheen: contestSheen,
                 isDeleted: isDeleted,
                 syncStatus: syncStatus,
                 createdAt: createdAt,
@@ -5471,6 +5913,12 @@ class $$TeamSlotsTableTableManager
                 Value<int?> ivSpa = const Value.absent(),
                 Value<int?> ivSpd = const Value.absent(),
                 Value<int?> ivSpe = const Value.absent(),
+                Value<int?> contestCool = const Value.absent(),
+                Value<int?> contestBeautiful = const Value.absent(),
+                Value<int?> contestCute = const Value.absent(),
+                Value<int?> contestClever = const Value.absent(),
+                Value<int?> contestTough = const Value.absent(),
+                Value<int?> contestSheen = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -5505,6 +5953,12 @@ class $$TeamSlotsTableTableManager
                 ivSpa: ivSpa,
                 ivSpd: ivSpd,
                 ivSpe: ivSpe,
+                contestCool: contestCool,
+                contestBeautiful: contestBeautiful,
+                contestCute: contestCute,
+                contestClever: contestClever,
+                contestTough: contestTough,
+                contestSheen: contestSheen,
                 isDeleted: isDeleted,
                 syncStatus: syncStatus,
                 createdAt: createdAt,
