@@ -24,6 +24,7 @@ import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
+import 'package:poke_team_dex/features/teams/data/ribbon_catalog.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
@@ -172,6 +173,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   // Contest conditions indexed [cool, beautiful, cute, clever, tough, sheen]
   late List<TextEditingController> _contestCtrls;
 
+  // Ribbons — set of ribbon ids currently awarded to this Pokémon
+  final Set<String> _ribbons = {};
+
   bool _initialized = false;
   bool _saving = false;
 
@@ -225,6 +229,16 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _ivCtrls[3].text = (slot.ivSpa ?? 31).toString();
     _ivCtrls[4].text = (slot.ivSpd ?? 31).toString();
     _ivCtrls[5].text = (slot.ivSpe ?? 31).toString();
+    // Ribbons
+    _ribbons.clear();
+    final ribbonJson = slot.ribbons;
+    if (ribbonJson != null && ribbonJson.isNotEmpty) {
+      try {
+        _ribbons.addAll(
+          (jsonDecode(ribbonJson) as List).cast<String>(),
+        );
+      } catch (_) {}
+    }
     _contestCtrls[0].text = (slot.contestCool      ?? 0).toString();
     _contestCtrls[1].text = (slot.contestBeautiful  ?? 0).toString();
     _contestCtrls[2].text = (slot.contestCute       ?? 0).toString();
@@ -303,6 +317,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           ivSpa: Value(ivs[3]),
           ivSpd: Value(ivs[4]),
           ivSpe: Value(ivs[5]),
+          ribbons: Value(_ribbons.isEmpty
+              ? null
+              : jsonEncode(_ribbons.toList())),
           contestCool:      Value(contest[0]),
           contestBeautiful: Value(contest[1]),
           contestCute:      Value(contest[2]),
@@ -531,6 +548,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 const SizedBox(height: 8),
                 _buildContestStats(),
               ],
+              // ── Ribbons ──
+              const SizedBox(height: 24),
+              _SectionTitle('Ribbons'),
+              const SizedBox(height: 8),
+              _buildRibbons(),
             ],
           ),
         );
@@ -1289,6 +1311,70 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       ),
     );
     if (result != null) setState(() => _moves[moveIndex] = result);
+  }
+
+  // ── Ribbons ───────────────────────────────────────────────────────────────
+
+  Widget _buildRibbons() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_ribbons.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              '${_ribbons.length} ribbon${_ribbons.length == 1 ? '' : 's'} awarded',
+              style: textTheme.bodySmall
+                  ?.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
+          ),
+        for (final category in kRibbonCatalog) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4, top: 8),
+            child: Text(
+              category.name,
+              style: textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: category.ribbons.map((r) {
+              final selected = _ribbons.contains(r.id);
+              return FilterChip(
+                avatar: r.spriteUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: r.spriteUrl!,
+                        width: 20,
+                        height: 20,
+                        fit: BoxFit.contain,
+                        errorWidget: (_, __, ___) => const Icon(
+                          Icons.workspace_premium_rounded,
+                          size: 16,
+                        ),
+                      )
+                    : const Icon(Icons.workspace_premium_rounded, size: 16),
+                label: Text(r.name),
+                selected: selected,
+                visualDensity: VisualDensity.compact,
+                labelStyle: textTheme.labelSmall?.copyWith(
+                  fontWeight:
+                      selected ? FontWeight.bold : FontWeight.normal,
+                ),
+                onSelected: (on) => setState(
+                    () => on ? _ribbons.add(r.id) : _ribbons.remove(r.id)),
+              );
+            }).toList(),
+          ),
+        ],
+      ],
+    );
   }
 
   // ── Contest conditions ──────────────────────────────────────────────────────

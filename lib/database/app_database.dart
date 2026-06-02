@@ -18,7 +18,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -77,6 +77,9 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(teamSlots, teamSlots.contestClever);
             await m.addColumn(teamSlots, teamSlots.contestTough);
             await m.addColumn(teamSlots, teamSlots.contestSheen);
+          }
+          if (from < 6) {
+            await m.addColumn(teamSlots, teamSlots.ribbons);
           }
         },
       );
