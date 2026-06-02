@@ -6,6 +6,7 @@ const _kApiBaseUrl = 'api_base_url';
 const _kUseFormatSprites = 'use_format_sprites';
 const _kSeedColor = 'seed_color';
 const _kThemeMode = 'theme_mode';
+const _kPsDirectory = 'ps_directory';
 const kDefaultApiBaseUrl = 'http://localhost:8000';
 // Default seed colour — Pokéball red
 const kDefaultSeedColor = 0xFFCC0000;
@@ -87,4 +88,18 @@ class AppConfigRepository {
 
   Stream<ThemeMode> watchThemeMode() =>
       watch(_kThemeMode).map(_parseThemeMode);
+
+  // ── Pokémon Showdown directory ─────────────────────────────────────────────
+
+  /// Returns the configured PS teams directory path, or null if not set.
+  Future<String?> getPsDirectory() async {
+    final v = await get(_kPsDirectory);
+    return (v == null || v.isEmpty) ? null : v;
+  }
+
+  Future<void> setPsDirectory(String? path) =>
+      set(_kPsDirectory, path ?? '');
+
+  Stream<String?> watchPsDirectory() =>
+      watch(_kPsDirectory).map((v) => (v == null || v.isEmpty) ? null : v);
 }

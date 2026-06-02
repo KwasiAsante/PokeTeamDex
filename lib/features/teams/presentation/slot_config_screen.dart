@@ -25,6 +25,7 @@ import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:poke_team_dex/features/teams/data/ribbon_catalog.dart';
+import 'package:poke_team_dex/features/teams/services/ps_export_service.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
@@ -355,6 +356,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         ),
       );
 
+      // Best-effort PS export — runs after the DB write succeeds.
+      await _maybePsExport(existing);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -375,6 +379,38 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Writes the team's PS export file if a PS directory is configured.
+  /// Errors are swallowed so they don't disrupt the normal save flow.
+  Future<void> _maybePsExport(TeamSlot existing) async {
+    if (!PsExportService.isSupported) return;
+    try {
+      final configRepo = ref.read(appConfigRepositoryProvider);
+      final psDir = await configRepo.getPsDirectory();
+      if (psDir == null || psDir.isEmpty) return;
+
+      final teamRepo = ref.read(teamRepositoryProvider);
+      final slotRepo = ref.read(teamSlotRepositoryProvider);
+      final folderRepo = ref.read(teamFolderRepositoryProvider);
+
+      final team = await teamRepo.getById(existing.teamId);
+      TeamFolder? folder;
+      if (team.folderId != null) {
+        folder = await folderRepo.getByIdOrNull(team.folderId!);
+      }
+      final slots = await slotRepo.getByTeam(existing.teamId);
+
+      await PsExportService.exportTeam(
+        team: team,
+        folder: folder,
+        slots: slots,
+        psDirectory: psDir,
+        pokeApi: ref.read(pokeApiRepositoryProvider),
+      );
+    } catch (_) {
+      // Best-effort — do not surface PS export errors to the user.
     }
   }
 

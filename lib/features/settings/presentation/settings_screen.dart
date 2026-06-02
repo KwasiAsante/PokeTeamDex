@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
@@ -175,6 +179,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   .setUseFormatSprites(v),
             ),
           ),
+          // ── Pokémon Showdown sync (desktop only) ──────────────────────────
+          if (!kIsWeb &&
+              (Platform.isWindows ||
+                  Platform.isMacOS ||
+                  Platform.isLinux)) ...[
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 16),
+            _SectionHeader('Pokémon Showdown'),
+            const SizedBox(height: 8),
+            _PsDirectoryTile(),
+          ],
+
           const SizedBox(height: 32),
           const Divider(),
           const SizedBox(height: 16),
@@ -417,6 +434,88 @@ class _SectionHeader extends StatelessWidget {
       style: Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
           ),
+    );
+  }
+}
+
+// ── PS directory tile ─────────────────────────────────────────────────────────
+
+class _PsDirectoryTile extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dirAsync = ref.watch(psDirectoryProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final current = dirAsync.asData?.value;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Teams directory',
+          style: textTheme.labelLarge,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'When set, every team save writes a .txt file to this '
+          'directory in Pokémon Showdown export format. '
+          'Teams inside folders are saved in a matching sub-folder.',
+          style: textTheme.bodySmall
+              ?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  border:
+                      Border.all(color: colorScheme.outlineVariant),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  current ?? 'Not set',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: current != null
+                        ? colorScheme.onSurface
+                        : colorScheme.onSurfaceVariant,
+                    fontFamily: current != null ? 'monospace' : null,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton(
+              onPressed: () async {
+                final path =
+                    await FilePicker.platform.getDirectoryPath(
+                  dialogTitle: 'Select Pokémon Showdown teams folder',
+                );
+                if (path != null) {
+                  await ref
+                      .read(appConfigRepositoryProvider)
+                      .setPsDirectory(path);
+                }
+              },
+              child: const Text('Browse'),
+            ),
+            if (current != null) ...[
+              const SizedBox(width: 4),
+              IconButton(
+                tooltip: 'Clear',
+                icon: const Icon(Icons.clear),
+                onPressed: () => ref
+                    .read(appConfigRepositoryProvider)
+                    .setPsDirectory(null),
+              ),
+            ],
+          ],
+        ),
+      ],
     );
   }
 }
