@@ -237,7 +237,7 @@
 - [x] **Contest data enhancement** — super contest + contest spectacular data in move detail; heart bar for appeal (❤️/🤍 per point), jam bar (🖤/🤍); contest-type badge chips (Cool/Beautiful/Cute/Clever/Tough)
 
 ### Slot Config
-- [ ] **Contest stats + radar chart** — 6 contest stat sliders (Coolness/Beautifulness/Cuteness/Cleverness/Toughness/Sheen, 0–255) in slot config, visible only for gen 3/4/no-format; rendered as a radar/spider chart via `fl_chart RadarChart`; DB migration adds 6 columns to `team_slots`
+- [x] **Contest stats + radar chart** — 6 contest stat sliders (Coolness/Beautifulness/Cuteness/Cleverness/Toughness/Sheen, 0–255) in slot config, visible only for gen 3/4/no-format; rendered as a radar/spider chart via `fl_chart RadarChart`; DB migration adds 6 columns to `team_slots`
 - [ ] **Ribbons** — hardcoded ribbon catalog by category (League, Contest, Tower, Memorial, Gift, Special) sourced from Bulbapedia; `ribbons` JSON column on `team_slots`; chip-grid picker in slot config
 
 ### Pokémon Showdown Sync
