@@ -229,7 +229,7 @@
 - [x] **Team: Duplicate** — "Duplicate team" in context menu; deep-copies team row + all slots with "(Copy)" suffix; queues create ops
 
 ### Pokédex
-- [ ] **Favorites** — star `IconButton` on Pokédex list tile, detail header, team slot card, and slot config AppBar; favorites `FilterChip` in Pokédex filter bar; `favorites` Drift table (`pokemon_id` PK)
+- [x] **Favorites** — star `IconButton` on Pokédex list tile, detail header, team slot card, and slot config AppBar; favorites `FilterChip` in Pokédex filter bar; `favorites` Drift table (`pokemon_id` PK)
 - [ ] **Slot picker: format auto-filter** — when team has a `formatLabel`, pre-seed the generation filter (and game chip for game-specific formats) in the slot picker so only eligible Pokémon are shown
 
 ### Reference Browsers
