@@ -313,7 +313,8 @@ class _ExpandedLayoutState extends State<_ExpandedLayout> {
       body: Row(
         children: [
           // ── Sidebar — full drawer or collapsed icon rail ─────────────────
-          AnimatedContainer(
+          ClipRect(
+            child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeInOut,
             width: _collapsed ? 72 : 260,
@@ -382,7 +383,8 @@ class _ExpandedLayoutState extends State<_ExpandedLayout> {
                         ),
                     ],
                   ),
-          ),
+          ), // AnimatedContainer
+          ), // ClipRect
           VerticalDivider(
               thickness: 1, width: 1,
               color: colorScheme.outlineVariant),
