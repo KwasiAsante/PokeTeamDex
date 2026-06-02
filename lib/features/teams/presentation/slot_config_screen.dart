@@ -1348,6 +1348,18 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             children: category.ribbons.map((r) {
               final selected = _ribbons.contains(r.id);
               return FilterChip(
+                avatar: r.spriteUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: r.spriteUrl!,
+                        width: 20,
+                        height: 20,
+                        fit: BoxFit.contain,
+                        errorWidget: (_, __, ___) => const Icon(
+                          Icons.workspace_premium_rounded,
+                          size: 16,
+                        ),
+                      )
+                    : const Icon(Icons.workspace_premium_rounded, size: 16),
                 label: Text(r.name),
                 selected: selected,
                 visualDensity: VisualDensity.compact,
@@ -1355,8 +1367,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   fontWeight:
                       selected ? FontWeight.bold : FontWeight.normal,
                 ),
-                onSelected: (on) =>
-                    setState(() => on ? _ribbons.add(r.id) : _ribbons.remove(r.id)),
+                onSelected: (on) => setState(
+                    () => on ? _ribbons.add(r.id) : _ribbons.remove(r.id)),
               );
             }).toList(),
           ),
