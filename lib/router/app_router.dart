@@ -342,8 +342,14 @@ class _ExpandedLayoutState extends State<_ExpandedLayout> {
                           labelType: NavigationRailLabelType.none,
                           destinations: _destinations
                               .map((d) => NavigationRailDestination(
-                                    icon: Icon(d.icon),
-                                    selectedIcon: Icon(d.activeIcon),
+                                    icon: Tooltip(
+                                      message: d.label,
+                                      child: Icon(d.icon),
+                                    ),
+                                    selectedIcon: Tooltip(
+                                      message: d.label,
+                                      child: Icon(d.activeIcon),
+                                    ),
                                     label: Text(d.label),
                                   ))
                               .toList(),
