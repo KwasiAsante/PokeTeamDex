@@ -224,9 +224,9 @@
 ## Planned Features — Wave 1 (Pre-release, simpler)
 
 ### Team Management
-- [ ] **Team: Move to folder** — "Move to folder" in team context menu; bottom sheet lists all folders + Ungrouped; one DB write + sync op
-- [ ] **Team: Drag to folder** — folder section headers as `DragTarget`; team tiles as `Draggable`; cross-section drag replaces folder assignment
-- [ ] **Team: Duplicate** — "Duplicate team" in context menu; deep-copies team row + all slots with "(Copy)" suffix; queues create ops
+- [x] **Team: Move to folder** — "Move to folder" in team context menu; bottom sheet lists all folders + Ungrouped; one DB write + sync op
+- [x] **Team: Drag to folder** — folder section headers as `DragTarget`; team tiles as `Draggable`; cross-section drag replaces folder assignment
+- [x] **Team: Duplicate** — "Duplicate team" in context menu; deep-copies team row + all slots with "(Copy)" suffix; queues create ops
 
 ### Pokédex
 - [ ] **Favorites** — star `IconButton` on Pokédex list tile, detail header, team slot card, and slot config AppBar; favorites `FilterChip` in Pokédex filter bar; `favorites` Drift table (`pokemon_id` PK)
