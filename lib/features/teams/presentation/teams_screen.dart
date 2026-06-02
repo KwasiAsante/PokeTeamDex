@@ -249,25 +249,69 @@ class _TeamsList extends ConsumerWidget {
                 ),
               ),
             // Ungrouped teams
-            if (ungrouped.isNotEmpty) ...[
-              if (folders.isNotEmpty)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                    child: Text(
-                      'Ungrouped',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                    ),
-                  ),
-                ),
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) => _TeamTile(team: ungrouped[i]),
-                  childCount: ungrouped.length,
+            if (ungrouped.isNotEmpty || folders.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: DragTarget<Team>(
+                  onWillAcceptWithDetails: (d) => d.data.folderId != null,
+                  onAcceptWithDetails: (d) =>
+                      moveTeamToFolder(ref, d.data.id, null),
+                  builder: (context, candidates, _) {
+                    final highlight = candidates.isNotEmpty;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      color: highlight
+                          ? Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest
+                              .withValues(alpha: 0.6)
+                          : null,
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                      child: Row(
+                        children: [
+                          if (folders.isNotEmpty)
+                            Text(
+                              'Ungrouped',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                          if (highlight) ...[
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.arrow_downward,
+                              size: 14,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Drop here to ungroup',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                  ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
+              if (ungrouped.isNotEmpty)
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (_, i) => _TeamTile(team: ungrouped[i]),
+                    childCount: ungrouped.length,
+                  ),
+                ),
             ],
             const SliverToBoxAdapter(child: SizedBox(height: 88)),
           ],
@@ -319,21 +363,34 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ListTile(
-          leading: ReorderableDragStartListener(
-            index: widget.index,
-            child: Icon(
-              _expanded ? Icons.folder_open : Icons.folder,
-              color: colorScheme.primary,
-            ),
-          ),
-          title: Text(
-            widget.folder.name,
-            style: Theme.of(context)
-                .textTheme
-                .titleSmall
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
+        DragTarget<Team>(
+          onWillAcceptWithDetails: (d) => d.data.folderId != widget.folder.id,
+          onAcceptWithDetails: (d) =>
+              moveTeamToFolder(ref, d.data.id, widget.folder.id),
+          builder: (context, candidates, _) {
+            final highlight = candidates.isNotEmpty;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              color: highlight
+                  ? colorScheme.primaryContainer.withValues(alpha: 0.4)
+                  : null,
+              child: ListTile(
+                leading: ReorderableDragStartListener(
+                  index: widget.index,
+                  child: Icon(
+                    _expanded ? Icons.folder_open : Icons.folder,
+                    color: highlight
+                        ? colorScheme.primary
+                        : colorScheme.primary,
+                  ),
+                ),
+                title: Text(
+                  widget.folder.name,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -355,7 +412,10 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
               ),
             ],
           ),
-          onTap: () => setState(() => _expanded = !_expanded),
+                onTap: () => setState(() => _expanded = !_expanded),
+              ),
+            );
+          },
         ),
         if (_expanded)
           teamsAsync.when(
@@ -581,10 +641,46 @@ class _TeamTile extends ConsumerWidget {
                 child: Icon(Icons.drag_handle, size: 20),
               ),
             ),
+          // Cross-folder drag handle — separate from the intra-folder handle
+          // above so they don't compete for the same gesture.
+          Draggable<Team>(
+            data: team,
+            feedback: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.catching_pokemon, size: 18),
+                    const SizedBox(width: 6),
+                    Text(team.name,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+            childWhenDragging: Opacity(
+              opacity: 0.3,
+              child: Icon(Icons.drive_file_move_outline,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+            child: Tooltip(
+              message: 'Drag to move folder',
+              child: Icon(Icons.drive_file_move_outline,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ),
           PopupMenuButton<String>(
             onSelected: (v) => _onTeamAction(context, ref, v),
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'rename', child: Text('Rename')),
+              PopupMenuItem(value: 'move', child: Text('Move to folder')),
+              PopupMenuItem(value: 'duplicate', child: Text('Duplicate')),
+              PopupMenuDivider(),
               PopupMenuItem(value: 'delete', child: Text('Delete')),
             ],
           ),
@@ -624,6 +720,21 @@ class _TeamTile extends ConsumerWidget {
       if (name != null && name.isNotEmpty) {
         await renameTeam(ref, team.id, name);
       }
+    } else if (action == 'move') {
+      final folders = ref.read(foldersProvider).asData?.value ?? [];
+      if (!context.mounted) return;
+      final result = await showModalBottomSheet<({int? folderId, bool confirmed})>(
+        context: context,
+        builder: (_) => _MoveFolderSheet(
+          folders: folders,
+          currentFolderId: team.folderId,
+        ),
+      );
+      if (result != null && result.confirmed) {
+        await moveTeamToFolder(ref, team.id, result.folderId);
+      }
+    } else if (action == 'duplicate') {
+      await duplicateTeam(ref, team.id);
     } else if (action == 'delete') {
       final confirmed = await showDialog<bool>(
         context: context,
@@ -878,6 +989,76 @@ class _TeamSpriteRow extends ConsumerWidget {
           );
         }),
         ),
+      ),
+    );
+  }
+}
+
+// ── Move to folder bottom sheet ───────────────────────────────────────────────
+
+/// Lists all folders + Ungrouped. Returns `(folderId, confirmed: true)` on
+/// selection, or null on dismiss.
+class _MoveFolderSheet extends StatelessWidget {
+  final List<TeamFolder> folders;
+  final int? currentFolderId;
+
+  const _MoveFolderSheet({
+    required this.folders,
+    required this.currentFolderId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text(
+              'Move to…',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: Icon(Icons.inbox_outlined,
+                color: currentFolderId == null
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant),
+            title: const Text('Ungrouped'),
+            trailing: currentFolderId == null
+                ? Icon(Icons.check, color: colorScheme.primary)
+                : null,
+            enabled: currentFolderId != null,
+            onTap: currentFolderId == null
+                ? null
+                : () => Navigator.pop(
+                    context, (folderId: null as int?, confirmed: true)),
+          ),
+          if (folders.isNotEmpty) const Divider(height: 1),
+          ...folders.map((f) => ListTile(
+                leading: Icon(Icons.folder_outlined,
+                    color: currentFolderId == f.id
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant),
+                title: Text(f.name),
+                trailing: currentFolderId == f.id
+                    ? Icon(Icons.check, color: colorScheme.primary)
+                    : null,
+                enabled: currentFolderId != f.id,
+                onTap: currentFolderId == f.id
+                    ? null
+                    : () => Navigator.pop(
+                        context, (folderId: f.id as int?, confirmed: true)),
+              )),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }
