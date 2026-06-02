@@ -221,8 +221,49 @@
 
 ---
 
-## Deferred / Out of Scope
+## Planned Features — Wave 1 (Pre-release, simpler)
 
+### Team Management
+- [ ] **Team: Move to folder** — "Move to folder" in team context menu; bottom sheet lists all folders + Ungrouped; one DB write + sync op
+- [ ] **Team: Drag to folder** — folder section headers as `DragTarget`; team tiles as `Draggable`; cross-section drag replaces folder assignment
+- [ ] **Team: Duplicate** — "Duplicate team" in context menu; deep-copies team row + all slots with "(Copy)" suffix; queues create ops
+
+### Pokédex
+- [ ] **Favorites** — star `IconButton` on Pokédex list tile, detail header, team slot card, and slot config AppBar; favorites `FilterChip` in Pokédex filter bar; `favorites` Drift table (`pokemon_id` PK)
+- [ ] **Slot picker: format auto-filter** — when team has a `formatLabel`, pre-seed the generation filter (and game chip for game-specific formats) in the slot picker so only eligible Pokémon are shown
+
+### Reference Browsers
+- [ ] **Move chips: Z / Max / G-Max** — "Z" chip (IDs 622–658, 695–703, 719, 723–728), "Max" chip (IDs 734, 757–774) on move tiles + detail; "G-Max" chip derived from PS `moves.json` (names starting with `g-max-`)
+- [ ] **Contest data enhancement** — super contest + contest spectacular data in move detail; heart bar for appeal (❤️/🤍 per point), jam bar (🖤/🤍); contest-type badge chips (Cool/Beautiful/Cute/Clever/Tough)
+
+### Slot Config
+- [ ] **Contest stats + radar chart** — 6 contest stat sliders (Coolness/Beautifulness/Cuteness/Cleverness/Toughness/Sheen, 0–255) in slot config, visible only for gen 3/4/no-format; rendered as a radar/spider chart via `fl_chart RadarChart`; DB migration adds 6 columns to `team_slots`
+- [ ] **Ribbons** — hardcoded ribbon catalog by category (League, Contest, Tower, Memorial, Gift, Special) sourced from Bulbapedia; `ribbons` JSON column on `team_slots`; chip-grid picker in slot config
+
+### Pokémon Showdown Sync
+- [ ] **PS import** — parse PS team `.txt` format (Nickname (Species) @ Item, Ability, EVs, moves) → create teams + slots locally; folder mapping from PS subfolder structure
+- [ ] **PS export to directory** — setting to point to PS teams directory (path picker); write/update `.txt` on every team save; subfolder per app folder
+
+---
+
+## Planned Features — Wave 2 (Pre-release, complex — after Wave 1)
+
+### Generation Gimmicks (format-engine/gimmicks epic)
+- [ ] **Mega Evolution** — mega stone → mega form mapping JSON; in slot config when held item is a Mega Stone and Pokémon has a mega form: sprite/image swaps to mega form, base stats recalculate, toggle to switch between base and mega; `is_mega_evolved` bool column on `team_slots`
+- [ ] **Z-Moves** — Z-crystal → Z-move lookup JSON (18 type crystals + ~20 exclusive crystals with required base moves); in slot config when Z-crystal is held show corresponding Z-move next to each of the 4 moves; exclusive Z-move shown if base move present
+- [ ] **Dynamax / Gigantamax** — all Pokémon: show type-appropriate Max Move next to each move; G-Max capable list + G-Max move per species from PS data; `has_gigantamax` + `gigantamax_enabled` booleans on `team_slots`; G-Max toggle swaps sprite to `-gmax` form; Alpha Pokémon flag (`is_alpha` bool) for Legends Arceus
+
+### Pokémon Instances (continuity across teams)
+- [ ] **Data model** — `pokemon_instances` table (`id`, `origin_slot_id`, `parent_instance_id` nullable); slots optionally reference an instance; ribbons and nickname history attach to the instance
+- [ ] **Link UI** — "Link to another team's Pokémon" in slot config; instance chain view showing all appearances in sequence with origin label
+- [ ] **Ribbon inheritance** — ribbons carry forward from parent instance to child; "Previously known as" / Aliases label when nickname differs from parent
+
+---
+
+## Deferred / Post-release
+
+- [ ] **PS sync: live directory watch** — `Directory.watch()` + three-way conflict resolution (PS file mtime vs local `updated_at` vs remote `updated_at`)
+- [ ] **Contest moves toggle** — contest move mode in slot config; separate 4-move picker showing contest information (appeal, jam, type) per move
 - Real-time battle simulation
 - Multi-user / public team sharing
 - Pokémon GO data
