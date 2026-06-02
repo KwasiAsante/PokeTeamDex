@@ -147,7 +147,7 @@
 
 ### Desktop Platform
 
-- [ ] **System tray** — minimize or close the app to the system tray on Windows/macOS/Linux; tray icon with quick-sync and quit actions (`tray_manager` package). The 15-min periodic Timer continues running while minimized to tray, giving near-WorkManager behaviour without needing a closed-app scheduler.
+- [x] **System tray** — minimize or close the app to the system tray on Windows/macOS/Linux; tray icon with quick-sync and quit actions (`tray_manager` package). The 15-min periodic Timer continues running while minimized to tray, giving near-WorkManager behaviour without needing a closed-app scheduler.
 
 ### Navigation & Shell
 
