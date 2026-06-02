@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/presentation/slot_config_screen.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart';
@@ -448,7 +449,36 @@ class _FilledSlotCard extends ConsumerWidget {
             s['stat']['name'] as String: s['base_stat'] as int,
         };
 
-        // Calculate final stats
+        // ── Mega Evolution support (must come before calcStats) ────────────
+        final megaEntry = slot.heldItemName != null
+            ? kMegaStoneMap[slot.heldItemName]
+            : null;
+        final isMegaApplicable = slot.isMegaEvolved &&
+            megaEntry != null &&
+            pokemon.name == megaEntry.baseSpecies;
+
+        final megaPokemon = isMegaApplicable
+            ? ref
+                .watch(pokemonByNameProvider(megaEntry.megaForm))
+                .asData
+                ?.value
+            : null;
+
+        // Override base stats when mega-evolved; falls back to base form stats.
+        final effectiveBaseStats = megaPokemon != null
+            ? <String, int>{
+                for (final s in megaPokemon.stats)
+                  s['stat']['name'] as String: s['base_stat'] as int,
+              }
+            : baseStats;
+        // Prefer HOME artwork; fall back to official artwork.
+        final megaHomeUrl = megaPokemon != null
+            ? pokemonHomeUrl(megaPokemon.id)
+            : null;
+        final megaOfficialUrl = megaPokemon?.officialArtworkUrl;
+        final megaArtworkUrl = megaHomeUrl;
+
+        // Calculate final stats (uses mega base stats when applicable)
         final level = slot.level ?? 50;
         final evs = [
           slot.evHp ?? 0, slot.evAtk ?? 0, slot.evDef ?? 0,
@@ -461,9 +491,9 @@ class _FilledSlotCard extends ConsumerWidget {
         final calcStats = <int>[
           for (int i = 0; i < _statKeys.length; i++)
             _statKeys[i] == 'hp'
-                ? _calcHP(baseStats['hp'] ?? 45, ivs[0], evs[0], level)
+                ? _calcHP(effectiveBaseStats['hp'] ?? 45, ivs[0], evs[0], level)
                 : _calcStat(
-                    baseStats[_statKeys[i]] ?? 50,
+                    effectiveBaseStats[_statKeys[i]] ?? 50,
                     ivs[i], evs[i], level,
                     _natureMod(slot.natureName, _statKeys[i]),
                   ),
@@ -584,9 +614,12 @@ class _FilledSlotCard extends ConsumerWidget {
                         child: Column(
                           children: [
                             PokemonSprite(
-                              defaultUrl: spriteUrls.defaultUrl,
-                              shinyUrl: spriteUrls.shinyUrl,
-                              shiny: slot.isShiny,
+                              defaultUrl: megaArtworkUrl ?? spriteUrls.defaultUrl,
+                              fallbackUrl: megaArtworkUrl != null
+                                  ? megaOfficialUrl
+                                  : null,
+                              shinyUrl: megaArtworkUrl != null ? null : spriteUrls.shinyUrl,
+                              shiny: megaArtworkUrl == null && slot.isShiny,
                               size: 96,
                             ),
                             if (itemEntry?.spriteUrl != null)
@@ -653,15 +686,23 @@ class _FilledSlotCard extends ConsumerWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            // Ability
-                            if (slot.abilityName != null)
-                              Text(
-                                slot.abilityName!.toCapitalCase(),
+                            // Ability — show mega form ability when evolved
+                            Builder(builder: (_) {
+                              final abilityName = (isMegaApplicable &&
+                                      megaPokemon != null &&
+                                      megaPokemon.abilities.isNotEmpty)
+                                  ? (megaPokemon.abilities.first['ability']
+                                          as Map)['name'] as String
+                                  : slot.abilityName;
+                              if (abilityName == null) return const SizedBox.shrink();
+                              return Text(
+                                abilityName.toCapitalCase(),
                                 style: textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                              ),
+                              );
+                            }),
                             // Nature
                             if (slot.natureName != null)
                               Text(
