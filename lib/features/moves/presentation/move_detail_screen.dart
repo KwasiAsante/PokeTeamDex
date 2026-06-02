@@ -2,7 +2,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:poke_team_dex/features/moves/providers/moves_provider.dart';
+import 'package:poke_team_dex/features/moves/providers/moves_provider.dart'
+    show contestEffectProvider, machineProvider, superContestEffectProvider;
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -81,6 +82,7 @@ class _MoveDetailBody extends StatelessWidget {
                 child: _PastValuesCard(pastValues: move.pastValues),
               ),
             if (move.contestTypeName != null ||
+                move.contestEffectUrl != null ||
                 (move.contestCombos != null && move.contestCombos!.hasAny))
               _Section(
                   title: 'Contest', child: _ContestCard(move: move)),
@@ -351,18 +353,110 @@ class _PastValuesCard extends StatelessWidget {
 
 // ── Contest ───────────────────────────────────────────────────────────────────
 
-class _ContestCard extends StatelessWidget {
+const _contestTypeColors = {
+  'cool':      Color(0xFFE53935),
+  'beautiful': Color(0xFF1E88E5),
+  'cute':      Color(0xFFE91E63),
+  'clever':    Color(0xFF43A047),
+  'tough':     Color(0xFF795548),
+};
+
+class _ContestCard extends ConsumerWidget {
   final MoveEntry move;
   const _ContestCard({required this.move});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final contestType = move.contestTypeName;
+    final typeColor = contestType != null
+        ? (_contestTypeColors[contestType] ?? colorScheme.primary)
+        : colorScheme.primary;
+
+    final effectAsync = move.contestEffectUrl != null
+        ? ref.watch(contestEffectProvider(move.contestEffectUrl!))
+        : null;
+    final superAsync = move.superContestEffectUrl != null
+        ? ref.watch(superContestEffectProvider(move.superContestEffectUrl!))
+        : null;
+
     final combos = move.contestCombos;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (move.contestTypeName != null)
-          _StatRow('Contest type', _fmt(move.contestTypeName!)),
+        // Contest type badge
+        if (contestType != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: typeColor,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                '${contestType[0].toUpperCase()}${contestType.substring(1)}',
+                style: textTheme.labelMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+
+        // Regular contest (Gen III)
+        if (effectAsync != null) ...[
+          Text('Regular Contest (Gen III)',
+              style: textTheme.labelMedium
+                  ?.copyWith(color: colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 6),
+          effectAsync.when(
+            loading: () => const _HeartBarSkeleton(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (e) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _HeartBarRow(
+                    label: 'Appeal', filled: e.appeal, total: 8,
+                    color: Colors.red),
+                if (e.jam > 0) ...[
+                  const SizedBox(height: 4),
+                  _HeartBarRow(
+                      label: 'Jam', filled: e.jam, total: 4,
+                      color: Colors.black87),
+                ],
+                if (e.shortEffect != null &&
+                    e.shortEffect != 'No additional effect.') ...[
+                  const SizedBox(height: 4),
+                  Text(e.shortEffect!,
+                      style: textTheme.bodySmall
+                          ?.copyWith(color: colorScheme.onSurfaceVariant)),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Super contest (Gen IV)
+        if (superAsync != null) ...[
+          Text('Super Contest (Gen IV)',
+              style: textTheme.labelMedium
+                  ?.copyWith(color: colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 6),
+          superAsync.when(
+            loading: () => const _HeartBarSkeleton(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (s) => _HeartBarRow(
+                label: 'Appeal', filled: s.appeal, total: 6,
+                color: Colors.red),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Combos
         if (combos != null) ...[
           if (combos.normalUseBefore.isNotEmpty)
             _StatRow('Use before', combos.normalUseBefore.map(_fmt).join(', ')),
@@ -378,6 +472,59 @@ class _ContestCard extends StatelessWidget {
       ],
     );
   }
+}
+
+class _HeartBarRow extends StatelessWidget {
+  final String label;
+  final int filled;
+  final int total;
+  final Color color;
+  const _HeartBarRow(
+      {required this.label,
+      required this.filled,
+      required this.total,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 56,
+          child: Text(label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  )),
+        ),
+        ...List.generate(
+          total,
+          (i) => Icon(
+            i < filled ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+            size: 16,
+            color: i < filled
+                ? color
+                : Theme.of(context)
+                    .colorScheme
+                    .onSurfaceVariant
+                    .withValues(alpha: 0.25),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          '$filled / $total',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeartBarSkeleton extends StatelessWidget {
+  const _HeartBarSkeleton();
+  @override
+  Widget build(BuildContext context) => const SizedBox(height: 20);
 }
 
 // ── Machines ──────────────────────────────────────────────────────────────────
