@@ -372,6 +372,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   }
 
   Widget _buildWithPokemon(TeamSlot slot) {
+    ref.watch(allFormatsProvider); // ensures PS data is loaded; triggers rebuild when ready
     final pokemonAsync = ref.watch(pokemonDetailProvider(slot.pokemonId));
     return pokemonAsync.when(
       loading: () => widget.embedded

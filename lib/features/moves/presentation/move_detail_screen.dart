@@ -7,7 +7,7 @@ import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
-import 'package:poke_team_dex/services/format/format_providers.dart';
+import 'package:poke_team_dex/services/format/format_providers.dart' show allFormatsProvider, formatServiceProvider;
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/move_type_chip.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
@@ -113,7 +113,8 @@ class _Header extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
-    final special = classifyMoveType(ref.watch(formatServiceProvider), move.name);
+    ref.watch(allFormatsProvider); // ensures service is initialized; triggers rebuild when ready
+    final special = classifyMoveType(ref.read(formatServiceProvider), move.name);
 
     return Container(
       width: double.infinity,

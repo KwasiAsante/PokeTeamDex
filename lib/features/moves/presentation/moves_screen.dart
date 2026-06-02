@@ -8,7 +8,7 @@ import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
-import 'package:poke_team_dex/services/format/format_providers.dart';
+import 'package:poke_team_dex/services/format/format_providers.dart' show allFormatsProvider, formatServiceProvider;
 import 'package:poke_team_dex/shared/widgets/move_type_chip.dart';
 import 'package:poke_team_dex/shared/widgets/skeleton_box.dart';
 
@@ -259,7 +259,8 @@ class _MoveListItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final special = classifyMoveType(ref.watch(formatServiceProvider), move.name);
+    ref.watch(allFormatsProvider); // ensures service is initialized; triggers rebuild when ready
+    final special = classifyMoveType(ref.read(formatServiceProvider), move.name);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final typeColor = move.typeName != null
@@ -355,7 +356,8 @@ class _MoveGridCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final special = classifyMoveType(ref.watch(formatServiceProvider), move.name);
+    ref.watch(allFormatsProvider); // ensures service is initialized; triggers rebuild when ready
+    final special = classifyMoveType(ref.read(formatServiceProvider), move.name);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final typeColor = move.typeName != null
