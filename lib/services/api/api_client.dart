@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/database/repositories/app_config_repository.dart';
@@ -21,6 +22,15 @@ class ApiClient {
       receiveTimeout: const Duration(seconds: 10),
     ));
     _dio.interceptors.add(_AppInterceptor(configRepo, getToken));
+    if (kDebugMode) {
+      _dio.interceptors.add(LogInterceptor(
+        requestHeader: true,
+        responseHeader: false,
+        requestBody: false,
+        responseBody: true,
+        logPrint: (o) => debugPrint('[Dio] $o'),
+      ));
+    }
   }
 
   late final Dio _dio;
@@ -43,6 +53,9 @@ class _AppInterceptor extends Interceptor {
 
     // Attach auth token from the in-memory provider state.
     final token = _getToken();
+    if (kDebugMode) {
+      debugPrint('[Auth] token state: ${token == null ? "null" : (token.isEmpty ? "empty-string" : "present (${token.length} chars)")}');
+    }
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
     }
