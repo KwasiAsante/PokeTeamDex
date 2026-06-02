@@ -46,6 +46,13 @@ class TeamRepository {
   Future<int> delete(int id) =>
       (_db.delete(_db.teams)..where((t) => t.id.equals(id))).go();
 
+  Future<int> updateFolder(int id, int? folderId) =>
+      (_db.update(_db.teams)..where((t) => t.id.equals(id)))
+          .write(TeamsCompanion(
+            folderId: Value(folderId),
+            updatedAt: Value(DateTime.now()),
+          ));
+
   Future<int> updateSortOrder(int id, int sortOrder) =>
       (_db.update(_db.teams)..where((t) => t.id.equals(id)))
           .write(TeamsCompanion(sortOrder: Value(sortOrder)));

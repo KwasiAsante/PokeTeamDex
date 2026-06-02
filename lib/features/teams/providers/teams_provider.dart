@@ -181,13 +181,9 @@ Future<void> moveTeamToFolder(
   final repo = ref.read(teamRepositoryProvider);
   final syncQueue = ref.read(syncQueueRepositoryProvider);
 
-  await repo.update(
-    TeamsCompanion(
-      id: Value(teamId),
-      folderId: Value(folderId),
-      updatedAt: Value(DateTime.now()),
-    ),
-  );
+  // Use updateFolder() instead of update()/replace() — replace() requires all
+  // non-nullable columns to be present and would fail with absent name.
+  await repo.updateFolder(teamId, folderId);
 
   await syncQueue.enqueue(PendingSyncOpsCompanion(
     operation: const Value('update'),
