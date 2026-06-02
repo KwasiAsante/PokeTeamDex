@@ -211,7 +211,17 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _level        = slot.level ?? 50;
     _friendship   = slot.friendship ?? 0;
     _abilityName  = slot.abilityName;
-    _natureName   = slot.natureName;
+    // Normalise nature to match DropdownButton item values (Proper case).
+    // Guards against lowercase values stored by older imports.
+    final rawNature = slot.natureName;
+    _natureName = (rawNature != null && rawNature.isNotEmpty)
+        ? rawNature[0].toUpperCase() + rawNature.substring(1).toLowerCase()
+        : null;
+    // If the value still doesn't match a known nature, clear it rather than crash.
+    if (_natureName != null &&
+        !_kNatures.any((n) => n.name == _natureName)) {
+      _natureName = null;
+    }
     _heldItemName = slot.heldItemName;
     _moves[0] = slot.move1;
     _moves[1] = slot.move2;

@@ -148,7 +148,11 @@ _PsSlot? _parseBlock(String block) {
     } else if (line.startsWith('IVs: ')) {
       _parseStatLine(line.substring(5), ivs);
     } else if (line.endsWith(' Nature')) {
-      nature = line.substring(0, line.length - 7).trim().toLowerCase();
+      // Keep PS casing: "Sassy Nature" → "Sassy" (matches DropdownButton items).
+      final raw = line.substring(0, line.length - 7).trim();
+      nature = raw.isNotEmpty
+          ? raw[0].toUpperCase() + raw.substring(1).toLowerCase()
+          : null;
     } else if (line.startsWith('- ')) {
       // Strip Hidden Power type annotation: "Hidden Power [Ice]" → "hidden-power"
       var move = line.substring(2).trim();
