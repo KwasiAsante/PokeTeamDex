@@ -85,6 +85,12 @@ class SyncService {
         if (op.entityType == 'team' && op.operation == 'create') op.entityId,
     };
 
+    // Re-enqueue CREATE ops for entities that have UPDATE ops but no remoteId
+    // and no CREATE in the queue — happens when a CREATE op was auto-pruned
+    // after repeated failures (e.g. a 403 flood).  The new CREATE op will be
+    // picked up on the next drain cycle.
+    await _healOrphanedOps(activeOps);
+
     final batchOps = <Map<String, dynamic>>[];
     final includedOps = <PendingSyncOp>[];
 
@@ -127,6 +133,57 @@ class SyncService {
       // Stale queue entries — drop them so they don't block future syncs.
       for (final op in includedOps) {
         await syncQueue.delete(op.id);
+      }
+    }
+  }
+
+  /// Detects UPDATE ops whose entity has no remoteId and no CREATE in the queue
+  /// and re-enqueues a fresh CREATE so the entity can be created on the server.
+  Future<void> _healOrphanedOps(List<PendingSyncOp> ops) async {
+    final foldersWithCreate = {
+      for (final op in ops)
+        if (op.entityType == 'team_folder' && op.operation == 'create') op.entityId,
+    };
+    final teamsWithCreate = {
+      for (final op in ops)
+        if (op.entityType == 'team' && op.operation == 'create') op.entityId,
+    };
+
+    final now = DateTime.now();
+    final healedFolders = <int>{};
+    final healedTeams = <int>{};
+
+    for (final op in ops) {
+      if (op.entityType == 'team_folder' && op.operation == 'update') {
+        if (foldersWithCreate.contains(op.entityId)) continue;
+        if (healedFolders.contains(op.entityId)) continue;
+        final folder = await folderRepo.getByIdOrNull(op.entityId);
+        if (folder == null || folder.remoteId != null) continue;
+        await syncQueue.enqueue(PendingSyncOpsCompanion(
+          operation: const Value('create'),
+          entityType: const Value('team_folder'),
+          entityId: Value(op.entityId),
+          payload: Value(jsonEncode({'name': folder.name})),
+          createdAt: Value(now),
+        ));
+        healedFolders.add(op.entityId);
+      } else if (op.entityType == 'team' && op.operation == 'update') {
+        if (teamsWithCreate.contains(op.entityId)) continue;
+        if (healedTeams.contains(op.entityId)) continue;
+        final team = await teamRepo.getByIdOrNull(op.entityId);
+        if (team == null || team.remoteId != null) continue;
+        await syncQueue.enqueue(PendingSyncOpsCompanion(
+          operation: const Value('create'),
+          entityType: const Value('team'),
+          entityId: Value(op.entityId),
+          payload: Value(jsonEncode({
+            'name': team.name,
+            'folder_local_id': team.folderId,
+            'format_label': team.formatLabel,
+          })),
+          createdAt: Value(now),
+        ));
+        healedTeams.add(op.entityId);
       }
     }
   }
