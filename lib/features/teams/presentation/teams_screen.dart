@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
+import 'package:poke_team_dex/features/teams/presentation/ps_import_sheet.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
@@ -42,6 +43,15 @@ class TeamsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('My Teams'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.file_download_outlined),
+            tooltip: 'Import from Showdown',
+            onPressed: () => showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              builder: (_) => const PsImportSheet(),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.create_new_folder_outlined),
             tooltip: 'New folder',
