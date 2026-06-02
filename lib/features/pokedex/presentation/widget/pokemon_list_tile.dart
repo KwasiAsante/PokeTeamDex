@@ -9,6 +9,7 @@ import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.d
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
+import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 
 const _kBase =
@@ -228,6 +229,7 @@ class PokemonListTile extends ConsumerWidget {
                   ),
                 ),
 
+                FavoriteButton(pokemonId: pokemon.id, iconSize: 20),
                 const Icon(Icons.chevron_right, size: 18),
               ],
             ),

@@ -303,6 +303,7 @@ class _FilterBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(pokedexFilterProvider);
+    final showFavs = ref.watch(showFavoritesOnlyProvider);
 
     return SizedBox(
       height: 44,
@@ -310,6 +311,18 @@ class _FilterBar extends ConsumerWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         children: [
+          FilterChip(
+            avatar: Icon(
+              showFavs ? Icons.star_rounded : Icons.star_outline_rounded,
+              size: 16,
+              color: showFavs ? Colors.amber : null,
+            ),
+            label: const Text('Favorites'),
+            selected: showFavs,
+            onSelected: (v) =>
+                ref.read(showFavoritesOnlyProvider.notifier).state = v,
+          ),
+          const SizedBox(width: 6),
           _SortChip(current: filter.sort),
           const SizedBox(width: 6),
           _GenerationChip(selected: filter.generation),

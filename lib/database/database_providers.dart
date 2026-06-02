@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/repositories/app_config_repository.dart';
+import 'package:poke_team_dex/database/repositories/favorites_repository.dart';
 import 'package:poke_team_dex/database/repositories/meta_repository.dart';
 import 'package:poke_team_dex/database/repositories/sync_queue_repository.dart';
 import 'package:poke_team_dex/database/repositories/team_folder_repository.dart';
@@ -36,6 +37,10 @@ final metaRepositoryProvider = Provider<MetaRepository>((ref) {
 
 final appConfigRepositoryProvider = Provider<AppConfigRepository>((ref) {
   return AppConfigRepository(ref.read(appDatabaseProvider));
+});
+
+final favoritesRepositoryProvider = Provider<FavoritesRepository>((ref) {
+  return FavoritesRepository(ref.read(appDatabaseProvider));
 });
 
 final apiBaseUrlProvider = StreamProvider<String>((ref) {

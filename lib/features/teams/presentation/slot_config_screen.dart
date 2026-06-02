@@ -22,6 +22,7 @@ import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
+import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
 import 'package:poke_team_dex/shared/widgets/stat_bar.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
@@ -514,6 +515,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    FavoriteButton(pokemonId: slot.pokemonId, iconSize: 20),
                     if (_saving)
                       const SizedBox(
                         width: 20,
@@ -544,6 +546,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           appBar: AppBar(
             title: Text('Slot ${widget.slotNumber} — $speciesName'),
             actions: [
+              FavoriteButton(pokemonId: slot.pokemonId),
               const ConnectivityStatusButton(),
               if (_saving)
                 const Padding(

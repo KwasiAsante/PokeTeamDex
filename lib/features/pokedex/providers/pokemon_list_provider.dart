@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:poke_team_dex/features/pokedex/models/pokedex_filter.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
+import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 
 /// Full unfiltered Pokémon list (IDs 1–1025 only, excludes alternate forms).
 final pokemonListProvider = FutureProvider<List<PokemonListEntry>>((ref) async {
@@ -23,6 +24,9 @@ final pokedexViewProvider =
 
 /// Current filter + sort state.
 final pokedexFilterProvider = StateProvider<PokedexFilter>((ref) => const PokedexFilter());
+
+/// When true, only favorited Pokémon are shown in the Pokédex list.
+final showFavoritesOnlyProvider = StateProvider<bool>((ref) => false);
 
 /// Set of IDs allowed by the active type filter (null = no type filter active).
 final _typeFilterIdsProvider = FutureProvider<Set<int>?>((ref) async {
@@ -72,11 +76,14 @@ final filteredPokemonListProvider =
   final gameDexAsync   = ref.watch(_gamePokedexProvider);
   final search         = ref.watch(pokemonSearchProvider).trim().toLowerCase();
   final filter         = ref.watch(pokedexFilterProvider);
+  final showFavs       = ref.watch(showFavoritesOnlyProvider);
+  final favSetAsync    = showFavs ? ref.watch(favoritesSetProvider) : null;
 
   // Propagate loading / error from any async source
   if (listAsync     is AsyncLoading ||
       typeIdsAsync  is AsyncLoading ||
-      gameDexAsync  is AsyncLoading) {
+      gameDexAsync  is AsyncLoading ||
+      (favSetAsync  is AsyncLoading)) {
     return const AsyncValue.loading();
   }
   if (listAsync    is AsyncError) return AsyncValue.error(listAsync.error!,    listAsync.stackTrace!);
@@ -102,6 +109,12 @@ final filteredPokemonListProvider =
   final typeIds = typeIdsAsync.value;
   if (typeIds != null) {
     items = items.where((p) => typeIds.contains(p.id)).toList();
+  }
+
+  // Favorites filter
+  if (showFavs && favSetAsync != null) {
+    final favIds = favSetAsync.requireValue;
+    items = items.where((p) => favIds.contains(p.id)).toList();
   }
 
   // Search

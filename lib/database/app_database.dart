@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:poke_team_dex/database/tables/app_config_table.dart';
+import 'package:poke_team_dex/database/tables/favorites_table.dart';
 import 'package:poke_team_dex/database/tables/meta_table.dart';
 import 'package:poke_team_dex/database/tables/pending_sync_ops_table.dart';
 import 'package:poke_team_dex/database/tables/team_folders_table.dart';
@@ -10,14 +11,14 @@ import 'package:poke_team_dex/database/tables/teams_table.dart';
 part 'app_database.g.dart';
 
 @DriftDatabase(
-  tables: [TeamFolders, Teams, TeamSlots, PendingSyncOps, Meta, AppConfigs],
+  tables: [TeamFolders, Teams, TeamSlots, PendingSyncOps, Meta, AppConfigs, Favorites],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor])
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -65,6 +66,9 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(teamSlots, teamSlots.ivSpe);
             await m.addColumn(teamSlots, teamSlots.isDeleted);
             await m.addColumn(teamSlots, teamSlots.syncStatus);
+          }
+          if (from < 4) {
+            await m.createTable(favorites);
           }
         },
       );

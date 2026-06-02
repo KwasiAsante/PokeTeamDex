@@ -17,6 +17,7 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart
 import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
@@ -169,6 +170,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
           style: const TextStyle(color: Colors.white),
         ),
         actions: [
+          FavoriteButton(pokemonId: pokemon.id),
           IconButton(
             tooltip: _shiny ? 'Show default' : 'Show shiny',
             icon: Icon(
@@ -324,6 +326,7 @@ class _DetailSliverAppBar extends StatelessWidget {
         style: const TextStyle(color: Colors.white),
       ),
       actions: [
+        FavoriteButton(pokemonId: pokemon.id),
         IconButton(
           tooltip: shiny ? 'Show default' : 'Show shiny',
           icon: Icon(

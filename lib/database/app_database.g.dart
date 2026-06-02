@@ -3718,6 +3718,148 @@ class AppConfigsCompanion extends UpdateCompanion<AppConfig> {
   }
 }
 
+class $FavoritesTable extends Favorites
+    with TableInfo<$FavoritesTable, Favorite> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FavoritesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _pokemonIdMeta = const VerificationMeta(
+    'pokemonId',
+  );
+  @override
+  late final GeneratedColumn<int> pokemonId = GeneratedColumn<int>(
+    'pokemon_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [pokemonId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'favorites';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Favorite> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('pokemon_id')) {
+      context.handle(
+        _pokemonIdMeta,
+        pokemonId.isAcceptableOrUnknown(data['pokemon_id']!, _pokemonIdMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {pokemonId};
+  @override
+  Favorite map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Favorite(
+      pokemonId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}pokemon_id'],
+      )!,
+    );
+  }
+
+  @override
+  $FavoritesTable createAlias(String alias) {
+    return $FavoritesTable(attachedDatabase, alias);
+  }
+}
+
+class Favorite extends DataClass implements Insertable<Favorite> {
+  final int pokemonId;
+  const Favorite({required this.pokemonId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['pokemon_id'] = Variable<int>(pokemonId);
+    return map;
+  }
+
+  FavoritesCompanion toCompanion(bool nullToAbsent) {
+    return FavoritesCompanion(pokemonId: Value(pokemonId));
+  }
+
+  factory Favorite.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Favorite(pokemonId: serializer.fromJson<int>(json['pokemonId']));
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{'pokemonId': serializer.toJson<int>(pokemonId)};
+  }
+
+  Favorite copyWith({int? pokemonId}) =>
+      Favorite(pokemonId: pokemonId ?? this.pokemonId);
+  Favorite copyWithCompanion(FavoritesCompanion data) {
+    return Favorite(
+      pokemonId: data.pokemonId.present ? data.pokemonId.value : this.pokemonId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Favorite(')
+          ..write('pokemonId: $pokemonId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => pokemonId.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Favorite && other.pokemonId == this.pokemonId);
+}
+
+class FavoritesCompanion extends UpdateCompanion<Favorite> {
+  final Value<int> pokemonId;
+  const FavoritesCompanion({this.pokemonId = const Value.absent()});
+  FavoritesCompanion.insert({this.pokemonId = const Value.absent()});
+  static Insertable<Favorite> custom({Expression<int>? pokemonId}) {
+    return RawValuesInsertable({
+      if (pokemonId != null) 'pokemon_id': pokemonId,
+    });
+  }
+
+  FavoritesCompanion copyWith({Value<int>? pokemonId}) {
+    return FavoritesCompanion(pokemonId: pokemonId ?? this.pokemonId);
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (pokemonId.present) {
+      map['pokemon_id'] = Variable<int>(pokemonId.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FavoritesCompanion(')
+          ..write('pokemonId: $pokemonId')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3727,6 +3869,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PendingSyncOpsTable pendingSyncOps = $PendingSyncOpsTable(this);
   late final $MetaTable meta = $MetaTable(this);
   late final $AppConfigsTable appConfigs = $AppConfigsTable(this);
+  late final $FavoritesTable favorites = $FavoritesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3738,6 +3881,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     pendingSyncOps,
     meta,
     appConfigs,
+    favorites,
   ];
 }
 
@@ -5955,6 +6099,108 @@ typedef $$AppConfigsTableProcessedTableManager =
       AppConfig,
       PrefetchHooks Function()
     >;
+typedef $$FavoritesTableCreateCompanionBuilder =
+    FavoritesCompanion Function({Value<int> pokemonId});
+typedef $$FavoritesTableUpdateCompanionBuilder =
+    FavoritesCompanion Function({Value<int> pokemonId});
+
+class $$FavoritesTableFilterComposer
+    extends Composer<_$AppDatabase, $FavoritesTable> {
+  $$FavoritesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get pokemonId => $composableBuilder(
+    column: $table.pokemonId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FavoritesTableOrderingComposer
+    extends Composer<_$AppDatabase, $FavoritesTable> {
+  $$FavoritesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get pokemonId => $composableBuilder(
+    column: $table.pokemonId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FavoritesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FavoritesTable> {
+  $$FavoritesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get pokemonId =>
+      $composableBuilder(column: $table.pokemonId, builder: (column) => column);
+}
+
+class $$FavoritesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FavoritesTable,
+          Favorite,
+          $$FavoritesTableFilterComposer,
+          $$FavoritesTableOrderingComposer,
+          $$FavoritesTableAnnotationComposer,
+          $$FavoritesTableCreateCompanionBuilder,
+          $$FavoritesTableUpdateCompanionBuilder,
+          (Favorite, BaseReferences<_$AppDatabase, $FavoritesTable, Favorite>),
+          Favorite,
+          PrefetchHooks Function()
+        > {
+  $$FavoritesTableTableManager(_$AppDatabase db, $FavoritesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FavoritesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FavoritesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FavoritesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({Value<int> pokemonId = const Value.absent()}) =>
+                  FavoritesCompanion(pokemonId: pokemonId),
+          createCompanionCallback:
+              ({Value<int> pokemonId = const Value.absent()}) =>
+                  FavoritesCompanion.insert(pokemonId: pokemonId),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FavoritesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FavoritesTable,
+      Favorite,
+      $$FavoritesTableFilterComposer,
+      $$FavoritesTableOrderingComposer,
+      $$FavoritesTableAnnotationComposer,
+      $$FavoritesTableCreateCompanionBuilder,
+      $$FavoritesTableUpdateCompanionBuilder,
+      (Favorite, BaseReferences<_$AppDatabase, $FavoritesTable, Favorite>),
+      Favorite,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -5970,4 +6216,6 @@ class $AppDatabaseManager {
   $$MetaTableTableManager get meta => $$MetaTableTableManager(_db, _db.meta);
   $$AppConfigsTableTableManager get appConfigs =>
       $$AppConfigsTableTableManager(_db, _db.appConfigs);
+  $$FavoritesTableTableManager get favorites =>
+      $$FavoritesTableTableManager(_db, _db.favorites);
 }
