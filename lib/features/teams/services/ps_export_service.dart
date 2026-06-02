@@ -22,14 +22,14 @@ class PsExportService {
     required List<TeamSlot> slots,
     required String psDirectory,
     required PokeApiRepository pokeApi,
-    String? formatName,
+    String? formatLabel,
   }) async {
     if (!isSupported || slots.isEmpty) return;
 
     final text = await buildShowdownExport(
       slots, pokeApi,
       teamName: team.name,
-      formatName: formatName,
+      formatLabel: formatLabel, // raw format id → PS format lookup
     );
     if (text.trim().isEmpty) return;
 

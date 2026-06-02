@@ -409,21 +409,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       }
       final slots = await slotRepo.getByTeam(existing.teamId);
 
-      String? formatName;
-      if (team.formatLabel != null) {
-        formatName = ref
-            .read(formatServiceProvider)
-            .formatById(team.formatLabel!)
-            ?.name;
-      }
-
       await PsExportService.exportTeam(
         team: team,
         folder: folder,
         slots: slots,
         psDirectory: psDir,
         pokeApi: ref.read(pokeApiRepositoryProvider),
-        formatName: formatName,
+        formatLabel: team.formatLabel, // raw format id → PS format lookup
       );
     } catch (_) {
       // Best-effort — do not surface PS export errors to the user.

@@ -189,17 +189,10 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
       BuildContext context, List<TeamSlot> slots, Team team) async {
     final pokeApi = ref.read(pokeApiRepositoryProvider);
     try {
-      String? formatName;
-      if (team.formatLabel != null) {
-        formatName = ref
-            .read(formatServiceProvider)
-            .formatById(team.formatLabel!)
-            ?.name;
-      }
       final text = await buildShowdownExport(
         slots, pokeApi,
         teamName: team.name,
-        formatName: formatName,
+        formatLabel: team.formatLabel, // raw format id → PS format lookup
       );
       await Clipboard.setData(ClipboardData(text: text));
       HapticFeedback.lightImpact();
