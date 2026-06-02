@@ -60,24 +60,31 @@ class SyncService {
     final ops = await syncQueue.getPending();
     if (ops.isEmpty) return;
 
+    // Prune ops that have exhausted all retries — they will never succeed and
+    // should not accumulate in the queue indefinitely.
+    for (final op in ops) {
+      if (op.attempts >= _maxAttempts) await syncQueue.delete(op.id);
+    }
+    final activeOps = ops.where((o) => o.attempts < _maxAttempts).toList();
+    if (activeOps.isEmpty) return;
+
     // Identify entity local IDs being created in this batch so cross-references
     // (e.g. a team whose folder is also being created here) can be resolved by
     // the server using the within-batch map rather than requiring a prior sync.
     final creatingFolderIds = <int>{
-      for (final op in ops)
+      for (final op in activeOps)
         if (op.entityType == 'team_folder' && op.operation == 'create')
           op.entityId,
     };
     final creatingTeamIds = <int>{
-      for (final op in ops)
+      for (final op in activeOps)
         if (op.entityType == 'team' && op.operation == 'create') op.entityId,
     };
 
     final batchOps = <Map<String, dynamic>>[];
     final includedOps = <PendingSyncOp>[];
 
-    for (final op in ops) {
-      if (op.attempts >= _maxAttempts) continue;
+    for (final op in activeOps) {
       final entry = await _buildOp(op, creatingFolderIds, creatingTeamIds);
       if (entry != null) {
         batchOps.add(entry);
