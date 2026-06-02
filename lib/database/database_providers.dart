@@ -58,3 +58,7 @@ final seedColorProvider = StreamProvider<int>((ref) {
 final themeModeProvider = StreamProvider<ThemeMode>((ref) {
   return ref.watch(appConfigRepositoryProvider).watchThemeMode();
 });
+
+final psDirectoryProvider = StreamProvider<String?>((ref) {
+  return ref.watch(appConfigRepositoryProvider).watchPsDirectory();
+});
