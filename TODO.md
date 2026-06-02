@@ -234,7 +234,7 @@
 
 ### Reference Browsers
 - [x] **Move chips: Z / Max / G-Max** — "Z" chip (IDs 622–658, 695–703, 719, 723–728), "Max" chip (IDs 734, 757–774) on move tiles + detail; "G-Max" chip derived from PS `moves.json` (names starting with `g-max-`)
-- [ ] **Contest data enhancement** — super contest + contest spectacular data in move detail; heart bar for appeal (❤️/🤍 per point), jam bar (🖤/🤍); contest-type badge chips (Cool/Beautiful/Cute/Clever/Tough)
+- [x] **Contest data enhancement** — super contest + contest spectacular data in move detail; heart bar for appeal (❤️/🤍 per point), jam bar (🖤/🤍); contest-type badge chips (Cool/Beautiful/Cute/Clever/Tough)
 
 ### Slot Config
 - [ ] **Contest stats + radar chart** — 6 contest stat sliders (Coolness/Beautifulness/Cuteness/Cleverness/Toughness/Sheen, 0–255) in slot config, visible only for gen 3/4/no-format; rendered as a radar/spider chart via `fl_chart RadarChart`; DB migration adds 6 columns to `team_slots`
