@@ -37,4 +37,10 @@ class SyncQueueRepository {
       (_db.delete(_db.pendingSyncOps)..where((o) => o.id.equals(id))).go();
 
   Future<int> clearAll() => _db.delete(_db.pendingSyncOps).go();
+
+  /// Deletes all ops that have exhausted their retry budget.
+  Future<int> clearStale(int maxAttempts) =>
+      (_db.delete(_db.pendingSyncOps)
+            ..where((o) => o.attempts.isBiggerOrEqualValue(maxAttempts)))
+          .go();
 }

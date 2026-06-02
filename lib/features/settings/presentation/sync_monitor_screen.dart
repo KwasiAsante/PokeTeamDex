@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
+import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
+
+const _maxAttempts = 5;
 
 class SyncMonitorScreen extends ConsumerStatefulWidget {
   const SyncMonitorScreen({super.key});
@@ -53,12 +56,24 @@ class _SyncMonitorScreenState extends ConsumerState<SyncMonitorScreen> {
       );
       return;
     }
-    ref.read(syncServiceProvider).run();
+    ref.read(syncServiceProvider).run(token: token);
   }
 
   void _refreshHealth() {
     ref.invalidate(backendHealthProvider);
     ref.invalidate(pokeApiHealthProvider);
+  }
+
+  Future<void> _clearStale() async {
+    await ref.read(syncQueueRepositoryProvider).clearStale(_maxAttempts);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text('Stale operations cleared.'),
+        ),
+      );
+    }
   }
 
   @override
@@ -102,6 +117,7 @@ class _SyncMonitorScreenState extends ConsumerState<SyncMonitorScreen> {
             pendingCount: pendingCount,
             pendingOps: pendingOps,
             now: _now,
+            onClearStale: _clearStale,
           ),
         ],
       ),
@@ -168,6 +184,15 @@ class _SyncStatusCard extends StatelessWidget {
                 syncState.errorMessage!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
+              if (syncState.errorMessage!.contains('403')) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'A 403 error usually means your session has expired. Try signing out and back in.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
             ],
             const SizedBox(height: 12),
             Row(
@@ -293,11 +318,13 @@ class _PendingQueueCard extends StatelessWidget {
     required this.pendingCount,
     required this.pendingOps,
     required this.now,
+    required this.onClearStale,
   });
 
   final AsyncValue<int> pendingCount;
   final AsyncValue<List<PendingSyncOp>> pendingOps;
   final DateTime now;
+  final VoidCallback onClearStale;
 
   @override
   Widget build(BuildContext context) {
@@ -306,6 +333,9 @@ class _PendingQueueCard extends StatelessWidget {
       loading: () => 0,
       error: (_, __) => 0,
     );
+
+    final ops = pendingOps.asData?.value ?? [];
+    final staleCount = ops.where((o) => o.attempts >= _maxAttempts).length;
 
     return Card(
       child: Padding(
@@ -321,6 +351,17 @@ class _PendingQueueCard extends StatelessWidget {
                         .titleMedium
                         ?.copyWith(fontWeight: FontWeight.bold)),
                 const Spacer(),
+                if (staleCount > 0)
+                  TextButton.icon(
+                    onPressed: onClearStale,
+                    icon: const Icon(Icons.delete_sweep_outlined, size: 16),
+                    label: Text('Clear $staleCount stale'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                const SizedBox(width: 8),
                 if (count > 0)
                   Badge(
                     label: Text('$count'),

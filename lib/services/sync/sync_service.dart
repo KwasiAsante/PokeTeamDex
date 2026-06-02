@@ -39,8 +39,12 @@ class SyncService {
 
   /// Push pending local ops then pull remote changes.
   /// Safe to call multiple times — only one execution runs at a time.
-  Future<void> run() async {
+  /// No-ops silently when no auth token is present.
+  Future<void> run({String? token}) async {
     if (_running) return;
+    // Require a non-empty token — avoids 403 floods when syncs fire before
+    // the user has logged in (e.g. immediately after a backend restart).
+    if (token == null || token.isEmpty) return;
     _running = true;
     notifier.setSyncing();
     try {
@@ -58,93 +62,234 @@ class SyncService {
 
   Future<void> _drain() async {
     final ops = await syncQueue.getPending();
+    if (ops.isEmpty) return;
+
+    // Prune ops that have exhausted all retries — they will never succeed and
+    // should not accumulate in the queue indefinitely.
     for (final op in ops) {
-      if (op.attempts >= _maxAttempts) continue;
-      try {
-        await _process(op);
+      if (op.attempts >= _maxAttempts) await syncQueue.delete(op.id);
+    }
+    final activeOps = ops.where((o) => o.attempts < _maxAttempts).toList();
+    if (activeOps.isEmpty) return;
+
+    // Identify entity local IDs being created in this batch so cross-references
+    // (e.g. a team whose folder is also being created here) can be resolved by
+    // the server using the within-batch map rather than requiring a prior sync.
+    final creatingFolderIds = <int>{
+      for (final op in activeOps)
+        if (op.entityType == 'team_folder' && op.operation == 'create')
+          op.entityId,
+    };
+    final creatingTeamIds = <int>{
+      for (final op in activeOps)
+        if (op.entityType == 'team' && op.operation == 'create') op.entityId,
+    };
+
+    // Re-enqueue CREATE ops for entities that have UPDATE ops but no remoteId
+    // and no CREATE in the queue — happens when a CREATE op was auto-pruned
+    // after repeated failures (e.g. a 403 flood).  The new CREATE op will be
+    // picked up on the next drain cycle.
+    await _healOrphanedOps(activeOps);
+
+    final batchOps = <Map<String, dynamic>>[];
+    final includedOps = <PendingSyncOp>[];
+
+    for (final op in activeOps) {
+      final entry = await _buildOp(op, creatingFolderIds, creatingTeamIds);
+      if (entry != null) {
+        batchOps.add(entry);
+        includedOps.add(op);
+      }
+    }
+
+    if (batchOps.isEmpty) return;
+
+    try {
+      final result = await api.pushBatch(batchOps);
+
+      // Write back server-assigned IDs for any entities created in this batch.
+      for (final c in (result['created'] as List).cast<Map<String, dynamic>>()) {
+        final localId = c['client_local_id'] as int;
+        final remoteId = (c['remote_id'] as int).toString();
+        switch (c['entity_type'] as String) {
+          case 'folder':
+            await (db.update(db.teamFolders)
+                  ..where((f) => f.id.equals(localId)))
+                .write(TeamFoldersCompanion(remoteId: Value(remoteId)));
+          case 'team':
+            await (db.update(db.teams)..where((t) => t.id.equals(localId)))
+                .write(TeamsCompanion(remoteId: Value(remoteId)));
+        }
+      }
+
+      for (final op in includedOps) {
         await syncQueue.delete(op.id);
-      } on DioException {
+      }
+    } on DioException {
+      for (final op in includedOps) {
         await syncQueue.markAttempted(op.id, op.attempts);
-      } on StateError {
-        // The referenced entity no longer exists locally — drop the stale op.
+      }
+    } on StateError {
+      // Stale queue entries — drop them so they don't block future syncs.
+      for (final op in includedOps) {
         await syncQueue.delete(op.id);
-      } catch (_) {
-        // Unexpected error — mark attempted so it doesn't block forever.
-        await syncQueue.markAttempted(op.id, op.attempts);
       }
     }
   }
 
-  Future<void> _process(PendingSyncOp op) async {
+  /// Detects UPDATE ops whose entity has no remoteId and no CREATE in the queue
+  /// and re-enqueues a fresh CREATE so the entity can be created on the server.
+  Future<void> _healOrphanedOps(List<PendingSyncOp> ops) async {
+    final foldersWithCreate = {
+      for (final op in ops)
+        if (op.entityType == 'team_folder' && op.operation == 'create') op.entityId,
+    };
+    final teamsWithCreate = {
+      for (final op in ops)
+        if (op.entityType == 'team' && op.operation == 'create') op.entityId,
+    };
+
+    final now = DateTime.now();
+    final healedFolders = <int>{};
+    final healedTeams = <int>{};
+
+    for (final op in ops) {
+      if (op.entityType == 'team_folder' && op.operation == 'update') {
+        if (foldersWithCreate.contains(op.entityId)) continue;
+        if (healedFolders.contains(op.entityId)) continue;
+        final folder = await folderRepo.getByIdOrNull(op.entityId);
+        if (folder == null || folder.remoteId != null) continue;
+        await syncQueue.enqueue(PendingSyncOpsCompanion(
+          operation: const Value('create'),
+          entityType: const Value('team_folder'),
+          entityId: Value(op.entityId),
+          payload: Value(jsonEncode({'name': folder.name})),
+          createdAt: Value(now),
+        ));
+        healedFolders.add(op.entityId);
+      } else if (op.entityType == 'team' && op.operation == 'update') {
+        if (teamsWithCreate.contains(op.entityId)) continue;
+        if (healedTeams.contains(op.entityId)) continue;
+        final team = await teamRepo.getByIdOrNull(op.entityId);
+        if (team == null || team.remoteId != null) continue;
+        await syncQueue.enqueue(PendingSyncOpsCompanion(
+          operation: const Value('create'),
+          entityType: const Value('team'),
+          entityId: Value(op.entityId),
+          payload: Value(jsonEncode({
+            'name': team.name,
+            'folder_local_id': team.folderId,
+            'format_label': team.formatLabel,
+          })),
+          createdAt: Value(now),
+        ));
+        healedTeams.add(op.entityId);
+      }
+    }
+  }
+
+  /// Converts a single queue entry into a batch-op map, resolving cross-entity
+  /// references. Returns null if the op should be skipped this cycle.
+  Future<Map<String, dynamic>?> _buildOp(
+    PendingSyncOp op,
+    Set<int> creatingFolderIds,
+    Set<int> creatingTeamIds,
+  ) async {
     final payload = jsonDecode(op.payload) as Map<String, dynamic>;
 
     switch ('${op.entityType}:${op.operation}') {
-      // ── Folders ─────────────────────────────────────────────────────────────
+      // ── Folders ───────────────────────────────────────────────────────────
       case 'team_folder:create':
-        final data = await api.createFolder(payload['name'] as String);
-        final remoteId = data['id'].toString();
-        await (db.update(db.teamFolders)
-              ..where((f) => f.id.equals(op.entityId)))
-            .write(TeamFoldersCompanion(remoteId: Value(remoteId)));
+        return {
+          'type': 'folder_create',
+          'client_local_id': op.entityId,
+          'name': payload['name'] as String,
+        };
 
       case 'team_folder:update':
         final folder = await folderRepo.getByIdOrNull(op.entityId);
-        if (folder == null || folder.remoteId == null) return;
-        await api.updateFolder(folder.remoteId!, payload['name'] as String);
+        if (folder?.remoteId == null) return null;
+        return {
+          'type': 'folder_update',
+          'remote_id': int.parse(folder!.remoteId!),
+          'name': payload['name'] as String,
+        };
 
       case 'team_folder:delete':
         final remoteId = payload['remote_id'] as String?;
-        if (remoteId == null) return;
-        await api.deleteFolder(remoteId);
+        if (remoteId == null) return null;
+        return {'type': 'folder_delete', 'remote_id': int.parse(remoteId)};
 
-      // ── Teams ────────────────────────────────────────────────────────────────
+      // ── Teams ─────────────────────────────────────────────────────────────
       case 'team:create':
-        String? folderRemoteId;
-        final folderLocalId = payload['folder_local_id'];
+        final entry = <String, dynamic>{
+          'type': 'team_create',
+          'client_local_id': op.entityId,
+          'name': payload['name'] as String,
+        };
+        final folderLocalId = payload['folder_local_id'] as int?;
         if (folderLocalId != null) {
-          final folder = await folderRepo.getByIdOrNull(folderLocalId as int);
-          if (folder == null) return;
-          folderRemoteId = folder.remoteId;
-          if (folderRemoteId == null) return;
+          if (creatingFolderIds.contains(folderLocalId)) {
+            // Folder also being created in this batch — server resolves it.
+            entry['folder_client_local_id'] = folderLocalId;
+          } else {
+            final folder = await folderRepo.getByIdOrNull(folderLocalId);
+            if (folder?.remoteId == null) return null;
+            entry['folder_remote_id'] = int.parse(folder!.remoteId!);
+          }
         }
-        final data = await api.createTeam(
-          payload['name'] as String,
-          folderRemoteId: folderRemoteId,
-        );
-        final remoteId = data['id'].toString();
-        await (db.update(db.teams)..where((t) => t.id.equals(op.entityId)))
-            .write(TeamsCompanion(remoteId: Value(remoteId)));
+        return entry;
 
       case 'team:update':
         final team = await teamRepo.getByIdOrNull(op.entityId);
-        if (team == null || team.remoteId == null) return;
-        // payload['name'] may be absent if only format_label changed — fall
-        // back to the current name from the DB so the API call is always valid.
-        final teamName = payload['name'] as String? ?? team.name;
-        await api.updateTeam(team.remoteId!, teamName);
+        if (team?.remoteId == null) return null;
+        return {
+          'type': 'team_update',
+          'remote_id': int.parse(team!.remoteId!),
+          // payload['name'] may be absent when only format_label changed.
+          'name': payload['name'] as String? ?? team.name,
+        };
 
       case 'team:delete':
         final remoteId = payload['remote_id'] as String?;
-        if (remoteId == null) return;
-        await api.deleteTeam(remoteId);
+        if (remoteId == null) return null;
+        return {'type': 'team_delete', 'remote_id': int.parse(remoteId)};
 
-      // ── Slots ─────────────────────────────────────────────────────────────────
+      // ── Slots ─────────────────────────────────────────────────────────────
       case 'team_slot:upsert':
         final teamLocalId = payload['team_local_id'] as int;
-        final team = await teamRepo.getByIdOrNull(teamLocalId);
-        if (team == null || team.remoteId == null) return;
-        await api.upsertSlot(
-          team.remoteId!,
-          payload['slot'] as int,
-          payload['pokemon_id'] as int,
-          nickname: payload['nickname'] as String?,
-        );
+        final entry = <String, dynamic>{
+          'type': 'slot_upsert',
+          'slot': payload['slot'] as int,
+          'pokemon_id': payload['pokemon_id'] as int,
+          if (payload['nickname'] != null) 'nickname': payload['nickname'],
+        };
+        if (creatingTeamIds.contains(teamLocalId)) {
+          entry['team_client_local_id'] = teamLocalId;
+        } else {
+          final team = await teamRepo.getByIdOrNull(teamLocalId);
+          if (team?.remoteId == null) return null;
+          entry['team_remote_id'] = int.parse(team!.remoteId!);
+        }
+        return entry;
 
       case 'team_slot:delete':
         final teamLocalId = payload['team_local_id'] as int;
-        final team = await teamRepo.getByIdOrNull(teamLocalId);
-        if (team == null || team.remoteId == null) return;
-        await api.deleteSlot(team.remoteId!, payload['slot'] as int);
+        final entry = <String, dynamic>{
+          'type': 'slot_delete',
+          'slot': payload['slot'] as int,
+        };
+        if (creatingTeamIds.contains(teamLocalId)) {
+          entry['team_client_local_id'] = teamLocalId;
+        } else {
+          final team = await teamRepo.getByIdOrNull(teamLocalId);
+          if (team?.remoteId == null) return null;
+          entry['team_remote_id'] = int.parse(team!.remoteId!);
+        }
+        return entry;
+
+      default:
+        return null;
     }
   }
 

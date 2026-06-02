@@ -18,7 +18,12 @@ class SyncStateNotifier extends Notifier<SyncState> {
   @override
   SyncState build() => const SyncState();
 
-  void setSyncing() => state = state.copyWith(status: SyncStatus.syncing);
+  // Clear any previous error when starting a new cycle so stale error
+  // messages aren't shown while the new sync is in progress.
+  void setSyncing() => state = state.copyWith(
+        status: SyncStatus.syncing,
+        errorMessage: null,
+      );
 
   void setSuccess() => state = state.copyWith(
         status: SyncStatus.success,

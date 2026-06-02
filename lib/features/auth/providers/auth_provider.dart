@@ -42,7 +42,7 @@ Future<void> register(WidgetRef ref, String email, String password) async {
   final token = await api.register(email, password);
   await _saveToken(token);
   ref.read(authTokenProvider.notifier).state = token;
-  ref.read(syncServiceProvider).run();
+  ref.read(syncServiceProvider).run(token: token);
 }
 
 Future<void> login(WidgetRef ref, String email, String password) async {
@@ -50,7 +50,7 @@ Future<void> login(WidgetRef ref, String email, String password) async {
   final token = await api.login(email, password);
   await _saveToken(token);
   ref.read(authTokenProvider.notifier).state = token;
-  ref.read(syncServiceProvider).run();
+  ref.read(syncServiceProvider).run(token: token);
 }
 
 Future<void> logout(WidgetRef ref) async {

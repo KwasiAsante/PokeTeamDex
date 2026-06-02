@@ -161,7 +161,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
   void _triggerSync() {
     try {
-      ref.read(syncServiceProvider).run();
+      final token = ref.read(authTokenProvider);
+      ref.read(syncServiceProvider).run(token: token);
     } catch (_) {
       // Sync is best-effort
     }
