@@ -494,6 +494,40 @@ class PokeApiRepository {
     return moveName;
   }
 
+  Future<ContestEffectData> fetchContestEffect(String url) async {
+    final id = url.split('/').where((s) => s.isNotEmpty).last;
+    final cacheKey = 'contest_effect_$id';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is Map) {
+      return ContestEffectData.fromJson(cached.cast<String, dynamic>());
+    }
+    final path = url.contains('api/v2')
+        ? url.substring(url.indexOf('api/v2') + 6)
+        : '/contest-effect/$id/';
+    final r = await _pokeApiClient.client.get(path);
+    if (r.statusCode != 200) throw Exception('Failed to fetch contest effect $id');
+    final data = r.data as Map<String, dynamic>;
+    _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 30));
+    return ContestEffectData.fromJson(data);
+  }
+
+  Future<SuperContestEffectData> fetchSuperContestEffect(String url) async {
+    final id = url.split('/').where((s) => s.isNotEmpty).last;
+    final cacheKey = 'super_contest_effect_$id';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is Map) {
+      return SuperContestEffectData.fromJson(cached.cast<String, dynamic>());
+    }
+    final path = url.contains('api/v2')
+        ? url.substring(url.indexOf('api/v2') + 6)
+        : '/super-contest-effect/$id/';
+    final r = await _pokeApiClient.client.get(path);
+    if (r.statusCode != 200) throw Exception('Failed to fetch super contest effect $id');
+    final data = r.data as Map<String, dynamic>;
+    _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 30));
+    return SuperContestEffectData.fromJson(data);
+  }
+
   List<PokemonListEntry> _parseList(Map<String, dynamic> raw) {
     final results = raw['results'] as List;
     return results

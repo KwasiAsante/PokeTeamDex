@@ -19,6 +19,10 @@ class MoveEntry {
   final List<MovePastValue> pastValues;
   final List<MoveFlavorText> flavorTextEntries;
 
+  // Contest effect URLs — used to lazily fetch appeal/jam values.
+  final String? contestEffectUrl;
+  final String? superContestEffectUrl;
+
   const MoveEntry({
     required this.name,
     this.typeName,
@@ -37,6 +41,8 @@ class MoveEntry {
     this.learnedByPokemon = const [],
     this.pastValues = const [],
     this.flavorTextEntries = const [],
+    this.contestEffectUrl,
+    this.superContestEffectUrl,
   });
 
   factory MoveEntry.fromJson(Map<String, dynamic> json) {
@@ -130,6 +136,9 @@ class MoveEntry {
       learnedByPokemon: learnedBy,
       pastValues: pastValues,
       flavorTextEntries: flavorEntries,
+      contestEffectUrl: (json['contest_effect'] as Map?)?['url'] as String?,
+      superContestEffectUrl:
+          (json['super_contest_effect'] as Map?)?['url'] as String?,
     );
   }
 
@@ -319,4 +328,58 @@ class MoveLearnMethod {
     required this.versionGroup,
     this.levelLearnedAt,
   });
+}
+
+// ── Contest effect data ───────────────────────────────────────────────────────
+
+class ContestEffectData {
+  final int appeal;
+  final int jam;
+  final String? shortEffect;
+
+  const ContestEffectData({
+    required this.appeal,
+    required this.jam,
+    this.shortEffect,
+  });
+
+  factory ContestEffectData.fromJson(Map<String, dynamic> j) {
+    String? shortEffect;
+    for (final e in (j['effect_entries'] as List? ?? [])) {
+      final em = e as Map<String, dynamic>;
+      if ((em['language'] as Map)['name'] == 'en') {
+        shortEffect = em['short_effect'] as String?;
+        break;
+      }
+    }
+    return ContestEffectData(
+      appeal: j['appeal'] as int? ?? 0,
+      jam: j['jam'] as int? ?? 0,
+      shortEffect: shortEffect,
+    );
+  }
+}
+
+class SuperContestEffectData {
+  final int appeal;
+  final String? flavorText;
+
+  const SuperContestEffectData({required this.appeal, this.flavorText});
+
+  factory SuperContestEffectData.fromJson(Map<String, dynamic> j) {
+    String? flavorText;
+    for (final e in (j['flavor_text_entries'] as List? ?? [])) {
+      final em = e as Map<String, dynamic>;
+      if ((em['language'] as Map)['name'] == 'en') {
+        flavorText = (em['flavor_text'] as String?)
+            ?.replaceAll('\n', ' ')
+            .replaceAll('\f', ' ');
+        break;
+      }
+    }
+    return SuperContestEffectData(
+      appeal: j['appeal'] as int? ?? 0,
+      flavorText: flavorText,
+    );
+  }
 }

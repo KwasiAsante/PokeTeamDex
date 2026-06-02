@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 
 final movesListProvider = FutureProvider<List<String>>((ref) async {
@@ -52,4 +53,18 @@ final machineProvider =
         (ref, url) async {
   final repo = ref.read(pokeApiRepositoryProvider);
   return repo.fetchMachineByUrl(url);
+});
+
+/// Fetches Gen III regular contest effect data (appeal + jam + effect text).
+final contestEffectProvider =
+    FutureProvider.autoDispose.family<ContestEffectData, String>(
+        (ref, url) async {
+  return ref.read(pokeApiRepositoryProvider).fetchContestEffect(url);
+});
+
+/// Fetches Gen IV super contest effect data (appeal + flavor text).
+final superContestEffectProvider =
+    FutureProvider.autoDispose.family<SuperContestEffectData, String>(
+        (ref, url) async {
+  return ref.read(pokeApiRepositoryProvider).fetchSuperContestEffect(url);
 });
