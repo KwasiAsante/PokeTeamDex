@@ -39,8 +39,12 @@ class SyncService {
 
   /// Push pending local ops then pull remote changes.
   /// Safe to call multiple times — only one execution runs at a time.
-  Future<void> run() async {
+  /// No-ops silently when no auth token is present.
+  Future<void> run({String? token}) async {
     if (_running) return;
+    // Require a non-empty token — avoids 403 floods when syncs fire before
+    // the user has logged in (e.g. immediately after a backend restart).
+    if (token == null || token.isEmpty) return;
     _running = true;
     notifier.setSyncing();
     try {

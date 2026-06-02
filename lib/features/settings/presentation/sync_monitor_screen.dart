@@ -56,7 +56,7 @@ class _SyncMonitorScreenState extends ConsumerState<SyncMonitorScreen> {
       );
       return;
     }
-    ref.read(syncServiceProvider).run();
+    ref.read(syncServiceProvider).run(token: token);
   }
 
   void _refreshHealth() {
