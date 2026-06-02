@@ -49,6 +49,8 @@ dependencies:
   connectivity_plus: ^7.1.1
   workmanager: ^0.9.0+3
   shimmer: ^3.0.0
+  tray_manager: ^0.2.3
+  window_manager: ^0.4.3
 
 dev_dependencies:
   flutter_test:
@@ -76,6 +78,9 @@ flutter:
 
   assets:
     - assets/data/ps/
+    # Tray icons — reuse existing platform icons (no new files needed)
+    - windows/runner/resources/app_icon.ico
+    - macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

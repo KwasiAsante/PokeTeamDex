@@ -20,8 +20,10 @@ import 'package:poke_team_dex/router/app_router.dart';
 import 'package:poke_team_dex/services/api/team_sync_api.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_service.dart';
+import 'package:poke_team_dex/services/tray/tray_service.dart';
 import 'package:poke_team_dex/shared/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:workmanager/workmanager.dart';
 
 const _syncTaskName = 'poketeamdex.sync';
@@ -88,6 +90,11 @@ void _workmanagerCallback() {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // window_manager must be initialised before runApp on desktop.
+  if (TrayService.isSupported) {
+    await windowManager.ensureInitialized();
+  }
+
   await Hive.initFlutter();
   await Hive.openBox('pokeapi_cache');
 
@@ -118,6 +125,7 @@ class MyApp extends ConsumerStatefulWidget {
 
 class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   Timer? _periodicSync;
+  TrayService? _trayService;
 
   @override
   void initState() {
@@ -125,8 +133,14 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
 
     // Seed auth state from persisted token
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       ref.read(authTokenProvider.notifier).state = widget.initialToken ?? '';
+
+      // Initialize system tray after the first frame so the window is ready.
+      if (TrayService.isSupported) {
+        _trayService = TrayService(onSyncNow: _triggerSync);
+        await _trayService!.init();
+      }
     });
 
     // Periodic in-process sync (covers app minimized / backgrounded).
@@ -149,6 +163,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     _periodicSync?.cancel();
+    _trayService?.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
