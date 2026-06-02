@@ -22,10 +22,15 @@ class PsExportService {
     required List<TeamSlot> slots,
     required String psDirectory,
     required PokeApiRepository pokeApi,
+    String? formatName,
   }) async {
     if (!isSupported || slots.isEmpty) return;
 
-    final text = await buildShowdownExport(slots, pokeApi);
+    final text = await buildShowdownExport(
+      slots, pokeApi,
+      teamName: team.name,
+      formatName: formatName,
+    );
     if (text.trim().isEmpty) return;
 
     final teamFile = '${_sanitize(team.name)}.txt';

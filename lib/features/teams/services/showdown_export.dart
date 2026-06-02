@@ -3,11 +3,17 @@ import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
 
 /// Generates a Pokémon Showdown-compatible export string for [slots].
-/// Follows the format from PRD §11.3.
+///
+/// When [teamName] and [formatName] are supplied the output is prefixed
+/// with a PS team header:  `=== [Format Name] Team Name ===`
+/// [formatName] should be the human-readable tier name from [GameFormat.name]
+/// (e.g. "Gen 9 OU", "Gen 9 Ubers").
 Future<String> buildShowdownExport(
   List<TeamSlot> slots,
-  PokeApiRepository pokeApi,
-) async {
+  PokeApiRepository pokeApi, {
+  String? teamName,
+  String? formatName,
+}) async {
   final blocks = <String>[];
 
   for (final slot in slots..sort((a, b) => a.slot.compareTo(b.slot))) {
@@ -58,5 +64,15 @@ Future<String> buildShowdownExport(
     blocks.add(lines.join('\n'));
   }
 
-  return blocks.join('\n\n');
+  final body = blocks.join('\n\n');
+
+  // Prepend === [Format] Name === header when a format is set.
+  if (teamName != null && teamName.isNotEmpty) {
+    final header = formatName != null && formatName.isNotEmpty
+        ? '=== [$formatName] $teamName ==='
+        : '=== $teamName ===';
+    return '$header\n\n$body';
+  }
+
+  return body;
 }

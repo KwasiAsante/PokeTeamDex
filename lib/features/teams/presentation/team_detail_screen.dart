@@ -114,7 +114,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
                 IconButton(
                   icon: const Icon(Icons.upload_outlined),
                   tooltip: 'Export to Showdown',
-                  onPressed: () => _exportShowdown(context, slots),
+                  onPressed: () => _exportShowdown(context, slots, team),
                 ),
               IconButton(
                 icon: const Icon(Icons.delete_outline),
@@ -185,10 +185,21 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
   }
 
   Future<void> _exportShowdown(
-      BuildContext context, List<TeamSlot> slots) async {
+      BuildContext context, List<TeamSlot> slots, Team team) async {
     final pokeApi = ref.read(pokeApiRepositoryProvider);
     try {
-      final text = await buildShowdownExport(slots, pokeApi);
+      String? formatName;
+      if (team.formatLabel != null) {
+        formatName = ref
+            .read(formatServiceProvider)
+            .formatById(team.formatLabel!)
+            ?.name;
+      }
+      final text = await buildShowdownExport(
+        slots, pokeApi,
+        teamName: team.name,
+        formatName: formatName,
+      );
       await Clipboard.setData(ClipboardData(text: text));
       HapticFeedback.lightImpact();
       if (context.mounted) {
