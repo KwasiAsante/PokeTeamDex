@@ -24,6 +24,7 @@ import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
+import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
 import 'package:poke_team_dex/features/teams/data/ribbon_catalog.dart';
 import 'package:poke_team_dex/features/teams/services/ps_export_service.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -177,6 +178,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   // Ribbons — set of ribbon ids currently awarded to this Pokémon
   final Set<String> _ribbons = {};
 
+  // Mega Evolution toggle
+  bool _isMegaEvolved = false;
+
   bool _initialized = false;
   bool _saving = false;
 
@@ -240,6 +244,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _ivCtrls[3].text = (slot.ivSpa ?? 31).toString();
     _ivCtrls[4].text = (slot.ivSpd ?? 31).toString();
     _ivCtrls[5].text = (slot.ivSpe ?? 31).toString();
+    _isMegaEvolved = slot.isMegaEvolved;
+
     // Ribbons
     _ribbons.clear();
     final ribbonJson = slot.ribbons;
@@ -328,6 +334,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           ivSpa: Value(ivs[3]),
           ivSpd: Value(ivs[4]),
           ivSpe: Value(ivs[5]),
+          isMegaEvolved: Value(_isMegaEvolved),
           ribbons: Value(_ribbons.isEmpty
               ? null
               : jsonEncode(_ribbons.toList())),
@@ -524,12 +531,37 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           useFormatSprites: useFormatSprites,
         );
 
+        // ── Mega Evolution ─────────────────────────────────────────────────
+        // Determine if a mega toggle should be shown for the current slot.
+        final megaEntry = _heldItemName != null
+            ? kMegaStoneMap[_heldItemName]
+            : null;
+        final canMegaEvolve = megaEntry != null &&
+            pokemon.name == megaEntry.baseSpecies &&
+            (mechanics?.hasMegaStone ?? false);
+
+        // Fetch mega form data lazily when the toggle is on.
+        final megaPokemonAsync = (canMegaEvolve && _isMegaEvolved)
+            ? ref.watch(pokemonByNameProvider(megaEntry.megaForm))
+            : null;
+        final megaPokemon = megaPokemonAsync?.asData?.value;
+
+        // Use mega form for stats and artwork when evolved.
+        final effectiveBaseStats = megaPokemon != null
+            ? <String, int>{
+                for (final s in megaPokemon.stats)
+                  s['stat']['name'] as String: s['base_stat'] as int,
+              }
+            : baseStats;
+        final megaArtworkUrl = megaPokemon?.officialArtworkUrl;
+
         final scrollBody = SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(slot, spriteUrls, mechanics),
+              _buildHeader(slot, spriteUrls, mechanics,
+                  megaArtworkUrl: megaArtworkUrl),
               const SizedBox(height: 24),
               _buildBasics(mechanics),
               // ── Ability (Gen 3+) ──
@@ -552,6 +584,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 _SectionTitle('Held Item'),
                 const SizedBox(height: 8),
                 _buildHeldItem(violation: violations['item']),
+              ],
+              // ── Mega Evolution toggle (Gen 6–7, when applicable) ──
+              if (canMegaEvolve) ...[
+                const SizedBox(height: 16),
+                _buildMegaToggle(megaEntry, megaPokemon,
+                    loading: megaPokemonAsync?.isLoading ?? false),
               ],
               const SizedBox(height: 24),
               _SectionTitle('Moves'),
@@ -595,7 +633,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               const SizedBox(height: 24),
               _SectionTitle('Stat Preview (Lv $_level)'),
               const SizedBox(height: 8),
-              _buildStatPreview(baseStats, mechanics),
+              _buildStatPreview(effectiveBaseStats, mechanics),
               // ── Contest conditions (Gen 3 / Gen 4 / no format) ──
               if (mechanics == null || mechanics.gen == 3 || mechanics.gen == 4) ...[
                 const SizedBox(height: 24),
@@ -685,8 +723,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   Widget _buildHeader(
     TeamSlot slot,
     ({String? defaultUrl, String? shinyUrl}) spriteUrls,
-    GenerationMechanics? mechanics,
-  ) {
+    GenerationMechanics? mechanics, {
+    String? megaArtworkUrl,
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -697,9 +736,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           alignment: Alignment.bottomRight,
           children: [
             PokemonSprite(
-              defaultUrl: spriteUrls.defaultUrl,
-              shinyUrl: spriteUrls.shinyUrl,
-              shiny: _isShiny,
+              defaultUrl: megaArtworkUrl ?? spriteUrls.defaultUrl,
+              shinyUrl: megaArtworkUrl != null ? null : spriteUrls.shinyUrl,
+              shiny: megaArtworkUrl == null && _isShiny,
               size: 140,
             ),
             if (mechanics == null || mechanics.hasShiny)
@@ -1366,6 +1405,72 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       ),
     );
     if (result != null) setState(() => _moves[moveIndex] = result);
+  }
+
+  // ── Mega Evolution ────────────────────────────────────────────────────────
+
+  Widget _buildMegaToggle(
+    MegaFormEntry entry,
+    dynamic megaPokemon,    // PokemonEntry? — typed as dynamic to avoid import
+    {required bool loading}
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: _isMegaEvolved
+            ? colorScheme.primaryContainer.withValues(alpha: 0.4)
+            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: _isMegaEvolved
+              ? colorScheme.primary
+              : colorScheme.outlineVariant,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.auto_awesome,
+            size: 18,
+            color: _isMegaEvolved ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mega Evolution',
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: _isMegaEvolved ? colorScheme.primary : null,
+                  ),
+                ),
+                Text(
+                  entry.megaForm.split('-').map((w) =>
+                      w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+                      .join(' '),
+                  style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          if (loading)
+            const SizedBox(
+              width: 20, height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Switch(
+              value: _isMegaEvolved,
+              onChanged: (v) => setState(() => _isMegaEvolved = v),
+            ),
+        ],
+      ),
+    );
   }
 
   // ── Ribbons ───────────────────────────────────────────────────────────────

@@ -1405,6 +1405,21 @@ class $TeamSlotsTable extends TeamSlots
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _isMegaEvolvedMeta = const VerificationMeta(
+    'isMegaEvolved',
+  );
+  @override
+  late final GeneratedColumn<bool> isMegaEvolved = GeneratedColumn<bool>(
+    'is_mega_evolved',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_mega_evolved" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _contestCoolMeta = const VerificationMeta(
     'contestCool',
   );
@@ -1554,6 +1569,7 @@ class $TeamSlotsTable extends TeamSlots
     ivSpd,
     ivSpe,
     ribbons,
+    isMegaEvolved,
     contestCool,
     contestBeautiful,
     contestCute,
@@ -1766,6 +1782,15 @@ class $TeamSlotsTable extends TeamSlots
         ribbons.isAcceptableOrUnknown(data['ribbons']!, _ribbonsMeta),
       );
     }
+    if (data.containsKey('is_mega_evolved')) {
+      context.handle(
+        _isMegaEvolvedMeta,
+        isMegaEvolved.isAcceptableOrUnknown(
+          data['is_mega_evolved']!,
+          _isMegaEvolvedMeta,
+        ),
+      );
+    }
     if (data.containsKey('contest_cool')) {
       context.handle(
         _contestCoolMeta,
@@ -1973,6 +1998,10 @@ class $TeamSlotsTable extends TeamSlots
         DriftSqlType.string,
         data['${effectivePrefix}ribbons'],
       ),
+      isMegaEvolved: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_mega_evolved'],
+      )!,
       contestCool: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}contest_cool'],
@@ -2053,6 +2082,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
   final int? ivSpd;
   final int? ivSpe;
   final String? ribbons;
+  final bool isMegaEvolved;
   final int? contestCool;
   final int? contestBeautiful;
   final int? contestCute;
@@ -2094,6 +2124,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     this.ivSpd,
     this.ivSpe,
     this.ribbons,
+    required this.isMegaEvolved,
     this.contestCool,
     this.contestBeautiful,
     this.contestCute,
@@ -2188,6 +2219,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     if (!nullToAbsent || ribbons != null) {
       map['ribbons'] = Variable<String>(ribbons);
     }
+    map['is_mega_evolved'] = Variable<bool>(isMegaEvolved);
     if (!nullToAbsent || contestCool != null) {
       map['contest_cool'] = Variable<int>(contestCool);
     }
@@ -2291,6 +2323,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       ribbons: ribbons == null && nullToAbsent
           ? const Value.absent()
           : Value(ribbons),
+      isMegaEvolved: Value(isMegaEvolved),
       contestCool: contestCool == null && nullToAbsent
           ? const Value.absent()
           : Value(contestCool),
@@ -2352,6 +2385,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       ivSpd: serializer.fromJson<int?>(json['ivSpd']),
       ivSpe: serializer.fromJson<int?>(json['ivSpe']),
       ribbons: serializer.fromJson<String?>(json['ribbons']),
+      isMegaEvolved: serializer.fromJson<bool>(json['isMegaEvolved']),
       contestCool: serializer.fromJson<int?>(json['contestCool']),
       contestBeautiful: serializer.fromJson<int?>(json['contestBeautiful']),
       contestCute: serializer.fromJson<int?>(json['contestCute']),
@@ -2398,6 +2432,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       'ivSpd': serializer.toJson<int?>(ivSpd),
       'ivSpe': serializer.toJson<int?>(ivSpe),
       'ribbons': serializer.toJson<String?>(ribbons),
+      'isMegaEvolved': serializer.toJson<bool>(isMegaEvolved),
       'contestCool': serializer.toJson<int?>(contestCool),
       'contestBeautiful': serializer.toJson<int?>(contestBeautiful),
       'contestCute': serializer.toJson<int?>(contestCute),
@@ -2442,6 +2477,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     Value<int?> ivSpd = const Value.absent(),
     Value<int?> ivSpe = const Value.absent(),
     Value<String?> ribbons = const Value.absent(),
+    bool? isMegaEvolved,
     Value<int?> contestCool = const Value.absent(),
     Value<int?> contestBeautiful = const Value.absent(),
     Value<int?> contestCute = const Value.absent(),
@@ -2483,6 +2519,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     ivSpd: ivSpd.present ? ivSpd.value : this.ivSpd,
     ivSpe: ivSpe.present ? ivSpe.value : this.ivSpe,
     ribbons: ribbons.present ? ribbons.value : this.ribbons,
+    isMegaEvolved: isMegaEvolved ?? this.isMegaEvolved,
     contestCool: contestCool.present ? contestCool.value : this.contestCool,
     contestBeautiful: contestBeautiful.present
         ? contestBeautiful.value
@@ -2538,6 +2575,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       ivSpd: data.ivSpd.present ? data.ivSpd.value : this.ivSpd,
       ivSpe: data.ivSpe.present ? data.ivSpe.value : this.ivSpe,
       ribbons: data.ribbons.present ? data.ribbons.value : this.ribbons,
+      isMegaEvolved: data.isMegaEvolved.present
+          ? data.isMegaEvolved.value
+          : this.isMegaEvolved,
       contestCool: data.contestCool.present
           ? data.contestCool.value
           : this.contestCool,
@@ -2598,6 +2638,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
           ..write('ivSpd: $ivSpd, ')
           ..write('ivSpe: $ivSpe, ')
           ..write('ribbons: $ribbons, ')
+          ..write('isMegaEvolved: $isMegaEvolved, ')
           ..write('contestCool: $contestCool, ')
           ..write('contestBeautiful: $contestBeautiful, ')
           ..write('contestCute: $contestCute, ')
@@ -2644,6 +2685,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     ivSpd,
     ivSpe,
     ribbons,
+    isMegaEvolved,
     contestCool,
     contestBeautiful,
     contestCute,
@@ -2689,6 +2731,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
           other.ivSpd == this.ivSpd &&
           other.ivSpe == this.ivSpe &&
           other.ribbons == this.ribbons &&
+          other.isMegaEvolved == this.isMegaEvolved &&
           other.contestCool == this.contestCool &&
           other.contestBeautiful == this.contestBeautiful &&
           other.contestCute == this.contestCute &&
@@ -2732,6 +2775,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
   final Value<int?> ivSpd;
   final Value<int?> ivSpe;
   final Value<String?> ribbons;
+  final Value<bool> isMegaEvolved;
   final Value<int?> contestCool;
   final Value<int?> contestBeautiful;
   final Value<int?> contestCute;
@@ -2773,6 +2817,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     this.ivSpd = const Value.absent(),
     this.ivSpe = const Value.absent(),
     this.ribbons = const Value.absent(),
+    this.isMegaEvolved = const Value.absent(),
     this.contestCool = const Value.absent(),
     this.contestBeautiful = const Value.absent(),
     this.contestCute = const Value.absent(),
@@ -2815,6 +2860,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     this.ivSpd = const Value.absent(),
     this.ivSpe = const Value.absent(),
     this.ribbons = const Value.absent(),
+    this.isMegaEvolved = const Value.absent(),
     this.contestCool = const Value.absent(),
     this.contestBeautiful = const Value.absent(),
     this.contestCute = const Value.absent(),
@@ -2859,6 +2905,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     Expression<int>? ivSpd,
     Expression<int>? ivSpe,
     Expression<String>? ribbons,
+    Expression<bool>? isMegaEvolved,
     Expression<int>? contestCool,
     Expression<int>? contestBeautiful,
     Expression<int>? contestCute,
@@ -2901,6 +2948,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
       if (ivSpd != null) 'iv_spd': ivSpd,
       if (ivSpe != null) 'iv_spe': ivSpe,
       if (ribbons != null) 'ribbons': ribbons,
+      if (isMegaEvolved != null) 'is_mega_evolved': isMegaEvolved,
       if (contestCool != null) 'contest_cool': contestCool,
       if (contestBeautiful != null) 'contest_beautiful': contestBeautiful,
       if (contestCute != null) 'contest_cute': contestCute,
@@ -2945,6 +2993,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     Value<int?>? ivSpd,
     Value<int?>? ivSpe,
     Value<String?>? ribbons,
+    Value<bool>? isMegaEvolved,
     Value<int?>? contestCool,
     Value<int?>? contestBeautiful,
     Value<int?>? contestCute,
@@ -2987,6 +3036,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
       ivSpd: ivSpd ?? this.ivSpd,
       ivSpe: ivSpe ?? this.ivSpe,
       ribbons: ribbons ?? this.ribbons,
+      isMegaEvolved: isMegaEvolved ?? this.isMegaEvolved,
       contestCool: contestCool ?? this.contestCool,
       contestBeautiful: contestBeautiful ?? this.contestBeautiful,
       contestCute: contestCute ?? this.contestCute,
@@ -3093,6 +3143,9 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     if (ribbons.present) {
       map['ribbons'] = Variable<String>(ribbons.value);
     }
+    if (isMegaEvolved.present) {
+      map['is_mega_evolved'] = Variable<bool>(isMegaEvolved.value);
+    }
     if (contestCool.present) {
       map['contest_cool'] = Variable<int>(contestCool.value);
     }
@@ -3159,6 +3212,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
           ..write('ivSpd: $ivSpd, ')
           ..write('ivSpe: $ivSpe, ')
           ..write('ribbons: $ribbons, ')
+          ..write('isMegaEvolved: $isMegaEvolved, ')
           ..write('contestCool: $contestCool, ')
           ..write('contestBeautiful: $contestBeautiful, ')
           ..write('contestCute: $contestCute, ')
@@ -5132,6 +5186,7 @@ typedef $$TeamSlotsTableCreateCompanionBuilder =
       Value<int?> ivSpd,
       Value<int?> ivSpe,
       Value<String?> ribbons,
+      Value<bool> isMegaEvolved,
       Value<int?> contestCool,
       Value<int?> contestBeautiful,
       Value<int?> contestCute,
@@ -5175,6 +5230,7 @@ typedef $$TeamSlotsTableUpdateCompanionBuilder =
       Value<int?> ivSpd,
       Value<int?> ivSpe,
       Value<String?> ribbons,
+      Value<bool> isMegaEvolved,
       Value<int?> contestCool,
       Value<int?> contestBeautiful,
       Value<int?> contestCute,
@@ -5361,6 +5417,11 @@ class $$TeamSlotsTableFilterComposer
 
   ColumnFilters<String> get ribbons => $composableBuilder(
     column: $table.ribbons,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isMegaEvolved => $composableBuilder(
+    column: $table.isMegaEvolved,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5592,6 +5653,11 @@ class $$TeamSlotsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isMegaEvolved => $composableBuilder(
+    column: $table.isMegaEvolved,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get contestCool => $composableBuilder(
     column: $table.contestCool,
     builder: (column) => ColumnOrderings(column),
@@ -5770,6 +5836,11 @@ class $$TeamSlotsTableAnnotationComposer
   GeneratedColumn<String> get ribbons =>
       $composableBuilder(column: $table.ribbons, builder: (column) => column);
 
+  GeneratedColumn<bool> get isMegaEvolved => $composableBuilder(
+    column: $table.isMegaEvolved,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get contestCool => $composableBuilder(
     column: $table.contestCool,
     builder: (column) => column,
@@ -5896,6 +5967,7 @@ class $$TeamSlotsTableTableManager
                 Value<int?> ivSpd = const Value.absent(),
                 Value<int?> ivSpe = const Value.absent(),
                 Value<String?> ribbons = const Value.absent(),
+                Value<bool> isMegaEvolved = const Value.absent(),
                 Value<int?> contestCool = const Value.absent(),
                 Value<int?> contestBeautiful = const Value.absent(),
                 Value<int?> contestCute = const Value.absent(),
@@ -5937,6 +6009,7 @@ class $$TeamSlotsTableTableManager
                 ivSpd: ivSpd,
                 ivSpe: ivSpe,
                 ribbons: ribbons,
+                isMegaEvolved: isMegaEvolved,
                 contestCool: contestCool,
                 contestBeautiful: contestBeautiful,
                 contestCute: contestCute,
@@ -5980,6 +6053,7 @@ class $$TeamSlotsTableTableManager
                 Value<int?> ivSpd = const Value.absent(),
                 Value<int?> ivSpe = const Value.absent(),
                 Value<String?> ribbons = const Value.absent(),
+                Value<bool> isMegaEvolved = const Value.absent(),
                 Value<int?> contestCool = const Value.absent(),
                 Value<int?> contestBeautiful = const Value.absent(),
                 Value<int?> contestCute = const Value.absent(),
@@ -6021,6 +6095,7 @@ class $$TeamSlotsTableTableManager
                 ivSpd: ivSpd,
                 ivSpe: ivSpe,
                 ribbons: ribbons,
+                isMegaEvolved: isMegaEvolved,
                 contestCool: contestCool,
                 contestBeautiful: contestBeautiful,
                 contestCute: contestCute,

@@ -47,6 +47,10 @@ class TeamSlots extends Table {
   // Ribbons — JSON array of ribbon IDs, e.g. '["champion","effort"]'
   TextColumn get ribbons => text().nullable()();
 
+  // Mega Evolution toggle (Gen 6–7 only)
+  BoolColumn get isMegaEvolved =>
+      boolean().withDefault(const Constant(false))();
+
   // Contest conditions (Gen III+): 0–255 each
   IntColumn get contestCool      => integer().nullable()();
   IntColumn get contestBeautiful => integer().nullable()();
