@@ -243,12 +243,27 @@ class SyncService {
       case 'team:update':
         final team = await teamRepo.getByIdOrNull(op.entityId);
         if (team?.remoteId == null) return null;
-        return {
+        final entry = <String, dynamic>{
           'type': 'team_update',
           'remote_id': int.parse(team!.remoteId!),
-          // payload['name'] may be absent when only format_label changed.
+          // payload['name'] may be absent when only folder changed.
           'name': payload['name'] as String? ?? team.name,
         };
+        // Include folder change only when the payload explicitly carries the key.
+        if (payload.containsKey('folder_local_id')) {
+          entry['update_folder'] = true;
+          final folderLocalId = payload['folder_local_id'] as int?;
+          if (folderLocalId == null) {
+            entry['folder_remote_id'] = null; // move to ungrouped
+          } else if (creatingFolderIds.contains(folderLocalId)) {
+            entry['folder_client_local_id'] = folderLocalId;
+          } else {
+            final folder = await folderRepo.getByIdOrNull(folderLocalId);
+            if (folder?.remoteId == null) return null;
+            entry['folder_remote_id'] = int.parse(folder!.remoteId!);
+          }
+        }
+        return entry;
 
       case 'team:delete':
         final remoteId = payload['remote_id'] as String?;

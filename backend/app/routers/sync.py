@@ -125,6 +125,21 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
             team = r.scalar_one_or_none()
             if team:
                 team.name = op.name
+                if op.update_folder:
+                    folder_id = op.folder_remote_id
+                    if folder_id is None and op.folder_client_local_id is not None:
+                        folder_id = folder_map.get(op.folder_client_local_id)
+                    if folder_id is not None:
+                        # Verify the folder belongs to this user before assigning
+                        fr = await db.execute(
+                            select(TeamFolder).where(
+                                TeamFolder.id == folder_id,
+                                TeamFolder.user_id == current_user.id,
+                            )
+                        )
+                        team.folder_id = folder_id if fr.scalar_one_or_none() else None
+                    else:
+                        team.folder_id = None  # move to ungrouped
 
         elif isinstance(op, TeamDeleteOp):
             r = await db.execute(

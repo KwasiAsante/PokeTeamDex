@@ -110,6 +110,11 @@ class TeamUpdateOp(BaseModel):
     type: Literal["team_update"]
     remote_id: int
     name: str
+    # Folder change — only applied when update_folder is True so that a
+    # plain rename (which has no folder info) doesn't accidentally clear it.
+    update_folder: bool = False
+    folder_remote_id: int | None = None
+    folder_client_local_id: int | None = None
 
 
 class TeamDeleteOp(BaseModel):
