@@ -336,23 +336,9 @@ class _ExpandedLayoutState extends State<_ExpandedLayout> {
                       const Divider(height: 1),
                       const SizedBox(height: 4),
                       Expanded(
-                        child: NavigationRail(
+                        child: _CollapsedRail(
                           selectedIndex: widget.shell.currentIndex,
-                          onDestinationSelected: widget.onTap,
-                          labelType: NavigationRailLabelType.none,
-                          destinations: _destinations
-                              .map((d) => NavigationRailDestination(
-                                    icon: Tooltip(
-                                      message: d.label,
-                                      child: Icon(d.icon),
-                                    ),
-                                    selectedIcon: Tooltip(
-                                      message: d.label,
-                                      child: Icon(d.activeIcon),
-                                    ),
-                                    label: Text(d.label),
-                                  ))
-                              .toList(),
+                          onTap: widget.onTap,
                         ),
                       ),
                     ],
@@ -403,6 +389,55 @@ class _ExpandedLayoutState extends State<_ExpandedLayout> {
           Expanded(child: widget.shell),
         ],
       ),
+    );
+  }
+}
+
+// ── Collapsed rail ─────────────────────────────────────────────────────────
+// Custom icon-only rail so Tooltip widgets own the pointer events directly.
+// NavigationRail absorbs MouseRegion hover internally, preventing inner
+// Tooltips from ever firing on desktop.
+
+class _CollapsedRail extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+  const _CollapsedRail({required this.selectedIndex, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ListView.builder(
+      itemCount: _destinations.length,
+      itemBuilder: (_, i) {
+        final d = _destinations[i];
+        final selected = i == selectedIndex;
+        return Tooltip(
+          message: d.label,
+          preferBelow: false,
+          waitDuration: Duration.zero,
+          child: InkWell(
+            onTap: () => onTap(i),
+            child: Container(
+              height: 56,
+              alignment: Alignment.center,
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: selected
+                  ? BoxDecoration(
+                      color: colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(28),
+                    )
+                  : null,
+              child: Icon(
+                selected ? d.activeIcon : d.icon,
+                color: selected
+                    ? colorScheme.onSecondaryContainer
+                    : colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
