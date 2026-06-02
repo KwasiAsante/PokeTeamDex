@@ -233,7 +233,7 @@
 - [x] **Slot picker: format auto-filter** — when team has a `formatLabel`, pre-seed the generation filter (and game chip for game-specific formats) in the slot picker so only eligible Pokémon are shown
 
 ### Reference Browsers
-- [ ] **Move chips: Z / Max / G-Max** — "Z" chip (IDs 622–658, 695–703, 719, 723–728), "Max" chip (IDs 734, 757–774) on move tiles + detail; "G-Max" chip derived from PS `moves.json` (names starting with `g-max-`)
+- [x] **Move chips: Z / Max / G-Max** — "Z" chip (IDs 622–658, 695–703, 719, 723–728), "Max" chip (IDs 734, 757–774) on move tiles + detail; "G-Max" chip derived from PS `moves.json` (names starting with `g-max-`)
 - [ ] **Contest data enhancement** — super contest + contest spectacular data in move detail; heart bar for appeal (❤️/🤍 per point), jam bar (🖤/🤍); contest-type badge chips (Cool/Beautiful/Cute/Clever/Tough)
 
 ### Slot Config
@@ -262,6 +262,7 @@
 
 ## Deferred / Post-release
 
+- [ ] **G-Max moves in move list + detail** — G-Max moves (`g-max-*`) are currently accessible via the moves browser but don't appear in PokéAPI's learned-by lists; source from PS/Bulbapedia data and surface them as a filterable category in the move list and as a distinct section in Pokémon detail Moves tab
 - [ ] **PS sync: live directory watch** — `Directory.watch()` + three-way conflict resolution (PS file mtime vs local `updated_at` vs remote `updated_at`)
 - [ ] **Contest moves toggle** — contest move mode in slot config; separate 4-move picker showing contest information (appeal, jam, type) per move
 - Real-time battle simulation
