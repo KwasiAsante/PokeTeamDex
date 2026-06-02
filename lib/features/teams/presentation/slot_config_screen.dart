@@ -24,6 +24,7 @@ import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
+import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 import 'package:poke_team_dex/shared/widgets/move_type_chip.dart';
@@ -514,6 +515,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 maxVal: mechanics?.statMax ?? 31,
                 gen1Mode: format?.gen == 1,
               ),
+              // ── Hidden Power (Gen 2–7 only) ──
+              if (mechanics == null || mechanics.hasHiddenPower) ...[
+                const SizedBox(height: 12),
+                _buildHiddenPower(gen: format?.gen),
+              ],
               const SizedBox(height: 24),
               _SectionTitle('Stat Preview (Lv $_level)'),
               const SizedBox(height: 8),
@@ -1106,6 +1112,91 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     );
   }
 
+  // ── Hidden Power ─────────────────────────────────────────────────────────
+
+  /// Type names for the 16 possible Hidden Power types (indices 0–15).
+  static const _hpTypeNames = [
+    'Fighting', 'Flying', 'Poison', 'Ground', 'Rock', 'Bug',
+    'Ghost',    'Steel',  'Fire',   'Water',  'Grass', 'Electric',
+    'Psychic',  'Ice',    'Dragon', 'Dark',
+  ];
+
+  /// Returns 0–15 index of the Hidden Power type from current IVs.
+  /// Uses the standard Gen 3+ formula.
+  int _hiddenPowerTypeIndex() {
+    final iv = _ivCtrls.map((c) => int.tryParse(c.text) ?? 31).toList();
+    // Bit order: HP, Atk, Def, Spe, SpA, SpD (note Spe=index 5, SpA=index 3, SpD=index 4)
+    final n = (iv[0] & 1) +
+        (iv[1] & 1) * 2 +
+        (iv[2] & 1) * 4 +
+        (iv[5] & 1) * 8 +
+        (iv[3] & 1) * 16 +
+        (iv[4] & 1) * 32;
+    return (n * 15) ~/ 63;
+  }
+
+  /// Returns the power of Hidden Power (30–70 in Gen 2–5; always 60 in Gen 6+).
+  int _hiddenPowerPower({int? gen}) {
+    if (gen != null && gen >= 6) return 60;
+    final iv = _ivCtrls.map((c) => int.tryParse(c.text) ?? 31).toList();
+    final u = ((iv[0] >> 1) & 1) +
+        ((iv[1] >> 1) & 1) * 2 +
+        ((iv[2] >> 1) & 1) * 4 +
+        ((iv[5] >> 1) & 1) * 8 +
+        ((iv[3] >> 1) & 1) * 16 +
+        ((iv[4] >> 1) & 1) * 32;
+    return (u * 40) ~/ 63 + 30;
+  }
+
+  Widget _buildHiddenPower({int? gen}) {
+    final typeIdx = _hiddenPowerTypeIndex();
+    final typeName = _hpTypeNames[typeIdx].toLowerCase();
+    final power = _hiddenPowerPower(gen: gen);
+    final typeColor = PokemonTypeColors.colors[typeName] ??
+        Theme.of(context).colorScheme.primary;
+
+    return Row(
+      children: [
+        Text('Hidden Power:',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                )),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+          decoration: BoxDecoration(
+            color: typeColor,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            _hpTypeNames[typeIdx],
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'Power $power',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        if (gen == null || gen < 6)
+          Text(
+            '  (Gen 6+: 60)',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurfaceVariant
+                      .withValues(alpha: 0.5),
+                ),
+          ),
+      ],
+    );
+  }
+
   // ── EV / IV grid ──────────────────────────────────────────────────────────
 
   // Gen 1: 5 stats — HP, Atk, Def, Spc (combined Special), Spe (no SpD).
@@ -1210,7 +1301,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     Color(0xFF1E88E5), // Beautiful — blue
     Color(0xFFE91E63), // Cute — pink
     Color(0xFF43A047), // Clever — green
-    Color(0xFF795548), // Tough — brown
+    Color(0xFFF9A825), // Tough — amber/yellow (Bulbapedia)
     Color(0xFF9E9E9E), // Sheen — grey
   ];
 
@@ -1226,7 +1317,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: AspectRatio(
-            aspectRatio: 1.4,
+            aspectRatio: 2.4,
             child: Stack(
               children: [
                 RadarChart(
