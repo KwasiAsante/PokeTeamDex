@@ -44,6 +44,9 @@ class TeamSlots extends Table {
   IntColumn get ivSpd => integer().nullable()();
   IntColumn get ivSpe => integer().nullable()();
 
+  // Ribbons — JSON array of ribbon IDs, e.g. '["champion","effort"]'
+  TextColumn get ribbons => text().nullable()();
+
   // Contest conditions (Gen III+): 0–255 each
   IntColumn get contestCool      => integer().nullable()();
   IntColumn get contestBeautiful => integer().nullable()();
