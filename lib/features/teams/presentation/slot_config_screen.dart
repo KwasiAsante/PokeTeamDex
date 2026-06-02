@@ -536,9 +536,10 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final megaEntry = _heldItemName != null
             ? kMegaStoneMap[_heldItemName]
             : null;
+        // No format = no restrictions; hasMegaStone applies only for specific gens.
         final canMegaEvolve = megaEntry != null &&
             pokemon.name == megaEntry.baseSpecies &&
-            (mechanics?.hasMegaStone ?? false);
+            (mechanics == null || mechanics.hasMegaStone);
 
         // Fetch mega form data lazily when the toggle is on.
         final megaPokemonAsync = (canMegaEvolve && _isMegaEvolved)
