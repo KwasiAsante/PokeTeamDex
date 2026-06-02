@@ -25,6 +25,7 @@ import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
+import 'package:poke_team_dex/features/teams/data/z_moves_data.dart';
 import 'package:poke_team_dex/features/teams/data/ribbon_catalog.dart';
 import 'package:poke_team_dex/features/teams/services/ps_export_service.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -599,7 +600,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               const SizedBox(height: 24),
               _SectionTitle('Moves'),
               const SizedBox(height: 8),
-              _buildMoves(learnableMoves, violations: violations),
+              _buildMoves(learnableMoves,
+                  violations: violations,
+                  pokemonName: pokemon.name),
               const SizedBox(height: 24),
               // ── EVs / Stat Exp. ──
               _SectionTitle(
@@ -1099,6 +1102,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   Widget _buildMoves(
     List<String> learnableMoves, {
     Map<String, String> violations = const {},
+    String pokemonName = '',
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -1203,6 +1207,61 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                       style: textTheme.bodySmall
                           ?.copyWith(color: colorScheme.onSurfaceVariant)),
                 ),
+              // Z-Move info — Gen 7 / no-format; shown when Z-crystal held and move qualifies
+              if (_moves[i] != null && _heldItemName != null) ...[
+                Builder(builder: (ctx) {
+                  final zMove = resolveZMove(
+                    itemId: _heldItemName!,
+                    moveId: _moves[i]!,
+                    pokemonName: pokemonName,
+                    moveType: moveDetail?.typeName,
+                  );
+                  if (zMove == null) return const SizedBox.shrink();
+                  final zDisplay = zMove
+                      .split('-')
+                      .map((w) => w.isEmpty
+                          ? ''
+                          : '${w[0].toUpperCase()}${w.substring(1)}')
+                      .join(' ');
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(6),
+                      onTap: () => context.push('/moves/$zMove'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF7B2FBE)
+                              .withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                              color: const Color(0xFF7B2FBE)
+                                  .withValues(alpha: 0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Text('💠',
+                                style: TextStyle(fontSize: 12)),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Z-Move: $zDisplay',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: const Color(0xFF9B4FDE),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(Icons.info_outline,
+                                size: 14,
+                                color: colorScheme.onSurfaceVariant),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ],
               // Violation banner
               _buildViolationBanner(violations['move${i + 1}']),
             ],
