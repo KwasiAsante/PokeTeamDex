@@ -292,46 +292,109 @@ class _MediumLayout extends StatelessWidget {
 
 // ── Expanded (> 840dp) — permanent navigation drawer ─────────────────────────
 
-class _ExpandedLayout extends StatelessWidget {
+class _ExpandedLayout extends StatefulWidget {
   final StatefulNavigationShell shell;
   final ValueChanged<int> onTap;
   const _ExpandedLayout({required this.shell, required this.onTap});
 
   @override
+  State<_ExpandedLayout> createState() => _ExpandedLayoutState();
+}
+
+class _ExpandedLayoutState extends State<_ExpandedLayout> {
+  bool _collapsed = false;
+
+  @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       body: Row(
         children: [
-          // Permanent sidebar using NavigationDrawer
-          SizedBox(
-            width: 260,
-            child: NavigationDrawer(
-              selectedIndex: shell.currentIndex,
-              onDestinationSelected: onTap,
-              children: [
-                // App name header
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 20, 16, 16),
-                  child: Text(
-                    'PokeTeamDex',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
+          // ── Sidebar — full drawer or collapsed icon rail ─────────────────
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            width: _collapsed ? 72 : 260,
+            child: _collapsed
+                // ── Collapsed: icon-only rail + expand button ─────────────
+                ? Column(
+                    children: [
+                      // Expand toggle at top
+                      SizedBox(
+                        height: 56,
+                        child: Center(
+                          child: IconButton(
+                            icon: const Icon(Icons.menu_open),
+                            tooltip: 'Expand navigation',
+                            onPressed: () =>
+                                setState(() => _collapsed = false),
+                          ),
                         ),
+                      ),
+                      const Divider(height: 1),
+                      const SizedBox(height: 4),
+                      Expanded(
+                        child: NavigationRail(
+                          selectedIndex: widget.shell.currentIndex,
+                          onDestinationSelected: widget.onTap,
+                          labelType: NavigationRailLabelType.none,
+                          destinations: _destinations
+                              .map((d) => NavigationRailDestination(
+                                    icon: Icon(d.icon),
+                                    selectedIcon: Icon(d.activeIcon),
+                                    label: Text(d.label),
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                    ],
+                  )
+                // ── Expanded: full NavigationDrawer ───────────────────────
+                : NavigationDrawer(
+                    selectedIndex: widget.shell.currentIndex,
+                    onDestinationSelected: widget.onTap,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 4, 8),
+                        child: Row(
+                          children: [
+                            Padding(
+                              padding:
+                                  const EdgeInsets.only(left: 12),
+                              child: Text(
+                                'PokeTeamDex',
+                                style: textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const Spacer(),
+                            // Collapse toggle
+                            IconButton(
+                              icon: const Icon(Icons.menu_open),
+                              tooltip: 'Collapse navigation',
+                              onPressed: () =>
+                                  setState(() => _collapsed = true),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      const SizedBox(height: 4),
+                      for (final d in _destinations)
+                        NavigationDrawerDestination(
+                          icon: Icon(d.icon),
+                          selectedIcon: Icon(d.activeIcon),
+                          label: Text(d.label),
+                        ),
+                    ],
                   ),
-                ),
-                const Divider(height: 1),
-                const SizedBox(height: 4),
-                for (final d in _destinations)
-                  NavigationDrawerDestination(
-                    icon: Icon(d.icon),
-                    selectedIcon: Icon(d.activeIcon),
-                    label: Text(d.label),
-                  ),
-              ],
-            ),
           ),
-          const VerticalDivider(thickness: 1, width: 1),
-          Expanded(child: shell),
+          VerticalDivider(
+              thickness: 1, width: 1,
+              color: colorScheme.outlineVariant),
+          Expanded(child: widget.shell),
         ],
       ),
     );

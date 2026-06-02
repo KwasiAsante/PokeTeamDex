@@ -1434,30 +1434,37 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
         .join(' ');
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-            color: colorScheme.primary.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.auto_awesome,
-              size: 14, color: colorScheme.primary),
-          const SizedBox(width: 8),
-          Text(
-            'Mega form ability: ',
-            style: textTheme.bodySmall
-                ?.copyWith(color: colorScheme.onSurfaceVariant),
-          ),
-          Text(
-            displayName,
-            style: textTheme.bodySmall
-                ?.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ],
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => context.push('/reference/abilities/$abilityName'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: colorScheme.primaryContainer.withValues(alpha: 0.25),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+              color: colorScheme.primary.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.auto_awesome, size: 14, color: colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              'Mega form ability: ',
+              style: textTheme.bodySmall
+                  ?.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
+            Expanded(
+              child: Text(
+                displayName,
+                style: textTheme.bodySmall
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            Icon(Icons.info_outline,
+                size: 14, color: colorScheme.onSurfaceVariant),
+          ],
+        ),
       ),
     );
   }
