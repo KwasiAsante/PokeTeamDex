@@ -8,6 +8,8 @@ import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
+import 'package:poke_team_dex/services/format/format_providers.dart' show allFormatsProvider, formatServiceProvider;
+import 'package:poke_team_dex/shared/widgets/move_type_chip.dart';
 import 'package:poke_team_dex/shared/widgets/skeleton_box.dart';
 
 class MovesScreen extends ConsumerStatefulWidget {
@@ -251,12 +253,14 @@ class _MoveTile extends ConsumerWidget {
       .join(' ');
 }
 
-class _MoveListItem extends StatelessWidget {
+class _MoveListItem extends ConsumerWidget {
   final MoveEntry move;
   const _MoveListItem({required this.move});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(allFormatsProvider); // ensures service is initialized; triggers rebuild when ready
+    final special = classifyMoveType(ref.read(formatServiceProvider), move.name);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final typeColor = move.typeName != null
@@ -277,6 +281,10 @@ class _MoveListItem extends StatelessWidget {
         children: [
           if (move.typeName != null)
             _TypeChip(type: move.typeName!, color: typeColor),
+          if (special != null) ...[
+            const SizedBox(width: 4),
+            MoveTypeChip(type: special),
+          ],
           if (move.power != null) ...[
             const SizedBox(width: 8),
             Text(
@@ -342,12 +350,14 @@ class _MoveGridCardSkeleton extends StatelessWidget {
   }
 }
 
-class _MoveGridCard extends StatelessWidget {
+class _MoveGridCard extends ConsumerWidget {
   final MoveEntry move;
   const _MoveGridCard({required this.move});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(allFormatsProvider); // ensures service is initialized; triggers rebuild when ready
+    final special = classifyMoveType(ref.read(formatServiceProvider), move.name);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final typeColor = move.typeName != null
@@ -374,6 +384,10 @@ class _MoveGridCard extends StatelessWidget {
                       children: [
                         if (move.typeName != null)
                           _TypeChip(type: move.typeName!, color: typeColor),
+                        if (special != null) ...[
+                          const SizedBox(width: 4),
+                          MoveTypeChip(type: special),
+                        ],
                         const Spacer(),
                         Text(
                           move.categoryIcon,
