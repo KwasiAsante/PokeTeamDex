@@ -18,6 +18,7 @@ import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
@@ -546,6 +547,8 @@ class _FilledSlotCard extends ConsumerWidget {
                             ),
                           ),
                         ),
+                      FavoriteButton(
+                          pokemonId: slot.pokemonId, iconSize: 18),
                       ReorderableDragStartListener(
                         index: dragIndex,
                         child: Icon(
