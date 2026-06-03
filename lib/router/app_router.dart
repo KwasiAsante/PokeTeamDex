@@ -164,6 +164,10 @@ GoRouter buildAppRouter(String? initialToken) {
                       GoRoute(
                         path: 'config/:slot',
                         builder: (context, state) => SlotConfigScreen(
+                          key: ValueKey(
+                            '${state.pathParameters['teamId']}-'
+                            '${state.pathParameters['slot']}',
+                          ),
                           teamId:
                               int.parse(state.pathParameters['teamId']!),
                           slotNumber:

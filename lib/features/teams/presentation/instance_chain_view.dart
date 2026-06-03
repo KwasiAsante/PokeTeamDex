@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart';
@@ -279,7 +280,7 @@ class _ChainRow extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
-              child: _buildContent(),
+              child: _buildContent(context),
             ),
           ),
         ],
@@ -287,7 +288,7 @@ class _ChainRow extends StatelessWidget {
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(BuildContext context) {
     String? badge;
     if (isOrigin && isCurrent) {
       badge = 'Origin · This slot';
@@ -310,16 +311,6 @@ class _ChainRow extends StatelessWidget {
             ? colorScheme.onSecondaryContainer
             : colorScheme.onSurfaceVariant;
 
-    final lines = <String>[];
-    for (final slot in slots) {
-      final teamName = teamCache[slot.teamId] ?? 'Unknown team';
-      final nick = slot.nickname?.isNotEmpty == true ? slot.nickname! : null;
-      lines.add(
-        '$teamName · Slot ${slot.slot}'
-        '${nick != null ? ' — "$nick"' : ''}',
-      );
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -340,11 +331,17 @@ class _ChainRow extends StatelessWidget {
           ),
           const SizedBox(height: 4),
         ],
-        if (lines.isNotEmpty)
-          for (final line in lines)
-            Text(
-              line,
-              style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurface),
+        if (slots.isNotEmpty)
+          for (final slot in slots)
+            _SlotLine(
+              slot: slot,
+              teamName: teamCache[slot.teamId] ?? 'Unknown team',
+              tappable: !isCurrent,
+              colorScheme: colorScheme,
+              textTheme: textTheme,
+              onTap: !isCurrent
+                  ? () => context.go('/teams/${slot.teamId}/config/${slot.slot}')
+                  : null,
             )
         else
           Text(
@@ -365,6 +362,60 @@ class _ChainRow extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+// ── Slot line ──────────────────────────────────────────────────────────────────
+
+class _SlotLine extends StatelessWidget {
+  final TeamSlot slot;
+  final String teamName;
+  final bool tappable;
+  final VoidCallback? onTap;
+  final ColorScheme colorScheme;
+  final TextTheme textTheme;
+
+  const _SlotLine({
+    required this.slot,
+    required this.teamName,
+    required this.tappable,
+    required this.colorScheme,
+    required this.textTheme,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final nick = slot.nickname?.isNotEmpty == true ? slot.nickname! : null;
+    final label = '$teamName · Slot ${slot.slot}'
+        '${nick != null ? ' — "$nick"' : ''}';
+
+    final text = Text(
+      label,
+      style: textTheme.bodySmall?.copyWith(
+        color: tappable ? colorScheme.primary : colorScheme.onSurface,
+        decoration: tappable ? TextDecoration.underline : null,
+        decorationColor: tappable ? colorScheme.primary : null,
+      ),
+    );
+
+    if (!tappable) return text;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 1),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            text,
+            const SizedBox(width: 4),
+            Icon(Icons.open_in_new, size: 12, color: colorScheme.primary),
+          ],
+        ),
+      ),
     );
   }
 }
