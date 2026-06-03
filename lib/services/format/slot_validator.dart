@@ -130,14 +130,43 @@ SlotValidation validateSlotSync(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// Returns the set of move names (PokéAPI hyphenated format) that [pokemonMoves]
-/// shows as learnable in [format].
+/// Returns the set of move names (PokéAPI hyphenated format) learnable in
+/// [format]. Supplements PokéAPI version-group data with PS learnset data so
+/// that moves PokéAPI incorrectly attributes to a later gen are still included
+/// (e.g. Charizard's Dragon Dance is listed in Gen 8/9 by PokéAPI but was
+/// available in Gen 6 via move tutors).
 ///
-/// Use this to pre-filter the move picker so only legal moves are shown.
+/// [pokemonName] and [formatService] are optional; when supplied the PS
+/// learnset is cross-checked: any move in [pokemonMoves] whose PS id appears
+/// in the PS learnset for [format.gen] is included regardless of PokéAPI's
+/// version-group data.
 Set<String> buildLearnsetForFormat(
   List<Map<String, dynamic>> pokemonMoves,
-  GameFormat format,
-) => _buildLearnset(pokemonMoves, format);
+  GameFormat format, {
+  String? pokemonName,
+  FormatService? formatService,
+}) {
+  final result = _buildLearnset(pokemonMoves, format);
+
+  // PS supplementary pass — catches moves PokéAPI links to the wrong gen.
+  if (pokemonName != null &&
+      formatService != null &&
+      formatService.isInitialized) {
+    final psMoveIds = formatService
+        .learnsetForGen(pokemonName.toLowerCase(), format.gen)
+        .toSet();
+    if (psMoveIds.isNotEmpty) {
+      for (final moveData in pokemonMoves) {
+        final moveName = (moveData['move'] as Map)['name'] as String;
+        // Convert PokéAPI name to PS id (strip hyphens) for comparison.
+        final psId = _toPsId(moveName);
+        if (psMoveIds.contains(psId)) result.add(moveName);
+      }
+    }
+  }
+
+  return result;
+}
 
 Set<String> _buildLearnset(
   List<Map<String, dynamic>> pokemonMoves,

@@ -188,6 +188,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   // Ribbons — set of ribbon ids currently awarded to this Pokémon
   final Set<String> _ribbons = {};
 
+  // Form change (e.g. aegislash-shield ↔ aegislash-blade)
+  String? _formName; // null = use the Pokémon's default form
+
   // Mega Evolution toggle
   bool _isMegaEvolved = false;
 
@@ -261,6 +264,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _ivCtrls[3].text = (slot.ivSpa ?? 31).toString();
     _ivCtrls[4].text = (slot.ivSpd ?? 31).toString();
     _ivCtrls[5].text = (slot.ivSpe ?? 31).toString();
+    _formName = slot.formName;
     _isMegaEvolved = slot.isMegaEvolved;
     _hasGigantamax = slot.hasGigantamax;
     _gigantamaxEnabled = slot.gigantamaxEnabled;
@@ -354,6 +358,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           ivSpa: Value(ivs[3]),
           ivSpd: Value(ivs[4]),
           ivSpe: Value(ivs[5]),
+          formName: Value(_formName),
           isMegaEvolved: Value(_isMegaEvolved),
           hasGigantamax: Value(_hasGigantamax),
           gigantamaxEnabled: Value(_gigantamaxEnabled),
@@ -527,8 +532,16 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
         // Learnable moves filtered by format version groups.
         // No format → show everything the Pokémon can ever learn.
+        // Learnable moves supplemented by PS learnset to catch moves
+        // PokéAPI incorrectly attributes to later gens (e.g. Dragon Dance on
+        // Charizard is listed only for Gen 8/9 in PokéAPI but was available
+        // from Gen 6 via move tutors).
         final learnableMoves = (format != null
-                ? buildLearnsetForFormat(pokemonMoves, format)
+                ? buildLearnsetForFormat(
+                    pokemonMoves, format,
+                    pokemonName: pokemon.name,
+                    formatService: formatService,
+                  )
                 : pokemon.moves
                     .map((m) => m['move']['name'] as String)
                     .toSet())
@@ -576,6 +589,27 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final megaArtworkUrl = megaHomeUrl; // primary; official is the fallback
 
 
+        // ── Form change ────────────────────────────────────────────────────
+        // _formName is stored in slot.formName; null means default form.
+        // When a non-default form is selected, fetch it for stats/sprite.
+        final availableForms = pokemon.formNames; // ["aegislash-shield","aegislash-blade"]
+        final hasMultipleForms = availableForms.length > 1;
+        final activeFallbackFormName = _formName; // from slot state
+        final formPokemonAsync = (hasMultipleForms &&
+                activeFallbackFormName != null &&
+                activeFallbackFormName != availableForms.first)
+            ? ref.watch(pokemonByNameProvider(activeFallbackFormName))
+            : null;
+        final formPokemon = formPokemonAsync?.asData?.value;
+
+        // Form stats take highest priority (form > mega > base).
+        final finalBaseStats = formPokemon != null
+            ? <String, int>{
+                for (final s in formPokemon.stats)
+                  s['stat']['name'] as String: s['base_stat'] as int,
+              }
+            : effectiveBaseStats;
+
         // ── Gigantamax / Dynamax ────────────────────────────────────────────
         final canDynamax = mechanics == null || mechanics.hasGigantamax;
         final gmaxMove = gmaxMoveForSpecies(pokemon.name);
@@ -615,6 +649,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               _buildHeader(slot, spriteUrls, mechanics,
                   megaArtworkUrl: effectiveMegaArtworkUrl,
                   megaFallbackUrl: effectiveMegaFallbackUrl),
+              // ── Form selector (when Pokémon has multiple forms) ──
+              if (hasMultipleForms) ...[
+                const SizedBox(height: 16),
+                _buildFormSelector(availableForms),
+              ],
               const SizedBox(height: 24),
               _buildBasics(mechanics),
               // ── Ability (Gen 3+) ──
@@ -711,7 +750,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               const SizedBox(height: 24),
               _SectionTitle('Stat Preview (Lv $_level)'),
               const SizedBox(height: 8),
-              _buildStatPreview(effectiveBaseStats, mechanics),
+              _buildStatPreview(finalBaseStats, mechanics),
               // ── Contest conditions (Gen 3 / Gen 4 / no format) ──
               if (mechanics == null || mechanics.gen == 3 || mechanics.gen == 4) ...[
                 const SizedBox(height: 24),
@@ -1622,6 +1661,47 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       ),
     );
     if (result != null) setState(() => _moves[moveIndex] = result);
+  }
+
+  // ── Form selector ─────────────────────────────────────────────────────────
+
+  Widget _buildFormSelector(List<String> forms) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    String fmtForm(String name) => name
+        .split('-')
+        .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+
+    final current = _formName ?? forms.first;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Form', style: textTheme.labelLarge),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: forms.map((form) {
+            final selected = form == current;
+            return ChoiceChip(
+              label: Text(fmtForm(form)),
+              selected: selected,
+              onSelected: (_) => setState(() {
+                _formName = form == forms.first ? null : form;
+                _initialized = false; // allow re-init if form changes abilities
+              }),
+              selectedColor: colorScheme.primaryContainer,
+              labelStyle: textTheme.labelSmall?.copyWith(
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
   }
 
   // ── Mega ability info row ─────────────────────────────────────────────────
