@@ -79,12 +79,15 @@ class FormatService {
     }
   }
 
-  /// Returns true when [moveName] (PokéAPI hyphenated id) is in the Gen 6
-  /// PS allow-list for [pokemonName].  Used to validate Gen 6 moves without
-  /// false-positives from missing Gen 6 sources in the main learnsets.
+  /// Returns true when [moveName] (PokéAPI hyphenated id, e.g. "dragon-dance")
+  /// is in the Gen 6 PS allow-list for [pokemonName].
+  /// The allow-list uses PS ids (no hyphens), so the input is normalised.
   bool isInG6Allowlist(String pokemonName, String moveName) {
     final entry = _g6Allowlist[pokemonName.toLowerCase()];
-    return entry?.contains(moveName) ?? false;
+    if (entry == null) return false;
+    // Convert PokéAPI hyphenated name → PS id (strip hyphens + lowercase).
+    final psId = moveName.toLowerCase().replaceAll('-', '');
+    return entry.contains(psId);
   }
 
   void _parseAll(
