@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/teams/data/dynamax_data.dart';
 import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/presentation/slot_config_screen.dart';
@@ -469,7 +470,24 @@ class _FilledSlotCard extends ConsumerWidget {
             ? pokemonHomeUrl(megaPokemon.id)
             : null;
         final megaOfficialUrl = megaPokemon?.officialArtworkUrl;
-        final megaArtworkUrl = megaHomeUrl;
+
+        // ── Gigantamax sprite ───────────────────────────────────────────────
+        final isGMaxActive = slot.hasGigantamax && slot.gigantamaxEnabled &&
+            gmaxMoveForSpecies(pokemon.name) != null;
+        final gmaxPokemon = isGMaxActive
+            ? ref
+                .watch(pokemonByNameProvider('${pokemon.name}-gmax'))
+                .asData
+                ?.value
+            : null;
+        final gmaxHomeUrl =
+            gmaxPokemon != null ? pokemonHomeUrl(gmaxPokemon.id) : null;
+
+        // G-Max takes priority over Mega for artwork.
+        final megaArtworkUrl = gmaxHomeUrl ?? megaHomeUrl;
+        final megaArtworkFallback = gmaxHomeUrl != null
+            ? gmaxPokemon?.officialArtworkUrl
+            : megaOfficialUrl;
 
         // Calculate final stats (uses mega base stats when applicable)
         final level = slot.level ?? 50;
@@ -609,7 +627,7 @@ class _FilledSlotCard extends ConsumerWidget {
                             PokemonSprite(
                               defaultUrl: megaArtworkUrl ?? spriteUrls.defaultUrl,
                               fallbackUrl: megaArtworkUrl != null
-                                  ? megaOfficialUrl
+                                  ? megaArtworkFallback
                                   : null,
                               shinyUrl: megaArtworkUrl != null ? null : spriteUrls.shinyUrl,
                               shiny: megaArtworkUrl == null && slot.isShiny,
