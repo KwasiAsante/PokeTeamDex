@@ -15,6 +15,9 @@ class FormatService {
   // In-memory caches populated on [initialize].
   List<GameFormat> _formats = [];
   Map<String, Map<String, List<String>>> _learnsets = {};
+  /// Gen 6 move allow-list from learnsets-g6.js.
+  /// Maps pokémon name → set of moves PS considers valid in Gen 6.
+  Map<String, Set<String>> _g6Allowlist = {};
   Map<String, PsMoveEntry> _moves = {};
   Map<String, PsItemEntry> _items = {};
   Map<String, PsAbilityEntry> _abilities = {};
@@ -24,11 +27,12 @@ class FormatService {
 
   // Hive box keys
   static const _boxName = 'ps_data';
-  static const _keyLearnsets  = 'learnsets';
-  static const _keyMoves      = 'moves';
-  static const _keyItems      = 'items';
-  static const _keyAbilities  = 'abilities';
-  static const _keyVersion    = 'version';
+  static const _keyLearnsets   = 'learnsets';
+  static const _keyG6Allowlist = 'learnsets_g6_allowlist';
+  static const _keyMoves       = 'moves';
+  static const _keyItems       = 'items';
+  static const _keyAbilities   = 'abilities';
+  static const _keyVersion     = 'version';
 
   // ---------------------------------------------------------------------------
   // Initialization
@@ -40,13 +44,15 @@ class FormatService {
     final box = await Hive.openBox<String>(_boxName);
 
     // 1. Load from Hive cache if available, otherwise fall back to bundled assets.
-    final learnsets  = await _loadJson(box, _keyLearnsets,  'assets/data/ps/learnsets.json');
-    final moves      = await _loadJson(box, _keyMoves,      'assets/data/ps/moves.json');
-    final items      = await _loadJson(box, _keyItems,      'assets/data/ps/items.json');
-    final abilities  = await _loadJson(box, _keyAbilities,  'assets/data/ps/abilities.json');
-    final formatsRaw = await _loadAsset('assets/data/ps/formats.json');
+    final learnsets   = await _loadJson(box, _keyLearnsets,   'assets/data/ps/learnsets.json');
+    final g6Allowlist = await _loadJson(box, _keyG6Allowlist, 'assets/data/ps/learnsets-g6-allowlist.json');
+    final moves       = await _loadJson(box, _keyMoves,       'assets/data/ps/moves.json');
+    final items       = await _loadJson(box, _keyItems,       'assets/data/ps/items.json');
+    final abilities   = await _loadJson(box, _keyAbilities,   'assets/data/ps/abilities.json');
+    final formatsRaw  = await _loadAsset('assets/data/ps/formats.json');
 
     _parseAll(learnsets, moves, items, abilities, formatsRaw);
+    _parseG6Allowlist(g6Allowlist);
     _initialized = true;
 
     // 2. Check for updates in the background (non-blocking).
@@ -61,6 +67,27 @@ class FormatService {
 
   Future<String> _loadAsset(String path) async {
     return rootBundle.loadString(path);
+  }
+
+  void _parseG6Allowlist(String raw) {
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      _g6Allowlist = map.map((k, v) =>
+          MapEntry(k, (v as List).cast<String>().toSet()));
+    } catch (_) {
+      _g6Allowlist = {};
+    }
+  }
+
+  /// Returns true when [moveName] (PokéAPI hyphenated id, e.g. "dragon-dance")
+  /// is in the Gen 6 PS allow-list for [pokemonName].
+  /// The allow-list uses PS ids (no hyphens), so the input is normalised.
+  bool isInG6Allowlist(String pokemonName, String moveName) {
+    final entry = _g6Allowlist[pokemonName.toLowerCase()];
+    if (entry == null) return false;
+    // Convert PokéAPI hyphenated name → PS id (strip hyphens + lowercase).
+    final psId = moveName.toLowerCase().replaceAll('-', '');
+    return entry.contains(psId);
   }
 
   void _parseAll(

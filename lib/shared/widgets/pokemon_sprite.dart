@@ -68,3 +68,12 @@ class PokemonSprite extends StatelessWidget {
 // HOME sprites have higher quality than official artwork for most Pokémon.
 String pokemonHomeUrl(int id) =>
     'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/$id.png';
+
+String pokemonHomeShinyUrl(int id) =>
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/$id.png';
+
+String pokemonHomeFemaleUrl(int id) =>
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/$id.png';
+
+String pokemonHomeShinyFemaleUrl(int id) =>
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/female/$id.png';

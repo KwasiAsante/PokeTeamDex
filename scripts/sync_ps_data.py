@@ -98,6 +98,38 @@ def transform_learnsets(raw: dict) -> dict:
     return result
 
 
+def build_g6_allowlist(raw: dict) -> dict[str, list[str]]:
+    """
+    Build a Gen-6 move allow-list from learnsets-g6.js.
+
+    learnsets-g6.js is PS's Gen 6 simulation data file.  Any move that
+    appears for a Pokémon in this file (regardless of its source-code
+    generation digit) is considered valid in a Gen 6 format by PS.
+
+    This covers two important cases:
+    1. Moves that are listed only as Gen 7/8 in the main learnsets.json
+       but were actually available in Gen 6 (e.g. Dragon Dance on
+       Charizard via ORAS tutor or Gen 6 egg move — the Gen 6 sources
+       are missing from PS's modern data but the move is still in the G6
+       allow-list file).
+    2. Moves that CAN transfer forward into Gen 6 simulation from older
+       games that PS Gen 6 allows.
+
+    Returns { "charizard": ["dragondance", "fly", ...], ... }
+    """
+    result: dict[str, list[str]] = {}
+    for pokemon, data in raw.items():
+        learnset = data.get("learnset") or {}
+        # Include every move that has at least one non-empty source.
+        moves = sorted(
+            move for move, sources in learnset.items()
+            if any(s for s in sources)  # at least one real source entry
+        )
+        if moves:
+            result[pokemon.lower()] = moves
+    return result
+
+
 def transform_moves(raw: dict) -> dict:
     """Keep only the fields needed for gen-filtering and slot-config display."""
     result: dict[str, dict] = {}
@@ -177,7 +209,18 @@ def main() -> None:
 
     print("Learnsets (JSON endpoint)…")
     learnsets = transform_learnsets(fetch_json_endpoint("learnsets.json"))
+
     ls_sha = write_json("learnsets.json", learnsets)
+
+    print("\nLearnsets-G6 allow-list (JS endpoint)…")
+    try:
+        g6_raw = fetch_js_endpoint("learnsets-g6.js")
+        g6_allowlist = build_g6_allowlist(g6_raw)
+        write_json("learnsets-g6-allowlist.json", g6_allowlist)
+        print(f"  Built Gen 6 allow-list for {len(g6_allowlist)} Pokémon")
+    except Exception as e:
+        print(f"  WARNING: Could not fetch learnsets-g6.js: {e}")
+        g6_allowlist = {}
 
     print("\nMoves (JSON endpoint)…")
     moves = transform_moves(fetch_json_endpoint("moves.json"))

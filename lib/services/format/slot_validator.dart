@@ -66,8 +66,12 @@ Future<SlotValidation> validateSlot(
     }
   }
 
-  // ── Moves — per-game or per-gen learnset ─────────────────────────────────
-  final learnset = _buildLearnset(pokemonMoves, format);
+  // ── Moves ────────────────────────────────────────────────────────────────
+  final learnset = buildLearnsetForFormat(
+    pokemonMoves, format,
+    pokemonName: pokemonName,
+    formatService: service,
+  );
   final moveSlots = {
     'move1': slot.move1,
     'move2': slot.move2,
@@ -76,10 +80,16 @@ Future<SlotValidation> validateSlot(
   };
   for (final entry in moveSlots.entries) {
     final moveName = entry.value;
-    if (moveName != null && !learnset.contains(moveName)) {
-      violations[entry.key] =
-          '${_display(moveName)} not learnable in ${_formatLabel(format)}';
+    if (moveName == null) continue;
+    if (learnset.contains(moveName)) continue;
+    // Gen 6: also accept moves in PS's learnsets-g6.js allow-list.
+    // This covers egg moves and tutors that are missing from the main
+    // learnsets data but that PS considers valid for Gen 6 simulation.
+    if (format.gen == 6 && service.isInG6Allowlist(pokemonName, moveName)) {
+      continue;
     }
+    violations[entry.key] =
+        '${_display(moveName)} not learnable in ${_formatLabel(format)}';
   }
 
   return SlotValidation(violations);
@@ -116,13 +126,20 @@ SlotValidation validateSlotSync(
     }
   }
 
-  final learnset = _buildLearnset(pokemonMoves, format);
+  final learnset = buildLearnsetForFormat(
+    pokemonMoves, format,
+    pokemonName: pokemonName,
+    formatService: service,
+  );
   for (int i = 0; i < moves.length; i++) {
     final moveName = moves[i];
-    if (moveName != null && !learnset.contains(moveName)) {
-      violations['move${i + 1}'] =
-          '${_display(moveName)} not learnable in ${_formatLabel(format)}';
+    if (moveName == null) continue;
+    if (learnset.contains(moveName)) continue;
+    if (format.gen == 6 && service.isInG6Allowlist(pokemonName, moveName)) {
+      continue;
     }
+    violations['move${i + 1}'] =
+        '${_display(moveName)} not learnable in ${_formatLabel(format)}';
   }
 
   return SlotValidation(violations);
@@ -130,14 +147,43 @@ SlotValidation validateSlotSync(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// Returns the set of move names (PokéAPI hyphenated format) that [pokemonMoves]
-/// shows as learnable in [format].
+/// Returns the set of move names (PokéAPI hyphenated format) learnable in
+/// [format]. Supplements PokéAPI version-group data with PS learnset data so
+/// that moves PokéAPI incorrectly attributes to a later gen are still included
+/// (e.g. Charizard's Dragon Dance is listed in Gen 8/9 by PokéAPI but was
+/// available in Gen 6 via move tutors).
 ///
-/// Use this to pre-filter the move picker so only legal moves are shown.
+/// [pokemonName] and [formatService] are optional; when supplied the PS
+/// learnset is cross-checked: any move in [pokemonMoves] whose PS id appears
+/// in the PS learnset for [format.gen] is included regardless of PokéAPI's
+/// version-group data.
 Set<String> buildLearnsetForFormat(
   List<Map<String, dynamic>> pokemonMoves,
-  GameFormat format,
-) => _buildLearnset(pokemonMoves, format);
+  GameFormat format, {
+  String? pokemonName,
+  FormatService? formatService,
+}) {
+  final result = _buildLearnset(pokemonMoves, format);
+
+  // PS supplementary pass — catches moves PokéAPI links to the wrong gen.
+  if (pokemonName != null &&
+      formatService != null &&
+      formatService.isInitialized) {
+    final psMoveIds = formatService
+        .learnsetForGen(pokemonName.toLowerCase(), format.gen)
+        .toSet();
+    if (psMoveIds.isNotEmpty) {
+      for (final moveData in pokemonMoves) {
+        final moveName = (moveData['move'] as Map)['name'] as String;
+        // Convert PokéAPI name to PS id (strip hyphens) for comparison.
+        final psId = _toPsId(moveName);
+        if (psMoveIds.contains(psId)) result.add(moveName);
+      }
+    }
+  }
+
+  return result;
+}
 
 Set<String> _buildLearnset(
   List<Map<String, dynamic>> pokemonMoves,

@@ -10,6 +10,8 @@ class PokemonEntry {
   final List<Map<String, dynamic>> stats;
   final List<Map<String, dynamic>> abilities;
   final List<Map<String, dynamic>> moves;
+  /// Alternative form names for this Pokémon (e.g. ["aegislash-shield","aegislash-blade"]).
+  final List<String> formNames;
 
   PokemonEntry({
     required this.id,
@@ -23,6 +25,7 @@ class PokemonEntry {
     this.stats = const [],
     this.abilities = const [],
     this.moves = const [],
+    this.formNames = const [],
   });
 
   factory PokemonEntry.fromJson(Map<String, dynamic> json) {
@@ -53,6 +56,10 @@ class PokemonEntry {
               ?.map((m) => Map<String, dynamic>.from(m as Map))
               .toList() ??
           [],
+      formNames: (json['forms'] as List?)
+              ?.map((f) => (f as Map)['name'] as String)
+              .toList() ??
+          [],
     );
   }
 
@@ -70,6 +77,9 @@ class PokemonEntry {
       };
 
   String displayId() => '#${id.toString().padLeft(3, '0')}';
+
+  String? get officialArtworkShinyUrl =>
+      sprites?['other']?['official-artwork']?['front_shiny'] as String?;
 
   String? getImageUrl() {
     if (officialArtworkUrl != null && officialArtworkUrl!.isNotEmpty) {

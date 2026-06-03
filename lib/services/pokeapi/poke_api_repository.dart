@@ -98,6 +98,31 @@ class PokeApiRepository {
     return PokemonEntry.fromJson(data);
   }
 
+  /// Like [fetchPokemonByName] but falls back to the species endpoint when the
+  /// direct name lookup fails (e.g. `aegislash` → 404; use species to find the
+  /// default variety `aegislash-shield`).
+  Future<PokemonEntry> fetchPokemonByNameOrDefault(String name) async {
+    try {
+      return await fetchPokemonByName(name);
+    } catch (_) {
+      // Try pokemon-species/{name} to find the default variety.
+      final r = await _pokeApiClient.client.get('/pokemon-species/$name');
+      if (r.statusCode == 200) {
+        final varieties = r.data['varieties'] as List? ?? [];
+        final defaultVariety = varieties.firstWhere(
+          (v) => v['is_default'] == true,
+          orElse: () => varieties.isNotEmpty ? varieties.first : null,
+        );
+        if (defaultVariety != null) {
+          final defaultName =
+              (defaultVariety['pokemon'] as Map)['name'] as String;
+          return await fetchPokemonByName(defaultName);
+        }
+      }
+      rethrow;
+    }
+  }
+
   Future<PokemonSpeciesEntry> fetchPokemonSpecies(int id) async {
     final cacheKey = 'pokemon_species_$id';
     final cached = _pokeApiCache.getIfValid(cacheKey);

@@ -261,9 +261,11 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         final slotNumber = i + 1;
 
         // Resolve species to PokéAPI id.
+        // Uses species fallback for Pokémon whose base name doesn't exist
+        // directly (e.g. aegislash → aegislash-shield).
         int? pokemonId;
         try {
-          final entry = await repo.fetchPokemonByName(s.species);
+          final entry = await repo.fetchPokemonByNameOrDefault(s.species);
           pokemonId = entry.id;
         } catch (_) {
           errors.add('Could not find Pokémon "${s.species}"');

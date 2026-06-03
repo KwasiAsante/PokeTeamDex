@@ -25,6 +25,7 @@ import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:poke_team_dex/features/teams/data/dynamax_data.dart';
+import 'package:poke_team_dex/features/teams/data/form_filter.dart';
 import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
 import 'package:poke_team_dex/features/teams/data/z_moves_data.dart';
 import 'package:poke_team_dex/features/teams/data/ribbon_catalog.dart';
@@ -188,6 +189,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   // Ribbons — set of ribbon ids currently awarded to this Pokémon
   final Set<String> _ribbons = {};
 
+  // Form change (e.g. aegislash-shield ↔ aegislash-blade)
+  String? _formName; // null = use the Pokémon's default form
+
   // Mega Evolution toggle
   bool _isMegaEvolved = false;
 
@@ -261,6 +265,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _ivCtrls[3].text = (slot.ivSpa ?? 31).toString();
     _ivCtrls[4].text = (slot.ivSpd ?? 31).toString();
     _ivCtrls[5].text = (slot.ivSpe ?? 31).toString();
+    _formName = slot.formName;
     _isMegaEvolved = slot.isMegaEvolved;
     _hasGigantamax = slot.hasGigantamax;
     _gigantamaxEnabled = slot.gigantamaxEnabled;
@@ -354,6 +359,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           ivSpa: Value(ivs[3]),
           ivSpd: Value(ivs[4]),
           ivSpe: Value(ivs[5]),
+          formName: Value(_formName),
           isMegaEvolved: Value(_isMegaEvolved),
           hasGigantamax: Value(_hasGigantamax),
           gigantamaxEnabled: Value(_gigantamaxEnabled),
@@ -521,19 +527,17 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             ? GenerationMechanics.forGen(format.gen)
             : null;
         final pokemonMoves = pokemon.moves.cast<Map<String, dynamic>>();
+        // violations is recomputed as effectiveViolations after form data loads.
+        // ignore: unused_local_variable
         final violations = format != null
             ? _computeViolations(formatService, format, pokemon.name, pokemonMoves)
             : <String, String>{};
 
         // Learnable moves filtered by format version groups.
         // No format → show everything the Pokémon can ever learn.
-        final learnableMoves = (format != null
-                ? buildLearnsetForFormat(pokemonMoves, format)
-                : pokemon.moves
-                    .map((m) => m['move']['name'] as String)
-                    .toSet())
-            .toList()
-          ..sort();
+        // Learnable moves supplemented by PS learnset to catch moves
+        // Base learnset (overridden by effectiveLearnableMoves below when a form
+        // is active — kept here so the compiler doesn't complain about order).
 
         // Sprite resolution
         final useFormatSprites =
@@ -576,6 +580,73 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final megaArtworkUrl = megaHomeUrl; // primary; official is the fallback
 
 
+        // ── Form change ────────────────────────────────────────────────────
+        // pokemon.formNames only lists the current form. Use the species
+        // endpoint (varieties) to get ALL forms for this species.
+        final speciesAsync = ref.watch(pokemonSpeciesProvider(slot.pokemonId));
+        final allVarieties = speciesAsync.asData?.value.varieties
+                .map((v) => v.name)
+                .toList() ??
+            <String>[];
+        // Filter: exclude mega/primal/gmax/gender; gate ability/item forms
+        // on their prerequisite being selected.
+        final availableForms = filterFormChips(
+          varieties: allVarieties,
+          heldItem: _heldItemName,
+          abilityName: _abilityName,
+        );
+        final hasMultipleForms = availableForms.isNotEmpty;
+        // Fetch form data whenever a non-default form is selected (_formName != null).
+        final formPokemonAsync = _formName != null
+            ? ref.watch(pokemonByNameProvider(_formName!))
+            : null;
+        final formPokemon = formPokemonAsync?.asData?.value;
+
+        // ── Form-specific abilities, moves, and base stats ─────────────────
+        // When a non-default form is active (e.g. Alolan Raichu, Galarian
+        // Rapidash) use that form's abilities and moves instead of the base
+        // form's data so the picker and validation reflect the correct options.
+        final effectiveAbilities = (formPokemon != null &&
+                formPokemon.abilities.isNotEmpty)
+            ? (formPokemon.abilities.map((a) => (
+                  name: a['ability']['name'] as String,
+                  isHidden: a['is_hidden'] as bool,
+                  abilitySlot: a['slot'] as int,
+                )).toList()
+              ..sort((a, b) => a.abilitySlot.compareTo(b.abilitySlot)))
+            : abilities;
+
+        final effectivePokemonMoves = formPokemon != null &&
+                formPokemon.moves.isNotEmpty
+            ? formPokemon.moves.cast<Map<String, dynamic>>()
+            : pokemonMoves;
+
+        // Re-compute violations and learnable moves with form-specific data.
+        final effectiveViolations = format != null
+            ? _computeViolations(
+                formatService, format, pokemon.name, effectivePokemonMoves)
+            : <String, String>{};
+
+        final effectiveLearnableMoves = (format != null
+                ? buildLearnsetForFormat(
+                    effectivePokemonMoves, format,
+                    pokemonName: formPokemon?.name ?? pokemon.name,
+                    formatService: formatService,
+                  )
+                : effectivePokemonMoves
+                    .map((m) => m['move']['name'] as String)
+                    .toSet())
+            .toList()
+          ..sort();
+
+        // Form stats take highest priority (form > mega > base).
+        final finalBaseStats = formPokemon != null
+            ? <String, int>{
+                for (final s in formPokemon.stats)
+                  s['stat']['name'] as String: s['base_stat'] as int,
+              }
+            : effectiveBaseStats;
+
         // ── Gigantamax / Dynamax ────────────────────────────────────────────
         final canDynamax = mechanics == null || mechanics.hasGigantamax;
         final gmaxMove = gmaxMoveForSpecies(pokemon.name);
@@ -588,12 +659,41 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             : null;
         final gmaxPokemon = gmaxPokemonAsync?.asData?.value;
 
-        // G-Max overrides mega if both somehow active (shouldn't normally happen).
+        // Form artwork — use shiny version when slot is shiny.
+        final formHomeUrl = formPokemon != null
+            ? (_isShiny
+                ? pokemonHomeShinyUrl(formPokemon.id)
+                : pokemonHomeUrl(formPokemon.id))
+            : null;
+        final formFallbackUrl = formPokemon != null
+            ? (_isShiny
+                ? (formPokemon.officialArtworkShinyUrl ??
+                    formPokemon.officialArtworkUrl)
+                : formPokemon.officialArtworkUrl)
+            : null;
+
+        // Sprite priority: G-Max > Mega > Form change > default.
         final gmaxHomeUrl = gmaxPokemon != null ? pokemonHomeUrl(gmaxPokemon.id) : null;
-        final effectiveMegaArtworkUrl = gmaxHomeUrl ?? megaArtworkUrl;
+        // ── Gender-specific base sprite ─────────────────────────────────────
+        // Try female HOME url first for female slots; CachedNetworkImage falls
+        // back to the regular HOME url if no female sprite exists for this species.
+        final isFemale = _gender == 'female';
+        final genderBaseUrl = isFemale
+            ? (_isShiny
+                ? pokemonHomeShinyFemaleUrl(pokemon.id)
+                : pokemonHomeFemaleUrl(pokemon.id))
+            : null;
+        final genderBaseFallback = isFemale
+            ? (_isShiny ? pokemonHomeShinyUrl(pokemon.id) : pokemonHomeUrl(pokemon.id))
+            : null;
+
+        final effectiveMegaArtworkUrl =
+            gmaxHomeUrl ?? megaArtworkUrl ?? formHomeUrl;
         final effectiveMegaFallbackUrl = gmaxHomeUrl != null
             ? gmaxPokemon?.officialArtworkUrl
-            : megaPokemon?.officialArtworkUrl;
+            : megaArtworkUrl != null
+                ? megaPokemon?.officialArtworkUrl
+                : formFallbackUrl;
 
         // ── Alpha Pokémon ───────────────────────────────────────────────────
         // Only show for formats where Alpha transfers make sense
@@ -614,7 +714,15 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             children: [
               _buildHeader(slot, spriteUrls, mechanics,
                   megaArtworkUrl: effectiveMegaArtworkUrl,
-                  megaFallbackUrl: effectiveMegaFallbackUrl),
+                  megaFallbackUrl: effectiveMegaFallbackUrl,
+                  genderBaseUrl: genderBaseUrl,
+                  genderBaseFallback: genderBaseFallback,
+                  isFormLoading: formPokemonAsync?.isLoading ?? false),
+              // ── Form selector (when Pokémon has multiple forms) ──
+              if (hasMultipleForms) ...[
+                const SizedBox(height: 16),
+                _buildFormSelector(availableForms),
+              ],
               const SizedBox(height: 24),
               _buildBasics(mechanics),
               // ── Ability (Gen 3+) ──
@@ -622,7 +730,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 const SizedBox(height: 24),
                 _SectionTitle('Ability'),
                 const SizedBox(height: 8),
-                _buildAbility(abilities, violations['ability']),
+                _buildAbility(effectiveAbilities, effectiveViolations['ability']),
                 // Mega form ability shown as read-only info when evolved.
                 if (canMegaEvolve && _isMegaEvolved && megaPokemon != null &&
                     megaPokemon.abilities.isNotEmpty) ...[
@@ -642,7 +750,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 const SizedBox(height: 24),
                 _SectionTitle('Held Item'),
                 const SizedBox(height: 8),
-                _buildHeldItem(violation: violations['item']),
+                _buildHeldItem(violation: effectiveViolations['item']),
               ],
               // ── Mega Evolution toggle (Gen 6–7, when applicable) ──
               if (canMegaEvolve) ...[
@@ -668,9 +776,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               const SizedBox(height: 24),
               _SectionTitle('Moves'),
               const SizedBox(height: 8),
-              _buildMoves(learnableMoves,
-                  violations: violations,
-                  pokemonName: pokemon.name,
+              _buildMoves(effectiveLearnableMoves,
+                  violations: effectiveViolations,
+                  pokemonName: formPokemon?.name ?? pokemon.name,
                   showMaxMoves: canDynamax,
                   useGMax: canGigantamax && _hasGigantamax && _gigantamaxEnabled),
               const SizedBox(height: 24),
@@ -711,7 +819,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               const SizedBox(height: 24),
               _SectionTitle('Stat Preview (Lv $_level)'),
               const SizedBox(height: 8),
-              _buildStatPreview(effectiveBaseStats, mechanics),
+              _buildStatPreview(finalBaseStats, mechanics),
               // ── Contest conditions (Gen 3 / Gen 4 / no format) ──
               if (mechanics == null || mechanics.gen == 3 || mechanics.gen == 4) ...[
                 const SizedBox(height: 24),
@@ -804,6 +912,10 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     GenerationMechanics? mechanics, {
     String? megaArtworkUrl,
     String? megaFallbackUrl,
+    // Gender-specific base sprite (female HOME url when slot is female).
+    String? genderBaseUrl,
+    String? genderBaseFallback,
+    bool isFormLoading = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -815,12 +927,40 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           alignment: Alignment.bottomRight,
           children: [
             PokemonSprite(
-              defaultUrl: megaArtworkUrl ?? spriteUrls.defaultUrl,
-              fallbackUrl: megaArtworkUrl != null ? megaFallbackUrl : null,
-              shinyUrl: megaArtworkUrl != null ? null : spriteUrls.shinyUrl,
-              shiny: megaArtworkUrl == null && _isShiny,
+              // Priority: form/mega/gmax override > female base > default sprite.
+              defaultUrl: megaArtworkUrl ??
+                  genderBaseUrl ??
+                  spriteUrls.defaultUrl,
+              fallbackUrl: megaArtworkUrl != null
+                  ? megaFallbackUrl
+                  : genderBaseUrl != null
+                      ? genderBaseFallback
+                      : null,
+              shinyUrl: (megaArtworkUrl == null && genderBaseUrl == null)
+                  ? spriteUrls.shinyUrl
+                  : null,
+              shiny: megaArtworkUrl == null &&
+                  genderBaseUrl == null &&
+                  _isShiny,
               size: 140,
             ),
+            // Loading overlay while form sprite is fetching
+            if (isFormLoading)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Center(
+                    child: SizedBox(
+                      width: 28, height: 28,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
             if (mechanics == null || mechanics.hasShiny)
             GestureDetector(
               onTap: () => setState(() => _isShiny = !_isShiny),
@@ -1622,6 +1762,57 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       ),
     );
     if (result != null) setState(() => _moves[moveIndex] = result);
+  }
+
+  // ── Form selector ─────────────────────────────────────────────────────────
+
+  Widget _buildFormSelector(List<String> forms) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    String fmtForm(String name) => name
+        .split('-')
+        .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+
+    final isDefault = _formName == null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Form', style: textTheme.labelLarge),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            // Default form chip
+            ChoiceChip(
+              label: const Text('Default'),
+              selected: isDefault,
+              onSelected: (_) => setState(() => _formName = null),
+              selectedColor: colorScheme.primaryContainer,
+              labelStyle: textTheme.labelSmall?.copyWith(
+                fontWeight: isDefault ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            // Non-default form chips (already filtered)
+            ...forms.map((form) {
+              final selected = _formName == form;
+              return ChoiceChip(
+                label: Text(fmtForm(form)),
+                selected: selected,
+                onSelected: (_) => setState(() => _formName = form),
+                selectedColor: colorScheme.primaryContainer,
+                labelStyle: textTheme.labelSmall?.copyWith(
+                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                ),
+              );
+            }),
+          ],
+        ),
+      ],
+    );
   }
 
   // ── Mega ability info row ─────────────────────────────────────────────────
