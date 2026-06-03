@@ -78,6 +78,9 @@ class PokemonEntry {
 
   String displayId() => '#${id.toString().padLeft(3, '0')}';
 
+  String? get officialArtworkShinyUrl =>
+      sprites?['other']?['official-artwork']?['front_shiny'] as String?;
+
   String? getImageUrl() {
     if (officialArtworkUrl != null && officialArtworkUrl!.isNotEmpty) {
       return officialArtworkUrl;

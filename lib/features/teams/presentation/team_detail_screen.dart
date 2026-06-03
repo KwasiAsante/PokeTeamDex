@@ -480,9 +480,18 @@ class _FilledSlotCard extends ConsumerWidget {
                 .asData
                 ?.value
             : null;
-        final formHomeUrl =
-            formChangePokemon != null ? pokemonHomeUrl(formChangePokemon.id) : null;
-        final formOfficialUrl = formChangePokemon?.officialArtworkUrl;
+        // Use shiny form artwork when the slot is shiny.
+        final formHomeUrl = formChangePokemon != null
+            ? (slot.isShiny
+                ? pokemonHomeShinyUrl(formChangePokemon.id)
+                : pokemonHomeUrl(formChangePokemon.id))
+            : null;
+        final formOfficialUrl = formChangePokemon != null
+            ? (slot.isShiny
+                ? (formChangePokemon.officialArtworkShinyUrl ??
+                    formChangePokemon.officialArtworkUrl)
+                : formChangePokemon.officialArtworkUrl)
+            : null;
 
         // ── Gigantamax sprite ───────────────────────────────────────────────
         final isGMaxActive = slot.hasGigantamax && slot.gigantamaxEnabled &&
