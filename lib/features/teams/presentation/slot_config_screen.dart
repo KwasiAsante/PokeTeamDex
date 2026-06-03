@@ -590,11 +590,15 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
 
         // ── Form change ────────────────────────────────────────────────────
-        // _formName is stored in slot.formName; null means default form.
-        // When a non-default form is selected, fetch it for stats/sprite.
-        final availableForms = pokemon.formNames; // ["aegislash-shield","aegislash-blade"]
+        // pokemon.formNames only lists the current form. Use the species
+        // endpoint (varieties) to get ALL forms for this species.
+        final speciesAsync = ref.watch(pokemonSpeciesProvider(slot.pokemonId));
+        final availableForms = speciesAsync.asData?.value.varieties
+                .map((v) => v.name)
+                .toList() ??
+            <String>[];
         final hasMultipleForms = availableForms.length > 1;
-        final activeFallbackFormName = _formName; // from slot state
+        final activeFallbackFormName = _formName;
         final formPokemonAsync = (hasMultipleForms &&
                 activeFallbackFormName != null &&
                 activeFallbackFormName != availableForms.first)
