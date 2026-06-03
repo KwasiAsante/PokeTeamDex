@@ -19,7 +19,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -93,6 +93,9 @@ class AppDatabase extends _$AppDatabase {
           if (from < 9) {
             await m.createTable(pokemonInstances);
             await m.addColumn(teamSlots, teamSlots.instanceId);
+          }
+          if (from < 10) {
+            await m.addColumn(pokemonInstances, pokemonInstances.remoteId);
           }
         },
       );

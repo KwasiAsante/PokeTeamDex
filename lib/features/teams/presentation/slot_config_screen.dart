@@ -279,7 +279,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _formName = slot.formName;
     _instanceId = slot.instanceId;
     _originalNickname = slot.nickname ?? '';
-    if (slot.instanceId != null) _loadInheritedData(slot.instanceId!);
+    if (slot.instanceId != null) _loadInheritedData(slot.instanceId!, currentSlotId: slot.id);
     _isMegaEvolved = slot.isMegaEvolved;
     _hasGigantamax = slot.hasGigantamax;
     _gigantamaxEnabled = slot.gigantamaxEnabled;
@@ -305,26 +305,51 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   /// Loads inherited ribbons and nickname aliases from the instance chain.
   /// Fire-and-forget from [_initFromSlot] — updates state when ready.
-  Future<void> _loadInheritedData(int instanceId) async {
+  Future<void> _loadInheritedData(int instanceId, {required int currentSlotId}) async {
     final repo = ref.read(pokemonInstanceRepositoryProvider);
     // Walk the full ancestor chain to union all inheritedRibbons.
     final chain = await repo.getChain(instanceId);
     final ribbons = <String>{};
     final aliases = <String>[];
+
+    void _addAlias(String? a) {
+      if (a != null && a.isNotEmpty && !aliases.contains(a)) aliases.add(a);
+    }
+
     for (final inst in chain) {
-      if (inst.inheritedRibbons != null && inst.inheritedRibbons!.isNotEmpty) {
+      // Aliases are collected from ancestors only — the current instance is the
+      // "now", so its own names are not "previous".
+      final isCurrentInstance = inst.id == instanceId;
+
+      if (!isCurrentInstance) {
+        // Include active slot nicknames for ancestor instances.
+        // Skip the current slot so its own nickname doesn't appear.
+        final slots = await repo.getSlotsForInstance(inst.id);
+        for (final slot in slots) {
+          if (slot.id != currentSlotId) _addAlias(slot.nickname);
+        }
+
+        // Include superseded names stored in the ancestor's alias history.
+        if (inst.nicknameAliases != null && inst.nicknameAliases!.isNotEmpty) {
+          try {
+            final a =
+                (jsonDecode(inst.nicknameAliases!) as List).cast<String>();
+            for (final alias in a) {
+              _addAlias(alias);
+            }
+          } catch (_) {}
+        }
+      }
+
+      // Inherited ribbons are only meaningful from ancestor instances — the
+      // current instance's inheritedRibbons is an accumulator for future
+      // children, not something this slot itself inherited.
+      if (!isCurrentInstance &&
+          inst.inheritedRibbons != null &&
+          inst.inheritedRibbons!.isNotEmpty) {
         try {
           ribbons.addAll(
               (jsonDecode(inst.inheritedRibbons!) as List).cast<String>());
-        } catch (_) {}
-      }
-      if (inst.nicknameAliases != null && inst.nicknameAliases!.isNotEmpty) {
-        try {
-          final a =
-              (jsonDecode(inst.nicknameAliases!) as List).cast<String>();
-          for (final alias in a) {
-            if (!aliases.contains(alias)) aliases.add(alias);
-          }
         } catch (_) {}
       }
     }
@@ -431,9 +456,35 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           entityType: const Value('team_slot'),
           entityId:   Value(existing.id),
           payload: Value(jsonEncode({
-            'team_local_id': existing.teamId,
-            'slot':          existing.slot,
-            'pokemon_id':    existing.pokemonId,
+            'team_local_id':   existing.teamId,
+            'slot':            existing.slot,
+            'pokemon_id':      existing.pokemonId,
+            if (nickname.isNotEmpty) 'nickname': nickname,
+            if (_instanceId != null) 'instance_client_local_id': _instanceId,
+            if (_formName != null) 'form_name': _formName,
+            'level':           _level,
+            if (_gender != null) 'gender': _gender,
+            'is_shiny':        _isShiny,
+            if (_friendship != null) 'friendship': _friendship,
+            if (_abilityName != null) 'ability_name': _abilityName,
+            if (_natureName != null) 'nature_name': _natureName,
+            if (_heldItemName != null) 'held_item_name': _heldItemName,
+            if (_moves[0] != null) 'move1': _moves[0],
+            if (_moves[1] != null) 'move2': _moves[1],
+            if (_moves[2] != null) 'move3': _moves[2],
+            if (_moves[3] != null) 'move4': _moves[3],
+            'ev_hp':  evs[0], 'ev_atk': evs[1], 'ev_def': evs[2],
+            'ev_spa': evs[3], 'ev_spd': evs[4], 'ev_spe': evs[5],
+            'iv_hp':  ivs[0], 'iv_atk': ivs[1], 'iv_def': ivs[2],
+            'iv_spa': ivs[3], 'iv_spd': ivs[4], 'iv_spe': ivs[5],
+            if (_ribbons.isNotEmpty) 'ribbons': jsonEncode(_ribbons.toList()),
+            'is_mega_evolved':    _isMegaEvolved,
+            'has_gigantamax':     _hasGigantamax,
+            'gigantamax_enabled': _gigantamaxEnabled,
+            'is_alpha':           _isAlpha,
+            'contest_cool':       contest[0], 'contest_beautiful': contest[1],
+            'contest_cute':       contest[2], 'contest_clever':    contest[3],
+            'contest_tough':      contest[4], 'contest_sheen':     contest[5],
           })),
           createdAt: Value(DateTime.now()),
         ),
@@ -2190,7 +2241,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     } else {
       parentInstanceId = await instanceRepo.createOrigin(
         pokemonId: targetSlot.pokemonId,
-        nickname: targetSlot.nickname,
       );
       await slotRepo.setInstanceId(targetSlot.id, parentInstanceId);
     }
@@ -2199,9 +2249,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     final childInstanceId = await instanceRepo.createIteration(
       pokemonId: currentSlot.pokemonId,
       parentInstanceId: parentInstanceId,
-      newNickname: _nicknameCtrl.text.trim().isEmpty
-          ? null
-          : _nicknameCtrl.text.trim(),
     );
 
     setState(() => _instanceId = childInstanceId);
@@ -2236,9 +2283,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     } else {
       originInstanceId = await instanceRepo.createOrigin(
         pokemonId: currentSlot.pokemonId,
-        nickname: _nicknameCtrl.text.trim().isEmpty
-            ? null
-            : _nicknameCtrl.text.trim(),
       );
       setState(() => _instanceId = originInstanceId);
     }
@@ -2247,7 +2291,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     final childInstanceId = await instanceRepo.createIteration(
       pokemonId: targetSlot.pokemonId,
       parentInstanceId: originInstanceId,
-      newNickname: targetSlot.nickname,
     );
     await slotRepo.setInstanceId(targetSlot.id, childInstanceId);
   }
@@ -2277,9 +2320,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     } else {
       originInstanceId = await instanceRepo.createOrigin(
         pokemonId: currentSlot.pokemonId,
-        nickname: _nicknameCtrl.text.trim().isEmpty
-            ? null
-            : _nicknameCtrl.text.trim(),
       );
       setState(() => _instanceId = originInstanceId);
     }
@@ -2497,9 +2537,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     } else {
       originInstanceId = await instanceRepo.createOrigin(
         pokemonId: currentSlot.pokemonId,
-        nickname: _nicknameCtrl.text.trim().isEmpty
-            ? null
-            : _nicknameCtrl.text.trim(),
       );
       setState(() => _instanceId = originInstanceId);
     }

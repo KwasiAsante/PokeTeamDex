@@ -28,6 +28,12 @@ async def create_folder(body: FolderCreate, current_user: CurrentUser, db: DB) -
     return FolderResponse.model_validate(folder)
 
 
+@router.get("/{folder_id}", response_model=FolderResponse)
+async def get_folder(folder_id: int, current_user: CurrentUser, db: DB) -> FolderResponse:
+    folder = await _get_owned_folder(folder_id, current_user.id, db)
+    return FolderResponse.model_validate(folder)
+
+
 @router.patch("/{folder_id}", response_model=FolderResponse)
 async def rename_folder(
     folder_id: int, body: FolderUpdate, current_user: CurrentUser, db: DB

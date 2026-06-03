@@ -4562,6 +4562,17 @@ class $PokemonInstancesTable extends PokemonInstances
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _remoteIdMeta = const VerificationMeta(
+    'remoteId',
+  );
+  @override
+  late final GeneratedColumn<String> remoteId = GeneratedColumn<String>(
+    'remote_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -4593,6 +4604,7 @@ class $PokemonInstancesTable extends PokemonInstances
     parentInstanceId,
     nicknameAliases,
     inheritedRibbons,
+    remoteId,
     createdAt,
     updatedAt,
   ];
@@ -4646,6 +4658,12 @@ class $PokemonInstancesTable extends PokemonInstances
         ),
       );
     }
+    if (data.containsKey('remote_id')) {
+      context.handle(
+        _remoteIdMeta,
+        remoteId.isAcceptableOrUnknown(data['remote_id']!, _remoteIdMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4687,6 +4705,10 @@ class $PokemonInstancesTable extends PokemonInstances
         DriftSqlType.string,
         data['${effectivePrefix}inherited_ribbons'],
       ),
+      remoteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}remote_id'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -4722,6 +4744,9 @@ class PokemonInstance extends DataClass implements Insertable<PokemonInstance> {
   /// Ribbons inherited from the parent chain, stored as a JSON array of ids.
   /// Merged with the current slot's own ribbons for display.
   final String? inheritedRibbons;
+
+  /// Server-assigned ID once this instance has been synced.
+  final String? remoteId;
   final DateTime createdAt;
   final DateTime updatedAt;
   const PokemonInstance({
@@ -4730,6 +4755,7 @@ class PokemonInstance extends DataClass implements Insertable<PokemonInstance> {
     this.parentInstanceId,
     this.nicknameAliases,
     this.inheritedRibbons,
+    this.remoteId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -4746,6 +4772,9 @@ class PokemonInstance extends DataClass implements Insertable<PokemonInstance> {
     }
     if (!nullToAbsent || inheritedRibbons != null) {
       map['inherited_ribbons'] = Variable<String>(inheritedRibbons);
+    }
+    if (!nullToAbsent || remoteId != null) {
+      map['remote_id'] = Variable<String>(remoteId);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -4765,6 +4794,9 @@ class PokemonInstance extends DataClass implements Insertable<PokemonInstance> {
       inheritedRibbons: inheritedRibbons == null && nullToAbsent
           ? const Value.absent()
           : Value(inheritedRibbons),
+      remoteId: remoteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteId),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -4781,6 +4813,7 @@ class PokemonInstance extends DataClass implements Insertable<PokemonInstance> {
       parentInstanceId: serializer.fromJson<int?>(json['parentInstanceId']),
       nicknameAliases: serializer.fromJson<String?>(json['nicknameAliases']),
       inheritedRibbons: serializer.fromJson<String?>(json['inheritedRibbons']),
+      remoteId: serializer.fromJson<String?>(json['remoteId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -4794,6 +4827,7 @@ class PokemonInstance extends DataClass implements Insertable<PokemonInstance> {
       'parentInstanceId': serializer.toJson<int?>(parentInstanceId),
       'nicknameAliases': serializer.toJson<String?>(nicknameAliases),
       'inheritedRibbons': serializer.toJson<String?>(inheritedRibbons),
+      'remoteId': serializer.toJson<String?>(remoteId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -4805,6 +4839,7 @@ class PokemonInstance extends DataClass implements Insertable<PokemonInstance> {
     Value<int?> parentInstanceId = const Value.absent(),
     Value<String?> nicknameAliases = const Value.absent(),
     Value<String?> inheritedRibbons = const Value.absent(),
+    Value<String?> remoteId = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => PokemonInstance(
@@ -4819,6 +4854,7 @@ class PokemonInstance extends DataClass implements Insertable<PokemonInstance> {
     inheritedRibbons: inheritedRibbons.present
         ? inheritedRibbons.value
         : this.inheritedRibbons,
+    remoteId: remoteId.present ? remoteId.value : this.remoteId,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -4835,6 +4871,7 @@ class PokemonInstance extends DataClass implements Insertable<PokemonInstance> {
       inheritedRibbons: data.inheritedRibbons.present
           ? data.inheritedRibbons.value
           : this.inheritedRibbons,
+      remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -4848,6 +4885,7 @@ class PokemonInstance extends DataClass implements Insertable<PokemonInstance> {
           ..write('parentInstanceId: $parentInstanceId, ')
           ..write('nicknameAliases: $nicknameAliases, ')
           ..write('inheritedRibbons: $inheritedRibbons, ')
+          ..write('remoteId: $remoteId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -4861,6 +4899,7 @@ class PokemonInstance extends DataClass implements Insertable<PokemonInstance> {
     parentInstanceId,
     nicknameAliases,
     inheritedRibbons,
+    remoteId,
     createdAt,
     updatedAt,
   );
@@ -4873,6 +4912,7 @@ class PokemonInstance extends DataClass implements Insertable<PokemonInstance> {
           other.parentInstanceId == this.parentInstanceId &&
           other.nicknameAliases == this.nicknameAliases &&
           other.inheritedRibbons == this.inheritedRibbons &&
+          other.remoteId == this.remoteId &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -4883,6 +4923,7 @@ class PokemonInstancesCompanion extends UpdateCompanion<PokemonInstance> {
   final Value<int?> parentInstanceId;
   final Value<String?> nicknameAliases;
   final Value<String?> inheritedRibbons;
+  final Value<String?> remoteId;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const PokemonInstancesCompanion({
@@ -4891,6 +4932,7 @@ class PokemonInstancesCompanion extends UpdateCompanion<PokemonInstance> {
     this.parentInstanceId = const Value.absent(),
     this.nicknameAliases = const Value.absent(),
     this.inheritedRibbons = const Value.absent(),
+    this.remoteId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -4900,6 +4942,7 @@ class PokemonInstancesCompanion extends UpdateCompanion<PokemonInstance> {
     this.parentInstanceId = const Value.absent(),
     this.nicknameAliases = const Value.absent(),
     this.inheritedRibbons = const Value.absent(),
+    this.remoteId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   }) : pokemonId = Value(pokemonId);
@@ -4909,6 +4952,7 @@ class PokemonInstancesCompanion extends UpdateCompanion<PokemonInstance> {
     Expression<int>? parentInstanceId,
     Expression<String>? nicknameAliases,
     Expression<String>? inheritedRibbons,
+    Expression<String>? remoteId,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -4918,6 +4962,7 @@ class PokemonInstancesCompanion extends UpdateCompanion<PokemonInstance> {
       if (parentInstanceId != null) 'parent_instance_id': parentInstanceId,
       if (nicknameAliases != null) 'nickname_aliases': nicknameAliases,
       if (inheritedRibbons != null) 'inherited_ribbons': inheritedRibbons,
+      if (remoteId != null) 'remote_id': remoteId,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -4929,6 +4974,7 @@ class PokemonInstancesCompanion extends UpdateCompanion<PokemonInstance> {
     Value<int?>? parentInstanceId,
     Value<String?>? nicknameAliases,
     Value<String?>? inheritedRibbons,
+    Value<String?>? remoteId,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -4938,6 +4984,7 @@ class PokemonInstancesCompanion extends UpdateCompanion<PokemonInstance> {
       parentInstanceId: parentInstanceId ?? this.parentInstanceId,
       nicknameAliases: nicknameAliases ?? this.nicknameAliases,
       inheritedRibbons: inheritedRibbons ?? this.inheritedRibbons,
+      remoteId: remoteId ?? this.remoteId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -4961,6 +5008,9 @@ class PokemonInstancesCompanion extends UpdateCompanion<PokemonInstance> {
     if (inheritedRibbons.present) {
       map['inherited_ribbons'] = Variable<String>(inheritedRibbons.value);
     }
+    if (remoteId.present) {
+      map['remote_id'] = Variable<String>(remoteId.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -4978,6 +5028,7 @@ class PokemonInstancesCompanion extends UpdateCompanion<PokemonInstance> {
           ..write('parentInstanceId: $parentInstanceId, ')
           ..write('nicknameAliases: $nicknameAliases, ')
           ..write('inheritedRibbons: $inheritedRibbons, ')
+          ..write('remoteId: $remoteId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -7585,6 +7636,7 @@ typedef $$PokemonInstancesTableCreateCompanionBuilder =
       Value<int?> parentInstanceId,
       Value<String?> nicknameAliases,
       Value<String?> inheritedRibbons,
+      Value<String?> remoteId,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -7595,6 +7647,7 @@ typedef $$PokemonInstancesTableUpdateCompanionBuilder =
       Value<int?> parentInstanceId,
       Value<String?> nicknameAliases,
       Value<String?> inheritedRibbons,
+      Value<String?> remoteId,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -7630,6 +7683,11 @@ class $$PokemonInstancesTableFilterComposer
 
   ColumnFilters<String> get inheritedRibbons => $composableBuilder(
     column: $table.inheritedRibbons,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get remoteId => $composableBuilder(
+    column: $table.remoteId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7678,6 +7736,11 @@ class $$PokemonInstancesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get remoteId => $composableBuilder(
+    column: $table.remoteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -7718,6 +7781,9 @@ class $$PokemonInstancesTableAnnotationComposer
     column: $table.inheritedRibbons,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get remoteId =>
+      $composableBuilder(column: $table.remoteId, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -7768,6 +7834,7 @@ class $$PokemonInstancesTableTableManager
                 Value<int?> parentInstanceId = const Value.absent(),
                 Value<String?> nicknameAliases = const Value.absent(),
                 Value<String?> inheritedRibbons = const Value.absent(),
+                Value<String?> remoteId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => PokemonInstancesCompanion(
@@ -7776,6 +7843,7 @@ class $$PokemonInstancesTableTableManager
                 parentInstanceId: parentInstanceId,
                 nicknameAliases: nicknameAliases,
                 inheritedRibbons: inheritedRibbons,
+                remoteId: remoteId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -7786,6 +7854,7 @@ class $$PokemonInstancesTableTableManager
                 Value<int?> parentInstanceId = const Value.absent(),
                 Value<String?> nicknameAliases = const Value.absent(),
                 Value<String?> inheritedRibbons = const Value.absent(),
+                Value<String?> remoteId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => PokemonInstancesCompanion.insert(
@@ -7794,6 +7863,7 @@ class $$PokemonInstancesTableTableManager
                 parentInstanceId: parentInstanceId,
                 nicknameAliases: nicknameAliases,
                 inheritedRibbons: inheritedRibbons,
+                remoteId: remoteId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),

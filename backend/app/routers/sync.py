@@ -5,9 +5,10 @@ from fastapi import APIRouter, Query
 from sqlalchemy import select
 
 from app.core.deps import CurrentUser, DB
-from app.models.team import Team, TeamFolder, TeamSlot
+from app.models.team import PokemonInstance, Team, TeamFolder, TeamSlot
 from app.schemas.team import (
     FolderCreateOp, FolderDeleteOp, FolderResponse, FolderUpdateOp,
+    InstanceCreateOp, InstanceResponse, InstanceUpdateOp,
     SlotDeleteOp, SlotResponse, SlotUpsertOp,
     SyncPullResponse, SyncPushCreated, SyncPushRequest, SyncPushResponse,
     TeamCreateOp, TeamDeleteOp, TeamResponse, TeamUpdateOp,
@@ -24,6 +25,7 @@ async def pull(
 ) -> SyncPullResponse:
     folder_q = select(TeamFolder).where(TeamFolder.user_id == current_user.id)
     team_q = select(Team).where(Team.user_id == current_user.id)
+    instance_q = select(PokemonInstance).where(PokemonInstance.user_id == current_user.id)
     slot_q = (
         select(TeamSlot)
         .join(Team, TeamSlot.team_id == Team.id)
@@ -33,15 +35,18 @@ async def pull(
     if since is not None:
         folder_q = folder_q.where(TeamFolder.updated_at > since)
         team_q = team_q.where(Team.updated_at > since)
+        instance_q = instance_q.where(PokemonInstance.updated_at > since)
         slot_q = slot_q.where(TeamSlot.updated_at > since)
 
     folders = (await db.execute(folder_q)).scalars().all()
     teams = (await db.execute(team_q)).scalars().all()
+    instances = (await db.execute(instance_q)).scalars().all()
     slots = (await db.execute(slot_q)).scalars().all()
 
     return SyncPullResponse(
         folders=[FolderResponse.model_validate(f) for f in folders],
         teams=[TeamResponse.model_validate(t) for t in teams],
+        instances=[InstanceResponse.model_validate(i) for i in instances],
         slots=[SlotResponse.model_validate(s) for s in slots],
     )
 
@@ -58,6 +63,7 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
     """
     folder_map: dict[int, int] = {}  # client_local_id → server id (this batch)
     team_map: dict[int, int] = {}
+    instance_map: dict[int, int] = {}
     created: list[SyncPushCreated] = []
 
     for op in body.ops:
@@ -154,12 +160,50 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
                 for slot in sr.scalars():
                     slot.is_deleted = True
 
+        elif isinstance(op, InstanceCreateOp):
+            parent_id = op.parent_instance_remote_id
+            if parent_id is None and op.parent_instance_client_local_id is not None:
+                parent_id = instance_map.get(op.parent_instance_client_local_id)
+            instance = PokemonInstance(
+                user_id=current_user.id,
+                pokemon_id=op.pokemon_id,
+                parent_instance_id=parent_id,
+                nickname_aliases=op.nickname_aliases,
+                inherited_ribbons=op.inherited_ribbons,
+            )
+            db.add(instance)
+            await db.flush()
+            instance_map[op.client_local_id] = instance.id
+            created.append(SyncPushCreated(
+                entity_type="instance",
+                client_local_id=op.client_local_id,
+                remote_id=instance.id,
+            ))
+
+        elif isinstance(op, InstanceUpdateOp):
+            r = await db.execute(
+                select(PokemonInstance).where(
+                    PokemonInstance.id == op.remote_id,
+                    PokemonInstance.user_id == current_user.id,
+                )
+            )
+            instance = r.scalar_one_or_none()
+            if instance:
+                if op.nickname_aliases is not None:
+                    instance.nickname_aliases = op.nickname_aliases
+                if op.inherited_ribbons is not None:
+                    instance.inherited_ribbons = op.inherited_ribbons
+
         elif isinstance(op, SlotUpsertOp):
             team_id = op.team_remote_id
             if team_id is None and op.team_client_local_id is not None:
                 team_id = team_map.get(op.team_client_local_id)
             if team_id is None:
                 continue
+            # Resolve instance reference.
+            instance_id = op.instance_remote_id
+            if instance_id is None and op.instance_client_local_id is not None:
+                instance_id = instance_map.get(op.instance_client_local_id)
             r = await db.execute(
                 select(TeamSlot).where(TeamSlot.team_id == team_id, TeamSlot.slot == op.slot)
             )
@@ -168,11 +212,63 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
                 slot = TeamSlot(
                     team_id=team_id, slot=op.slot,
                     pokemon_id=op.pokemon_id, nickname=op.nickname,
+                    instance_id=instance_id,
+                    form_name=op.form_name, level=op.level, gender=op.gender,
+                    is_shiny=op.is_shiny, friendship=op.friendship,
+                    ability_name=op.ability_name, nature_name=op.nature_name,
+                    held_item_name=op.held_item_name,
+                    move1=op.move1, move2=op.move2, move3=op.move3, move4=op.move4,
+                    ev_hp=op.ev_hp, ev_atk=op.ev_atk, ev_def=op.ev_def,
+                    ev_spa=op.ev_spa, ev_spd=op.ev_spd, ev_spe=op.ev_spe,
+                    iv_hp=op.iv_hp, iv_atk=op.iv_atk, iv_def=op.iv_def,
+                    iv_spa=op.iv_spa, iv_spd=op.iv_spd, iv_spe=op.iv_spe,
+                    ribbons=op.ribbons,
+                    is_mega_evolved=op.is_mega_evolved, has_gigantamax=op.has_gigantamax,
+                    gigantamax_enabled=op.gigantamax_enabled, is_alpha=op.is_alpha,
+                    contest_cool=op.contest_cool, contest_beautiful=op.contest_beautiful,
+                    contest_cute=op.contest_cute, contest_clever=op.contest_clever,
+                    contest_tough=op.contest_tough, contest_sheen=op.contest_sheen,
                 )
                 db.add(slot)
             else:
                 slot.pokemon_id = op.pokemon_id
                 slot.nickname = op.nickname
+                slot.instance_id = instance_id
+                slot.form_name = op.form_name
+                slot.level = op.level
+                slot.gender = op.gender
+                slot.is_shiny = op.is_shiny
+                slot.friendship = op.friendship
+                slot.ability_name = op.ability_name
+                slot.nature_name = op.nature_name
+                slot.held_item_name = op.held_item_name
+                slot.move1 = op.move1
+                slot.move2 = op.move2
+                slot.move3 = op.move3
+                slot.move4 = op.move4
+                slot.ev_hp = op.ev_hp
+                slot.ev_atk = op.ev_atk
+                slot.ev_def = op.ev_def
+                slot.ev_spa = op.ev_spa
+                slot.ev_spd = op.ev_spd
+                slot.ev_spe = op.ev_spe
+                slot.iv_hp = op.iv_hp
+                slot.iv_atk = op.iv_atk
+                slot.iv_def = op.iv_def
+                slot.iv_spa = op.iv_spa
+                slot.iv_spd = op.iv_spd
+                slot.iv_spe = op.iv_spe
+                slot.ribbons = op.ribbons
+                slot.is_mega_evolved = op.is_mega_evolved
+                slot.has_gigantamax = op.has_gigantamax
+                slot.gigantamax_enabled = op.gigantamax_enabled
+                slot.is_alpha = op.is_alpha
+                slot.contest_cool = op.contest_cool
+                slot.contest_beautiful = op.contest_beautiful
+                slot.contest_cute = op.contest_cute
+                slot.contest_clever = op.contest_clever
+                slot.contest_tough = op.contest_tough
+                slot.contest_sheen = op.contest_sheen
                 slot.is_deleted = False
 
         elif isinstance(op, SlotDeleteOp):

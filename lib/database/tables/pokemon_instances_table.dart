@@ -28,6 +28,9 @@ class PokemonInstances extends Table {
   /// Merged with the current slot's own ribbons for display.
   TextColumn get inheritedRibbons => text().nullable()();
 
+  /// Server-assigned ID once this instance has been synced.
+  TextColumn get remoteId => text().nullable()();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 }

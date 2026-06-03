@@ -47,6 +47,7 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     folderRepo: ref.read(teamFolderRepositoryProvider),
     teamRepo: ref.read(teamRepositoryProvider),
     slotRepo: ref.read(teamSlotRepositoryProvider),
+    instanceRepo: ref.read(pokemonInstanceRepositoryProvider),
     metaRepo: ref.read(metaRepositoryProvider),
     api: ref.read(teamSyncApiProvider),
     db: ref.read(appDatabaseProvider),

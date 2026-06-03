@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/repositories/meta_repository.dart';
+import 'package:poke_team_dex/database/repositories/pokemon_instance_repository.dart';
 import 'package:poke_team_dex/database/repositories/sync_queue_repository.dart';
 import 'package:poke_team_dex/database/repositories/team_folder_repository.dart';
 import 'package:poke_team_dex/database/repositories/team_repository.dart';
@@ -20,6 +21,7 @@ class SyncService {
     required this.folderRepo,
     required this.teamRepo,
     required this.slotRepo,
+    required this.instanceRepo,
     required this.metaRepo,
     required this.api,
     required this.db,
@@ -30,6 +32,7 @@ class SyncService {
   final TeamFolderRepository folderRepo;
   final TeamRepository teamRepo;
   final TeamSlotRepository slotRepo;
+  final PokemonInstanceRepository instanceRepo;
   final MetaRepository metaRepo;
   final TeamSyncApi api;
   final AppDatabase db;
@@ -42,8 +45,6 @@ class SyncService {
   /// No-ops silently when no auth token is present.
   Future<void> run({String? token}) async {
     if (_running) return;
-    // Require a non-empty token — avoids 403 floods when syncs fire before
-    // the user has logged in (e.g. immediately after a backend restart).
     if (token == null || token.isEmpty) return;
     _running = true;
     notifier.setSyncing();
@@ -64,17 +65,12 @@ class SyncService {
     final ops = await syncQueue.getPending();
     if (ops.isEmpty) return;
 
-    // Prune ops that have exhausted all retries — they will never succeed and
-    // should not accumulate in the queue indefinitely.
     for (final op in ops) {
       if (op.attempts >= _maxAttempts) await syncQueue.delete(op.id);
     }
     final activeOps = ops.where((o) => o.attempts < _maxAttempts).toList();
     if (activeOps.isEmpty) return;
 
-    // Identify entity local IDs being created in this batch so cross-references
-    // (e.g. a team whose folder is also being created here) can be resolved by
-    // the server using the within-batch map rather than requiring a prior sync.
     final creatingFolderIds = <int>{
       for (final op in activeOps)
         if (op.entityType == 'team_folder' && op.operation == 'create')
@@ -84,18 +80,24 @@ class SyncService {
       for (final op in activeOps)
         if (op.entityType == 'team' && op.operation == 'create') op.entityId,
     };
+    final creatingInstanceIds = <int>{
+      for (final op in activeOps)
+        if (op.entityType == 'pokemon_instance' && op.operation == 'create')
+          op.entityId,
+    };
 
-    // Re-enqueue CREATE ops for entities that have UPDATE ops but no remoteId
-    // and no CREATE in the queue — happens when a CREATE op was auto-pruned
-    // after repeated failures (e.g. a 403 flood).  The new CREATE op will be
-    // picked up on the next drain cycle.
     await _healOrphanedOps(activeOps);
 
     final batchOps = <Map<String, dynamic>>[];
     final includedOps = <PendingSyncOp>[];
 
     for (final op in activeOps) {
-      final entry = await _buildOp(op, creatingFolderIds, creatingTeamIds);
+      final entry = await _buildOp(
+        op,
+        creatingFolderIds,
+        creatingTeamIds,
+        creatingInstanceIds,
+      );
       if (entry != null) {
         batchOps.add(entry);
         includedOps.add(op);
@@ -107,7 +109,6 @@ class SyncService {
     try {
       final result = await api.pushBatch(batchOps);
 
-      // Write back server-assigned IDs for any entities created in this batch.
       for (final c in (result['created'] as List).cast<Map<String, dynamic>>()) {
         final localId = c['client_local_id'] as int;
         final remoteId = (c['remote_id'] as int).toString();
@@ -119,6 +120,10 @@ class SyncService {
           case 'team':
             await (db.update(db.teams)..where((t) => t.id.equals(localId)))
                 .write(TeamsCompanion(remoteId: Value(remoteId)));
+          case 'instance':
+            await (db.update(db.pokemonInstances)
+                  ..where((i) => i.id.equals(localId)))
+                .write(PokemonInstancesCompanion(remoteId: Value(remoteId)));
         }
       }
 
@@ -130,15 +135,12 @@ class SyncService {
         await syncQueue.markAttempted(op.id, op.attempts);
       }
     } on StateError {
-      // Stale queue entries — drop them so they don't block future syncs.
       for (final op in includedOps) {
         await syncQueue.delete(op.id);
       }
     }
   }
 
-  /// Detects UPDATE ops whose entity has no remoteId and no CREATE in the queue
-  /// and re-enqueues a fresh CREATE so the entity can be created on the server.
   Future<void> _healOrphanedOps(List<PendingSyncOp> ops) async {
     final foldersWithCreate = {
       for (final op in ops)
@@ -188,12 +190,11 @@ class SyncService {
     }
   }
 
-  /// Converts a single queue entry into a batch-op map, resolving cross-entity
-  /// references. Returns null if the op should be skipped this cycle.
   Future<Map<String, dynamic>?> _buildOp(
     PendingSyncOp op,
     Set<int> creatingFolderIds,
     Set<int> creatingTeamIds,
+    Set<int> creatingInstanceIds,
   ) async {
     final payload = jsonDecode(op.payload) as Map<String, dynamic>;
 
@@ -230,7 +231,6 @@ class SyncService {
         final folderLocalId = payload['folder_local_id'] as int?;
         if (folderLocalId != null) {
           if (creatingFolderIds.contains(folderLocalId)) {
-            // Folder also being created in this batch — server resolves it.
             entry['folder_client_local_id'] = folderLocalId;
           } else {
             final folder = await folderRepo.getByIdOrNull(folderLocalId);
@@ -246,15 +246,13 @@ class SyncService {
         final entry = <String, dynamic>{
           'type': 'team_update',
           'remote_id': int.parse(team!.remoteId!),
-          // payload['name'] may be absent when only folder changed.
           'name': payload['name'] as String? ?? team.name,
         };
-        // Include folder change only when the payload explicitly carries the key.
         if (payload.containsKey('folder_local_id')) {
           entry['update_folder'] = true;
           final folderLocalId = payload['folder_local_id'] as int?;
           if (folderLocalId == null) {
-            entry['folder_remote_id'] = null; // move to ungrouped
+            entry['folder_remote_id'] = null;
           } else if (creatingFolderIds.contains(folderLocalId)) {
             entry['folder_client_local_id'] = folderLocalId;
           } else {
@@ -270,6 +268,42 @@ class SyncService {
         if (remoteId == null) return null;
         return {'type': 'team_delete', 'remote_id': int.parse(remoteId)};
 
+      // ── Instances ─────────────────────────────────────────────────────────
+      case 'pokemon_instance:create':
+        final entry = <String, dynamic>{
+          'type': 'instance_create',
+          'client_local_id': op.entityId,
+          'pokemon_id': payload['pokemon_id'] as int,
+          if (payload['nickname_aliases'] != null)
+            'nickname_aliases': payload['nickname_aliases'],
+          if (payload['inherited_ribbons'] != null)
+            'inherited_ribbons': payload['inherited_ribbons'],
+        };
+        final parentLocalId = payload['parent_instance_client_local_id'] as int?;
+        if (parentLocalId != null) {
+          if (creatingInstanceIds.contains(parentLocalId)) {
+            // Parent also being created in this batch — server resolves it.
+            entry['parent_instance_client_local_id'] = parentLocalId;
+          } else {
+            final parent = await instanceRepo.getById(parentLocalId);
+            if (parent?.remoteId == null) return null; // parent not yet synced
+            entry['parent_instance_remote_id'] = int.parse(parent!.remoteId!);
+          }
+        }
+        return entry;
+
+      case 'pokemon_instance:update':
+        final inst = await instanceRepo.getById(op.entityId);
+        if (inst?.remoteId == null) return null; // not yet created on server
+        return {
+          'type': 'instance_update',
+          'remote_id': int.parse(inst!.remoteId!),
+          if (payload['nickname_aliases'] != null)
+            'nickname_aliases': payload['nickname_aliases'],
+          if (payload['inherited_ribbons'] != null)
+            'inherited_ribbons': payload['inherited_ribbons'],
+        };
+
       // ── Slots ─────────────────────────────────────────────────────────────
       case 'team_slot:upsert':
         final teamLocalId = payload['team_local_id'] as int;
@@ -278,6 +312,42 @@ class SyncService {
           'slot': payload['slot'] as int,
           'pokemon_id': payload['pokemon_id'] as int,
           if (payload['nickname'] != null) 'nickname': payload['nickname'],
+          // Full slot config — pass through whatever the client stored.
+          if (payload['form_name'] != null) 'form_name': payload['form_name'],
+          if (payload['level'] != null) 'level': payload['level'],
+          if (payload['gender'] != null) 'gender': payload['gender'],
+          'is_shiny': payload['is_shiny'] ?? false,
+          if (payload['friendship'] != null) 'friendship': payload['friendship'],
+          if (payload['ability_name'] != null) 'ability_name': payload['ability_name'],
+          if (payload['nature_name'] != null) 'nature_name': payload['nature_name'],
+          if (payload['held_item_name'] != null) 'held_item_name': payload['held_item_name'],
+          if (payload['move1'] != null) 'move1': payload['move1'],
+          if (payload['move2'] != null) 'move2': payload['move2'],
+          if (payload['move3'] != null) 'move3': payload['move3'],
+          if (payload['move4'] != null) 'move4': payload['move4'],
+          if (payload['ev_hp'] != null) 'ev_hp': payload['ev_hp'],
+          if (payload['ev_atk'] != null) 'ev_atk': payload['ev_atk'],
+          if (payload['ev_def'] != null) 'ev_def': payload['ev_def'],
+          if (payload['ev_spa'] != null) 'ev_spa': payload['ev_spa'],
+          if (payload['ev_spd'] != null) 'ev_spd': payload['ev_spd'],
+          if (payload['ev_spe'] != null) 'ev_spe': payload['ev_spe'],
+          if (payload['iv_hp'] != null) 'iv_hp': payload['iv_hp'],
+          if (payload['iv_atk'] != null) 'iv_atk': payload['iv_atk'],
+          if (payload['iv_def'] != null) 'iv_def': payload['iv_def'],
+          if (payload['iv_spa'] != null) 'iv_spa': payload['iv_spa'],
+          if (payload['iv_spd'] != null) 'iv_spd': payload['iv_spd'],
+          if (payload['iv_spe'] != null) 'iv_spe': payload['iv_spe'],
+          if (payload['ribbons'] != null) 'ribbons': payload['ribbons'],
+          'is_mega_evolved': payload['is_mega_evolved'] ?? false,
+          'has_gigantamax': payload['has_gigantamax'] ?? false,
+          'gigantamax_enabled': payload['gigantamax_enabled'] ?? false,
+          'is_alpha': payload['is_alpha'] ?? false,
+          if (payload['contest_cool'] != null) 'contest_cool': payload['contest_cool'],
+          if (payload['contest_beautiful'] != null) 'contest_beautiful': payload['contest_beautiful'],
+          if (payload['contest_cute'] != null) 'contest_cute': payload['contest_cute'],
+          if (payload['contest_clever'] != null) 'contest_clever': payload['contest_clever'],
+          if (payload['contest_tough'] != null) 'contest_tough': payload['contest_tough'],
+          if (payload['contest_sheen'] != null) 'contest_sheen': payload['contest_sheen'],
         };
         if (creatingTeamIds.contains(teamLocalId)) {
           entry['team_client_local_id'] = teamLocalId;
@@ -285,6 +355,20 @@ class SyncService {
           final team = await teamRepo.getByIdOrNull(teamLocalId);
           if (team?.remoteId == null) return null;
           entry['team_remote_id'] = int.parse(team!.remoteId!);
+        }
+        // Resolve instance reference if present.
+        final instLocalId = payload['instance_client_local_id'] as int?;
+        if (instLocalId != null) {
+          if (creatingInstanceIds.contains(instLocalId)) {
+            entry['instance_client_local_id'] = instLocalId;
+          } else {
+            final inst = await instanceRepo.getById(instLocalId);
+            if (inst?.remoteId != null) {
+              entry['instance_remote_id'] = int.parse(inst!.remoteId!);
+            } else {
+              entry['instance_client_local_id'] = instLocalId;
+            }
+          }
         }
         return entry;
 
@@ -314,13 +398,12 @@ class SyncService {
     final sinceStr = await metaRepo.get(_metaKeyLastPullAt);
     final since = sinceStr != null ? DateTime.parse(sinceStr) : null;
 
-    // Record start time before the request so we don't miss changes that
-    // arrive concurrently during the pull.
     final pullStart = DateTime.now().toUtc();
     final data = await api.pullSince(since);
 
     await _mergeFolders(data['folders'] as List);
     await _mergeTeams(data['teams'] as List);
+    await _mergeInstances(data['instances'] as List? ?? []);
     await _mergeSlots(data['slots'] as List);
 
     await metaRepo.set(_metaKeyLastPullAt, pullStart.toIso8601String());
@@ -336,9 +419,7 @@ class SyncService {
       final existing = await folderRepo.getByRemoteId(remoteId);
 
       if (remoteDeleted) {
-        // Soft-deleted on server — hard-delete locally if present.
         if (existing != null) {
-          // Move orphaned teams to ungrouped before deleting the folder.
           await (db.update(db.teams)
                 ..where((t) => t.folderId.equals(existing.id)))
               .write(const TeamsCompanion(folderId: Value(null)));
@@ -375,7 +456,6 @@ class SyncService {
       final existing = await teamRepo.getByRemoteId(remoteId);
 
       if (remoteDeleted) {
-        // Soft-deleted on server — hard-delete locally including all slots.
         if (existing != null) {
           await slotRepo.deleteAllForTeam(existing.id);
           await teamRepo.delete(existing.id);
@@ -386,7 +466,6 @@ class SyncService {
       final remoteName = rt['name'] as String;
       final remoteFolderId = rt['folder_id'];
 
-      // Resolve remote folder_id → local folder
       int? localFolderId;
       if (remoteFolderId != null) {
         final localFolder =
@@ -412,6 +491,62 @@ class SyncService {
     }
   }
 
+  Future<void> _mergeInstances(List remote) async {
+    for (final ri in remote.cast<Map<String, dynamic>>()) {
+      final remoteId = ri['id'].toString();
+      final remoteDeleted = ri['is_deleted'] as bool? ?? false;
+      final remoteUpdatedAt =
+          DateTime.parse(ri['updated_at'] as String).toUtc();
+
+      final existing = await instanceRepo.getByRemoteId(remoteId);
+
+      if (remoteDeleted) {
+        if (existing != null) await instanceRepo.delete(existing.id);
+        continue;
+      }
+
+      final pokemonId = ri['pokemon_id'] as int;
+      final nicknameAliases = ri['nickname_aliases'] as String?;
+      final inheritedRibbons = ri['inherited_ribbons'] as String?;
+
+      // Resolve remote parent id → local instance id.
+      int? localParentId;
+      final remoteParentId = ri['parent_instance_id'];
+      if (remoteParentId != null) {
+        final parent =
+            await instanceRepo.getByRemoteId(remoteParentId.toString());
+        localParentId = parent?.id;
+      }
+
+      if (existing == null) {
+        await db.into(db.pokemonInstances).insert(
+              PokemonInstancesCompanion.insert(
+                pokemonId: pokemonId,
+                parentInstanceId: Value(localParentId),
+                nicknameAliases: Value(nicknameAliases),
+                inheritedRibbons: Value(inheritedRibbons),
+                remoteId: Value(remoteId),
+                updatedAt: Value(remoteUpdatedAt),
+              ),
+            );
+      } else if (remoteUpdatedAt.isAfter(existing.updatedAt)) {
+        await (db.update(db.pokemonInstances)
+              ..where((i) => i.id.equals(existing.id)))
+            .write(PokemonInstancesCompanion(
+          // Only overwrite with server data when non-null — preserves locally-set
+          // data that hasn't reached the server yet (e.g. same-batch ordering).
+          nicknameAliases: nicknameAliases != null
+              ? Value(nicknameAliases)
+              : const Value.absent(),
+          inheritedRibbons: inheritedRibbons != null
+              ? Value(inheritedRibbons)
+              : const Value.absent(),
+          updatedAt: Value(remoteUpdatedAt),
+        ));
+      }
+    }
+  }
+
   Future<void> _mergeSlots(List remote) async {
     for (final rs in remote.cast<Map<String, dynamic>>()) {
       final remoteTeamId = rs['team_id'].toString();
@@ -421,13 +556,12 @@ class SyncService {
           DateTime.parse(rs['updated_at'] as String).toUtc();
 
       final localTeam = await teamRepo.getByRemoteId(remoteTeamId);
-      if (localTeam == null) continue; // team not yet pulled — skip
+      if (localTeam == null) continue;
 
       final existing =
           await slotRepo.getByTeamAndSlot(localTeam.id, slotNumber);
 
       if (remoteDeleted) {
-        // Soft-deleted on server — hard-delete locally if present.
         if (existing != null) {
           await slotRepo.deleteSlot(localTeam.id, slotNumber);
         }
@@ -437,22 +571,105 @@ class SyncService {
       final pokemonId = rs['pokemon_id'] as int;
       final nickname = rs['nickname'] as String?;
 
+      // Resolve the instance reference from the server.
+      int? localInstanceId;
+      final remoteInstanceId = rs['instance_id'];
+      if (remoteInstanceId != null) {
+        final inst =
+            await instanceRepo.getByRemoteId(remoteInstanceId.toString());
+        localInstanceId = inst?.id;
+      }
+
+      final companion = TeamSlotsCompanion(
+        pokemonId:        Value(pokemonId),
+        nickname:         Value(nickname),
+        instanceId:       Value(localInstanceId),
+        formName:         Value(rs['form_name'] as String?),
+        level:            Value(rs['level'] as int?),
+        gender:           Value(rs['gender'] as String?),
+        isShiny:          Value(rs['is_shiny'] as bool? ?? false),
+        friendship:       Value(rs['friendship'] as int?),
+        abilityName:      Value(rs['ability_name'] as String?),
+        natureName:       Value(rs['nature_name'] as String?),
+        heldItemName:     Value(rs['held_item_name'] as String?),
+        move1:            Value(rs['move1'] as String?),
+        move2:            Value(rs['move2'] as String?),
+        move3:            Value(rs['move3'] as String?),
+        move4:            Value(rs['move4'] as String?),
+        evHp:             Value(rs['ev_hp'] as int?),
+        evAtk:            Value(rs['ev_atk'] as int?),
+        evDef:            Value(rs['ev_def'] as int?),
+        evSpa:            Value(rs['ev_spa'] as int?),
+        evSpd:            Value(rs['ev_spd'] as int?),
+        evSpe:            Value(rs['ev_spe'] as int?),
+        ivHp:             Value(rs['iv_hp'] as int?),
+        ivAtk:            Value(rs['iv_atk'] as int?),
+        ivDef:            Value(rs['iv_def'] as int?),
+        ivSpa:            Value(rs['iv_spa'] as int?),
+        ivSpd:            Value(rs['iv_spd'] as int?),
+        ivSpe:            Value(rs['iv_spe'] as int?),
+        ribbons:          Value(rs['ribbons'] as String?),
+        isMegaEvolved:    Value(rs['is_mega_evolved'] as bool? ?? false),
+        hasGigantamax:    Value(rs['has_gigantamax'] as bool? ?? false),
+        gigantamaxEnabled: Value(rs['gigantamax_enabled'] as bool? ?? false),
+        isAlpha:          Value(rs['is_alpha'] as bool? ?? false),
+        contestCool:      Value(rs['contest_cool'] as int?),
+        contestBeautiful: Value(rs['contest_beautiful'] as int?),
+        contestCute:      Value(rs['contest_cute'] as int?),
+        contestClever:    Value(rs['contest_clever'] as int?),
+        contestTough:     Value(rs['contest_tough'] as int?),
+        contestSheen:     Value(rs['contest_sheen'] as int?),
+        updatedAt:        Value(remoteUpdatedAt),
+      );
+
       if (existing == null) {
         await slotRepo.insert(TeamSlotsCompanion(
-          teamId: Value(localTeam.id),
-          slot: Value(slotNumber),
-          pokemonId: Value(pokemonId),
-          nickname: Value(nickname),
-          updatedAt: Value(remoteUpdatedAt),
+          teamId:           Value(localTeam.id),
+          slot:             Value(slotNumber),
+          pokemonId:        companion.pokemonId,
+          nickname:         companion.nickname,
+          instanceId:       companion.instanceId,
+          formName:         companion.formName,
+          level:            companion.level,
+          gender:           companion.gender,
+          isShiny:          companion.isShiny,
+          friendship:       companion.friendship,
+          abilityName:      companion.abilityName,
+          natureName:       companion.natureName,
+          heldItemName:     companion.heldItemName,
+          move1:            companion.move1,
+          move2:            companion.move2,
+          move3:            companion.move3,
+          move4:            companion.move4,
+          evHp:             companion.evHp,
+          evAtk:            companion.evAtk,
+          evDef:            companion.evDef,
+          evSpa:            companion.evSpa,
+          evSpd:            companion.evSpd,
+          evSpe:            companion.evSpe,
+          ivHp:             companion.ivHp,
+          ivAtk:            companion.ivAtk,
+          ivDef:            companion.ivDef,
+          ivSpa:            companion.ivSpa,
+          ivSpd:            companion.ivSpd,
+          ivSpe:            companion.ivSpe,
+          ribbons:          companion.ribbons,
+          isMegaEvolved:    companion.isMegaEvolved,
+          hasGigantamax:    companion.hasGigantamax,
+          gigantamaxEnabled: companion.gigantamaxEnabled,
+          isAlpha:          companion.isAlpha,
+          contestCool:      companion.contestCool,
+          contestBeautiful: companion.contestBeautiful,
+          contestCute:      companion.contestCute,
+          contestClever:    companion.contestClever,
+          contestTough:     companion.contestTough,
+          contestSheen:     companion.contestSheen,
+          updatedAt:        companion.updatedAt,
         ));
       } else if (remoteUpdatedAt.isAfter(existing.updatedAt)) {
         await (db.update(db.teamSlots)
               ..where((s) => s.id.equals(existing.id)))
-            .write(TeamSlotsCompanion(
-          pokemonId: Value(pokemonId),
-          nickname: Value(nickname),
-          updatedAt: Value(remoteUpdatedAt),
-        ));
+            .write(companion);
       }
     }
   }
