@@ -82,6 +82,13 @@ class PokemonInstanceRepository {
     return chain;
   }
 
+  /// Returns all instances whose [parentInstanceId] equals [instanceId]
+  /// (i.e. the direct children of this instance in the chain).
+  Future<List<PokemonInstance>> getDirectChildren(int instanceId) =>
+      (_db.select(_db.pokemonInstances)
+            ..where((t) => t.parentInstanceId.equals(instanceId)))
+          .get();
+
   /// Returns all slots currently linked to [instanceId].
   Future<List<TeamSlot>> getSlotsForInstance(int instanceId) =>
       (_db.select(_db.teamSlots)

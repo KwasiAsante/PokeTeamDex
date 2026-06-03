@@ -29,6 +29,8 @@ import 'package:poke_team_dex/features/teams/data/form_filter.dart';
 import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
 import 'package:poke_team_dex/features/teams/data/z_moves_data.dart';
 import 'package:poke_team_dex/features/teams/data/ribbon_catalog.dart';
+import 'package:poke_team_dex/features/teams/presentation/instance_chain_view.dart';
+import 'package:poke_team_dex/features/teams/presentation/instance_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/services/ps_export_service.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
@@ -192,6 +194,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   // Form change (e.g. aegislash-shield ↔ aegislash-blade)
   String? _formName; // null = use the Pokémon's default form
 
+  // Pokemon instance link
+  int? _instanceId;
+
   // Mega Evolution toggle
   bool _isMegaEvolved = false;
 
@@ -266,6 +271,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _ivCtrls[4].text = (slot.ivSpd ?? 31).toString();
     _ivCtrls[5].text = (slot.ivSpe ?? 31).toString();
     _formName = slot.formName;
+    _instanceId = slot.instanceId;
     _isMegaEvolved = slot.isMegaEvolved;
     _hasGigantamax = slot.hasGigantamax;
     _gigantamaxEnabled = slot.gigantamaxEnabled;
@@ -364,6 +370,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           hasGigantamax: Value(_hasGigantamax),
           gigantamaxEnabled: Value(_gigantamaxEnabled),
           isAlpha: Value(_isAlpha),
+          instanceId: Value(_instanceId),
           ribbons: Value(_ribbons.isEmpty
               ? null
               : jsonEncode(_ribbons.toList())),
@@ -832,6 +839,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               _SectionTitle('Ribbons'),
               const SizedBox(height: 8),
               _buildRibbons(),
+              // ── Pokémon Instance ──
+              const SizedBox(height: 24),
+              _SectionTitle('Pokémon Identity'),
+              const SizedBox(height: 8),
+              _buildInstanceSection(slot, speciesName),
             ],
           ),
         );
@@ -2090,6 +2102,451 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // ── Ribbons ───────────────────────────────────────────────────────────────
 
+  // ── Pokémon Instance ──────────────────────────────────────────────────────
+
+  // ── "Link as child" path ──
+  // Current slot is the child; the picked slot is (or becomes) the origin.
+
+  Future<void> _onLinkAsChild(TeamSlot currentSlot, TeamSlot targetSlot) async {
+    final instanceRepo = ref.read(pokemonInstanceRepositoryProvider);
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+
+    // Ensure the target has an origin instance.
+    int parentInstanceId;
+    if (targetSlot.instanceId != null) {
+      parentInstanceId = targetSlot.instanceId!;
+    } else {
+      parentInstanceId = await instanceRepo.createOrigin(
+        pokemonId: targetSlot.pokemonId,
+        nickname: targetSlot.nickname,
+      );
+      await slotRepo.setInstanceId(targetSlot.id, parentInstanceId);
+    }
+
+    // Create an iteration for the current slot.
+    final childInstanceId = await instanceRepo.createIteration(
+      pokemonId: currentSlot.pokemonId,
+      parentInstanceId: parentInstanceId,
+      newNickname: _nicknameCtrl.text.trim().isEmpty
+          ? null
+          : _nicknameCtrl.text.trim(),
+    );
+
+    setState(() => _instanceId = childInstanceId);
+  }
+
+  // ── "Link as origin" path ──
+  // Current slot is the origin; the picked slot becomes the child.
+
+  Future<void> _onLinkAsOriginExisting(
+      TeamSlot currentSlot, TeamSlot targetSlot) async {
+    // Block if the target already has an origin.
+    if (targetSlot.instanceId != null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'That slot already has an origin. Unlink it from its config first.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final instanceRepo = ref.read(pokemonInstanceRepositoryProvider);
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+
+    // Ensure the current slot has an origin instance.
+    int originInstanceId;
+    if (_instanceId != null) {
+      originInstanceId = _instanceId!;
+    } else {
+      originInstanceId = await instanceRepo.createOrigin(
+        pokemonId: currentSlot.pokemonId,
+        nickname: _nicknameCtrl.text.trim().isEmpty
+            ? null
+            : _nicknameCtrl.text.trim(),
+      );
+      setState(() => _instanceId = originInstanceId);
+    }
+
+    // Create a child iteration for the target slot.
+    final childInstanceId = await instanceRepo.createIteration(
+      pokemonId: targetSlot.pokemonId,
+      parentInstanceId: originInstanceId,
+      newNickname: targetSlot.nickname,
+    );
+    await slotRepo.setInstanceId(targetSlot.id, childInstanceId);
+  }
+
+  Future<void> _onLinkAsOriginNewTeam(
+      TeamSlot currentSlot, String speciesName) async {
+    final instanceRepo = ref.read(pokemonInstanceRepositoryProvider);
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+    final teamRepo = ref.read(teamRepositoryProvider);
+
+    // 1. Create the new team (no format, no folder).
+    final allTeams = await teamRepo.getAll();
+    final newTeamId = await teamRepo.insert(
+      TeamsCompanion(
+        name: Value('$speciesName — Journey'),
+        sortOrder: Value(allTeams.length),
+        syncStatus: const Value('pending'),
+        createdAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+
+    // 2. Ensure the current slot has an origin instance.
+    int originInstanceId;
+    if (_instanceId != null) {
+      originInstanceId = _instanceId!;
+    } else {
+      originInstanceId = await instanceRepo.createOrigin(
+        pokemonId: currentSlot.pokemonId,
+        nickname: _nicknameCtrl.text.trim().isEmpty
+            ? null
+            : _nicknameCtrl.text.trim(),
+      );
+      setState(() => _instanceId = originInstanceId);
+    }
+
+    // 3. Create a child iteration for the new slot.
+    final childInstanceId = await instanceRepo.createIteration(
+      pokemonId: currentSlot.pokemonId,
+      parentInstanceId: originInstanceId,
+    );
+
+    // 4. Insert the new slot (copies species, gender, shiny).
+    await slotRepo.insert(
+      TeamSlotsCompanion(
+        teamId: Value(newTeamId),
+        slot: const Value(1),
+        pokemonId: Value(currentSlot.pokemonId),
+        gender: Value(currentSlot.gender),
+        isShiny: Value(currentSlot.isShiny),
+        instanceId: Value(childInstanceId),
+        syncStatus: const Value('pending'),
+        createdAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          '"$speciesName — Journey" created and linked as child.',
+        ),
+      ),
+    );
+  }
+
+  // ── Link-type chooser ──
+
+  void _showLinkTypeSheet(TeamSlot slot, String speciesName) {
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'How is this slot connected?',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Choose whether this slot is the original appearance or a later one.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── This slot is the CHILD ──
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(
+                  child: Icon(Icons.south_rounded, size: 18),
+                ),
+                title: const Text('This slot is the child'),
+                subtitle:
+                    const Text('Pick the earlier slot this Pokémon came from.'),
+                onTap: () {
+                  Navigator.of(sheetCtx).pop();
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    builder: (_) => InstancePickerSheet(
+                      pokemonId: slot.pokemonId,
+                      currentSlotId: slot.id,
+                      onPick: (targetSlot) {
+                        Navigator.of(context).pop();
+                        _onLinkAsChild(slot, targetSlot);
+                      },
+                    ),
+                  );
+                },
+              ),
+
+              const Divider(),
+
+              // ── This slot is the ORIGIN ──
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(
+                  child: Icon(Icons.north_rounded, size: 18),
+                ),
+                title: const Text('This slot is the origin'),
+                subtitle: const Text(
+                    'Link a later slot, or create a new team to track this Pokémon forward.'),
+                onTap: () {
+                  Navigator.of(sheetCtx).pop();
+                  _showOriginSubOptions(slot, speciesName);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showOriginSubOptions(TeamSlot slot, String speciesName) {
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Link as origin',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── Link to an already-filled slot ──
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(
+                  child: Icon(Icons.people_alt_rounded, size: 18),
+                ),
+                title: const Text('Link to an existing slot'),
+                subtitle: const Text(
+                    'Pick a filled slot on another team to become the child.'),
+                onTap: () {
+                  Navigator.of(sheetCtx).pop();
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    builder: (_) => InstancePickerSheet(
+                      pokemonId: slot.pokemonId,
+                      currentSlotId: slot.id,
+                      onPick: (targetSlot) {
+                        Navigator.of(context).pop();
+                        _onLinkAsOriginExisting(slot, targetSlot);
+                      },
+                    ),
+                  );
+                },
+              ),
+
+              const Divider(),
+
+              // ── Copy to a team slot (new team OR empty slot in existing team) ──
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(
+                  child: Icon(Icons.add_circle_outline_rounded, size: 18),
+                ),
+                title: const Text('Copy to a team slot'),
+                subtitle: const Text(
+                    'Create a new team or pick an empty slot in an existing team.'),
+                onTap: () {
+                  Navigator.of(sheetCtx).pop();
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    builder: (_) => _TeamSlotDestinationSheet(
+                      speciesName: speciesName,
+                      onNewTeam: () {
+                        Navigator.of(context).pop();
+                        _onLinkAsOriginNewTeam(slot, speciesName);
+                      },
+                      onExistingSlot: (teamId, slotNum, teamName) {
+                        Navigator.of(context).pop();
+                        _onLinkAsOriginExistingSlot(
+                            slot, teamId, slotNum, teamName);
+                      },
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Copies the current slot's Pokémon into an empty slot on an existing team,
+  /// then links: current slot = origin, target slot = child.
+  Future<void> _onLinkAsOriginExistingSlot(
+    TeamSlot currentSlot,
+    int targetTeamId,
+    int targetSlotNum,
+    String targetTeamName,
+  ) async {
+    final instanceRepo = ref.read(pokemonInstanceRepositoryProvider);
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+
+    // Ensure current slot has an origin instance.
+    int originInstanceId;
+    if (_instanceId != null) {
+      originInstanceId = _instanceId!;
+    } else {
+      originInstanceId = await instanceRepo.createOrigin(
+        pokemonId: currentSlot.pokemonId,
+        nickname: _nicknameCtrl.text.trim().isEmpty
+            ? null
+            : _nicknameCtrl.text.trim(),
+      );
+      setState(() => _instanceId = originInstanceId);
+    }
+
+    // Create child iteration.
+    final childInstanceId = await instanceRepo.createIteration(
+      pokemonId: currentSlot.pokemonId,
+      parentInstanceId: originInstanceId,
+    );
+
+    // Insert into the target slot.
+    await slotRepo.insert(
+      TeamSlotsCompanion(
+        teamId: Value(targetTeamId),
+        slot: Value(targetSlotNum),
+        pokemonId: Value(currentSlot.pokemonId),
+        gender: Value(currentSlot.gender),
+        isShiny: Value(currentSlot.isShiny),
+        instanceId: Value(childInstanceId),
+        syncStatus: const Value('pending'),
+        createdAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+            'Copied to "$targetTeamName" slot $targetSlotNum and linked.'),
+      ),
+    );
+  }
+
+  void _unlink() => setState(() => _instanceId = null);
+
+  Widget _buildInstanceSection(TeamSlot slot, String speciesName) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Track this Pokémon\'s journey across teams. '
+          'Linking records nickname history and ribbon inheritance.',
+          style: textTheme.bodySmall
+              ?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 12),
+
+        if (_instanceId != null) ...[
+          // ── Linked state ──
+          InstanceChainView(
+            instanceId: _instanceId!,
+            currentSlotId: slot.id,
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.tonalIcon(
+                icon: const Icon(Icons.add_link_rounded, size: 16),
+                label: const Text('Add child'),
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                ),
+                onPressed: () => _showOriginSubOptions(slot, speciesName),
+              ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.link_off_rounded, size: 16),
+                label: const Text('Unlink'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colorScheme.error,
+                  side: BorderSide(
+                      color: colorScheme.error.withValues(alpha: 0.5)),
+                  visualDensity: VisualDensity.compact,
+                ),
+                onPressed: _unlink,
+              ),
+            ],
+          ),
+        ] else ...[
+          // ── Unlinked state ──
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.link_off_rounded,
+                    size: 18, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Text(
+                  'Not linked to a Pokémon identity',
+                  style: textTheme.bodySmall
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.tonalIcon(
+            icon: const Icon(Icons.link_rounded, size: 16),
+            label: const Text('Link to another team\'s Pokémon'),
+            style: FilledButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+            ),
+            onPressed: () => _showLinkTypeSheet(slot, speciesName),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildRibbons() {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -2726,6 +3183,162 @@ class _ItemListTile extends ConsumerWidget {
               overflow: TextOverflow.ellipsis)
           : null,
       trailing: isSelected ? const Icon(Icons.check, size: 16) : null,
+    );
+  }
+}
+
+// ── Team-slot destination picker ──────────────────────────────────────────────
+//
+// Shows a "New team" tile at the top, followed by every existing team that has
+// at least one empty slot (1–6). Tapping an empty slot number calls back with
+// the team id, slot number, and team name.
+
+class _TeamSlotDestinationSheet extends ConsumerStatefulWidget {
+  final String speciesName;
+  final VoidCallback onNewTeam;
+  final void Function(int teamId, int slotNum, String teamName) onExistingSlot;
+
+  const _TeamSlotDestinationSheet({
+    required this.speciesName,
+    required this.onNewTeam,
+    required this.onExistingSlot,
+  });
+
+  @override
+  ConsumerState<_TeamSlotDestinationSheet> createState() =>
+      _TeamSlotDestinationSheetState();
+}
+
+class _TeamSlotDestinationSheetState
+    extends ConsumerState<_TeamSlotDestinationSheet> {
+  // teamId → set of occupied slot numbers
+  Map<int, Set<int>>? _occupiedSlots;
+  List<Team>? _teams;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final teamRepo = ref.read(teamRepositoryProvider);
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+
+    final teams = await teamRepo.getAll();
+    final occupied = <int, Set<int>>{};
+    for (final t in teams) {
+      final slots = await slotRepo.getByTeam(t.id);
+      occupied[t.id] = slots.map((s) => s.slot).toSet();
+    }
+    if (mounted) setState(() { _teams = teams; _occupiedSlots = occupied; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      builder: (ctx, scrollCtrl) => Column(
+        children: [
+          // Handle
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text(
+              'Copy to a team slot',
+              style: textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: _occupiedSlots == null
+                ? const Center(child: CircularProgressIndicator())
+                : ListView(
+                    controller: scrollCtrl,
+                    children: [
+                      // ── New team ──
+                      ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor:
+                              colorScheme.primaryContainer,
+                          child: Icon(Icons.add_rounded,
+                              color: colorScheme.onPrimaryContainer),
+                        ),
+                        title: Text(
+                          '${widget.speciesName} — Journey',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: const Text('Create new team'),
+                        onTap: widget.onNewTeam,
+                      ),
+                      const Divider(),
+                      // ── Existing teams with empty slots ──
+                      for (final team in _teams ?? <Team>[]) ...[
+                        _buildTeamSection(team, colorScheme, textTheme),
+                      ],
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTeamSection(
+      Team team, ColorScheme colorScheme, TextTheme textTheme) {
+    final occupied = _occupiedSlots![team.id] ?? <int>{};
+    final emptySlots =
+        List.generate(6, (i) => i + 1).where((n) => !occupied.contains(n)).toList();
+
+    if (emptySlots.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+          child: Text(
+            team.name,
+            style: textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: emptySlots.map((slotNum) {
+              return ActionChip(
+                label: Text('Slot $slotNum'),
+                avatar: const Icon(Icons.add_rounded, size: 16),
+                onPressed: () =>
+                    widget.onExistingSlot(team.id, slotNum, team.name),
+              );
+            }).toList(),
+          ),
+        ),
+        const Divider(height: 1),
+      ],
     );
   }
 }
