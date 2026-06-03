@@ -51,6 +51,16 @@ class TeamSlots extends Table {
   BoolColumn get isMegaEvolved =>
       boolean().withDefault(const Constant(false))();
 
+  // Gigantamax (Gen 8)
+  BoolColumn get hasGigantamax =>
+      boolean().withDefault(const Constant(false))();
+  BoolColumn get gigantamaxEnabled =>
+      boolean().withDefault(const Constant(false))();
+
+  // Alpha Pokémon (Legends: Arceus)
+  BoolColumn get isAlpha =>
+      boolean().withDefault(const Constant(false))();
+
   // Contest conditions (Gen III+): 0–255 each
   IntColumn get contestCool      => integer().nullable()();
   IntColumn get contestBeautiful => integer().nullable()();

@@ -24,6 +24,7 @@ import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
+import 'package:poke_team_dex/features/teams/data/dynamax_data.dart';
 import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
 import 'package:poke_team_dex/features/teams/data/z_moves_data.dart';
 import 'package:poke_team_dex/features/teams/data/ribbon_catalog.dart';
@@ -182,6 +183,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   // Mega Evolution toggle
   bool _isMegaEvolved = false;
 
+  // Gigantamax (Gen 8)
+  bool _hasGigantamax = false;
+  bool _gigantamaxEnabled = false;
+
+  // Alpha Pokémon (Legends: Arceus)
+  bool _isAlpha = false;
+
   bool _initialized = false;
   bool _saving = false;
 
@@ -246,6 +254,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _ivCtrls[4].text = (slot.ivSpd ?? 31).toString();
     _ivCtrls[5].text = (slot.ivSpe ?? 31).toString();
     _isMegaEvolved = slot.isMegaEvolved;
+    _hasGigantamax = slot.hasGigantamax;
+    _gigantamaxEnabled = slot.gigantamaxEnabled;
+    _isAlpha = slot.isAlpha;
 
     // Ribbons
     _ribbons.clear();
@@ -336,6 +347,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           ivSpd: Value(ivs[4]),
           ivSpe: Value(ivs[5]),
           isMegaEvolved: Value(_isMegaEvolved),
+          hasGigantamax: Value(_hasGigantamax),
+          gigantamaxEnabled: Value(_gigantamaxEnabled),
+          isAlpha: Value(_isAlpha),
           ribbons: Value(_ribbons.isEmpty
               ? null
               : jsonEncode(_ribbons.toList())),
@@ -554,14 +568,37 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final megaArtworkUrl = megaHomeUrl; // primary; official is the fallback
 
 
+        // ── Gigantamax / Dynamax ────────────────────────────────────────────
+        final canDynamax = mechanics == null || mechanics.hasGigantamax;
+        final gmaxMove = gmaxMoveForSpecies(pokemon.name);
+        final canGigantamax = canDynamax && gmaxMove != null;
+
+        // Fetch G-Max form sprite when G-Max is active.
+        final gmaxFormName = canGigantamax ? '${pokemon.name}-gmax' : null;
+        final gmaxPokemonAsync = (canGigantamax && _hasGigantamax && _gigantamaxEnabled)
+            ? ref.watch(pokemonByNameProvider(gmaxFormName!))
+            : null;
+        final gmaxPokemon = gmaxPokemonAsync?.asData?.value;
+
+        // G-Max overrides mega if both somehow active (shouldn't normally happen).
+        final gmaxHomeUrl = gmaxPokemon != null ? pokemonHomeUrl(gmaxPokemon.id) : null;
+        final effectiveMegaArtworkUrl = gmaxHomeUrl ?? megaArtworkUrl;
+        final effectiveMegaFallbackUrl = gmaxHomeUrl != null
+            ? gmaxPokemon?.officialArtworkUrl
+            : megaPokemon?.officialArtworkUrl;
+
+        // ── Alpha Pokémon ───────────────────────────────────────────────────
+        // Only for PLA format (format id 'pla') or no format.
+        final canAlpha = mechanics == null || format?.id == 'pla';
+
         final scrollBody = SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(slot, spriteUrls, mechanics,
-                  megaArtworkUrl: megaArtworkUrl,
-                  megaFallbackUrl: megaPokemon?.officialArtworkUrl),
+                  megaArtworkUrl: effectiveMegaArtworkUrl,
+                  megaFallbackUrl: effectiveMegaFallbackUrl),
               const SizedBox(height: 24),
               _buildBasics(mechanics),
               // ── Ability (Gen 3+) ──
@@ -597,12 +634,29 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 _buildMegaToggle(megaEntry, megaPokemon,
                     loading: megaPokemonAsync?.isLoading ?? false),
               ],
+              // ── Gigantamax (Gen 8) ──
+              if (canDynamax) ...[
+                if (canGigantamax) ...[
+                  const SizedBox(height: 12),
+                  _buildGigantamaxToggle(
+                      gmaxMove: gmaxMove,
+                      gmaxPokemon: gmaxPokemon,
+                      loading: gmaxPokemonAsync?.isLoading ?? false),
+                ],
+              ],
+              // ── Alpha Pokémon (Legends: Arceus) ──
+              if (canAlpha) ...[
+                const SizedBox(height: 12),
+                _buildAlphaToggle(),
+              ],
               const SizedBox(height: 24),
               _SectionTitle('Moves'),
               const SizedBox(height: 8),
               _buildMoves(learnableMoves,
                   violations: violations,
-                  pokemonName: pokemon.name),
+                  pokemonName: pokemon.name,
+                  showMaxMoves: canDynamax,
+                  useGMax: canGigantamax && _hasGigantamax && _gigantamaxEnabled),
               const SizedBox(height: 24),
               // ── EVs / Stat Exp. ──
               _SectionTitle(
@@ -1107,6 +1161,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     List<String> learnableMoves, {
     Map<String, String> violations = const {},
     String pokemonName = '',
+    bool showMaxMoves = false,
+    bool useGMax = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -1259,6 +1315,68 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                             Icon(Icons.info_outline,
                                 size: 14,
                                 color: colorScheme.onSurfaceVariant),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ],
+              // Max Move / G-Max Move — shown when Dynamax/Gigantamax is available
+              if (showMaxMoves && _moves[i] != null) ...[
+                Builder(builder: (ctx) {
+                  final maxMove = resolveMaxMove(
+                    moveType: moveDetail?.typeName,
+                    moveCategory: moveDetail?.damageClass,
+                    speciesName: pokemonName,
+                    useGMax: useGMax,
+                  );
+                  if (maxMove == null) return const SizedBox.shrink();
+                  final isGMax = maxMove.startsWith('g-max-');
+                  final displayName = maxMove
+                      .split('-')
+                      .map((w) => w.isEmpty
+                          ? ''
+                          : '${w[0].toUpperCase()}${w.substring(1)}')
+                      .join(' ');
+                  final color = isGMax
+                      ? const Color(0xFFF9A825)   // G-Max: amber
+                      : const Color(0xFFB71C1C);  // Max: crimson
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(6),
+                      onTap: () => context.push('/moves/$maxMove'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                              color: color.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(isGMax ? '🌟' : '💢',
+                                style: const TextStyle(fontSize: 12)),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${isGMax ? "G-Max" : "Max"}: $displayName',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: color,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            const Spacer(),
+                            Icon(Icons.info_outline,
+                                size: 14,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant),
                           ],
                         ),
                       ),
@@ -1598,6 +1716,166 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               value: _isMegaEvolved,
               onChanged: (v) => setState(() => _isMegaEvolved = v),
             ),
+        ],
+      ),
+    );
+  }
+
+  // ── Gigantamax toggle ─────────────────────────────────────────────────────
+
+  Widget _buildGigantamaxToggle({
+    required String gmaxMove,
+    required dynamic gmaxPokemon,
+    required bool loading,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    const gmaxColor = Color(0xFFB71C1C);
+
+    final gmaxDisplay = gmaxMove
+        .split('-')
+        .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+
+    return Column(
+      children: [
+        // Has Gigantamax Factor toggle
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: _hasGigantamax
+                ? gmaxColor.withValues(alpha: 0.1)
+                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+                color: _hasGigantamax
+                    ? gmaxColor.withValues(alpha: 0.4)
+                    : colorScheme.outlineVariant),
+          ),
+          child: Row(
+            children: [
+              const Text('💢', style: TextStyle(fontSize: 16)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Gigantamax Factor',
+                        style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: _hasGigantamax ? gmaxColor : null)),
+                    Text('G-Max Move: $gmaxDisplay',
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: colorScheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _hasGigantamax,
+                onChanged: (v) => setState(() {
+                  _hasGigantamax = v;
+                  if (!v) _gigantamaxEnabled = false;
+                }),
+              ),
+            ],
+          ),
+        ),
+        // Gigantamax enabled toggle (only when has Gigantamax Factor)
+        if (_hasGigantamax) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: _gigantamaxEnabled
+                  ? const Color(0xFFF9A825).withValues(alpha: 0.15)
+                  : colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: _gigantamaxEnabled
+                      ? const Color(0xFFF9A825).withValues(alpha: 0.5)
+                      : colorScheme.outlineVariant),
+            ),
+            child: Row(
+              children: [
+                const Text('🌟', style: TextStyle(fontSize: 16)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Gigantamax',
+                          style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: _gigantamaxEnabled
+                                  ? const Color(0xFFF9A825)
+                                  : null)),
+                      Text(
+                          loading ? 'Loading form…' : 'Show G-Max sprite and G-Max Moves',
+                          style: textTheme.bodySmall
+                              ?.copyWith(color: colorScheme.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                if (loading)
+                  const SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                else
+                  Switch(
+                    value: _gigantamaxEnabled,
+                    onChanged: (v) => setState(() => _gigantamaxEnabled = v),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── Alpha toggle ──────────────────────────────────────────────────────────
+
+  Widget _buildAlphaToggle() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    const alphaColor = Color(0xFF1565C0);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: _isAlpha
+            ? alphaColor.withValues(alpha: 0.1)
+            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+            color: _isAlpha
+                ? alphaColor.withValues(alpha: 0.4)
+                : colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.brightness_high_rounded,
+              size: 20,
+              color: _isAlpha ? alphaColor : colorScheme.onSurfaceVariant),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Alpha Pokémon',
+                    style: textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: _isAlpha ? alphaColor : null)),
+                Text('Legends: Arceus — extra-large, more aggressive',
+                    style: textTheme.bodySmall
+                        ?.copyWith(color: colorScheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          Switch(
+            value: _isAlpha,
+            onChanged: (v) => setState(() => _isAlpha = v),
+          ),
         ],
       ),
     );
