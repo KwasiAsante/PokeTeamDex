@@ -995,7 +995,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                       IconButton(
                         icon: const Icon(Icons.close),
                         tooltip: 'Close',
-                        onPressed: widget.onClose,
+                        onPressed: _dirty
+                            ? () => _showUnsavedDialog(onDiscard: widget.onClose)
+                            : widget.onClose,
                       ),
                   ],
                 ),
@@ -1037,7 +1039,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     );
   }
 
-  Future<void> _showUnsavedDialog() async {
+  Future<void> _showUnsavedDialog({VoidCallback? onDiscard}) async {
     final slot = _currentSlot;
     if (slot == null) return;
     final result = await showDialog<bool>(
@@ -1062,7 +1064,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       await _save(slot);
     } else if (result == false) {
       setState(() => _dirty = false);
-      if (mounted) context.pop();
+      if (!mounted) return;
+      if (onDiscard != null) {
+        onDiscard();
+      } else {
+        context.pop();
+      }
     }
   }
 
