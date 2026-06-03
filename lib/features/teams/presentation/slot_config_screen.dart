@@ -157,6 +157,12 @@ class SlotConfigScreen extends ConsumerStatefulWidget {
   final int slotNumber;
   final bool embedded;
   final VoidCallback? onClose;
+  /// When set by the parent, the slot config registers a [Future<bool>]
+  /// callback that the parent can invoke to ask "is it safe to close?".
+  /// The callback shows the unsaved-changes dialog if dirty and returns
+  /// true when the parent may proceed (saved or discarded) or false if
+  /// the user cancelled.
+  final ValueNotifier<Future<bool> Function()?>? canCloseNotifier;
 
   const SlotConfigScreen({
     super.key,
@@ -164,6 +170,7 @@ class SlotConfigScreen extends ConsumerStatefulWidget {
     required this.slotNumber,
     this.embedded = false,
     this.onClose,
+    this.canCloseNotifier,
   });
 
   @override
@@ -230,10 +237,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _evCtrls = List.generate(6, (_) => TextEditingController(text: '0'));
     _ivCtrls = List.generate(6, (_) => TextEditingController(text: '31'));
     _contestCtrls = List.generate(6, (_) => TextEditingController(text: '0'));
+    widget.canCloseNotifier?.value = _canClose;
   }
 
   @override
   void dispose() {
+    widget.canCloseNotifier?.value = null;
     _nicknameCtrl.dispose();
     for (final c in _evCtrls) { c.dispose(); }
     for (final c in _ivCtrls) { c.dispose(); }
@@ -1037,6 +1046,45 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         );
       },
     );
+  }
+
+  /// Called by the parent (wide layout) to check whether it is safe to
+  /// navigate away. Shows the unsaved-changes dialog when dirty and returns
+  /// true if the caller may proceed (saved or discarded) or false if cancelled.
+  Future<bool> _canClose() async {
+    if (!_dirty) return true;
+    final slot = _currentSlot;
+    if (slot == null) return true;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Unsaved changes'),
+        content: const Text('You have unsaved changes. Would you like to save or discard them?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null), // cancel
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false), // discard
+            child: const Text('Discard'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true), // save
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return false;
+    if (result == true) {
+      await _save(slot);
+      return true;
+    } else if (result == false) {
+      setState(() => _dirty = false);
+      return true;
+    }
+    return false; // cancelled
   }
 
   Future<void> _showUnsavedDialog({VoidCallback? onDiscard}) async {

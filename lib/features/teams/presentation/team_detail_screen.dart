@@ -71,6 +71,13 @@ class TeamDetailScreen extends ConsumerStatefulWidget {
 
 class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
   int? _selectedSlot;
+  final _canCloseNotifier = ValueNotifier<Future<bool> Function()?>(null);
+
+  @override
+  void dispose() {
+    _canCloseNotifier.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,7 +105,19 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
 
         final slots = slotsAsync.asData?.value ?? [];
 
-        return Scaffold(
+        return ListenableBuilder(
+          listenable: _canCloseNotifier,
+          builder: (context, child) => PopScope(
+          canPop: _canCloseNotifier.value == null,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) return;
+            final canClose = _canCloseNotifier.value;
+            final ok = canClose != null ? await canClose() : true;
+            if (ok && mounted) context.pop();
+          },
+          child: child!,
+          ),
+          child: Scaffold(
           appBar: AppBar(
             title: _TeamAppBarTitle(team: team),
             actions: [
@@ -138,6 +157,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
                     formatId: team.formatLabel,
                   ),
           ),
+          ),
         );
       },
     );
@@ -156,8 +176,10 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
               slots: slots,
               formatId: team.formatLabel,
               selectedSlot: _selectedSlot,
-              onSlotTap: (slotNumber) =>
-                  setState(() => _selectedSlot = slotNumber),
+              onSlotTap: (slotNumber) {
+                _canCloseNotifier.value = null;
+                setState(() => _selectedSlot = slotNumber);
+              },
             ),
           ),
         ),
@@ -178,7 +200,11 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
                     teamId: widget.teamId,
                     slotNumber: _selectedSlot!,
                     embedded: true,
-                    onClose: () => setState(() => _selectedSlot = null),
+                    onClose: () {
+                      _canCloseNotifier.value = null;
+                      setState(() => _selectedSlot = null);
+                    },
+                    canCloseNotifier: _canCloseNotifier,
                   ),
           ),
         ),
