@@ -2197,11 +2197,15 @@ class _ItemListTile extends ConsumerWidget {
 
     final entry = detailAsync.whenOrNull(data: (e) => e);
     final spriteUrl = entry?.spriteUrl;
-    // Prefer flavor text — shortEffect is a placeholder for many items
-    // (e.g. Z-crystals show "XXX new effect for …").
+    // Z-crystals have a placeholder shortEffect ("XXX new effect for …").
+    // Use flavor text for them; keep shortEffect for everything else.
+    final normalizedItemName = itemName
+        .replaceAll(RegExp(r'-(held|bag)$'), '')
+        .replaceAll(RegExp(r'-+$'), '');
+    final isZCrystal = normalizedItemName.endsWith('-z');
     final description = entry == null
         ? null
-        : entry.flavorTextEntries.isNotEmpty
+        : (isZCrystal && entry.flavorTextEntries.isNotEmpty)
             ? entry.flavorTextEntries.last.text
             : entry.shortEffect;
 
