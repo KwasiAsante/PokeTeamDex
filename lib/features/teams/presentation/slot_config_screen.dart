@@ -215,6 +215,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   bool _initialized = false;
   bool _saving = false;
+  bool _dirty = false;
+  TeamSlot? _currentSlot;
 
   static const _statLabels = ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe'];
   static const _statKeys = [
@@ -301,6 +303,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _contestCtrls[3].text = (slot.contestClever     ?? 0).toString();
     _contestCtrls[4].text = (slot.contestTough      ?? 0).toString();
     _contestCtrls[5].text = (slot.contestSheen      ?? 0).toString();
+    _currentSlot = slot;
   }
 
   /// Loads inherited ribbons and nickname aliases from the instance chain.
@@ -514,6 +517,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       await _maybePsExport(existing);
 
       if (mounted) {
+        setState(() => _dirty = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             behavior: SnackBarBehavior.floating,
@@ -1002,7 +1006,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           );
         }
 
-        return Scaffold(
+        return PopScope(
+          canPop: !_dirty,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) _showUnsavedDialog();
+          },
+          child: Scaffold(
           appBar: AppBar(
             title: Text('Slot ${widget.slotNumber} — $speciesName'),
             actions: [
@@ -1022,9 +1031,39 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             ],
           ),
           body: scrollBody,
+        ),
         );
       },
     );
+  }
+
+  Future<void> _showUnsavedDialog() async {
+    final slot = _currentSlot;
+    if (slot == null) return;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Unsaved changes'),
+        content: const Text('You have unsaved changes. Would you like to save or discard them?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Discard'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (result == true) {
+      await _save(slot);
+    } else if (result == false) {
+      setState(() => _dirty = false);
+      if (mounted) context.pop();
+    }
   }
 
   // ── Header ────────────────────────────────────────────────────────────────
@@ -1086,7 +1125,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               ),
             if (mechanics == null || mechanics.hasShiny)
             GestureDetector(
-              onTap: () => setState(() => _isShiny = !_isShiny),
+              onTap: () => setState(() { _isShiny = !_isShiny; _dirty = true; }),
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
@@ -1118,7 +1157,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 ),
                 inputFormatters: [LengthLimitingTextInputFormatter(12)],
                 textCapitalization: TextCapitalization.words,
-                onChanged: (_) => setState(() {}),
+                onChanged: (_) => setState(() => _dirty = true),
               ),
               if (_nicknameAliases.isNotEmpty) ...[
                 const SizedBox(height: 4),
@@ -1164,7 +1203,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 value: _level.toDouble(),
                 min: 1, max: 100, divisions: 99,
                 label: '$_level',
-                onChanged: (v) => setState(() => _level = v.round()),
+                onChanged: (v) => setState(() { _level = v.round(); _dirty = true; }),
               ),
             ),
           ],
@@ -1178,7 +1217,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 label: Text(g.$2),
                 selected: _gender == g.$1,
                 onSelected: (_) =>
-                    setState(() => _gender = _gender == g.$1 ? null : g.$1),
+                    setState(() { _gender = _gender == g.$1 ? null : g.$1; _dirty = true; }),
               ),
           ],
         ),
@@ -1196,7 +1235,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   value: _friendship.toDouble(),
                   min: 0, max: 255, divisions: 255,
                   label: '$_friendship',
-                  onChanged: (v) => setState(() => _friendship = v.round()),
+                  onChanged: (v) => setState(() { _friendship = v.round(); _dirty = true; }),
                 ),
               ),
             ],
@@ -1228,7 +1267,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: InkWell(
-            onTap: () => setState(() => _abilityName = isSelected ? null : a.name),
+            onTap: () => setState(() { _abilityName = isSelected ? null : a.name; _dirty = true; }),
             borderRadius: BorderRadius.circular(8),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
@@ -1366,7 +1405,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             child: Text(label, style: const TextStyle(fontSize: 13)),
           );
         }).toList(),
-        onChanged: (v) => setState(() => _natureName = v),
+        onChanged: (v) => setState(() { _natureName = v; _dirty = true; }),
       ),
     );
   }
@@ -1425,7 +1464,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     iconSize: 18,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
-                    onPressed: () => setState(() => _heldItemName = null),
+                    onPressed: () => setState(() { _heldItemName = null; _dirty = true; }),
                   ),
                 ],
                 const SizedBox(width: 4),
@@ -1542,7 +1581,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                           iconSize: 18,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
-                          onPressed: () => setState(() => _moves[i] = null),
+                          onPressed: () => setState(() { _moves[i] = null; _dirty = true; }),
                         ),
                       const SizedBox(width: 4),
                       const Icon(Icons.chevron_right),
@@ -1827,7 +1866,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           ),
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => setState(() => _dirty = true),
         );
       },
     );
@@ -1880,9 +1919,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     // e.g. "incinium-z-held" → strips "-held" → "incinium-z"
     //      "incinium-z-"    → strips trailing "-" → "incinium-z"
     if (result != null) {
-      setState(() => _heldItemName = result
-          .replaceAll(RegExp(r'-(held|bag)$'), '')
-          .replaceAll(RegExp(r'-+$'), ''));
+      setState(() {
+        _heldItemName = result
+            .replaceAll(RegExp(r'-(held|bag)$'), '')
+            .replaceAll(RegExp(r'-+$'), '');
+        _dirty = true;
+      });
     }
   }
 
@@ -1896,7 +1938,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         label: 'Move ${moveIndex + 1}',
       ),
     );
-    if (result != null) setState(() => _moves[moveIndex] = result);
+    if (result != null) setState(() { _moves[moveIndex] = result; _dirty = true; });
   }
 
   // ── Form selector ─────────────────────────────────────────────────────────
@@ -1925,7 +1967,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             ChoiceChip(
               label: const Text('Default'),
               selected: isDefault,
-              onSelected: (_) => setState(() => _formName = null),
+              onSelected: (_) => setState(() { _formName = null; _dirty = true; }),
               selectedColor: colorScheme.primaryContainer,
               labelStyle: textTheme.labelSmall?.copyWith(
                 fontWeight: isDefault ? FontWeight.bold : FontWeight.normal,
@@ -1937,7 +1979,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               return ChoiceChip(
                 label: Text(fmtForm(form)),
                 selected: selected,
-                onSelected: (_) => setState(() => _formName = form),
+                onSelected: (_) => setState(() { _formName = form; _dirty = true; }),
                 selectedColor: colorScheme.primaryContainer,
                 labelStyle: textTheme.labelSmall?.copyWith(
                   fontWeight: selected ? FontWeight.bold : FontWeight.normal,
@@ -2056,7 +2098,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           else
             Switch(
               value: _isMegaEvolved,
-              onChanged: (v) => setState(() => _isMegaEvolved = v),
+              onChanged: (v) => setState(() { _isMegaEvolved = v; _dirty = true; }),
             ),
         ],
       ),
@@ -2117,6 +2159,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 onChanged: (v) => setState(() {
                   _hasGigantamax = v;
                   if (!v) _gigantamaxEnabled = false;
+                  _dirty = true;
                 }),
               ),
             ],
@@ -2165,7 +2208,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 else
                   Switch(
                     value: _gigantamaxEnabled,
-                    onChanged: (v) => setState(() => _gigantamaxEnabled = v),
+                    onChanged: (v) => setState(() { _gigantamaxEnabled = v; _dirty = true; }),
                   ),
               ],
             ),
@@ -2216,7 +2259,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           ),
           Switch(
             value: _isAlpha,
-            onChanged: (v) => setState(() => _isAlpha = v),
+            onChanged: (v) => setState(() { _isAlpha = v; _dirty = true; }),
           ),
         ],
       ),
@@ -2251,7 +2294,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       parentInstanceId: parentInstanceId,
     );
 
-    setState(() => _instanceId = childInstanceId);
+    setState(() { _instanceId = childInstanceId; _dirty = true; });
   }
 
   // ── "Link as origin" path ──
@@ -2284,7 +2327,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       originInstanceId = await instanceRepo.createOrigin(
         pokemonId: currentSlot.pokemonId,
       );
-      setState(() => _instanceId = originInstanceId);
+      setState(() { _instanceId = originInstanceId; _dirty = true; });
     }
 
     // Create a child iteration for the target slot.
@@ -2321,7 +2364,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       originInstanceId = await instanceRepo.createOrigin(
         pokemonId: currentSlot.pokemonId,
       );
-      setState(() => _instanceId = originInstanceId);
+      setState(() { _instanceId = originInstanceId; _dirty = true; });
     }
 
     // 3. Create a child iteration for the new slot.
@@ -2538,7 +2581,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       originInstanceId = await instanceRepo.createOrigin(
         pokemonId: currentSlot.pokemonId,
       );
-      setState(() => _instanceId = originInstanceId);
+      setState(() { _instanceId = originInstanceId; _dirty = true; });
     }
 
     // Create child iteration.
@@ -2572,7 +2615,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     );
   }
 
-  void _unlink() => setState(() => _instanceId = null);
+  void _unlink() => setState(() { _instanceId = null; _dirty = true; });
 
   Widget _buildInstanceSection(TeamSlot slot, String speciesName) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -2770,8 +2813,10 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   fontWeight:
                       selected ? FontWeight.bold : FontWeight.normal,
                 ),
-                onSelected: (on) => setState(
-                    () => on ? _ribbons.add(r.id) : _ribbons.remove(r.id)),
+                onSelected: (on) => setState(() {
+                    on ? _ribbons.add(r.id) : _ribbons.remove(r.id);
+                    _dirty = true;
+                  }),
               );
             }).toList(),
           ),
@@ -2867,7 +2912,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             label: _contestLabels[i],
             color: _contestColors[i],
             ctrl: _contestCtrls[i],
-            onChanged: () => setState(() {}),
+            onChanged: () => setState(() => _dirty = true),
           ),
           if (i < 5) const SizedBox(height: 8),
         ],

@@ -48,28 +48,38 @@ class SyncService {
     if (token == null || token.isEmpty) return;
     _running = true;
     notifier.setSyncing();
+    bool pushOk = true;
     try {
-      await _drain();
+      pushOk = await _drain();
+    } catch (e) {
+      pushOk = false;
+    }
+    try {
       await _pull();
-      notifier.setSuccess();
     } catch (e) {
       notifier.setError(e.toString());
-    } finally {
       _running = false;
+      return;
     }
+    if (pushOk) {
+      notifier.setSuccess();
+    } else {
+      notifier.setError('Some changes failed to sync and will retry automatically.');
+    }
+    _running = false;
   }
 
   // ── Push ────────────────────────────────────────────────────────────────────
 
-  Future<void> _drain() async {
+  Future<bool> _drain() async {
     final ops = await syncQueue.getPending();
-    if (ops.isEmpty) return;
+    if (ops.isEmpty) return true;
 
     for (final op in ops) {
       if (op.attempts >= _maxAttempts) await syncQueue.delete(op.id);
     }
     final activeOps = ops.where((o) => o.attempts < _maxAttempts).toList();
-    if (activeOps.isEmpty) return;
+    if (activeOps.isEmpty) return true;
 
     final creatingFolderIds = <int>{
       for (final op in activeOps)
@@ -104,7 +114,7 @@ class SyncService {
       }
     }
 
-    if (batchOps.isEmpty) return;
+    if (batchOps.isEmpty) return true;
 
     try {
       final result = await api.pushBatch(batchOps);
@@ -130,14 +140,17 @@ class SyncService {
       for (final op in includedOps) {
         await syncQueue.delete(op.id);
       }
+      return true;
     } on DioException {
       for (final op in includedOps) {
         await syncQueue.markAttempted(op.id, op.attempts);
       }
+      return false;
     } on StateError {
       for (final op in includedOps) {
         await syncQueue.delete(op.id);
       }
+      return true; // bad data discarded — not a transient push failure
     }
   }
 

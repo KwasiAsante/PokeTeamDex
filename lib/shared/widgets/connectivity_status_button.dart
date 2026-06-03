@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/connectivity/connectivity_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
@@ -143,6 +144,12 @@ class _StatusSheet extends ConsumerWidget {
             icon: Icons.person_outline,
             status: isLoggedIn ? _RowStatus.ok : _RowStatus.warn,
             statusText: isLoggedIn ? 'Signed in' : 'Not signed in',
+            onTap: isLoggedIn
+                ? null
+                : () {
+                    Navigator.of(context).pop();
+                    context.go('/login');
+                  },
           ),
         ],
       ),
@@ -159,12 +166,14 @@ class _StatusRow extends StatelessWidget {
   final IconData icon;
   final _RowStatus status;
   final String statusText;
+  final VoidCallback? onTap;
 
   const _StatusRow({
     required this.label,
     required this.icon,
     required this.status,
     required this.statusText,
+    this.onTap,
   });
 
   @override
@@ -191,29 +200,41 @@ class _StatusRow extends StatelessWidget {
             decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
           );
 
+    final row = Row(
+      children: [
+        Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
+        const SizedBox(width: 12),
+        Text(label, style: textTheme.bodyMedium),
+        const Spacer(),
+        dot,
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(
+            color: chipColor,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            statusText,
+            style: textTheme.labelSmall?.copyWith(color: dotColor, fontWeight: FontWeight.w600),
+          ),
+        ),
+        if (onTap != null) ...[
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right, size: 16),
+        ],
+      ],
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
-          const SizedBox(width: 12),
-          Text(label, style: textTheme.bodyMedium),
-          const Spacer(),
-          dot,
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-            decoration: BoxDecoration(
-              color: chipColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              statusText,
-              style: textTheme.labelSmall?.copyWith(color: dotColor, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
+      child: onTap != null
+          ? InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(8),
+              child: row,
+            )
+          : row,
     );
   }
 }
