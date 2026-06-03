@@ -29,6 +29,8 @@ import 'package:poke_team_dex/features/teams/data/form_filter.dart';
 import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
 import 'package:poke_team_dex/features/teams/data/z_moves_data.dart';
 import 'package:poke_team_dex/features/teams/data/ribbon_catalog.dart';
+import 'package:poke_team_dex/features/teams/presentation/instance_chain_view.dart';
+import 'package:poke_team_dex/features/teams/presentation/instance_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/services/ps_export_service.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
@@ -192,6 +194,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   // Form change (e.g. aegislash-shield ↔ aegislash-blade)
   String? _formName; // null = use the Pokémon's default form
 
+  // Pokemon instance link
+  int? _instanceId;
+
   // Mega Evolution toggle
   bool _isMegaEvolved = false;
 
@@ -266,6 +271,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _ivCtrls[4].text = (slot.ivSpd ?? 31).toString();
     _ivCtrls[5].text = (slot.ivSpe ?? 31).toString();
     _formName = slot.formName;
+    _instanceId = slot.instanceId;
     _isMegaEvolved = slot.isMegaEvolved;
     _hasGigantamax = slot.hasGigantamax;
     _gigantamaxEnabled = slot.gigantamaxEnabled;
@@ -364,6 +370,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           hasGigantamax: Value(_hasGigantamax),
           gigantamaxEnabled: Value(_gigantamaxEnabled),
           isAlpha: Value(_isAlpha),
+          instanceId: Value(_instanceId),
           ribbons: Value(_ribbons.isEmpty
               ? null
               : jsonEncode(_ribbons.toList())),
@@ -832,6 +839,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               _SectionTitle('Ribbons'),
               const SizedBox(height: 8),
               _buildRibbons(),
+              // ── Pokémon Instance ──
+              const SizedBox(height: 24),
+              _SectionTitle('Pokémon Identity'),
+              const SizedBox(height: 8),
+              _buildInstanceSection(slot),
             ],
           ),
         );
@@ -2089,6 +2101,137 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   }
 
   // ── Ribbons ───────────────────────────────────────────────────────────────
+
+  // ── Pokémon Instance ──────────────────────────────────────────────────────
+
+  /// Called when the user picks a slot to link to from the picker sheet.
+  /// Creates instance records immediately so the chain view can render.
+  Future<void> _onLinkSelected(TeamSlot targetSlot) async {
+    final instanceRepo = ref.read(pokemonInstanceRepositoryProvider);
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+
+    // 1. Ensure the target slot has an instance (create origin if needed).
+    int parentInstanceId;
+    if (targetSlot.instanceId != null) {
+      parentInstanceId = targetSlot.instanceId!;
+    } else {
+      // Create an origin instance for the target slot.
+      parentInstanceId = await instanceRepo.createOrigin(
+        pokemonId: targetSlot.pokemonId,
+        nickname: targetSlot.nickname,
+      );
+      // Link the target slot to its new origin instance right away.
+      await slotRepo.update(
+        TeamSlotsCompanion(
+          id: Value(targetSlot.id),
+          teamId: Value(targetSlot.teamId),
+          slot: Value(targetSlot.slot),
+          pokemonId: Value(targetSlot.pokemonId),
+          instanceId: Value(parentInstanceId),
+          syncStatus: const Value('pending'),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
+
+    // 2. Create an iteration instance for the current slot.
+    final newInstanceId = await instanceRepo.createIteration(
+      pokemonId: targetSlot.pokemonId,
+      parentInstanceId: parentInstanceId,
+      newNickname: _nicknameCtrl.text.trim().isEmpty
+          ? null
+          : _nicknameCtrl.text.trim(),
+    );
+
+    setState(() => _instanceId = newInstanceId);
+  }
+
+  /// Unlinks this slot from its instance without deleting the instance itself
+  /// (other slots in the chain are unaffected).
+  void _unlink() => setState(() => _instanceId = null);
+
+  Widget _buildInstanceSection(TeamSlot slot) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Track this Pokémon\'s journey across teams. '
+          'Linking records nickname history and ribbon inheritance.',
+          style: textTheme.bodySmall
+              ?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 12),
+
+        if (_instanceId != null) ...[
+          // ── Linked state ──
+          InstanceChainView(
+            instanceId: _instanceId!,
+            currentSlotId: slot.id,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              OutlinedButton.icon(
+                icon: const Icon(Icons.link_off_rounded, size: 16),
+                label: const Text('Unlink'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colorScheme.error,
+                  side: BorderSide(color: colorScheme.error.withValues(alpha: 0.5)),
+                  visualDensity: VisualDensity.compact,
+                ),
+                onPressed: _unlink,
+              ),
+            ],
+          ),
+        ] else ...[
+          // ── Unlinked state ──
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.link_off_rounded,
+                    size: 18, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Text(
+                  'Not linked to a Pokémon identity',
+                  style: textTheme.bodySmall
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.tonalIcon(
+            icon: const Icon(Icons.link_rounded, size: 16),
+            label: const Text('Link to another team\'s Pokémon'),
+            style: FilledButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+            ),
+            onPressed: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              useSafeArea: true,
+              builder: (_) => InstancePickerSheet(
+                pokemonId: slot.pokemonId,
+                currentSlotId: slot.id,
+                onPick: (targetSlot) {
+                  Navigator.of(context).pop();
+                  _onLinkSelected(targetSlot);
+                },
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 
   Widget _buildRibbons() {
     final colorScheme = Theme.of(context).colorScheme;
