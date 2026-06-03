@@ -98,40 +98,36 @@ def transform_learnsets(raw: dict) -> dict:
     return result
 
 
-def extract_g6_learnsets(raw: dict) -> dict[str, set[str]]:
+def build_g6_allowlist(raw: dict) -> dict[str, list[str]]:
     """
-    Extract Gen-6 moves from the learnsets-g6.js supplement.
-    Returns { "charizard": {"dragondance", "heatwave", ...}, ... }
+    Build a Gen-6 move allow-list from learnsets-g6.js.
 
-    learnsets-g6.js contains historical Gen 6 entries that the main
-    learnsets.json omits (e.g. Dragon Dance on Charizard was a Gen 6 ORAS
-    move tutor, but the modern PS data only lists the Gen 8 TM entry).
+    learnsets-g6.js is PS's Gen 6 simulation data file.  Any move that
+    appears for a Pokémon in this file (regardless of its source-code
+    generation digit) is considered valid in a Gen 6 format by PS.
+
+    This covers two important cases:
+    1. Moves that are listed only as Gen 7/8 in the main learnsets.json
+       but were actually available in Gen 6 (e.g. Dragon Dance on
+       Charizard via ORAS tutor or Gen 6 egg move — the Gen 6 sources
+       are missing from PS's modern data but the move is still in the G6
+       allow-list file).
+    2. Moves that CAN transfer forward into Gen 6 simulation from older
+       games that PS Gen 6 allows.
+
+    Returns { "charizard": ["dragondance", "fly", ...], ... }
     """
-    result: dict[str, set[str]] = {}
+    result: dict[str, list[str]] = {}
     for pokemon, data in raw.items():
         learnset = data.get("learnset") or {}
-        moves: set[str] = set()
-        for move, sources in learnset.items():
-            # Include the move if it has any Gen 6 source OR if this file
-            # only contains Gen 6 data (all sources start with "6").
-            for src in sources:
-                if src and src[0] == "6":
-                    moves.add(move)
-                    break
+        # Include every move that has at least one non-empty source.
+        moves = sorted(
+            move for move, sources in learnset.items()
+            if any(s for s in sources)  # at least one real source entry
+        )
         if moves:
             result[pokemon.lower()] = moves
     return result
-
-
-def merge_g6_into_learnsets(learnsets: dict, g6: dict[str, set[str]]) -> dict:
-    """Supplement learnsets with Gen 6 moves from learnsets-g6.js."""
-    for pokemon, g6_moves in g6.items():
-        if pokemon not in learnsets:
-            learnsets[pokemon] = {}
-        existing = set(learnsets[pokemon].get("6", []))
-        merged = sorted(existing | g6_moves)
-        learnsets[pokemon]["6"] = merged
-    return learnsets
 
 
 def transform_moves(raw: dict) -> dict:
@@ -214,16 +210,17 @@ def main() -> None:
     print("Learnsets (JSON endpoint)…")
     learnsets = transform_learnsets(fetch_json_endpoint("learnsets.json"))
 
-    print("Learnsets-G6 supplement (JS endpoint)…")
+    ls_sha = write_json("learnsets.json", learnsets)
+
+    print("\nLearnsets-G6 allow-list (JS endpoint)…")
     try:
         g6_raw = fetch_js_endpoint("learnsets-g6.js")
-        g6_data = extract_g6_learnsets(g6_raw)
-        learnsets = merge_g6_into_learnsets(learnsets, g6_data)
-        print(f"  Merged Gen 6 data for {len(g6_data)} Pokémon")
+        g6_allowlist = build_g6_allowlist(g6_raw)
+        write_json("learnsets-g6-allowlist.json", g6_allowlist)
+        print(f"  Built Gen 6 allow-list for {len(g6_allowlist)} Pokémon")
     except Exception as e:
         print(f"  WARNING: Could not fetch learnsets-g6.js: {e}")
-
-    ls_sha = write_json("learnsets.json", learnsets)
+        g6_allowlist = {}
 
     print("\nMoves (JSON endpoint)…")
     moves = transform_moves(fetch_json_endpoint("moves.json"))

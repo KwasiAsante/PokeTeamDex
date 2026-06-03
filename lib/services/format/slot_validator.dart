@@ -66,30 +66,30 @@ Future<SlotValidation> validateSlot(
     }
   }
 
-  // ── Moves — per-game or per-gen learnset (PS-supplemented) ──────────────
-  // Move-gen validation is skipped for Gen ≤ 6 because both PokéAPI and PS
-  // have known gaps in historical tutor/event data for older gens (e.g. ORAS
-  // move tutors are frequently missing from modern data sources).
-  // Gen 7+ data is substantially more complete and reliable.
-  if (format.gen >= 7) {
-    final learnset = buildLearnsetForFormat(
-      pokemonMoves, format,
-      pokemonName: pokemonName,
-      formatService: service,
-    );
-    final moveSlots = {
-      'move1': slot.move1,
-      'move2': slot.move2,
-      'move3': slot.move3,
-      'move4': slot.move4,
-    };
-    for (final entry in moveSlots.entries) {
-      final moveName = entry.value;
-      if (moveName != null && !learnset.contains(moveName)) {
-        violations[entry.key] =
-            '${_display(moveName)} not learnable in ${_formatLabel(format)}';
-      }
+  // ── Moves ────────────────────────────────────────────────────────────────
+  final learnset = buildLearnsetForFormat(
+    pokemonMoves, format,
+    pokemonName: pokemonName,
+    formatService: service,
+  );
+  final moveSlots = {
+    'move1': slot.move1,
+    'move2': slot.move2,
+    'move3': slot.move3,
+    'move4': slot.move4,
+  };
+  for (final entry in moveSlots.entries) {
+    final moveName = entry.value;
+    if (moveName == null) continue;
+    if (learnset.contains(moveName)) continue;
+    // Gen 6: also accept moves in PS's learnsets-g6.js allow-list.
+    // This covers egg moves and tutors that are missing from the main
+    // learnsets data but that PS considers valid for Gen 6 simulation.
+    if (format.gen == 6 && service.isInG6Allowlist(pokemonName, moveName)) {
+      continue;
     }
+    violations[entry.key] =
+        '${_display(moveName)} not learnable in ${_formatLabel(format)}';
   }
 
   return SlotValidation(violations);
@@ -126,19 +126,20 @@ SlotValidation validateSlotSync(
     }
   }
 
-  if (format.gen >= 7) {
-    final learnset = buildLearnsetForFormat(
-      pokemonMoves, format,
-      pokemonName: pokemonName,
-      formatService: service,
-    );
-    for (int i = 0; i < moves.length; i++) {
-      final moveName = moves[i];
-      if (moveName != null && !learnset.contains(moveName)) {
-        violations['move${i + 1}'] =
-            '${_display(moveName)} not learnable in ${_formatLabel(format)}';
-      }
+  final learnset = buildLearnsetForFormat(
+    pokemonMoves, format,
+    pokemonName: pokemonName,
+    formatService: service,
+  );
+  for (int i = 0; i < moves.length; i++) {
+    final moveName = moves[i];
+    if (moveName == null) continue;
+    if (learnset.contains(moveName)) continue;
+    if (format.gen == 6 && service.isInG6Allowlist(pokemonName, moveName)) {
+      continue;
     }
+    violations['move${i + 1}'] =
+        '${_display(moveName)} not learnable in ${_formatLabel(format)}';
   }
 
   return SlotValidation(violations);
