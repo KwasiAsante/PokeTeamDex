@@ -588,8 +588,10 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             : megaPokemon?.officialArtworkUrl;
 
         // ── Alpha Pokémon ───────────────────────────────────────────────────
-        // Only for PLA format (format id 'pla') or no format.
-        final canAlpha = mechanics == null || format?.id == 'pla';
+        // Available for PLA (origin), Gen 9 / SV (transfer target), or no format.
+        final canAlpha = mechanics == null ||
+            format?.id == 'pla' ||
+            format?.gen == 9;
 
         final scrollBody = SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
