@@ -716,7 +716,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   megaArtworkUrl: effectiveMegaArtworkUrl,
                   megaFallbackUrl: effectiveMegaFallbackUrl,
                   genderBaseUrl: genderBaseUrl,
-                  genderBaseFallback: genderBaseFallback),
+                  genderBaseFallback: genderBaseFallback,
+                  isFormLoading: formPokemonAsync?.isLoading ?? false),
               // ── Form selector (when Pokémon has multiple forms) ──
               if (hasMultipleForms) ...[
                 const SizedBox(height: 16),
@@ -914,6 +915,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     // Gender-specific base sprite (female HOME url when slot is female).
     String? genderBaseUrl,
     String? genderBaseFallback,
+    bool isFormLoading = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -942,6 +944,23 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   _isShiny,
               size: 140,
             ),
+            // Loading overlay while form sprite is fetching
+            if (isFormLoading)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Center(
+                    child: SizedBox(
+                      width: 28, height: 28,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
             if (mechanics == null || mechanics.hasShiny)
             GestureDetector(
               onTap: () => setState(() => _isShiny = !_isShiny),
