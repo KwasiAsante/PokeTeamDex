@@ -1054,7 +1054,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    _heldItemName?.toCapitalCase() ?? '— None —',
+                    _heldItemName?.replaceAll(RegExp(r'-held$'), '').toCapitalCase() ?? '— None —',
                     style: textTheme.bodyMedium,
                   ),
                 ),
@@ -1451,18 +1451,22 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   // ── Pickers ───────────────────────────────────────────────────────────────
 
   Future<void> _pickItem() async {
-    // Exclude the held/bag variants of Z-crystals and similar duplicate forms
-    // (e.g. "incinium-z-held") — only the base name is useful when selecting
-    // a held item.
+    // PokéAPI has both -held and -bag variants for some items (e.g. Z-crystals).
+    // -bag variants are true duplicates with no gameplay difference — exclude them.
+    // -held variants are kept (some items only exist in held form); the display
+    // strips "-held" so users see "Incinium Z" not "Incinium Z Held".
     final items = (ref.read(_itemListProvider).asData?.value ?? [])
-        .where((n) => !n.endsWith('-held') && !n.endsWith('-bag'))
+        .where((n) => !n.endsWith('-bag'))
         .toList();
     final result = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       builder: (_) => _ItemPickerSheet(items: items, current: _heldItemName),
     );
-    if (result != null) setState(() => _heldItemName = result);
+    // Normalise stored value: strip -held so "incinium-z-held" → "incinium-z".
+    if (result != null) {
+      setState(() => _heldItemName = result.replaceAll(RegExp(r'-held$'), ''));
+    }
   }
 
   Future<void> _pickMove(int moveIndex, List<String> learnableMoves) async {
@@ -2203,7 +2207,9 @@ class _ItemListTile extends ConsumerWidget {
             : const Icon(Icons.inventory_2_outlined, size: 20,
                 color: Colors.transparent),
       ),
-      title: Text(itemName.toCapitalCase(),
+      title: Text(
+          // Strip '-held' suffix so "incinium-z-held" displays as "Incinium Z"
+          itemName.replaceAll(RegExp(r'-held$'), '').toCapitalCase(),
           style: textTheme.bodyMedium
               ?.copyWith(fontWeight: isSelected ? FontWeight.bold : null)),
       subtitle: description != null
