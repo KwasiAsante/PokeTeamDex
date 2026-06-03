@@ -181,10 +181,10 @@
 
 ### Bug Fixes & Polish Needed
 
-- [ ] **Unsaved changes guard** — when leaving slot config with unsaved changes, show a dialog offering "Discard" or "Save" before navigating away
-- [ ] **Sync failure feedback** — push failures are currently silent; show an error message/snackbar when push fails (pull-only success should not be reported as full sync success); sync is only successful when both push and pull complete without error
-- [ ] **Connectivity button → login shortcut** — when the user is not logged in, the wifi/connectivity icon in the AppBar should be tappable and navigate directly to the login screen
-- [ ] **Login screen keyboard submit** — pressing Enter/Return on the password field should trigger the login attempt (same as tapping the login button)
+- [x] **Unsaved changes guard** — when leaving slot config with unsaved changes, show a dialog offering "Discard" or "Save" before navigating away; works in both narrow (PopScope on Scaffold) and wide layout (back button on team detail intercepted via canCloseNotifier)
+- [x] **Sync failure feedback** — push failures are now surfaced; pull still runs on push failure but sync reports error instead of success
+- [x] **Connectivity button → login shortcut** — Account row in the connectivity sheet is tappable when not signed in and navigates to the login screen
+- [x] **Login screen keyboard submit** — pressing Enter/Return on the password field triggers the login attempt
 
 ### Bug Fixes & Polish Applied
 
