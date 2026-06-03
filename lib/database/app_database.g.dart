@@ -1420,6 +1420,51 @@ class $TeamSlotsTable extends TeamSlots
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _hasGigantamaxMeta = const VerificationMeta(
+    'hasGigantamax',
+  );
+  @override
+  late final GeneratedColumn<bool> hasGigantamax = GeneratedColumn<bool>(
+    'has_gigantamax',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("has_gigantamax" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _gigantamaxEnabledMeta = const VerificationMeta(
+    'gigantamaxEnabled',
+  );
+  @override
+  late final GeneratedColumn<bool> gigantamaxEnabled = GeneratedColumn<bool>(
+    'gigantamax_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("gigantamax_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _isAlphaMeta = const VerificationMeta(
+    'isAlpha',
+  );
+  @override
+  late final GeneratedColumn<bool> isAlpha = GeneratedColumn<bool>(
+    'is_alpha',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_alpha" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _contestCoolMeta = const VerificationMeta(
     'contestCool',
   );
@@ -1570,6 +1615,9 @@ class $TeamSlotsTable extends TeamSlots
     ivSpe,
     ribbons,
     isMegaEvolved,
+    hasGigantamax,
+    gigantamaxEnabled,
+    isAlpha,
     contestCool,
     contestBeautiful,
     contestCute,
@@ -1791,6 +1839,30 @@ class $TeamSlotsTable extends TeamSlots
         ),
       );
     }
+    if (data.containsKey('has_gigantamax')) {
+      context.handle(
+        _hasGigantamaxMeta,
+        hasGigantamax.isAcceptableOrUnknown(
+          data['has_gigantamax']!,
+          _hasGigantamaxMeta,
+        ),
+      );
+    }
+    if (data.containsKey('gigantamax_enabled')) {
+      context.handle(
+        _gigantamaxEnabledMeta,
+        gigantamaxEnabled.isAcceptableOrUnknown(
+          data['gigantamax_enabled']!,
+          _gigantamaxEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_alpha')) {
+      context.handle(
+        _isAlphaMeta,
+        isAlpha.isAcceptableOrUnknown(data['is_alpha']!, _isAlphaMeta),
+      );
+    }
     if (data.containsKey('contest_cool')) {
       context.handle(
         _contestCoolMeta,
@@ -2002,6 +2074,18 @@ class $TeamSlotsTable extends TeamSlots
         DriftSqlType.bool,
         data['${effectivePrefix}is_mega_evolved'],
       )!,
+      hasGigantamax: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}has_gigantamax'],
+      )!,
+      gigantamaxEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}gigantamax_enabled'],
+      )!,
+      isAlpha: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_alpha'],
+      )!,
       contestCool: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}contest_cool'],
@@ -2083,6 +2167,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
   final int? ivSpe;
   final String? ribbons;
   final bool isMegaEvolved;
+  final bool hasGigantamax;
+  final bool gigantamaxEnabled;
+  final bool isAlpha;
   final int? contestCool;
   final int? contestBeautiful;
   final int? contestCute;
@@ -2125,6 +2212,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     this.ivSpe,
     this.ribbons,
     required this.isMegaEvolved,
+    required this.hasGigantamax,
+    required this.gigantamaxEnabled,
+    required this.isAlpha,
     this.contestCool,
     this.contestBeautiful,
     this.contestCute,
@@ -2220,6 +2310,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       map['ribbons'] = Variable<String>(ribbons);
     }
     map['is_mega_evolved'] = Variable<bool>(isMegaEvolved);
+    map['has_gigantamax'] = Variable<bool>(hasGigantamax);
+    map['gigantamax_enabled'] = Variable<bool>(gigantamaxEnabled);
+    map['is_alpha'] = Variable<bool>(isAlpha);
     if (!nullToAbsent || contestCool != null) {
       map['contest_cool'] = Variable<int>(contestCool);
     }
@@ -2324,6 +2417,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
           ? const Value.absent()
           : Value(ribbons),
       isMegaEvolved: Value(isMegaEvolved),
+      hasGigantamax: Value(hasGigantamax),
+      gigantamaxEnabled: Value(gigantamaxEnabled),
+      isAlpha: Value(isAlpha),
       contestCool: contestCool == null && nullToAbsent
           ? const Value.absent()
           : Value(contestCool),
@@ -2386,6 +2482,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       ivSpe: serializer.fromJson<int?>(json['ivSpe']),
       ribbons: serializer.fromJson<String?>(json['ribbons']),
       isMegaEvolved: serializer.fromJson<bool>(json['isMegaEvolved']),
+      hasGigantamax: serializer.fromJson<bool>(json['hasGigantamax']),
+      gigantamaxEnabled: serializer.fromJson<bool>(json['gigantamaxEnabled']),
+      isAlpha: serializer.fromJson<bool>(json['isAlpha']),
       contestCool: serializer.fromJson<int?>(json['contestCool']),
       contestBeautiful: serializer.fromJson<int?>(json['contestBeautiful']),
       contestCute: serializer.fromJson<int?>(json['contestCute']),
@@ -2433,6 +2532,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       'ivSpe': serializer.toJson<int?>(ivSpe),
       'ribbons': serializer.toJson<String?>(ribbons),
       'isMegaEvolved': serializer.toJson<bool>(isMegaEvolved),
+      'hasGigantamax': serializer.toJson<bool>(hasGigantamax),
+      'gigantamaxEnabled': serializer.toJson<bool>(gigantamaxEnabled),
+      'isAlpha': serializer.toJson<bool>(isAlpha),
       'contestCool': serializer.toJson<int?>(contestCool),
       'contestBeautiful': serializer.toJson<int?>(contestBeautiful),
       'contestCute': serializer.toJson<int?>(contestCute),
@@ -2478,6 +2580,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     Value<int?> ivSpe = const Value.absent(),
     Value<String?> ribbons = const Value.absent(),
     bool? isMegaEvolved,
+    bool? hasGigantamax,
+    bool? gigantamaxEnabled,
+    bool? isAlpha,
     Value<int?> contestCool = const Value.absent(),
     Value<int?> contestBeautiful = const Value.absent(),
     Value<int?> contestCute = const Value.absent(),
@@ -2520,6 +2625,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     ivSpe: ivSpe.present ? ivSpe.value : this.ivSpe,
     ribbons: ribbons.present ? ribbons.value : this.ribbons,
     isMegaEvolved: isMegaEvolved ?? this.isMegaEvolved,
+    hasGigantamax: hasGigantamax ?? this.hasGigantamax,
+    gigantamaxEnabled: gigantamaxEnabled ?? this.gigantamaxEnabled,
+    isAlpha: isAlpha ?? this.isAlpha,
     contestCool: contestCool.present ? contestCool.value : this.contestCool,
     contestBeautiful: contestBeautiful.present
         ? contestBeautiful.value
@@ -2578,6 +2686,13 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       isMegaEvolved: data.isMegaEvolved.present
           ? data.isMegaEvolved.value
           : this.isMegaEvolved,
+      hasGigantamax: data.hasGigantamax.present
+          ? data.hasGigantamax.value
+          : this.hasGigantamax,
+      gigantamaxEnabled: data.gigantamaxEnabled.present
+          ? data.gigantamaxEnabled.value
+          : this.gigantamaxEnabled,
+      isAlpha: data.isAlpha.present ? data.isAlpha.value : this.isAlpha,
       contestCool: data.contestCool.present
           ? data.contestCool.value
           : this.contestCool,
@@ -2639,6 +2754,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
           ..write('ivSpe: $ivSpe, ')
           ..write('ribbons: $ribbons, ')
           ..write('isMegaEvolved: $isMegaEvolved, ')
+          ..write('hasGigantamax: $hasGigantamax, ')
+          ..write('gigantamaxEnabled: $gigantamaxEnabled, ')
+          ..write('isAlpha: $isAlpha, ')
           ..write('contestCool: $contestCool, ')
           ..write('contestBeautiful: $contestBeautiful, ')
           ..write('contestCute: $contestCute, ')
@@ -2686,6 +2804,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     ivSpe,
     ribbons,
     isMegaEvolved,
+    hasGigantamax,
+    gigantamaxEnabled,
+    isAlpha,
     contestCool,
     contestBeautiful,
     contestCute,
@@ -2732,6 +2853,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
           other.ivSpe == this.ivSpe &&
           other.ribbons == this.ribbons &&
           other.isMegaEvolved == this.isMegaEvolved &&
+          other.hasGigantamax == this.hasGigantamax &&
+          other.gigantamaxEnabled == this.gigantamaxEnabled &&
+          other.isAlpha == this.isAlpha &&
           other.contestCool == this.contestCool &&
           other.contestBeautiful == this.contestBeautiful &&
           other.contestCute == this.contestCute &&
@@ -2776,6 +2900,9 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
   final Value<int?> ivSpe;
   final Value<String?> ribbons;
   final Value<bool> isMegaEvolved;
+  final Value<bool> hasGigantamax;
+  final Value<bool> gigantamaxEnabled;
+  final Value<bool> isAlpha;
   final Value<int?> contestCool;
   final Value<int?> contestBeautiful;
   final Value<int?> contestCute;
@@ -2818,6 +2945,9 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     this.ivSpe = const Value.absent(),
     this.ribbons = const Value.absent(),
     this.isMegaEvolved = const Value.absent(),
+    this.hasGigantamax = const Value.absent(),
+    this.gigantamaxEnabled = const Value.absent(),
+    this.isAlpha = const Value.absent(),
     this.contestCool = const Value.absent(),
     this.contestBeautiful = const Value.absent(),
     this.contestCute = const Value.absent(),
@@ -2861,6 +2991,9 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     this.ivSpe = const Value.absent(),
     this.ribbons = const Value.absent(),
     this.isMegaEvolved = const Value.absent(),
+    this.hasGigantamax = const Value.absent(),
+    this.gigantamaxEnabled = const Value.absent(),
+    this.isAlpha = const Value.absent(),
     this.contestCool = const Value.absent(),
     this.contestBeautiful = const Value.absent(),
     this.contestCute = const Value.absent(),
@@ -2906,6 +3039,9 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     Expression<int>? ivSpe,
     Expression<String>? ribbons,
     Expression<bool>? isMegaEvolved,
+    Expression<bool>? hasGigantamax,
+    Expression<bool>? gigantamaxEnabled,
+    Expression<bool>? isAlpha,
     Expression<int>? contestCool,
     Expression<int>? contestBeautiful,
     Expression<int>? contestCute,
@@ -2949,6 +3085,9 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
       if (ivSpe != null) 'iv_spe': ivSpe,
       if (ribbons != null) 'ribbons': ribbons,
       if (isMegaEvolved != null) 'is_mega_evolved': isMegaEvolved,
+      if (hasGigantamax != null) 'has_gigantamax': hasGigantamax,
+      if (gigantamaxEnabled != null) 'gigantamax_enabled': gigantamaxEnabled,
+      if (isAlpha != null) 'is_alpha': isAlpha,
       if (contestCool != null) 'contest_cool': contestCool,
       if (contestBeautiful != null) 'contest_beautiful': contestBeautiful,
       if (contestCute != null) 'contest_cute': contestCute,
@@ -2994,6 +3133,9 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     Value<int?>? ivSpe,
     Value<String?>? ribbons,
     Value<bool>? isMegaEvolved,
+    Value<bool>? hasGigantamax,
+    Value<bool>? gigantamaxEnabled,
+    Value<bool>? isAlpha,
     Value<int?>? contestCool,
     Value<int?>? contestBeautiful,
     Value<int?>? contestCute,
@@ -3037,6 +3179,9 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
       ivSpe: ivSpe ?? this.ivSpe,
       ribbons: ribbons ?? this.ribbons,
       isMegaEvolved: isMegaEvolved ?? this.isMegaEvolved,
+      hasGigantamax: hasGigantamax ?? this.hasGigantamax,
+      gigantamaxEnabled: gigantamaxEnabled ?? this.gigantamaxEnabled,
+      isAlpha: isAlpha ?? this.isAlpha,
       contestCool: contestCool ?? this.contestCool,
       contestBeautiful: contestBeautiful ?? this.contestBeautiful,
       contestCute: contestCute ?? this.contestCute,
@@ -3146,6 +3291,15 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     if (isMegaEvolved.present) {
       map['is_mega_evolved'] = Variable<bool>(isMegaEvolved.value);
     }
+    if (hasGigantamax.present) {
+      map['has_gigantamax'] = Variable<bool>(hasGigantamax.value);
+    }
+    if (gigantamaxEnabled.present) {
+      map['gigantamax_enabled'] = Variable<bool>(gigantamaxEnabled.value);
+    }
+    if (isAlpha.present) {
+      map['is_alpha'] = Variable<bool>(isAlpha.value);
+    }
     if (contestCool.present) {
       map['contest_cool'] = Variable<int>(contestCool.value);
     }
@@ -3213,6 +3367,9 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
           ..write('ivSpe: $ivSpe, ')
           ..write('ribbons: $ribbons, ')
           ..write('isMegaEvolved: $isMegaEvolved, ')
+          ..write('hasGigantamax: $hasGigantamax, ')
+          ..write('gigantamaxEnabled: $gigantamaxEnabled, ')
+          ..write('isAlpha: $isAlpha, ')
           ..write('contestCool: $contestCool, ')
           ..write('contestBeautiful: $contestBeautiful, ')
           ..write('contestCute: $contestCute, ')
@@ -5187,6 +5344,9 @@ typedef $$TeamSlotsTableCreateCompanionBuilder =
       Value<int?> ivSpe,
       Value<String?> ribbons,
       Value<bool> isMegaEvolved,
+      Value<bool> hasGigantamax,
+      Value<bool> gigantamaxEnabled,
+      Value<bool> isAlpha,
       Value<int?> contestCool,
       Value<int?> contestBeautiful,
       Value<int?> contestCute,
@@ -5231,6 +5391,9 @@ typedef $$TeamSlotsTableUpdateCompanionBuilder =
       Value<int?> ivSpe,
       Value<String?> ribbons,
       Value<bool> isMegaEvolved,
+      Value<bool> hasGigantamax,
+      Value<bool> gigantamaxEnabled,
+      Value<bool> isAlpha,
       Value<int?> contestCool,
       Value<int?> contestBeautiful,
       Value<int?> contestCute,
@@ -5422,6 +5585,21 @@ class $$TeamSlotsTableFilterComposer
 
   ColumnFilters<bool> get isMegaEvolved => $composableBuilder(
     column: $table.isMegaEvolved,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hasGigantamax => $composableBuilder(
+    column: $table.hasGigantamax,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get gigantamaxEnabled => $composableBuilder(
+    column: $table.gigantamaxEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isAlpha => $composableBuilder(
+    column: $table.isAlpha,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5658,6 +5836,21 @@ class $$TeamSlotsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get hasGigantamax => $composableBuilder(
+    column: $table.hasGigantamax,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get gigantamaxEnabled => $composableBuilder(
+    column: $table.gigantamaxEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isAlpha => $composableBuilder(
+    column: $table.isAlpha,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get contestCool => $composableBuilder(
     column: $table.contestCool,
     builder: (column) => ColumnOrderings(column),
@@ -5841,6 +6034,19 @@ class $$TeamSlotsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get hasGigantamax => $composableBuilder(
+    column: $table.hasGigantamax,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get gigantamaxEnabled => $composableBuilder(
+    column: $table.gigantamaxEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isAlpha =>
+      $composableBuilder(column: $table.isAlpha, builder: (column) => column);
+
   GeneratedColumn<int> get contestCool => $composableBuilder(
     column: $table.contestCool,
     builder: (column) => column,
@@ -5968,6 +6174,9 @@ class $$TeamSlotsTableTableManager
                 Value<int?> ivSpe = const Value.absent(),
                 Value<String?> ribbons = const Value.absent(),
                 Value<bool> isMegaEvolved = const Value.absent(),
+                Value<bool> hasGigantamax = const Value.absent(),
+                Value<bool> gigantamaxEnabled = const Value.absent(),
+                Value<bool> isAlpha = const Value.absent(),
                 Value<int?> contestCool = const Value.absent(),
                 Value<int?> contestBeautiful = const Value.absent(),
                 Value<int?> contestCute = const Value.absent(),
@@ -6010,6 +6219,9 @@ class $$TeamSlotsTableTableManager
                 ivSpe: ivSpe,
                 ribbons: ribbons,
                 isMegaEvolved: isMegaEvolved,
+                hasGigantamax: hasGigantamax,
+                gigantamaxEnabled: gigantamaxEnabled,
+                isAlpha: isAlpha,
                 contestCool: contestCool,
                 contestBeautiful: contestBeautiful,
                 contestCute: contestCute,
@@ -6054,6 +6266,9 @@ class $$TeamSlotsTableTableManager
                 Value<int?> ivSpe = const Value.absent(),
                 Value<String?> ribbons = const Value.absent(),
                 Value<bool> isMegaEvolved = const Value.absent(),
+                Value<bool> hasGigantamax = const Value.absent(),
+                Value<bool> gigantamaxEnabled = const Value.absent(),
+                Value<bool> isAlpha = const Value.absent(),
                 Value<int?> contestCool = const Value.absent(),
                 Value<int?> contestBeautiful = const Value.absent(),
                 Value<int?> contestCute = const Value.absent(),
@@ -6096,6 +6311,9 @@ class $$TeamSlotsTableTableManager
                 ivSpe: ivSpe,
                 ribbons: ribbons,
                 isMegaEvolved: isMegaEvolved,
+                hasGigantamax: hasGigantamax,
+                gigantamaxEnabled: gigantamaxEnabled,
+                isAlpha: isAlpha,
                 contestCool: contestCool,
                 contestBeautiful: contestBeautiful,
                 contestCute: contestCute,

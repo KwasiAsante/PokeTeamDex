@@ -18,7 +18,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -83,6 +83,11 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 7) {
             await m.addColumn(teamSlots, teamSlots.isMegaEvolved);
+          }
+          if (from < 8) {
+            await m.addColumn(teamSlots, teamSlots.hasGigantamax);
+            await m.addColumn(teamSlots, teamSlots.gigantamaxEnabled);
+            await m.addColumn(teamSlots, teamSlots.isAlpha);
           }
         },
       );
