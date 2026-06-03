@@ -2341,7 +2341,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               ),
               const SizedBox(height: 20),
 
-              // ── Pick an existing slot ──
+              // ── Link to an already-filled slot ──
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const CircleAvatar(
@@ -2349,7 +2349,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 ),
                 title: const Text('Link to an existing slot'),
                 subtitle: const Text(
-                    'Pick a slot on another team to become the child.'),
+                    'Pick a filled slot on another team to become the child.'),
                 onTap: () {
                   Navigator.of(sheetCtx).pop();
                   showModalBottomSheet(
@@ -2370,24 +2370,95 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
               const Divider(),
 
-              // ── Create new team ──
+              // ── Copy to a team slot (new team OR empty slot in existing team) ──
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const CircleAvatar(
                   child: Icon(Icons.add_circle_outline_rounded, size: 18),
                 ),
-                title: const Text('Create a new team'),
-                subtitle: Text(
-                  'Creates "$speciesName — Journey" with this Pokémon in slot 1, linked as child.',
-                ),
+                title: const Text('Copy to a team slot'),
+                subtitle: const Text(
+                    'Create a new team or pick an empty slot in an existing team.'),
                 onTap: () {
                   Navigator.of(sheetCtx).pop();
-                  _onLinkAsOriginNewTeam(slot, speciesName);
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    builder: (_) => _TeamSlotDestinationSheet(
+                      speciesName: speciesName,
+                      onNewTeam: () {
+                        Navigator.of(context).pop();
+                        _onLinkAsOriginNewTeam(slot, speciesName);
+                      },
+                      onExistingSlot: (teamId, slotNum, teamName) {
+                        Navigator.of(context).pop();
+                        _onLinkAsOriginExistingSlot(
+                            slot, teamId, slotNum, teamName);
+                      },
+                    ),
+                  );
                 },
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Copies the current slot's Pokémon into an empty slot on an existing team,
+  /// then links: current slot = origin, target slot = child.
+  Future<void> _onLinkAsOriginExistingSlot(
+    TeamSlot currentSlot,
+    int targetTeamId,
+    int targetSlotNum,
+    String targetTeamName,
+  ) async {
+    final instanceRepo = ref.read(pokemonInstanceRepositoryProvider);
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+
+    // Ensure current slot has an origin instance.
+    int originInstanceId;
+    if (_instanceId != null) {
+      originInstanceId = _instanceId!;
+    } else {
+      originInstanceId = await instanceRepo.createOrigin(
+        pokemonId: currentSlot.pokemonId,
+        nickname: _nicknameCtrl.text.trim().isEmpty
+            ? null
+            : _nicknameCtrl.text.trim(),
+      );
+      setState(() => _instanceId = originInstanceId);
+    }
+
+    // Create child iteration.
+    final childInstanceId = await instanceRepo.createIteration(
+      pokemonId: currentSlot.pokemonId,
+      parentInstanceId: originInstanceId,
+    );
+
+    // Insert into the target slot.
+    await slotRepo.insert(
+      TeamSlotsCompanion(
+        teamId: Value(targetTeamId),
+        slot: Value(targetSlotNum),
+        pokemonId: Value(currentSlot.pokemonId),
+        gender: Value(currentSlot.gender),
+        isShiny: Value(currentSlot.isShiny),
+        instanceId: Value(childInstanceId),
+        syncStatus: const Value('pending'),
+        createdAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+            'Copied to "$targetTeamName" slot $targetSlotNum and linked.'),
       ),
     );
   }
@@ -3098,6 +3169,162 @@ class _ItemListTile extends ConsumerWidget {
               overflow: TextOverflow.ellipsis)
           : null,
       trailing: isSelected ? const Icon(Icons.check, size: 16) : null,
+    );
+  }
+}
+
+// ── Team-slot destination picker ──────────────────────────────────────────────
+//
+// Shows a "New team" tile at the top, followed by every existing team that has
+// at least one empty slot (1–6). Tapping an empty slot number calls back with
+// the team id, slot number, and team name.
+
+class _TeamSlotDestinationSheet extends ConsumerStatefulWidget {
+  final String speciesName;
+  final VoidCallback onNewTeam;
+  final void Function(int teamId, int slotNum, String teamName) onExistingSlot;
+
+  const _TeamSlotDestinationSheet({
+    required this.speciesName,
+    required this.onNewTeam,
+    required this.onExistingSlot,
+  });
+
+  @override
+  ConsumerState<_TeamSlotDestinationSheet> createState() =>
+      _TeamSlotDestinationSheetState();
+}
+
+class _TeamSlotDestinationSheetState
+    extends ConsumerState<_TeamSlotDestinationSheet> {
+  // teamId → set of occupied slot numbers
+  Map<int, Set<int>>? _occupiedSlots;
+  List<Team>? _teams;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final teamRepo = ref.read(teamRepositoryProvider);
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+
+    final teams = await teamRepo.getAll();
+    final occupied = <int, Set<int>>{};
+    for (final t in teams) {
+      final slots = await slotRepo.getByTeam(t.id);
+      occupied[t.id] = slots.map((s) => s.slot).toSet();
+    }
+    if (mounted) setState(() { _teams = teams; _occupiedSlots = occupied; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      builder: (ctx, scrollCtrl) => Column(
+        children: [
+          // Handle
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text(
+              'Copy to a team slot',
+              style: textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: _occupiedSlots == null
+                ? const Center(child: CircularProgressIndicator())
+                : ListView(
+                    controller: scrollCtrl,
+                    children: [
+                      // ── New team ──
+                      ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor:
+                              colorScheme.primaryContainer,
+                          child: Icon(Icons.add_rounded,
+                              color: colorScheme.onPrimaryContainer),
+                        ),
+                        title: Text(
+                          '${widget.speciesName} — Journey',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: const Text('Create new team'),
+                        onTap: widget.onNewTeam,
+                      ),
+                      const Divider(),
+                      // ── Existing teams with empty slots ──
+                      for (final team in _teams ?? <Team>[]) ...[
+                        _buildTeamSection(team, colorScheme, textTheme),
+                      ],
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTeamSection(
+      Team team, ColorScheme colorScheme, TextTheme textTheme) {
+    final occupied = _occupiedSlots![team.id] ?? <int>{};
+    final emptySlots =
+        List.generate(6, (i) => i + 1).where((n) => !occupied.contains(n)).toList();
+
+    if (emptySlots.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+          child: Text(
+            team.name,
+            style: textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: emptySlots.map((slotNum) {
+              return ActionChip(
+                label: Text('Slot $slotNum'),
+                avatar: const Icon(Icons.add_rounded, size: 16),
+                onPressed: () =>
+                    widget.onExistingSlot(team.id, slotNum, team.name),
+              );
+            }).toList(),
+          ),
+        ),
+        const Divider(height: 1),
+      ],
     );
   }
 }
