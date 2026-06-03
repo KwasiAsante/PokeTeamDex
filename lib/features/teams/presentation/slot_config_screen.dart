@@ -127,6 +127,14 @@ double _natureMod(String? natureName, String statKey) {
 final _itemListProvider = FutureProvider<List<String>>((ref) =>
     ref.read(pokeApiRepositoryProvider).fetchItemList());
 
+/// Set of species names (PokéAPI format) catchable in Legends: Arceus.
+/// Fetched once, cached in Hive by the repository layer.
+final _hisuiDexProvider = FutureProvider.autoDispose<Set<String>>((ref) async {
+  final dex =
+      await ref.read(pokeApiRepositoryProvider).fetchRegionalPokedex('hisui');
+  return dex.keys.toSet();
+});
+
 final _abilityDetailProvider =
     FutureProvider.autoDispose.family<AbilityEntry, String>((ref, name) =>
         ref.read(pokeApiRepositoryProvider).fetchAbility(name));
@@ -588,10 +596,16 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             : megaPokemon?.officialArtworkUrl;
 
         // ── Alpha Pokémon ───────────────────────────────────────────────────
-        // Available for PLA (origin), Gen 9 / SV (transfer target), or no format.
-        final canAlpha = mechanics == null ||
+        // Only show for formats where Alpha transfers make sense
+        // (PLA / Gen 9 / no format) AND only for species actually in PLA.
+        final alphaFormatOk = mechanics == null ||
             format?.id == 'pla' ||
             format?.gen == 9;
+        final hisuiDexAsync =
+            alphaFormatOk ? ref.watch(_hisuiDexProvider) : null;
+        final isInHisui =
+            hisuiDexAsync?.asData?.value.contains(pokemon.name) ?? false;
+        final canAlpha = alphaFormatOk && isInHisui;
 
         final scrollBody = SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
