@@ -255,9 +255,10 @@
 - [x] **Dynamax / Gigantamax** — all Pokémon: show type-appropriate Max Move next to each move; G-Max capable list + G-Max move per species from PS data; `has_gigantamax` + `gigantamax_enabled` booleans on `team_slots`; G-Max toggle swaps sprite to `-gmax` form; Alpha Pokémon flag (`is_alpha` bool) for Legends Arceus
 
 ### Pokémon Instances (continuity across teams)
-- [ ] **Data model** — `pokemon_instances` table (`id`, `origin_slot_id`, `parent_instance_id` nullable); slots optionally reference an instance; ribbons and nickname history attach to the instance
-- [ ] **Link UI** — "Link to another team's Pokémon" in slot config; instance chain view showing all appearances in sequence with origin label
-- [ ] **Ribbon inheritance** — ribbons carry forward from parent instance to child; "Previously known as" / Aliases label when nickname differs from parent
+- [x] **Data model** — `pokemon_instances` table (schema v9): `id`, `parent_instance_id` (nullable self-ref chain), `nickname_aliases` (JSON), `inherited_ribbons` (JSON); `team_slots.instance_id` nullable FK; `PokemonInstanceRepository` with full CRUD + `getChain` / `getDirectChildren`
+- [x] **Link UI** — "Pokémon Identity" section in slot config; link type chooser (child vs origin); instance picker sheet; chain view showing ancestors + current slot + direct children with origin/child badges; "Add child" button on linked state; copy-to-team-slot destination picker (new team or empty slot in existing team)
+- [ ] **Data inheritance** — ribbon merging from `inheritedRibbons`; "Previously known as" alias display when nickname differs from parent; propagate gender/isShiny when copying to child slot
+- [ ] **Navigation** — tapping a chain row navigates to that slot's config screen
 
 ---
 

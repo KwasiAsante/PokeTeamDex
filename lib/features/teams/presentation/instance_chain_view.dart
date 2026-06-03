@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
@@ -130,6 +132,23 @@ class _ChainListState extends ConsumerState<_ChainList> {
 
     final totalRows = widget.chain.length + _children.length;
 
+    // Accumulate aliases across the ancestor chain so each row shows the full
+    // nickname history up to that point (oldest first).
+    final accumulated = <String>[];
+    final accumulatedPerIndex = <int, List<String>>{};
+    for (int i = 0; i < widget.chain.length; i++) {
+      final raw = widget.chain[i].nicknameAliases;
+      if (raw != null && raw.isNotEmpty) {
+        try {
+          final parsed = (jsonDecode(raw) as List).cast<String>();
+          for (final a in parsed) {
+            if (!accumulated.contains(a)) accumulated.add(a);
+          }
+        } catch (_) {}
+      }
+      accumulatedPerIndex[i] = List.of(accumulated);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -144,6 +163,7 @@ class _ChainListState extends ConsumerState<_ChainList> {
                 .any((s) => s.id == widget.currentSlotId),
             isLast: i == totalRows - 1,
             isChild: false,
+            accumulatedAliases: accumulatedPerIndex[i] ?? [],
             colorScheme: colorScheme,
             textTheme: textTheme,
           ),
@@ -158,6 +178,7 @@ class _ChainListState extends ConsumerState<_ChainList> {
             isCurrent: false,
             isLast: i == _children.length - 1,
             isChild: true,
+            accumulatedAliases: const [],
             colorScheme: colorScheme,
             textTheme: textTheme,
           ),
@@ -176,6 +197,8 @@ class _ChainRow extends StatelessWidget {
   final bool isCurrent;
   final bool isChild;
   final bool isLast;
+  /// All nicknames accumulated from the chain up to and including this row.
+  final List<String> accumulatedAliases;
   final ColorScheme colorScheme;
   final TextTheme textTheme;
 
@@ -187,6 +210,7 @@ class _ChainRow extends StatelessWidget {
     required this.isCurrent,
     required this.isChild,
     required this.isLast,
+    required this.accumulatedAliases,
     required this.colorScheme,
     required this.textTheme,
   });
@@ -310,11 +334,10 @@ class _ChainRow extends StatelessWidget {
               fontStyle: FontStyle.italic,
             ),
           ),
-        if (instance.nicknameAliases != null &&
-            instance.nicknameAliases!.isNotEmpty) ...[
+        if (accumulatedAliases.isNotEmpty) ...[
           const SizedBox(height: 2),
           Text(
-            'Previously: ${instance.nicknameAliases}',
+            'Aliases: ${accumulatedAliases.join(', ')}',
             style: textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
               fontStyle: FontStyle.italic,

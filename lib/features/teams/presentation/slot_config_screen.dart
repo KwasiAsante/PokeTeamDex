@@ -197,6 +197,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   // Pokemon instance link
   int? _instanceId;
 
+  // Data inherited from the instance chain
+  Set<String> _inheritedRibbons = {};
+  List<String> _nicknameAliases = [];
+  // Nickname at load time — used to record an alias when it changes on save.
+  String _originalNickname = '';
+
   // Mega Evolution toggle
   bool _isMegaEvolved = false;
 
@@ -272,6 +278,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _ivCtrls[5].text = (slot.ivSpe ?? 31).toString();
     _formName = slot.formName;
     _instanceId = slot.instanceId;
+    _originalNickname = slot.nickname ?? '';
+    if (slot.instanceId != null) _loadInheritedData(slot.instanceId!);
     _isMegaEvolved = slot.isMegaEvolved;
     _hasGigantamax = slot.hasGigantamax;
     _gigantamaxEnabled = slot.gigantamaxEnabled;
@@ -293,6 +301,38 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _contestCtrls[3].text = (slot.contestClever     ?? 0).toString();
     _contestCtrls[4].text = (slot.contestTough      ?? 0).toString();
     _contestCtrls[5].text = (slot.contestSheen      ?? 0).toString();
+  }
+
+  /// Loads inherited ribbons and nickname aliases from the instance chain.
+  /// Fire-and-forget from [_initFromSlot] — updates state when ready.
+  Future<void> _loadInheritedData(int instanceId) async {
+    final repo = ref.read(pokemonInstanceRepositoryProvider);
+    // Walk the full ancestor chain to union all inheritedRibbons.
+    final chain = await repo.getChain(instanceId);
+    final ribbons = <String>{};
+    final aliases = <String>[];
+    for (final inst in chain) {
+      if (inst.inheritedRibbons != null && inst.inheritedRibbons!.isNotEmpty) {
+        try {
+          ribbons.addAll(
+              (jsonDecode(inst.inheritedRibbons!) as List).cast<String>());
+        } catch (_) {}
+      }
+      if (inst.nicknameAliases != null && inst.nicknameAliases!.isNotEmpty) {
+        try {
+          final a =
+              (jsonDecode(inst.nicknameAliases!) as List).cast<String>();
+          for (final alias in a) {
+            if (!aliases.contains(alias)) aliases.add(alias);
+          }
+        } catch (_) {}
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _inheritedRibbons = ribbons;
+      _nicknameAliases = aliases;
+    });
   }
 
   int get _evTotal =>
@@ -398,6 +438,26 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           createdAt: Value(DateTime.now()),
         ),
       );
+
+      // Propagate instance data when linked.
+      if (_instanceId != null) {
+        final instanceRepo = ref.read(pokemonInstanceRepositoryProvider);
+
+        // Record old nickname as an alias if it changed.
+        final newNickname = _nicknameCtrl.text.trim();
+        if (_originalNickname.isNotEmpty &&
+            _originalNickname != newNickname) {
+          await instanceRepo.addNicknameAlias(
+              _instanceId!, _originalNickname);
+        }
+        _originalNickname = newNickname;
+
+        // Merge this slot's ribbons into the instance's inheritedRibbons so
+        // child instances can pick them up.
+        if (_ribbons.isNotEmpty) {
+          await instanceRepo.mergeRibbons(_instanceId!, _ribbons.toList());
+        }
+      }
 
       // Best-effort PS export — runs after the DB write succeeds.
       await _maybePsExport(existing);
@@ -1009,6 +1069,18 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 textCapitalization: TextCapitalization.words,
                 onChanged: (_) => setState(() {}),
               ),
+              if (_nicknameAliases.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Previously known as: ${_nicknameAliases.join(', ')}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant,
+                        fontStyle: FontStyle.italic,
+                      ),
+                ),
+              ],
             ],
           ),
         ),
@@ -2551,9 +2623,71 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    // Ribbons that are inherited but not yet awarded on this slot.
+    final inheritedOnly =
+        _inheritedRibbons.difference(_ribbons).toList()..sort();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ── Inherited from chain ──────────────────────────────────────────
+        if (inheritedOnly.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                Icon(Icons.history_rounded,
+                    size: 14, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Text(
+                  'Inherited from previous appearances',
+                  style: textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: inheritedOnly.map((id) {
+              // Find ribbon metadata for display name / sprite.
+              final ribbon = kRibbonCatalog
+                  .expand((c) => c.ribbons)
+                  .where((r) => r.id == id)
+                  .firstOrNull;
+              return Chip(
+                avatar: ribbon?.spriteUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: ribbon!.spriteUrl!,
+                        width: 16,
+                        height: 16,
+                        fit: BoxFit.contain,
+                        errorWidget: (_, __, ___) => const Icon(
+                          Icons.workspace_premium_rounded,
+                          size: 14,
+                        ),
+                      )
+                    : const Icon(Icons.workspace_premium_rounded, size: 14),
+                label: Text(ribbon?.name ?? id),
+                visualDensity: VisualDensity.compact,
+                labelStyle: textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                side: BorderSide(
+                    color: colorScheme.outlineVariant, width: 1),
+                backgroundColor: colorScheme.surfaceContainerHighest,
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+        ],
+
+        // ── Awarded on this slot ──────────────────────────────────────────
         if (_ribbons.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
