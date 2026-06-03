@@ -84,6 +84,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 controller: _passwordController,
                 obscureText: true,
                 decoration: const InputDecoration(labelText: 'Password'),
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _loading ? null : _submit(),
                 validator: (v) =>
                     v != null && v.length >= 6 ? null : 'Min 6 characters',
               ),

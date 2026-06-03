@@ -1,6 +1,6 @@
 # PokeTeamDex — Progress Tracker
 
-> Updated 2026-05-30 after schema v3 + slot config merge (PR #30).
+> Updated 2026-06-03 after instance sync + full slot config sync (PR #82).
 
 ---
 
@@ -179,6 +179,13 @@
 - [x] **Empty-state illustrations** — replace generic icon + text with a more polished empty state (e.g. Poké Ball graphic for empty team list)
 - [x] **Folder drag-and-drop** — reorder folders with long-press drag
 
+### Bug Fixes & Polish Needed
+
+- [ ] **Unsaved changes guard** — when leaving slot config with unsaved changes, show a dialog offering "Discard" or "Save" before navigating away
+- [ ] **Sync failure feedback** — push failures are currently silent; show an error message/snackbar when push fails (pull-only success should not be reported as full sync success); sync is only successful when both push and pull complete without error
+- [ ] **Connectivity button → login shortcut** — when the user is not logged in, the wifi/connectivity icon in the AppBar should be tappable and navigate directly to the login screen
+- [ ] **Login screen keyboard submit** — pressing Enter/Return on the password field should trigger the login attempt (same as tapping the login button)
+
 ### Bug Fixes & Polish Applied
 
 - [x] Moves damage class filter no longer leaves blank gaps — `itemExtent` disabled when filter active
@@ -257,7 +264,7 @@
 ### Pokémon Instances (continuity across teams)
 - [x] **Data model** — `pokemon_instances` table (schema v9): `id`, `parent_instance_id` (nullable self-ref chain), `nickname_aliases` (JSON), `inherited_ribbons` (JSON); `team_slots.instance_id` nullable FK; `PokemonInstanceRepository` with full CRUD + `getChain` / `getDirectChildren`
 - [x] **Link UI** — "Pokémon Identity" section in slot config; link type chooser (child vs origin); instance picker sheet; chain view showing ancestors + current slot + direct children with origin/child badges; "Add child" button on linked state; copy-to-team-slot destination picker (new team or empty slot in existing team)
-- [ ] **Data inheritance** — ribbon merging from `inheritedRibbons`; "Previously known as" alias display when nickname differs from parent; propagate gender/isShiny when copying to child slot
+- [x] **Data inheritance** — ribbon merging from `inheritedRibbons`; "Previously known as" alias display when nickname differs from parent; gender/isShiny propagated when copying to child slot
 - [ ] **Navigation** — tapping a chain row navigates to that slot's config screen
 
 ---
