@@ -61,6 +61,10 @@ const Map<String, String> kGMaxMovesBySpecies = {
   'alcremie':   'g-max-finale',
   'copperajah': 'g-max-steelsurge',
   'duraludon':  'g-max-depletion',
+  // Isle of Armor DLC additions
+  'rillaboom':  'g-max-drum-solo',
+  'cinderace':  'g-max-fireball',
+  'inteleon':   'g-max-hydrosnipe',
   // Urshifu has two forms with different G-Max moves; handled in resolveGMaxMove.
   'urshifu-single-strike': 'g-max-one-blow',
   'urshifu-rapid-strike':  'g-max-rapid-flow',
