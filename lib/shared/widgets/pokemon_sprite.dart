@@ -71,3 +71,9 @@ String pokemonHomeUrl(int id) =>
 
 String pokemonHomeShinyUrl(int id) =>
     'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/$id.png';
+
+String pokemonHomeFemaleUrl(int id) =>
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/$id.png';
+
+String pokemonHomeShinyFemaleUrl(int id) =>
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/female/$id.png';

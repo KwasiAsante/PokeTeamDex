@@ -641,6 +641,19 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
         // Sprite priority: G-Max > Mega > Form change > default.
         final gmaxHomeUrl = gmaxPokemon != null ? pokemonHomeUrl(gmaxPokemon.id) : null;
+        // ── Gender-specific base sprite ─────────────────────────────────────
+        // Try female HOME url first for female slots; CachedNetworkImage falls
+        // back to the regular HOME url if no female sprite exists for this species.
+        final isFemale = _gender == 'female';
+        final genderBaseUrl = isFemale
+            ? (_isShiny
+                ? pokemonHomeShinyFemaleUrl(pokemon.id)
+                : pokemonHomeFemaleUrl(pokemon.id))
+            : null;
+        final genderBaseFallback = isFemale
+            ? (_isShiny ? pokemonHomeShinyUrl(pokemon.id) : pokemonHomeUrl(pokemon.id))
+            : null;
+
         final effectiveMegaArtworkUrl =
             gmaxHomeUrl ?? megaArtworkUrl ?? formHomeUrl;
         final effectiveMegaFallbackUrl = gmaxHomeUrl != null
@@ -668,7 +681,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             children: [
               _buildHeader(slot, spriteUrls, mechanics,
                   megaArtworkUrl: effectiveMegaArtworkUrl,
-                  megaFallbackUrl: effectiveMegaFallbackUrl),
+                  megaFallbackUrl: effectiveMegaFallbackUrl,
+                  genderBaseUrl: genderBaseUrl,
+                  genderBaseFallback: genderBaseFallback),
               // ── Form selector (when Pokémon has multiple forms) ──
               if (hasMultipleForms) ...[
                 const SizedBox(height: 16),
@@ -863,6 +878,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     GenerationMechanics? mechanics, {
     String? megaArtworkUrl,
     String? megaFallbackUrl,
+    // Gender-specific base sprite (female HOME url when slot is female).
+    String? genderBaseUrl,
+    String? genderBaseFallback,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -874,10 +892,21 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           alignment: Alignment.bottomRight,
           children: [
             PokemonSprite(
-              defaultUrl: megaArtworkUrl ?? spriteUrls.defaultUrl,
-              fallbackUrl: megaArtworkUrl != null ? megaFallbackUrl : null,
-              shinyUrl: megaArtworkUrl != null ? null : spriteUrls.shinyUrl,
-              shiny: megaArtworkUrl == null && _isShiny,
+              // Priority: form/mega/gmax override > female base > default sprite.
+              defaultUrl: megaArtworkUrl ??
+                  genderBaseUrl ??
+                  spriteUrls.defaultUrl,
+              fallbackUrl: megaArtworkUrl != null
+                  ? megaFallbackUrl
+                  : genderBaseUrl != null
+                      ? genderBaseFallback
+                      : null,
+              shinyUrl: (megaArtworkUrl == null && genderBaseUrl == null)
+                  ? spriteUrls.shinyUrl
+                  : null,
+              shiny: megaArtworkUrl == null &&
+                  genderBaseUrl == null &&
+                  _isShiny,
               size: 140,
             ),
             if (mechanics == null || mechanics.hasShiny)

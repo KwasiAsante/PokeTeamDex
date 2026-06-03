@@ -648,15 +648,36 @@ class _FilledSlotCard extends ConsumerWidget {
                         width: 100,
                         child: Column(
                           children: [
-                            PokemonSprite(
-                              defaultUrl: megaArtworkUrl ?? spriteUrls.defaultUrl,
-                              fallbackUrl: megaArtworkUrl != null
-                                  ? megaArtworkFallback
-                                  : null,
-                              shinyUrl: megaArtworkUrl != null ? null : spriteUrls.shinyUrl,
-                              shiny: megaArtworkUrl == null && slot.isShiny,
-                              size: 96,
-                            ),
+                            Builder(builder: (ctx) {
+                              final isFemale = slot.gender == 'female';
+                              final genderUrl = isFemale
+                                  ? (slot.isShiny
+                                      ? pokemonHomeShinyFemaleUrl(pokemon.id)
+                                      : pokemonHomeFemaleUrl(pokemon.id))
+                                  : null;
+                              final genderFallback = isFemale
+                                  ? (slot.isShiny
+                                      ? pokemonHomeShinyUrl(pokemon.id)
+                                      : pokemonHomeUrl(pokemon.id))
+                                  : null;
+                              return PokemonSprite(
+                                defaultUrl: megaArtworkUrl ??
+                                    genderUrl ??
+                                    spriteUrls.defaultUrl,
+                                fallbackUrl: megaArtworkUrl != null
+                                    ? megaArtworkFallback
+                                    : genderUrl != null
+                                        ? genderFallback
+                                        : null,
+                                shinyUrl: (megaArtworkUrl == null && genderUrl == null)
+                                    ? spriteUrls.shinyUrl
+                                    : null,
+                                shiny: megaArtworkUrl == null &&
+                                    genderUrl == null &&
+                                    slot.isShiny,
+                                size: 96,
+                              );
+                            }),
                             if (itemEntry?.spriteUrl != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
