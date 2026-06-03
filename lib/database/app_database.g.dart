@@ -1405,6 +1405,17 @@ class $TeamSlotsTable extends TeamSlots
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _instanceIdMeta = const VerificationMeta(
+    'instanceId',
+  );
+  @override
+  late final GeneratedColumn<int> instanceId = GeneratedColumn<int>(
+    'instance_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isMegaEvolvedMeta = const VerificationMeta(
     'isMegaEvolved',
   );
@@ -1614,6 +1625,7 @@ class $TeamSlotsTable extends TeamSlots
     ivSpd,
     ivSpe,
     ribbons,
+    instanceId,
     isMegaEvolved,
     hasGigantamax,
     gigantamaxEnabled,
@@ -1828,6 +1840,12 @@ class $TeamSlotsTable extends TeamSlots
       context.handle(
         _ribbonsMeta,
         ribbons.isAcceptableOrUnknown(data['ribbons']!, _ribbonsMeta),
+      );
+    }
+    if (data.containsKey('instance_id')) {
+      context.handle(
+        _instanceIdMeta,
+        instanceId.isAcceptableOrUnknown(data['instance_id']!, _instanceIdMeta),
       );
     }
     if (data.containsKey('is_mega_evolved')) {
@@ -2070,6 +2088,10 @@ class $TeamSlotsTable extends TeamSlots
         DriftSqlType.string,
         data['${effectivePrefix}ribbons'],
       ),
+      instanceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}instance_id'],
+      ),
       isMegaEvolved: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_mega_evolved'],
@@ -2166,6 +2188,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
   final int? ivSpd;
   final int? ivSpe;
   final String? ribbons;
+  final int? instanceId;
   final bool isMegaEvolved;
   final bool hasGigantamax;
   final bool gigantamaxEnabled;
@@ -2211,6 +2234,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     this.ivSpd,
     this.ivSpe,
     this.ribbons,
+    this.instanceId,
     required this.isMegaEvolved,
     required this.hasGigantamax,
     required this.gigantamaxEnabled,
@@ -2308,6 +2332,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     }
     if (!nullToAbsent || ribbons != null) {
       map['ribbons'] = Variable<String>(ribbons);
+    }
+    if (!nullToAbsent || instanceId != null) {
+      map['instance_id'] = Variable<int>(instanceId);
     }
     map['is_mega_evolved'] = Variable<bool>(isMegaEvolved);
     map['has_gigantamax'] = Variable<bool>(hasGigantamax);
@@ -2416,6 +2443,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       ribbons: ribbons == null && nullToAbsent
           ? const Value.absent()
           : Value(ribbons),
+      instanceId: instanceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(instanceId),
       isMegaEvolved: Value(isMegaEvolved),
       hasGigantamax: Value(hasGigantamax),
       gigantamaxEnabled: Value(gigantamaxEnabled),
@@ -2481,6 +2511,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       ivSpd: serializer.fromJson<int?>(json['ivSpd']),
       ivSpe: serializer.fromJson<int?>(json['ivSpe']),
       ribbons: serializer.fromJson<String?>(json['ribbons']),
+      instanceId: serializer.fromJson<int?>(json['instanceId']),
       isMegaEvolved: serializer.fromJson<bool>(json['isMegaEvolved']),
       hasGigantamax: serializer.fromJson<bool>(json['hasGigantamax']),
       gigantamaxEnabled: serializer.fromJson<bool>(json['gigantamaxEnabled']),
@@ -2531,6 +2562,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       'ivSpd': serializer.toJson<int?>(ivSpd),
       'ivSpe': serializer.toJson<int?>(ivSpe),
       'ribbons': serializer.toJson<String?>(ribbons),
+      'instanceId': serializer.toJson<int?>(instanceId),
       'isMegaEvolved': serializer.toJson<bool>(isMegaEvolved),
       'hasGigantamax': serializer.toJson<bool>(hasGigantamax),
       'gigantamaxEnabled': serializer.toJson<bool>(gigantamaxEnabled),
@@ -2579,6 +2611,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     Value<int?> ivSpd = const Value.absent(),
     Value<int?> ivSpe = const Value.absent(),
     Value<String?> ribbons = const Value.absent(),
+    Value<int?> instanceId = const Value.absent(),
     bool? isMegaEvolved,
     bool? hasGigantamax,
     bool? gigantamaxEnabled,
@@ -2624,6 +2657,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     ivSpd: ivSpd.present ? ivSpd.value : this.ivSpd,
     ivSpe: ivSpe.present ? ivSpe.value : this.ivSpe,
     ribbons: ribbons.present ? ribbons.value : this.ribbons,
+    instanceId: instanceId.present ? instanceId.value : this.instanceId,
     isMegaEvolved: isMegaEvolved ?? this.isMegaEvolved,
     hasGigantamax: hasGigantamax ?? this.hasGigantamax,
     gigantamaxEnabled: gigantamaxEnabled ?? this.gigantamaxEnabled,
@@ -2683,6 +2717,9 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
       ivSpd: data.ivSpd.present ? data.ivSpd.value : this.ivSpd,
       ivSpe: data.ivSpe.present ? data.ivSpe.value : this.ivSpe,
       ribbons: data.ribbons.present ? data.ribbons.value : this.ribbons,
+      instanceId: data.instanceId.present
+          ? data.instanceId.value
+          : this.instanceId,
       isMegaEvolved: data.isMegaEvolved.present
           ? data.isMegaEvolved.value
           : this.isMegaEvolved,
@@ -2753,6 +2790,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
           ..write('ivSpd: $ivSpd, ')
           ..write('ivSpe: $ivSpe, ')
           ..write('ribbons: $ribbons, ')
+          ..write('instanceId: $instanceId, ')
           ..write('isMegaEvolved: $isMegaEvolved, ')
           ..write('hasGigantamax: $hasGigantamax, ')
           ..write('gigantamaxEnabled: $gigantamaxEnabled, ')
@@ -2803,6 +2841,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
     ivSpd,
     ivSpe,
     ribbons,
+    instanceId,
     isMegaEvolved,
     hasGigantamax,
     gigantamaxEnabled,
@@ -2852,6 +2891,7 @@ class TeamSlot extends DataClass implements Insertable<TeamSlot> {
           other.ivSpd == this.ivSpd &&
           other.ivSpe == this.ivSpe &&
           other.ribbons == this.ribbons &&
+          other.instanceId == this.instanceId &&
           other.isMegaEvolved == this.isMegaEvolved &&
           other.hasGigantamax == this.hasGigantamax &&
           other.gigantamaxEnabled == this.gigantamaxEnabled &&
@@ -2899,6 +2939,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
   final Value<int?> ivSpd;
   final Value<int?> ivSpe;
   final Value<String?> ribbons;
+  final Value<int?> instanceId;
   final Value<bool> isMegaEvolved;
   final Value<bool> hasGigantamax;
   final Value<bool> gigantamaxEnabled;
@@ -2944,6 +2985,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     this.ivSpd = const Value.absent(),
     this.ivSpe = const Value.absent(),
     this.ribbons = const Value.absent(),
+    this.instanceId = const Value.absent(),
     this.isMegaEvolved = const Value.absent(),
     this.hasGigantamax = const Value.absent(),
     this.gigantamaxEnabled = const Value.absent(),
@@ -2990,6 +3032,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     this.ivSpd = const Value.absent(),
     this.ivSpe = const Value.absent(),
     this.ribbons = const Value.absent(),
+    this.instanceId = const Value.absent(),
     this.isMegaEvolved = const Value.absent(),
     this.hasGigantamax = const Value.absent(),
     this.gigantamaxEnabled = const Value.absent(),
@@ -3038,6 +3081,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     Expression<int>? ivSpd,
     Expression<int>? ivSpe,
     Expression<String>? ribbons,
+    Expression<int>? instanceId,
     Expression<bool>? isMegaEvolved,
     Expression<bool>? hasGigantamax,
     Expression<bool>? gigantamaxEnabled,
@@ -3084,6 +3128,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
       if (ivSpd != null) 'iv_spd': ivSpd,
       if (ivSpe != null) 'iv_spe': ivSpe,
       if (ribbons != null) 'ribbons': ribbons,
+      if (instanceId != null) 'instance_id': instanceId,
       if (isMegaEvolved != null) 'is_mega_evolved': isMegaEvolved,
       if (hasGigantamax != null) 'has_gigantamax': hasGigantamax,
       if (gigantamaxEnabled != null) 'gigantamax_enabled': gigantamaxEnabled,
@@ -3132,6 +3177,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     Value<int?>? ivSpd,
     Value<int?>? ivSpe,
     Value<String?>? ribbons,
+    Value<int?>? instanceId,
     Value<bool>? isMegaEvolved,
     Value<bool>? hasGigantamax,
     Value<bool>? gigantamaxEnabled,
@@ -3178,6 +3224,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
       ivSpd: ivSpd ?? this.ivSpd,
       ivSpe: ivSpe ?? this.ivSpe,
       ribbons: ribbons ?? this.ribbons,
+      instanceId: instanceId ?? this.instanceId,
       isMegaEvolved: isMegaEvolved ?? this.isMegaEvolved,
       hasGigantamax: hasGigantamax ?? this.hasGigantamax,
       gigantamaxEnabled: gigantamaxEnabled ?? this.gigantamaxEnabled,
@@ -3288,6 +3335,9 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
     if (ribbons.present) {
       map['ribbons'] = Variable<String>(ribbons.value);
     }
+    if (instanceId.present) {
+      map['instance_id'] = Variable<int>(instanceId.value);
+    }
     if (isMegaEvolved.present) {
       map['is_mega_evolved'] = Variable<bool>(isMegaEvolved.value);
     }
@@ -3366,6 +3416,7 @@ class TeamSlotsCompanion extends UpdateCompanion<TeamSlot> {
           ..write('ivSpd: $ivSpd, ')
           ..write('ivSpe: $ivSpe, ')
           ..write('ribbons: $ribbons, ')
+          ..write('instanceId: $instanceId, ')
           ..write('isMegaEvolved: $isMegaEvolved, ')
           ..write('hasGigantamax: $hasGigantamax, ')
           ..write('gigantamaxEnabled: $gigantamaxEnabled, ')
@@ -4448,6 +4499,492 @@ class FavoritesCompanion extends UpdateCompanion<Favorite> {
   }
 }
 
+class $PokemonInstancesTable extends PokemonInstances
+    with TableInfo<$PokemonInstancesTable, PokemonInstance> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PokemonInstancesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _pokemonIdMeta = const VerificationMeta(
+    'pokemonId',
+  );
+  @override
+  late final GeneratedColumn<int> pokemonId = GeneratedColumn<int>(
+    'pokemon_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _parentInstanceIdMeta = const VerificationMeta(
+    'parentInstanceId',
+  );
+  @override
+  late final GeneratedColumn<int> parentInstanceId = GeneratedColumn<int>(
+    'parent_instance_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _nicknameAliasesMeta = const VerificationMeta(
+    'nicknameAliases',
+  );
+  @override
+  late final GeneratedColumn<String> nicknameAliases = GeneratedColumn<String>(
+    'nickname_aliases',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _inheritedRibbonsMeta = const VerificationMeta(
+    'inheritedRibbons',
+  );
+  @override
+  late final GeneratedColumn<String> inheritedRibbons = GeneratedColumn<String>(
+    'inherited_ribbons',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    pokemonId,
+    parentInstanceId,
+    nicknameAliases,
+    inheritedRibbons,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pokemon_instances';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PokemonInstance> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('pokemon_id')) {
+      context.handle(
+        _pokemonIdMeta,
+        pokemonId.isAcceptableOrUnknown(data['pokemon_id']!, _pokemonIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pokemonIdMeta);
+    }
+    if (data.containsKey('parent_instance_id')) {
+      context.handle(
+        _parentInstanceIdMeta,
+        parentInstanceId.isAcceptableOrUnknown(
+          data['parent_instance_id']!,
+          _parentInstanceIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('nickname_aliases')) {
+      context.handle(
+        _nicknameAliasesMeta,
+        nicknameAliases.isAcceptableOrUnknown(
+          data['nickname_aliases']!,
+          _nicknameAliasesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('inherited_ribbons')) {
+      context.handle(
+        _inheritedRibbonsMeta,
+        inheritedRibbons.isAcceptableOrUnknown(
+          data['inherited_ribbons']!,
+          _inheritedRibbonsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PokemonInstance map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PokemonInstance(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      pokemonId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}pokemon_id'],
+      )!,
+      parentInstanceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}parent_instance_id'],
+      ),
+      nicknameAliases: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}nickname_aliases'],
+      ),
+      inheritedRibbons: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}inherited_ribbons'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PokemonInstancesTable createAlias(String alias) {
+    return $PokemonInstancesTable(attachedDatabase, alias);
+  }
+}
+
+class PokemonInstance extends DataClass implements Insertable<PokemonInstance> {
+  /// Auto-increment primary key.
+  final int id;
+
+  /// National Dex ID of the Pokémon species.
+  final int pokemonId;
+
+  /// Points to the previous iteration of this Pokémon (null = origin).
+  /// Self-referential — not enforced as a FK to avoid SQLite circular issues.
+  final int? parentInstanceId;
+
+  /// JSON array of past nicknames in chronological order.
+  /// e.g. '["Lancelot","Sir Lance"]' — used for the "previously known as" label.
+  final String? nicknameAliases;
+
+  /// Ribbons inherited from the parent chain, stored as a JSON array of ids.
+  /// Merged with the current slot's own ribbons for display.
+  final String? inheritedRibbons;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const PokemonInstance({
+    required this.id,
+    required this.pokemonId,
+    this.parentInstanceId,
+    this.nicknameAliases,
+    this.inheritedRibbons,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['pokemon_id'] = Variable<int>(pokemonId);
+    if (!nullToAbsent || parentInstanceId != null) {
+      map['parent_instance_id'] = Variable<int>(parentInstanceId);
+    }
+    if (!nullToAbsent || nicknameAliases != null) {
+      map['nickname_aliases'] = Variable<String>(nicknameAliases);
+    }
+    if (!nullToAbsent || inheritedRibbons != null) {
+      map['inherited_ribbons'] = Variable<String>(inheritedRibbons);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  PokemonInstancesCompanion toCompanion(bool nullToAbsent) {
+    return PokemonInstancesCompanion(
+      id: Value(id),
+      pokemonId: Value(pokemonId),
+      parentInstanceId: parentInstanceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentInstanceId),
+      nicknameAliases: nicknameAliases == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nicknameAliases),
+      inheritedRibbons: inheritedRibbons == null && nullToAbsent
+          ? const Value.absent()
+          : Value(inheritedRibbons),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory PokemonInstance.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PokemonInstance(
+      id: serializer.fromJson<int>(json['id']),
+      pokemonId: serializer.fromJson<int>(json['pokemonId']),
+      parentInstanceId: serializer.fromJson<int?>(json['parentInstanceId']),
+      nicknameAliases: serializer.fromJson<String?>(json['nicknameAliases']),
+      inheritedRibbons: serializer.fromJson<String?>(json['inheritedRibbons']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'pokemonId': serializer.toJson<int>(pokemonId),
+      'parentInstanceId': serializer.toJson<int?>(parentInstanceId),
+      'nicknameAliases': serializer.toJson<String?>(nicknameAliases),
+      'inheritedRibbons': serializer.toJson<String?>(inheritedRibbons),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  PokemonInstance copyWith({
+    int? id,
+    int? pokemonId,
+    Value<int?> parentInstanceId = const Value.absent(),
+    Value<String?> nicknameAliases = const Value.absent(),
+    Value<String?> inheritedRibbons = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => PokemonInstance(
+    id: id ?? this.id,
+    pokemonId: pokemonId ?? this.pokemonId,
+    parentInstanceId: parentInstanceId.present
+        ? parentInstanceId.value
+        : this.parentInstanceId,
+    nicknameAliases: nicknameAliases.present
+        ? nicknameAliases.value
+        : this.nicknameAliases,
+    inheritedRibbons: inheritedRibbons.present
+        ? inheritedRibbons.value
+        : this.inheritedRibbons,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  PokemonInstance copyWithCompanion(PokemonInstancesCompanion data) {
+    return PokemonInstance(
+      id: data.id.present ? data.id.value : this.id,
+      pokemonId: data.pokemonId.present ? data.pokemonId.value : this.pokemonId,
+      parentInstanceId: data.parentInstanceId.present
+          ? data.parentInstanceId.value
+          : this.parentInstanceId,
+      nicknameAliases: data.nicknameAliases.present
+          ? data.nicknameAliases.value
+          : this.nicknameAliases,
+      inheritedRibbons: data.inheritedRibbons.present
+          ? data.inheritedRibbons.value
+          : this.inheritedRibbons,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PokemonInstance(')
+          ..write('id: $id, ')
+          ..write('pokemonId: $pokemonId, ')
+          ..write('parentInstanceId: $parentInstanceId, ')
+          ..write('nicknameAliases: $nicknameAliases, ')
+          ..write('inheritedRibbons: $inheritedRibbons, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    pokemonId,
+    parentInstanceId,
+    nicknameAliases,
+    inheritedRibbons,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PokemonInstance &&
+          other.id == this.id &&
+          other.pokemonId == this.pokemonId &&
+          other.parentInstanceId == this.parentInstanceId &&
+          other.nicknameAliases == this.nicknameAliases &&
+          other.inheritedRibbons == this.inheritedRibbons &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class PokemonInstancesCompanion extends UpdateCompanion<PokemonInstance> {
+  final Value<int> id;
+  final Value<int> pokemonId;
+  final Value<int?> parentInstanceId;
+  final Value<String?> nicknameAliases;
+  final Value<String?> inheritedRibbons;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  const PokemonInstancesCompanion({
+    this.id = const Value.absent(),
+    this.pokemonId = const Value.absent(),
+    this.parentInstanceId = const Value.absent(),
+    this.nicknameAliases = const Value.absent(),
+    this.inheritedRibbons = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  PokemonInstancesCompanion.insert({
+    this.id = const Value.absent(),
+    required int pokemonId,
+    this.parentInstanceId = const Value.absent(),
+    this.nicknameAliases = const Value.absent(),
+    this.inheritedRibbons = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  }) : pokemonId = Value(pokemonId);
+  static Insertable<PokemonInstance> custom({
+    Expression<int>? id,
+    Expression<int>? pokemonId,
+    Expression<int>? parentInstanceId,
+    Expression<String>? nicknameAliases,
+    Expression<String>? inheritedRibbons,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (pokemonId != null) 'pokemon_id': pokemonId,
+      if (parentInstanceId != null) 'parent_instance_id': parentInstanceId,
+      if (nicknameAliases != null) 'nickname_aliases': nicknameAliases,
+      if (inheritedRibbons != null) 'inherited_ribbons': inheritedRibbons,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  PokemonInstancesCompanion copyWith({
+    Value<int>? id,
+    Value<int>? pokemonId,
+    Value<int?>? parentInstanceId,
+    Value<String?>? nicknameAliases,
+    Value<String?>? inheritedRibbons,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+  }) {
+    return PokemonInstancesCompanion(
+      id: id ?? this.id,
+      pokemonId: pokemonId ?? this.pokemonId,
+      parentInstanceId: parentInstanceId ?? this.parentInstanceId,
+      nicknameAliases: nicknameAliases ?? this.nicknameAliases,
+      inheritedRibbons: inheritedRibbons ?? this.inheritedRibbons,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (pokemonId.present) {
+      map['pokemon_id'] = Variable<int>(pokemonId.value);
+    }
+    if (parentInstanceId.present) {
+      map['parent_instance_id'] = Variable<int>(parentInstanceId.value);
+    }
+    if (nicknameAliases.present) {
+      map['nickname_aliases'] = Variable<String>(nicknameAliases.value);
+    }
+    if (inheritedRibbons.present) {
+      map['inherited_ribbons'] = Variable<String>(inheritedRibbons.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PokemonInstancesCompanion(')
+          ..write('id: $id, ')
+          ..write('pokemonId: $pokemonId, ')
+          ..write('parentInstanceId: $parentInstanceId, ')
+          ..write('nicknameAliases: $nicknameAliases, ')
+          ..write('inheritedRibbons: $inheritedRibbons, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4458,6 +4995,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $MetaTable meta = $MetaTable(this);
   late final $AppConfigsTable appConfigs = $AppConfigsTable(this);
   late final $FavoritesTable favorites = $FavoritesTable(this);
+  late final $PokemonInstancesTable pokemonInstances = $PokemonInstancesTable(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4470,6 +5010,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     meta,
     appConfigs,
     favorites,
+    pokemonInstances,
   ];
 }
 
@@ -5343,6 +5884,7 @@ typedef $$TeamSlotsTableCreateCompanionBuilder =
       Value<int?> ivSpd,
       Value<int?> ivSpe,
       Value<String?> ribbons,
+      Value<int?> instanceId,
       Value<bool> isMegaEvolved,
       Value<bool> hasGigantamax,
       Value<bool> gigantamaxEnabled,
@@ -5390,6 +5932,7 @@ typedef $$TeamSlotsTableUpdateCompanionBuilder =
       Value<int?> ivSpd,
       Value<int?> ivSpe,
       Value<String?> ribbons,
+      Value<int?> instanceId,
       Value<bool> isMegaEvolved,
       Value<bool> hasGigantamax,
       Value<bool> gigantamaxEnabled,
@@ -5580,6 +6123,11 @@ class $$TeamSlotsTableFilterComposer
 
   ColumnFilters<String> get ribbons => $composableBuilder(
     column: $table.ribbons,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get instanceId => $composableBuilder(
+    column: $table.instanceId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5831,6 +6379,11 @@ class $$TeamSlotsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get instanceId => $composableBuilder(
+    column: $table.instanceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isMegaEvolved => $composableBuilder(
     column: $table.isMegaEvolved,
     builder: (column) => ColumnOrderings(column),
@@ -6029,6 +6582,11 @@ class $$TeamSlotsTableAnnotationComposer
   GeneratedColumn<String> get ribbons =>
       $composableBuilder(column: $table.ribbons, builder: (column) => column);
 
+  GeneratedColumn<int> get instanceId => $composableBuilder(
+    column: $table.instanceId,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<bool> get isMegaEvolved => $composableBuilder(
     column: $table.isMegaEvolved,
     builder: (column) => column,
@@ -6173,6 +6731,7 @@ class $$TeamSlotsTableTableManager
                 Value<int?> ivSpd = const Value.absent(),
                 Value<int?> ivSpe = const Value.absent(),
                 Value<String?> ribbons = const Value.absent(),
+                Value<int?> instanceId = const Value.absent(),
                 Value<bool> isMegaEvolved = const Value.absent(),
                 Value<bool> hasGigantamax = const Value.absent(),
                 Value<bool> gigantamaxEnabled = const Value.absent(),
@@ -6218,6 +6777,7 @@ class $$TeamSlotsTableTableManager
                 ivSpd: ivSpd,
                 ivSpe: ivSpe,
                 ribbons: ribbons,
+                instanceId: instanceId,
                 isMegaEvolved: isMegaEvolved,
                 hasGigantamax: hasGigantamax,
                 gigantamaxEnabled: gigantamaxEnabled,
@@ -6265,6 +6825,7 @@ class $$TeamSlotsTableTableManager
                 Value<int?> ivSpd = const Value.absent(),
                 Value<int?> ivSpe = const Value.absent(),
                 Value<String?> ribbons = const Value.absent(),
+                Value<int?> instanceId = const Value.absent(),
                 Value<bool> isMegaEvolved = const Value.absent(),
                 Value<bool> hasGigantamax = const Value.absent(),
                 Value<bool> gigantamaxEnabled = const Value.absent(),
@@ -6310,6 +6871,7 @@ class $$TeamSlotsTableTableManager
                 ivSpd: ivSpd,
                 ivSpe: ivSpe,
                 ribbons: ribbons,
+                instanceId: instanceId,
                 isMegaEvolved: isMegaEvolved,
                 hasGigantamax: hasGigantamax,
                 gigantamaxEnabled: gigantamaxEnabled,
@@ -7016,6 +7578,250 @@ typedef $$FavoritesTableProcessedTableManager =
       Favorite,
       PrefetchHooks Function()
     >;
+typedef $$PokemonInstancesTableCreateCompanionBuilder =
+    PokemonInstancesCompanion Function({
+      Value<int> id,
+      required int pokemonId,
+      Value<int?> parentInstanceId,
+      Value<String?> nicknameAliases,
+      Value<String?> inheritedRibbons,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+typedef $$PokemonInstancesTableUpdateCompanionBuilder =
+    PokemonInstancesCompanion Function({
+      Value<int> id,
+      Value<int> pokemonId,
+      Value<int?> parentInstanceId,
+      Value<String?> nicknameAliases,
+      Value<String?> inheritedRibbons,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+
+class $$PokemonInstancesTableFilterComposer
+    extends Composer<_$AppDatabase, $PokemonInstancesTable> {
+  $$PokemonInstancesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pokemonId => $composableBuilder(
+    column: $table.pokemonId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get parentInstanceId => $composableBuilder(
+    column: $table.parentInstanceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nicknameAliases => $composableBuilder(
+    column: $table.nicknameAliases,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get inheritedRibbons => $composableBuilder(
+    column: $table.inheritedRibbons,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PokemonInstancesTableOrderingComposer
+    extends Composer<_$AppDatabase, $PokemonInstancesTable> {
+  $$PokemonInstancesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get pokemonId => $composableBuilder(
+    column: $table.pokemonId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get parentInstanceId => $composableBuilder(
+    column: $table.parentInstanceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nicknameAliases => $composableBuilder(
+    column: $table.nicknameAliases,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get inheritedRibbons => $composableBuilder(
+    column: $table.inheritedRibbons,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PokemonInstancesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PokemonInstancesTable> {
+  $$PokemonInstancesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get pokemonId =>
+      $composableBuilder(column: $table.pokemonId, builder: (column) => column);
+
+  GeneratedColumn<int> get parentInstanceId => $composableBuilder(
+    column: $table.parentInstanceId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get nicknameAliases => $composableBuilder(
+    column: $table.nicknameAliases,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get inheritedRibbons => $composableBuilder(
+    column: $table.inheritedRibbons,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$PokemonInstancesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PokemonInstancesTable,
+          PokemonInstance,
+          $$PokemonInstancesTableFilterComposer,
+          $$PokemonInstancesTableOrderingComposer,
+          $$PokemonInstancesTableAnnotationComposer,
+          $$PokemonInstancesTableCreateCompanionBuilder,
+          $$PokemonInstancesTableUpdateCompanionBuilder,
+          (
+            PokemonInstance,
+            BaseReferences<
+              _$AppDatabase,
+              $PokemonInstancesTable,
+              PokemonInstance
+            >,
+          ),
+          PokemonInstance,
+          PrefetchHooks Function()
+        > {
+  $$PokemonInstancesTableTableManager(
+    _$AppDatabase db,
+    $PokemonInstancesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PokemonInstancesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PokemonInstancesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PokemonInstancesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> pokemonId = const Value.absent(),
+                Value<int?> parentInstanceId = const Value.absent(),
+                Value<String?> nicknameAliases = const Value.absent(),
+                Value<String?> inheritedRibbons = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => PokemonInstancesCompanion(
+                id: id,
+                pokemonId: pokemonId,
+                parentInstanceId: parentInstanceId,
+                nicknameAliases: nicknameAliases,
+                inheritedRibbons: inheritedRibbons,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int pokemonId,
+                Value<int?> parentInstanceId = const Value.absent(),
+                Value<String?> nicknameAliases = const Value.absent(),
+                Value<String?> inheritedRibbons = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => PokemonInstancesCompanion.insert(
+                id: id,
+                pokemonId: pokemonId,
+                parentInstanceId: parentInstanceId,
+                nicknameAliases: nicknameAliases,
+                inheritedRibbons: inheritedRibbons,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PokemonInstancesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PokemonInstancesTable,
+      PokemonInstance,
+      $$PokemonInstancesTableFilterComposer,
+      $$PokemonInstancesTableOrderingComposer,
+      $$PokemonInstancesTableAnnotationComposer,
+      $$PokemonInstancesTableCreateCompanionBuilder,
+      $$PokemonInstancesTableUpdateCompanionBuilder,
+      (
+        PokemonInstance,
+        BaseReferences<_$AppDatabase, $PokemonInstancesTable, PokemonInstance>,
+      ),
+      PokemonInstance,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7033,4 +7839,6 @@ class $AppDatabaseManager {
       $$AppConfigsTableTableManager(_db, _db.appConfigs);
   $$FavoritesTableTableManager get favorites =>
       $$FavoritesTableTableManager(_db, _db.favorites);
+  $$PokemonInstancesTableTableManager get pokemonInstances =>
+      $$PokemonInstancesTableTableManager(_db, _db.pokemonInstances);
 }
