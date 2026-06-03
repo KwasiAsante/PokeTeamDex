@@ -98,6 +98,42 @@ def transform_learnsets(raw: dict) -> dict:
     return result
 
 
+def extract_g6_learnsets(raw: dict) -> dict[str, set[str]]:
+    """
+    Extract Gen-6 moves from the learnsets-g6.js supplement.
+    Returns { "charizard": {"dragondance", "heatwave", ...}, ... }
+
+    learnsets-g6.js contains historical Gen 6 entries that the main
+    learnsets.json omits (e.g. Dragon Dance on Charizard was a Gen 6 ORAS
+    move tutor, but the modern PS data only lists the Gen 8 TM entry).
+    """
+    result: dict[str, set[str]] = {}
+    for pokemon, data in raw.items():
+        learnset = data.get("learnset") or {}
+        moves: set[str] = set()
+        for move, sources in learnset.items():
+            # Include the move if it has any Gen 6 source OR if this file
+            # only contains Gen 6 data (all sources start with "6").
+            for src in sources:
+                if src and src[0] == "6":
+                    moves.add(move)
+                    break
+        if moves:
+            result[pokemon.lower()] = moves
+    return result
+
+
+def merge_g6_into_learnsets(learnsets: dict, g6: dict[str, set[str]]) -> dict:
+    """Supplement learnsets with Gen 6 moves from learnsets-g6.js."""
+    for pokemon, g6_moves in g6.items():
+        if pokemon not in learnsets:
+            learnsets[pokemon] = {}
+        existing = set(learnsets[pokemon].get("6", []))
+        merged = sorted(existing | g6_moves)
+        learnsets[pokemon]["6"] = merged
+    return learnsets
+
+
 def transform_moves(raw: dict) -> dict:
     """Keep only the fields needed for gen-filtering and slot-config display."""
     result: dict[str, dict] = {}
@@ -177,6 +213,16 @@ def main() -> None:
 
     print("Learnsets (JSON endpoint)…")
     learnsets = transform_learnsets(fetch_json_endpoint("learnsets.json"))
+
+    print("Learnsets-G6 supplement (JS endpoint)…")
+    try:
+        g6_raw = fetch_js_endpoint("learnsets-g6.js")
+        g6_data = extract_g6_learnsets(g6_raw)
+        learnsets = merge_g6_into_learnsets(learnsets, g6_data)
+        print(f"  Merged Gen 6 data for {len(g6_data)} Pokémon")
+    except Exception as e:
+        print(f"  WARNING: Could not fetch learnsets-g6.js: {e}")
+
     ls_sha = write_json("learnsets.json", learnsets)
 
     print("\nMoves (JSON endpoint)…")

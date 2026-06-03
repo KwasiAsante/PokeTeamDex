@@ -67,22 +67,28 @@ Future<SlotValidation> validateSlot(
   }
 
   // ── Moves — per-game or per-gen learnset (PS-supplemented) ──────────────
-  final learnset = buildLearnsetForFormat(
-    pokemonMoves, format,
-    pokemonName: pokemonName,
-    formatService: service,
-  );
-  final moveSlots = {
-    'move1': slot.move1,
-    'move2': slot.move2,
-    'move3': slot.move3,
-    'move4': slot.move4,
-  };
-  for (final entry in moveSlots.entries) {
-    final moveName = entry.value;
-    if (moveName != null && !learnset.contains(moveName)) {
-      violations[entry.key] =
-          '${_display(moveName)} not learnable in ${_formatLabel(format)}';
+  // Move-gen validation is skipped for Gen ≤ 6 because both PokéAPI and PS
+  // have known gaps in historical tutor/event data for older gens (e.g. ORAS
+  // move tutors are frequently missing from modern data sources).
+  // Gen 7+ data is substantially more complete and reliable.
+  if (format.gen >= 7) {
+    final learnset = buildLearnsetForFormat(
+      pokemonMoves, format,
+      pokemonName: pokemonName,
+      formatService: service,
+    );
+    final moveSlots = {
+      'move1': slot.move1,
+      'move2': slot.move2,
+      'move3': slot.move3,
+      'move4': slot.move4,
+    };
+    for (final entry in moveSlots.entries) {
+      final moveName = entry.value;
+      if (moveName != null && !learnset.contains(moveName)) {
+        violations[entry.key] =
+            '${_display(moveName)} not learnable in ${_formatLabel(format)}';
+      }
     }
   }
 
@@ -120,16 +126,18 @@ SlotValidation validateSlotSync(
     }
   }
 
-  final learnset = buildLearnsetForFormat(
-    pokemonMoves, format,
-    pokemonName: pokemonName,
-    formatService: service,
-  );
-  for (int i = 0; i < moves.length; i++) {
-    final moveName = moves[i];
-    if (moveName != null && !learnset.contains(moveName)) {
-      violations['move${i + 1}'] =
-          '${_display(moveName)} not learnable in ${_formatLabel(format)}';
+  if (format.gen >= 7) {
+    final learnset = buildLearnsetForFormat(
+      pokemonMoves, format,
+      pokemonName: pokemonName,
+      formatService: service,
+    );
+    for (int i = 0; i < moves.length; i++) {
+      final moveName = moves[i];
+      if (moveName != null && !learnset.contains(moveName)) {
+        violations['move${i + 1}'] =
+            '${_display(moveName)} not learnable in ${_formatLabel(format)}';
+      }
     }
   }
 
