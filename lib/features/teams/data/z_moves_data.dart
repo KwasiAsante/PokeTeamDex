@@ -145,9 +145,10 @@ const Map<String, ExclusiveZData> kExclusiveZCrystals = {
 
 /// Strips the `-held` or `-bag` suffix that PokéAPI/PS attaches to the
 /// held-form of Z-crystals (e.g. `incinium-z-held` → `incinium-z`).
-/// Both the bag and held forms are the same crystal for Z-move purposes.
-String _normalizeZCrystalId(String itemId) =>
-    itemId.replaceAll(RegExp(r'-(held|bag)$'), '');
+/// Also strips any trailing hyphens left over after the removal.
+String _normalizeZCrystalId(String itemId) => itemId
+    .replaceAll(RegExp(r'-(held|bag)$'), '')
+    .replaceAll(RegExp(r'-+$'), '');
 
 /// Returns the Z-move name for [moveId] (PokéAPI name) given the current
 /// Z-crystal [itemId] and [pokemonName].

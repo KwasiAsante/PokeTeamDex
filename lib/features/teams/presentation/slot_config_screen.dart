@@ -1054,7 +1054,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    _heldItemName?.replaceAll(RegExp(r'-held$'), '').toCapitalCase() ?? '— None —',
+                    _heldItemName
+                            ?.replaceAll(RegExp(r'-(held|bag)$'), '')
+                            .replaceAll(RegExp(r'-+$'), '')
+                            .toCapitalCase() ??
+                        '— None —',
                     style: textTheme.bodyMedium,
                   ),
                 ),
@@ -1463,9 +1467,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       isScrollControlled: true,
       builder: (_) => _ItemPickerSheet(items: items, current: _heldItemName),
     );
-    // Normalise stored value: strip -held so "incinium-z-held" → "incinium-z".
+    // Normalise stored value: strip -held/-bag and any trailing hyphen.
+    // e.g. "incinium-z-held" → strips "-held" → "incinium-z"
+    //      "incinium-z-"    → strips trailing "-" → "incinium-z"
     if (result != null) {
-      setState(() => _heldItemName = result.replaceAll(RegExp(r'-held$'), ''));
+      setState(() => _heldItemName = result
+          .replaceAll(RegExp(r'-(held|bag)$'), '')
+          .replaceAll(RegExp(r'-+$'), ''));
     }
   }
 
@@ -2208,8 +2216,11 @@ class _ItemListTile extends ConsumerWidget {
                 color: Colors.transparent),
       ),
       title: Text(
-          // Strip '-held' suffix so "incinium-z-held" displays as "Incinium Z"
-          itemName.replaceAll(RegExp(r'-held$'), '').toCapitalCase(),
+          // Strip -held/-bag and trailing hyphens so "incinium-z-held" → "Incinium Z"
+          itemName
+              .replaceAll(RegExp(r'-(held|bag)$'), '')
+              .replaceAll(RegExp(r'-+$'), '')
+              .toCapitalCase(),
           style: textTheme.bodyMedium
               ?.copyWith(fontWeight: isSelected ? FontWeight.bold : null)),
       subtitle: description != null
