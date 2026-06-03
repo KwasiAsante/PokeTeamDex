@@ -596,11 +596,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           abilityName: _abilityName,
         );
         final hasMultipleForms = availableForms.isNotEmpty;
-        final activeFallbackFormName = _formName;
-        final formPokemonAsync = (hasMultipleForms &&
-                activeFallbackFormName != null &&
-                activeFallbackFormName != availableForms.first)
-            ? ref.watch(pokemonByNameProvider(activeFallbackFormName))
+        // Fetch form data whenever a non-default form is selected (_formName != null).
+        final formPokemonAsync = _formName != null
+            ? ref.watch(pokemonByNameProvider(_formName!))
             : null;
         final formPokemon = formPokemonAsync?.asData?.value;
 
