@@ -252,7 +252,7 @@
 ### Generation Gimmicks (format-engine/gimmicks epic)
 - [x] **Mega Evolution** — mega stone → mega form mapping JSON; in slot config when held item is a Mega Stone and Pokémon has a mega form: sprite/image swaps to mega form, base stats recalculate, toggle to switch between base and mega; `is_mega_evolved` bool column on `team_slots`
 - [x] **Z-Moves** — Z-crystal → Z-move lookup JSON (18 type crystals + ~20 exclusive crystals with required base moves); in slot config when Z-crystal is held show corresponding Z-move next to each of the 4 moves; exclusive Z-move shown if base move present
-- [ ] **Dynamax / Gigantamax** — all Pokémon: show type-appropriate Max Move next to each move; G-Max capable list + G-Max move per species from PS data; `has_gigantamax` + `gigantamax_enabled` booleans on `team_slots`; G-Max toggle swaps sprite to `-gmax` form; Alpha Pokémon flag (`is_alpha` bool) for Legends Arceus
+- [x] **Dynamax / Gigantamax** — all Pokémon: show type-appropriate Max Move next to each move; G-Max capable list + G-Max move per species from PS data; `has_gigantamax` + `gigantamax_enabled` booleans on `team_slots`; G-Max toggle swaps sprite to `-gmax` form; Alpha Pokémon flag (`is_alpha` bool) for Legends Arceus
 
 ### Pokémon Instances (continuity across teams)
 - [ ] **Data model** — `pokemon_instances` table (`id`, `origin_slot_id`, `parent_instance_id` nullable); slots optionally reference an instance; ribbons and nickname history attach to the instance
