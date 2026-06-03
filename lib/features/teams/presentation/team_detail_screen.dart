@@ -92,74 +92,75 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
       });
     }
 
-    return teamAsync.when(
-      loading: () => Scaffold(appBar: AppBar(), body: const LoadingState()),
-      error: (e, _) => Scaffold(appBar: AppBar(), body: ErrorState(error: e)),
-      data: (team) {
-        if (team == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.canPop()) context.pop();
-          });
-          return const Scaffold(body: LoadingState());
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final canClose = _canCloseNotifier.value;
+        if (canClose == null) {
+          // No embedded slot config open — allow back normally.
+          if (mounted) context.pop();
+          return;
         }
-
-        final slots = slotsAsync.asData?.value ?? [];
-
-        return ListenableBuilder(
-          listenable: _canCloseNotifier,
-          builder: (context, child) => PopScope(
-          canPop: _canCloseNotifier.value == null,
-          onPopInvokedWithResult: (didPop, _) async {
-            if (didPop) return;
-            final canClose = _canCloseNotifier.value;
-            final ok = canClose != null ? await canClose() : true;
-            if (ok && mounted) context.pop();
-          },
-          child: child!,
-          ),
-          child: Scaffold(
-          appBar: AppBar(
-            title: _TeamAppBarTitle(team: team),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.edit_outlined),
-                tooltip: 'Rename',
-                onPressed: () => _renameTeam(context, team),
-              ),
-              IconButton(
-                icon: const Icon(Icons.tune_outlined),
-                tooltip: 'Change format',
-                onPressed: () => _editFormat(context, team),
-              ),
-              if (slots.isNotEmpty)
-                IconButton(
-                  icon: const Icon(Icons.upload_outlined),
-                  tooltip: 'Export to Showdown',
-                  onPressed: () => _exportShowdown(context, slots, team),
-                ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
-                tooltip: 'Delete team',
-                onPressed: () => _deleteTeam(context, team),
-              ),
-              const ConnectivityStatusButton(),
-              const SettingsButton(),
-            ],
-          ),
-          body: slotsAsync.when(
-            loading: () => const LoadingState(),
-            error: (e, _) => ErrorState(error: e),
-            data: (slots) => isWide
-                ? _buildWideLayout(slots, team)
-                : _SlotList(
-                    teamId: widget.teamId,
-                    slots: slots,
-                    formatId: team.formatLabel,
-                  ),
-          ),
-          ),
-        );
+        final ok = await canClose();
+        if (ok && mounted) context.pop();
       },
+      child: teamAsync.when(
+        loading: () => Scaffold(appBar: AppBar(), body: const LoadingState()),
+        error: (e, _) => Scaffold(appBar: AppBar(), body: ErrorState(error: e)),
+        data: (team) {
+          if (team == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.canPop()) context.pop();
+            });
+            return const Scaffold(body: LoadingState());
+          }
+
+          final slots = slotsAsync.asData?.value ?? [];
+
+          return Scaffold(
+            appBar: AppBar(
+              title: _TeamAppBarTitle(team: team),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: 'Rename',
+                  onPressed: () => _renameTeam(context, team),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.tune_outlined),
+                  tooltip: 'Change format',
+                  onPressed: () => _editFormat(context, team),
+                ),
+                if (slots.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.upload_outlined),
+                    tooltip: 'Export to Showdown',
+                    onPressed: () => _exportShowdown(context, slots, team),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: 'Delete team',
+                  onPressed: () => _deleteTeam(context, team),
+                ),
+                const ConnectivityStatusButton(),
+                const SettingsButton(),
+              ],
+            ),
+            body: slotsAsync.when(
+              loading: () => const LoadingState(),
+              error: (e, _) => ErrorState(error: e),
+              data: (slots) => isWide
+                  ? _buildWideLayout(slots, team)
+                  : _SlotList(
+                      teamId: widget.teamId,
+                      slots: slots,
+                      formatId: team.formatLabel,
+                    ),
+            ),
+          );
+        },
+      ),
     );
   }
 
