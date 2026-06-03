@@ -25,6 +25,7 @@ import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:poke_team_dex/features/teams/data/dynamax_data.dart';
+import 'package:poke_team_dex/features/teams/data/form_filter.dart';
 import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
 import 'package:poke_team_dex/features/teams/data/z_moves_data.dart';
 import 'package:poke_team_dex/features/teams/data/ribbon_catalog.dart';
@@ -593,11 +594,18 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         // pokemon.formNames only lists the current form. Use the species
         // endpoint (varieties) to get ALL forms for this species.
         final speciesAsync = ref.watch(pokemonSpeciesProvider(slot.pokemonId));
-        final availableForms = speciesAsync.asData?.value.varieties
+        final allVarieties = speciesAsync.asData?.value.varieties
                 .map((v) => v.name)
                 .toList() ??
             <String>[];
-        final hasMultipleForms = availableForms.length > 1;
+        // Filter: exclude mega/primal/gmax/gender; gate ability/item forms
+        // on their prerequisite being selected.
+        final availableForms = filterFormChips(
+          varieties: allVarieties,
+          heldItem: _heldItemName,
+          abilityName: _abilityName,
+        );
+        final hasMultipleForms = availableForms.isNotEmpty;
         final activeFallbackFormName = _formName;
         final formPokemonAsync = (hasMultipleForms &&
                 activeFallbackFormName != null &&
@@ -1723,7 +1731,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
         .join(' ');
 
-    final current = _formName ?? forms.first;
+    final isDefault = _formName == null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1733,20 +1741,31 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         Wrap(
           spacing: 8,
           runSpacing: 6,
-          children: forms.map((form) {
-            final selected = form == current;
-            return ChoiceChip(
-              label: Text(fmtForm(form)),
-              selected: selected,
-              onSelected: (_) => setState(() {
-                _formName = form == forms.first ? null : form;
-              }),
+          children: [
+            // Default form chip
+            ChoiceChip(
+              label: const Text('Default'),
+              selected: isDefault,
+              onSelected: (_) => setState(() => _formName = null),
               selectedColor: colorScheme.primaryContainer,
               labelStyle: textTheme.labelSmall?.copyWith(
-                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isDefault ? FontWeight.bold : FontWeight.normal,
               ),
-            );
-          }).toList(),
+            ),
+            // Non-default form chips (already filtered)
+            ...forms.map((form) {
+              final selected = _formName == form;
+              return ChoiceChip(
+                label: Text(fmtForm(form)),
+                selected: selected,
+                onSelected: (_) => setState(() => _formName = form),
+                selectedColor: colorScheme.primaryContainer,
+                labelStyle: textTheme.labelSmall?.copyWith(
+                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                ),
+              );
+            }),
+          ],
         ),
       ],
     );
