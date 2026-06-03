@@ -1695,7 +1695,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               selected: selected,
               onSelected: (_) => setState(() {
                 _formName = form == forms.first ? null : form;
-                _initialized = false; // allow re-init if form changes abilities
               }),
               selectedColor: colorScheme.primaryContainer,
               labelStyle: textTheme.labelSmall?.copyWith(
