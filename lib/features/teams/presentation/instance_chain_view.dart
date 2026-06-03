@@ -137,7 +137,21 @@ class _ChainListState extends ConsumerState<_ChainList> {
     final accumulated = <String>[];
     final accumulatedPerIndex = <int, List<String>>{};
     for (int i = 0; i < widget.chain.length; i++) {
-      final raw = widget.chain[i].nicknameAliases;
+      final inst = widget.chain[i];
+
+      // Include current active nicknames from all slots referencing this instance
+      // (skip the slot currently being configured — its name is shown elsewhere).
+      for (final slot in (_slotCache[inst.id] ?? [])) {
+        if (slot.id != widget.currentSlotId) {
+          final nick = slot.nickname;
+          if (nick != null && nick.isNotEmpty && !accumulated.contains(nick)) {
+            accumulated.add(nick);
+          }
+        }
+      }
+
+      // Include superseded nicknames stored in the instance's alias history.
+      final raw = inst.nicknameAliases;
       if (raw != null && raw.isNotEmpty) {
         try {
           final parsed = (jsonDecode(raw) as List).cast<String>();
@@ -146,6 +160,7 @@ class _ChainListState extends ConsumerState<_ChainList> {
           }
         } catch (_) {}
       }
+
       accumulatedPerIndex[i] = List.of(accumulated);
     }
 

@@ -13,6 +13,7 @@ import 'package:poke_team_dex/database/repositories/meta_repository.dart';
 import 'package:poke_team_dex/database/repositories/sync_queue_repository.dart';
 import 'package:poke_team_dex/database/repositories/team_folder_repository.dart';
 import 'package:poke_team_dex/database/repositories/team_repository.dart';
+import 'package:poke_team_dex/database/repositories/pokemon_instance_repository.dart';
 import 'package:poke_team_dex/database/repositories/team_slot_repository.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
@@ -41,7 +42,8 @@ void _workmanagerCallback() {
       final syncQueue   = SyncQueueRepository(db);
       final folderRepo  = TeamFolderRepository(db);
       final teamRepo    = TeamRepository(db);
-      final slotRepo    = TeamSlotRepository(db);
+      final slotRepo        = TeamSlotRepository(db, syncQueue);
+      final instanceRepo    = PokemonInstanceRepository(db, syncQueue);
 
       final apiBaseUrl = await configRepo.getApiBaseUrl();
       final prefs      = await SharedPreferences.getInstance();
@@ -69,14 +71,15 @@ void _workmanagerCallback() {
       final notifier = SyncStateNotifier();
 
       await SyncService(
-        syncQueue:  syncQueue,
-        folderRepo: folderRepo,
-        teamRepo:   teamRepo,
-        slotRepo:   slotRepo,
-        metaRepo:   metaRepo,
-        api:        api,
-        db:         db,
-        notifier:   notifier,
+        syncQueue:    syncQueue,
+        folderRepo:   folderRepo,
+        teamRepo:     teamRepo,
+        slotRepo:     slotRepo,
+        instanceRepo: instanceRepo,
+        metaRepo:     metaRepo,
+        api:          api,
+        db:           db,
+        notifier:     notifier,
       ).run();
 
       await db.close();

@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/repositories/meta_repository.dart';
+import 'package:poke_team_dex/database/repositories/pokemon_instance_repository.dart';
 import 'package:poke_team_dex/database/repositories/sync_queue_repository.dart';
 import 'package:poke_team_dex/database/repositories/team_folder_repository.dart';
 import 'package:poke_team_dex/database/repositories/team_repository.dart';
@@ -20,6 +21,7 @@ class SyncService {
     required this.folderRepo,
     required this.teamRepo,
     required this.slotRepo,
+    required this.instanceRepo,
     required this.metaRepo,
     required this.api,
     required this.db,
@@ -30,6 +32,7 @@ class SyncService {
   final TeamFolderRepository folderRepo;
   final TeamRepository teamRepo;
   final TeamSlotRepository slotRepo;
+  final PokemonInstanceRepository instanceRepo;
   final MetaRepository metaRepo;
   final TeamSyncApi api;
   final AppDatabase db;
@@ -42,8 +45,6 @@ class SyncService {
   /// No-ops silently when no auth token is present.
   Future<void> run({String? token}) async {
     if (_running) return;
-    // Require a non-empty token — avoids 403 floods when syncs fire before
-    // the user has logged in (e.g. immediately after a backend restart).
     if (token == null || token.isEmpty) return;
     _running = true;
     notifier.setSyncing();
@@ -64,17 +65,12 @@ class SyncService {
     final ops = await syncQueue.getPending();
     if (ops.isEmpty) return;
 
-    // Prune ops that have exhausted all retries — they will never succeed and
-    // should not accumulate in the queue indefinitely.
     for (final op in ops) {
       if (op.attempts >= _maxAttempts) await syncQueue.delete(op.id);
     }
     final activeOps = ops.where((o) => o.attempts < _maxAttempts).toList();
     if (activeOps.isEmpty) return;
 
-    // Identify entity local IDs being created in this batch so cross-references
-    // (e.g. a team whose folder is also being created here) can be resolved by
-    // the server using the within-batch map rather than requiring a prior sync.
     final creatingFolderIds = <int>{
       for (final op in activeOps)
         if (op.entityType == 'team_folder' && op.operation == 'create')
@@ -84,18 +80,24 @@ class SyncService {
       for (final op in activeOps)
         if (op.entityType == 'team' && op.operation == 'create') op.entityId,
     };
+    final creatingInstanceIds = <int>{
+      for (final op in activeOps)
+        if (op.entityType == 'pokemon_instance' && op.operation == 'create')
+          op.entityId,
+    };
 
-    // Re-enqueue CREATE ops for entities that have UPDATE ops but no remoteId
-    // and no CREATE in the queue — happens when a CREATE op was auto-pruned
-    // after repeated failures (e.g. a 403 flood).  The new CREATE op will be
-    // picked up on the next drain cycle.
     await _healOrphanedOps(activeOps);
 
     final batchOps = <Map<String, dynamic>>[];
     final includedOps = <PendingSyncOp>[];
 
     for (final op in activeOps) {
-      final entry = await _buildOp(op, creatingFolderIds, creatingTeamIds);
+      final entry = await _buildOp(
+        op,
+        creatingFolderIds,
+        creatingTeamIds,
+        creatingInstanceIds,
+      );
       if (entry != null) {
         batchOps.add(entry);
         includedOps.add(op);
@@ -107,7 +109,6 @@ class SyncService {
     try {
       final result = await api.pushBatch(batchOps);
 
-      // Write back server-assigned IDs for any entities created in this batch.
       for (final c in (result['created'] as List).cast<Map<String, dynamic>>()) {
         final localId = c['client_local_id'] as int;
         final remoteId = (c['remote_id'] as int).toString();
@@ -119,6 +120,10 @@ class SyncService {
           case 'team':
             await (db.update(db.teams)..where((t) => t.id.equals(localId)))
                 .write(TeamsCompanion(remoteId: Value(remoteId)));
+          case 'instance':
+            await (db.update(db.pokemonInstances)
+                  ..where((i) => i.id.equals(localId)))
+                .write(PokemonInstancesCompanion(remoteId: Value(remoteId)));
         }
       }
 
@@ -130,15 +135,12 @@ class SyncService {
         await syncQueue.markAttempted(op.id, op.attempts);
       }
     } on StateError {
-      // Stale queue entries — drop them so they don't block future syncs.
       for (final op in includedOps) {
         await syncQueue.delete(op.id);
       }
     }
   }
 
-  /// Detects UPDATE ops whose entity has no remoteId and no CREATE in the queue
-  /// and re-enqueues a fresh CREATE so the entity can be created on the server.
   Future<void> _healOrphanedOps(List<PendingSyncOp> ops) async {
     final foldersWithCreate = {
       for (final op in ops)
@@ -188,12 +190,11 @@ class SyncService {
     }
   }
 
-  /// Converts a single queue entry into a batch-op map, resolving cross-entity
-  /// references. Returns null if the op should be skipped this cycle.
   Future<Map<String, dynamic>?> _buildOp(
     PendingSyncOp op,
     Set<int> creatingFolderIds,
     Set<int> creatingTeamIds,
+    Set<int> creatingInstanceIds,
   ) async {
     final payload = jsonDecode(op.payload) as Map<String, dynamic>;
 
@@ -230,7 +231,6 @@ class SyncService {
         final folderLocalId = payload['folder_local_id'] as int?;
         if (folderLocalId != null) {
           if (creatingFolderIds.contains(folderLocalId)) {
-            // Folder also being created in this batch — server resolves it.
             entry['folder_client_local_id'] = folderLocalId;
           } else {
             final folder = await folderRepo.getByIdOrNull(folderLocalId);
@@ -246,15 +246,13 @@ class SyncService {
         final entry = <String, dynamic>{
           'type': 'team_update',
           'remote_id': int.parse(team!.remoteId!),
-          // payload['name'] may be absent when only folder changed.
           'name': payload['name'] as String? ?? team.name,
         };
-        // Include folder change only when the payload explicitly carries the key.
         if (payload.containsKey('folder_local_id')) {
           entry['update_folder'] = true;
           final folderLocalId = payload['folder_local_id'] as int?;
           if (folderLocalId == null) {
-            entry['folder_remote_id'] = null; // move to ungrouped
+            entry['folder_remote_id'] = null;
           } else if (creatingFolderIds.contains(folderLocalId)) {
             entry['folder_client_local_id'] = folderLocalId;
           } else {
@@ -269,6 +267,42 @@ class SyncService {
         final remoteId = payload['remote_id'] as String?;
         if (remoteId == null) return null;
         return {'type': 'team_delete', 'remote_id': int.parse(remoteId)};
+
+      // ── Instances ─────────────────────────────────────────────────────────
+      case 'pokemon_instance:create':
+        final entry = <String, dynamic>{
+          'type': 'instance_create',
+          'client_local_id': op.entityId,
+          'pokemon_id': payload['pokemon_id'] as int,
+          if (payload['nickname_aliases'] != null)
+            'nickname_aliases': payload['nickname_aliases'],
+          if (payload['inherited_ribbons'] != null)
+            'inherited_ribbons': payload['inherited_ribbons'],
+        };
+        final parentLocalId = payload['parent_instance_client_local_id'] as int?;
+        if (parentLocalId != null) {
+          if (creatingInstanceIds.contains(parentLocalId)) {
+            // Parent also being created in this batch — server resolves it.
+            entry['parent_instance_client_local_id'] = parentLocalId;
+          } else {
+            final parent = await instanceRepo.getById(parentLocalId);
+            if (parent?.remoteId == null) return null; // parent not yet synced
+            entry['parent_instance_remote_id'] = int.parse(parent!.remoteId!);
+          }
+        }
+        return entry;
+
+      case 'pokemon_instance:update':
+        final inst = await instanceRepo.getById(op.entityId);
+        if (inst?.remoteId == null) return null; // not yet created on server
+        return {
+          'type': 'instance_update',
+          'remote_id': int.parse(inst!.remoteId!),
+          if (payload['nickname_aliases'] != null)
+            'nickname_aliases': payload['nickname_aliases'],
+          if (payload['inherited_ribbons'] != null)
+            'inherited_ribbons': payload['inherited_ribbons'],
+        };
 
       // ── Slots ─────────────────────────────────────────────────────────────
       case 'team_slot:upsert':
@@ -285,6 +319,22 @@ class SyncService {
           final team = await teamRepo.getByIdOrNull(teamLocalId);
           if (team?.remoteId == null) return null;
           entry['team_remote_id'] = int.parse(team!.remoteId!);
+        }
+        // Resolve instance reference if present.
+        final instLocalId = payload['instance_client_local_id'] as int?;
+        if (instLocalId != null) {
+          if (creatingInstanceIds.contains(instLocalId)) {
+            entry['instance_client_local_id'] = instLocalId;
+          } else {
+            final inst = await instanceRepo.getById(instLocalId);
+            if (inst?.remoteId != null) {
+              entry['instance_remote_id'] = int.parse(inst!.remoteId!);
+            } else {
+              // Instance not yet on server — still send upsert without it;
+              // the link will be pushed again when the instance create succeeds.
+              entry['instance_client_local_id'] = instLocalId;
+            }
+          }
         }
         return entry;
 
@@ -314,13 +364,12 @@ class SyncService {
     final sinceStr = await metaRepo.get(_metaKeyLastPullAt);
     final since = sinceStr != null ? DateTime.parse(sinceStr) : null;
 
-    // Record start time before the request so we don't miss changes that
-    // arrive concurrently during the pull.
     final pullStart = DateTime.now().toUtc();
     final data = await api.pullSince(since);
 
     await _mergeFolders(data['folders'] as List);
     await _mergeTeams(data['teams'] as List);
+    await _mergeInstances(data['instances'] as List? ?? []);
     await _mergeSlots(data['slots'] as List);
 
     await metaRepo.set(_metaKeyLastPullAt, pullStart.toIso8601String());
@@ -336,9 +385,7 @@ class SyncService {
       final existing = await folderRepo.getByRemoteId(remoteId);
 
       if (remoteDeleted) {
-        // Soft-deleted on server — hard-delete locally if present.
         if (existing != null) {
-          // Move orphaned teams to ungrouped before deleting the folder.
           await (db.update(db.teams)
                 ..where((t) => t.folderId.equals(existing.id)))
               .write(const TeamsCompanion(folderId: Value(null)));
@@ -375,7 +422,6 @@ class SyncService {
       final existing = await teamRepo.getByRemoteId(remoteId);
 
       if (remoteDeleted) {
-        // Soft-deleted on server — hard-delete locally including all slots.
         if (existing != null) {
           await slotRepo.deleteAllForTeam(existing.id);
           await teamRepo.delete(existing.id);
@@ -386,7 +432,6 @@ class SyncService {
       final remoteName = rt['name'] as String;
       final remoteFolderId = rt['folder_id'];
 
-      // Resolve remote folder_id → local folder
       int? localFolderId;
       if (remoteFolderId != null) {
         final localFolder =
@@ -412,6 +457,56 @@ class SyncService {
     }
   }
 
+  Future<void> _mergeInstances(List remote) async {
+    for (final ri in remote.cast<Map<String, dynamic>>()) {
+      final remoteId = ri['id'].toString();
+      final remoteDeleted = ri['is_deleted'] as bool? ?? false;
+      final remoteUpdatedAt =
+          DateTime.parse(ri['updated_at'] as String).toUtc();
+
+      final existing = await instanceRepo.getByRemoteId(remoteId);
+
+      if (remoteDeleted) {
+        if (existing != null) await instanceRepo.delete(existing.id);
+        continue;
+      }
+
+      final pokemonId = ri['pokemon_id'] as int;
+      final nicknameAliases = ri['nickname_aliases'] as String?;
+      final inheritedRibbons = ri['inherited_ribbons'] as String?;
+
+      // Resolve remote parent id → local instance id.
+      int? localParentId;
+      final remoteParentId = ri['parent_instance_id'];
+      if (remoteParentId != null) {
+        final parent =
+            await instanceRepo.getByRemoteId(remoteParentId.toString());
+        localParentId = parent?.id;
+      }
+
+      if (existing == null) {
+        await db.into(db.pokemonInstances).insert(
+              PokemonInstancesCompanion.insert(
+                pokemonId: pokemonId,
+                parentInstanceId: Value(localParentId),
+                nicknameAliases: Value(nicknameAliases),
+                inheritedRibbons: Value(inheritedRibbons),
+                remoteId: Value(remoteId),
+                updatedAt: Value(remoteUpdatedAt),
+              ),
+            );
+      } else if (remoteUpdatedAt.isAfter(existing.updatedAt)) {
+        await (db.update(db.pokemonInstances)
+              ..where((i) => i.id.equals(existing.id)))
+            .write(PokemonInstancesCompanion(
+          nicknameAliases: Value(nicknameAliases),
+          inheritedRibbons: Value(inheritedRibbons),
+          updatedAt: Value(remoteUpdatedAt),
+        ));
+      }
+    }
+  }
+
   Future<void> _mergeSlots(List remote) async {
     for (final rs in remote.cast<Map<String, dynamic>>()) {
       final remoteTeamId = rs['team_id'].toString();
@@ -421,13 +516,12 @@ class SyncService {
           DateTime.parse(rs['updated_at'] as String).toUtc();
 
       final localTeam = await teamRepo.getByRemoteId(remoteTeamId);
-      if (localTeam == null) continue; // team not yet pulled — skip
+      if (localTeam == null) continue;
 
       final existing =
           await slotRepo.getByTeamAndSlot(localTeam.id, slotNumber);
 
       if (remoteDeleted) {
-        // Soft-deleted on server — hard-delete locally if present.
         if (existing != null) {
           await slotRepo.deleteSlot(localTeam.id, slotNumber);
         }
@@ -437,12 +531,22 @@ class SyncService {
       final pokemonId = rs['pokemon_id'] as int;
       final nickname = rs['nickname'] as String?;
 
+      // Resolve the instance reference from the server.
+      int? localInstanceId;
+      final remoteInstanceId = rs['instance_id'];
+      if (remoteInstanceId != null) {
+        final inst =
+            await instanceRepo.getByRemoteId(remoteInstanceId.toString());
+        localInstanceId = inst?.id;
+      }
+
       if (existing == null) {
         await slotRepo.insert(TeamSlotsCompanion(
           teamId: Value(localTeam.id),
           slot: Value(slotNumber),
           pokemonId: Value(pokemonId),
           nickname: Value(nickname),
+          instanceId: Value(localInstanceId),
           updatedAt: Value(remoteUpdatedAt),
         ));
       } else if (remoteUpdatedAt.isAfter(existing.updatedAt)) {
@@ -451,6 +555,7 @@ class SyncService {
             .write(TeamSlotsCompanion(
           pokemonId: Value(pokemonId),
           nickname: Value(nickname),
+          instanceId: Value(localInstanceId),
           updatedAt: Value(remoteUpdatedAt),
         ));
       }

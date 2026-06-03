@@ -279,7 +279,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _formName = slot.formName;
     _instanceId = slot.instanceId;
     _originalNickname = slot.nickname ?? '';
-    if (slot.instanceId != null) _loadInheritedData(slot.instanceId!);
+    if (slot.instanceId != null) _loadInheritedData(slot.instanceId!, currentSlotId: slot.id);
     _isMegaEvolved = slot.isMegaEvolved;
     _hasGigantamax = slot.hasGigantamax;
     _gigantamaxEnabled = slot.gigantamaxEnabled;
@@ -305,26 +305,46 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   /// Loads inherited ribbons and nickname aliases from the instance chain.
   /// Fire-and-forget from [_initFromSlot] — updates state when ready.
-  Future<void> _loadInheritedData(int instanceId) async {
+  Future<void> _loadInheritedData(int instanceId, {required int currentSlotId}) async {
     final repo = ref.read(pokemonInstanceRepositoryProvider);
     // Walk the full ancestor chain to union all inheritedRibbons.
     final chain = await repo.getChain(instanceId);
     final ribbons = <String>{};
     final aliases = <String>[];
+
+    void _addAlias(String? a) {
+      if (a != null && a.isNotEmpty && !aliases.contains(a)) aliases.add(a);
+    }
+
     for (final inst in chain) {
+      // Aliases are collected from ancestors only — the current instance is the
+      // "now", so its own names are not "previous".
+      final isCurrentInstance = inst.id == instanceId;
+
+      if (!isCurrentInstance) {
+        // Include active slot nicknames for ancestor instances.
+        // Skip the current slot so its own nickname doesn't appear.
+        final slots = await repo.getSlotsForInstance(inst.id);
+        for (final slot in slots) {
+          if (slot.id != currentSlotId) _addAlias(slot.nickname);
+        }
+
+        // Include superseded names stored in the ancestor's alias history.
+        if (inst.nicknameAliases != null && inst.nicknameAliases!.isNotEmpty) {
+          try {
+            final a =
+                (jsonDecode(inst.nicknameAliases!) as List).cast<String>();
+            for (final alias in a) {
+              _addAlias(alias);
+            }
+          } catch (_) {}
+        }
+      }
+
       if (inst.inheritedRibbons != null && inst.inheritedRibbons!.isNotEmpty) {
         try {
           ribbons.addAll(
               (jsonDecode(inst.inheritedRibbons!) as List).cast<String>());
-        } catch (_) {}
-      }
-      if (inst.nicknameAliases != null && inst.nicknameAliases!.isNotEmpty) {
-        try {
-          final a =
-              (jsonDecode(inst.nicknameAliases!) as List).cast<String>();
-          for (final alias in a) {
-            if (!aliases.contains(alias)) aliases.add(alias);
-          }
         } catch (_) {}
       }
     }
@@ -434,6 +454,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             'team_local_id': existing.teamId,
             'slot':          existing.slot,
             'pokemon_id':    existing.pokemonId,
+            if (_instanceId != null) 'instance_client_local_id': _instanceId,
           })),
           createdAt: Value(DateTime.now()),
         ),

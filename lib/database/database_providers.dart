@@ -25,7 +25,10 @@ final teamRepositoryProvider = Provider<TeamRepository>((ref) {
 });
 
 final teamSlotRepositoryProvider = Provider<TeamSlotRepository>((ref) {
-  return TeamSlotRepository(ref.read(appDatabaseProvider));
+  return TeamSlotRepository(
+    ref.read(appDatabaseProvider),
+    ref.read(syncQueueRepositoryProvider),
+  );
 });
 
 final syncQueueRepositoryProvider = Provider<SyncQueueRepository>((ref) {
@@ -46,7 +49,10 @@ final favoritesRepositoryProvider = Provider<FavoritesRepository>((ref) {
 
 final pokemonInstanceRepositoryProvider =
     Provider<PokemonInstanceRepository>((ref) {
-  return PokemonInstanceRepository(ref.read(appDatabaseProvider));
+  return PokemonInstanceRepository(
+    ref.read(appDatabaseProvider),
+    ref.read(syncQueueRepositoryProvider),
+  );
 });
 
 final apiBaseUrlProvider = StreamProvider<String>((ref) {

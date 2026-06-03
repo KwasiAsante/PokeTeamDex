@@ -33,6 +33,7 @@ class TeamsScreen extends ConsumerWidget {
     final pendingCount = ref.watch(pendingSyncCountProvider);
     final pending = pendingCount.when(data: (v) => v, loading: () => 0, error: (_, __) => 0);
     final isSyncing = syncState.status == SyncStatus.syncing;
+    final authToken = ref.watch(authTokenProvider);
     final isOnline = ref.watch(isOnlineProvider).when(
       data: (v) => v,
       loading: () => true,
@@ -89,7 +90,7 @@ class TeamsScreen extends ConsumerWidget {
                           );
                           return;
                         }
-                        ref.read(syncServiceProvider).run();
+                        ref.read(syncServiceProvider).run(token: token);
                       },
               ),
               if (pending > 0 && !isSyncing)
@@ -216,6 +217,7 @@ class _TeamsList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final allTeamsAsync = ref.watch(allTeamsProvider);
+    final authToken = ref.watch(authTokenProvider);
 
     return allTeamsAsync.when(
       loading: () => const LoadingState(),
@@ -233,7 +235,7 @@ class _TeamsList extends ConsumerWidget {
         }
 
         return RefreshIndicator(
-          onRefresh: () => ref.read(syncServiceProvider).run(),
+          onRefresh: () => ref.read(syncServiceProvider).run(token: authToken),
           child: CustomScrollView(
           // AlwaysScrollableScrollPhysics lets RefreshIndicator trigger
           // even when the content is short; on desktop (no touch) the sync
@@ -244,7 +246,7 @@ class _TeamsList extends ConsumerWidget {
             if (!_isTouchPlatform())
               SliverToBoxAdapter(
                 child: _DesktopRefreshBar(
-                  onRefresh: () => ref.read(syncServiceProvider).run(),
+                  onRefresh: () => ref.read(syncServiceProvider).run(token: authToken),
                 ),
               ),
             // Reorderable folder list
