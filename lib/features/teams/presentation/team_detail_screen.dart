@@ -471,6 +471,19 @@ class _FilledSlotCard extends ConsumerWidget {
             : null;
         final megaOfficialUrl = megaPokemon?.officialArtworkUrl;
 
+        // ── Form change sprite ──────────────────────────────────────────────
+        final isFormActive = slot.formName != null &&
+            slot.formName!.isNotEmpty;
+        final formChangePokemon = isFormActive
+            ? ref
+                .watch(pokemonByNameProvider(slot.formName!))
+                .asData
+                ?.value
+            : null;
+        final formHomeUrl =
+            formChangePokemon != null ? pokemonHomeUrl(formChangePokemon.id) : null;
+        final formOfficialUrl = formChangePokemon?.officialArtworkUrl;
+
         // ── Gigantamax sprite ───────────────────────────────────────────────
         final isGMaxActive = slot.hasGigantamax && slot.gigantamaxEnabled &&
             gmaxMoveForSpecies(pokemon.name) != null;
@@ -483,11 +496,13 @@ class _FilledSlotCard extends ConsumerWidget {
         final gmaxHomeUrl =
             gmaxPokemon != null ? pokemonHomeUrl(gmaxPokemon.id) : null;
 
-        // G-Max takes priority over Mega for artwork.
-        final megaArtworkUrl = gmaxHomeUrl ?? megaHomeUrl;
+        // Sprite priority: G-Max > Mega > Form change > default.
+        final megaArtworkUrl = gmaxHomeUrl ?? megaHomeUrl ?? formHomeUrl;
         final megaArtworkFallback = gmaxHomeUrl != null
             ? gmaxPokemon?.officialArtworkUrl
-            : megaOfficialUrl;
+            : megaHomeUrl != null
+                ? megaOfficialUrl
+                : formOfficialUrl;
 
         // Calculate final stats (uses mega base stats when applicable)
         final level = slot.level ?? 50;

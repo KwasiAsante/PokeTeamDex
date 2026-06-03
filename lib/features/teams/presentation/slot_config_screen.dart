@@ -626,12 +626,20 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             : null;
         final gmaxPokemon = gmaxPokemonAsync?.asData?.value;
 
-        // G-Max overrides mega if both somehow active (shouldn't normally happen).
+        // Form artwork (non-default form is active).
+        final formHomeUrl =
+            formPokemon != null ? pokemonHomeUrl(formPokemon.id) : null;
+        final formOfficialUrl = formPokemon?.officialArtworkUrl;
+
+        // Sprite priority: G-Max > Mega > Form change > default.
         final gmaxHomeUrl = gmaxPokemon != null ? pokemonHomeUrl(gmaxPokemon.id) : null;
-        final effectiveMegaArtworkUrl = gmaxHomeUrl ?? megaArtworkUrl;
+        final effectiveMegaArtworkUrl =
+            gmaxHomeUrl ?? megaArtworkUrl ?? formHomeUrl;
         final effectiveMegaFallbackUrl = gmaxHomeUrl != null
             ? gmaxPokemon?.officialArtworkUrl
-            : megaPokemon?.officialArtworkUrl;
+            : megaArtworkUrl != null
+                ? megaPokemon?.officialArtworkUrl
+                : formOfficialUrl;
 
         // ── Alpha Pokémon ───────────────────────────────────────────────────
         // Only show for formats where Alpha transfers make sense
