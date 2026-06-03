@@ -5,10 +5,18 @@ import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart';
 
 /// Displays the full instance chain for [instanceId] as a compact vertical
-/// timeline — oldest (origin) at the top, current instance at the bottom.
+/// timeline:
+///
+///   [Origin]
+///     ↓
+///   [Intermediate…]
+///     ↓
+///   [Current slot]   ← highlighted
+///     ↓
+///   [Child 1]
+///   [Child 2]  (if multiple direct children)
 ///
 /// Each row shows: team name · slot number · nickname (if set).
-/// The origin row is labelled "Origin".
 class InstanceChainView extends ConsumerWidget {
   final int instanceId;
 
@@ -55,29 +63,47 @@ class _ChainList extends ConsumerStatefulWidget {
 }
 
 class _ChainListState extends ConsumerState<_ChainList> {
-  // instance id → list of slots referencing it
+  /// instance id → slots that reference it
   final _slotCache = <int, List<TeamSlot>>{};
-  // team id → team name
+  /// team id → team name
   final _teamCache = <int, String>{};
+  /// direct children of the current instance (the last in the chain)
+  final _children = <PokemonInstance>[];
   bool _loaded = false;
+
+  // The last instance in the ancestor chain is the one whose id == instanceId
+  // (i.e. the current slot's own instance).
+  PokemonInstance get _currentInstance => widget.chain.last;
 
   @override
   void initState() {
     super.initState();
-    _loadChainData();
+    _load();
   }
 
-  Future<void> _loadChainData() async {
+  Future<void> _load() async {
     final instanceRepo = ref.read(pokemonInstanceRepositoryProvider);
     final teamRepo = ref.read(teamRepositoryProvider);
 
-    // Resolve slots for each instance in the chain.
+    // Resolve slots for every ancestor in the chain.
     final teamIdsNeeded = <int>{};
     for (final inst in widget.chain) {
       final slots = await instanceRepo.getSlotsForInstance(inst.id);
       _slotCache[inst.id] = slots;
       teamIdsNeeded.addAll(slots.map((s) => s.teamId));
     }
+
+    // Resolve direct children of the current instance.
+    final children =
+        await instanceRepo.getDirectChildren(_currentInstance.id);
+    for (final child in children) {
+      final slots = await instanceRepo.getSlotsForInstance(child.id);
+      _slotCache[child.id] = slots;
+      teamIdsNeeded.addAll(slots.map((s) => s.teamId));
+    }
+    _children
+      ..clear()
+      ..addAll(children);
 
     // Batch-load team names.
     final allTeams = await teamRepo.getAll();
@@ -102,9 +128,12 @@ class _ChainListState extends ConsumerState<_ChainList> {
       );
     }
 
+    final totalRows = widget.chain.length + _children.length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ── Ancestor chain (origin → current) ──
         for (int i = 0; i < widget.chain.length; i++)
           _ChainRow(
             instance: widget.chain[i],
@@ -113,7 +142,22 @@ class _ChainListState extends ConsumerState<_ChainList> {
             isOrigin: i == 0,
             isCurrent: (_slotCache[widget.chain[i].id] ?? [])
                 .any((s) => s.id == widget.currentSlotId),
-            isLast: i == widget.chain.length - 1,
+            isLast: i == totalRows - 1,
+            isChild: false,
+            colorScheme: colorScheme,
+            textTheme: textTheme,
+          ),
+
+        // ── Direct children ──
+        for (int i = 0; i < _children.length; i++)
+          _ChainRow(
+            instance: _children[i],
+            slots: _slotCache[_children[i].id] ?? [],
+            teamCache: _teamCache,
+            isOrigin: false,
+            isCurrent: false,
+            isLast: i == _children.length - 1,
+            isChild: true,
             colorScheme: colorScheme,
             textTheme: textTheme,
           ),
@@ -130,6 +174,7 @@ class _ChainRow extends StatelessWidget {
   final Map<int, String> teamCache;
   final bool isOrigin;
   final bool isCurrent;
+  final bool isChild;
   final bool isLast;
   final ColorScheme colorScheme;
   final TextTheme textTheme;
@@ -140,6 +185,7 @@ class _ChainRow extends StatelessWidget {
     required this.teamCache,
     required this.isOrigin,
     required this.isCurrent,
+    required this.isChild,
     required this.isLast,
     required this.colorScheme,
     required this.textTheme,
@@ -147,8 +193,11 @@ class _ChainRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dotColor =
-        isCurrent ? colorScheme.primary : colorScheme.outlineVariant;
+    final dotColor = isCurrent
+        ? colorScheme.primary
+        : isChild
+            ? colorScheme.secondary
+            : colorScheme.outlineVariant;
 
     return IntrinsicHeight(
       child: Row(
@@ -166,8 +215,7 @@ class _ChainRow extends StatelessWidget {
                     shape: BoxShape.circle,
                     color: dotColor,
                     border: isOrigin
-                        ? Border.all(
-                            color: colorScheme.primary, width: 2)
+                        ? Border.all(color: colorScheme.primary, width: 2)
                         : null,
                   ),
                 ),
@@ -196,12 +244,28 @@ class _ChainRow extends StatelessWidget {
   }
 
   Widget _buildContent() {
-    // Determine label badge
     String? badge;
-    if (isOrigin) badge = 'Origin';
-    if (isCurrent) badge = 'This slot';
+    if (isOrigin && isCurrent) {
+      badge = 'Origin · This slot';
+    } else if (isOrigin) {
+      badge = 'Origin';
+    } else if (isCurrent) {
+      badge = 'This slot';
+    } else if (isChild) {
+      badge = 'Child';
+    }
 
-    // Collect appearance lines (one per slot)
+    final badgeBackground = isCurrent
+        ? colorScheme.primaryContainer
+        : isChild
+            ? colorScheme.secondaryContainer
+            : colorScheme.surfaceContainerHighest;
+    final badgeForeground = isCurrent
+        ? colorScheme.onPrimaryContainer
+        : isChild
+            ? colorScheme.onSecondaryContainer
+            : colorScheme.onSurfaceVariant;
+
     final lines = <String>[];
     for (final slot in slots) {
       final teamName = teamCache[slot.teamId] ?? 'Unknown team';
@@ -217,20 +281,15 @@ class _ChainRow extends StatelessWidget {
       children: [
         if (badge != null) ...[
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: isCurrent
-                  ? colorScheme.primaryContainer
-                  : colorScheme.surfaceContainerHighest,
+              color: badgeBackground,
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
               badge,
               style: textTheme.labelSmall?.copyWith(
-                color: isCurrent
-                    ? colorScheme.onPrimaryContainer
-                    : colorScheme.onSurfaceVariant,
+                color: badgeForeground,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -241,9 +300,7 @@ class _ChainRow extends StatelessWidget {
           for (final line in lines)
             Text(
               line,
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurface,
-              ),
+              style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurface),
             )
         else
           Text(
@@ -253,7 +310,6 @@ class _ChainRow extends StatelessWidget {
               fontStyle: FontStyle.italic,
             ),
           ),
-        // Nickname aliases from previous appearances
         if (instance.nicknameAliases != null &&
             instance.nicknameAliases!.isNotEmpty) ...[
           const SizedBox(height: 2),
