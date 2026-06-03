@@ -143,6 +143,12 @@ const Map<String, ExclusiveZData> kExclusiveZCrystals = {
   ),
 };
 
+/// Strips the `-held` or `-bag` suffix that PokéAPI/PS attaches to the
+/// held-form of Z-crystals (e.g. `incinium-z-held` → `incinium-z`).
+/// Both the bag and held forms are the same crystal for Z-move purposes.
+String _normalizeZCrystalId(String itemId) =>
+    itemId.replaceAll(RegExp(r'-(held|bag)$'), '');
+
 /// Returns the Z-move name for [moveId] (PokéAPI name) given the current
 /// Z-crystal [itemId] and [pokemonName].
 /// Returns null when no Z-move applies.
@@ -152,8 +158,10 @@ String? resolveZMove({
   required String pokemonName,
   String? moveType, // PokéAPI type name of the move
 }) {
+  final id = _normalizeZCrystalId(itemId);
+
   // Check exclusive Z-crystals first.
-  final exclusive = kExclusiveZCrystals[itemId];
+  final exclusive = kExclusiveZCrystals[id];
   if (exclusive != null) {
     if (moveId == exclusive.requiredMoveId &&
         exclusive.matchesSpecies(pokemonName)) {
@@ -163,7 +171,7 @@ String? resolveZMove({
   }
 
   // Check type Z-crystals.
-  final typeEntry = kTypeZCrystals[itemId];
+  final typeEntry = kTypeZCrystals[id];
   if (typeEntry != null && moveType == typeEntry.type) {
     return typeEntry.zMove;
   }
