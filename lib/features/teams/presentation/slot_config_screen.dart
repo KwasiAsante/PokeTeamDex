@@ -1451,7 +1451,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   // ── Pickers ───────────────────────────────────────────────────────────────
 
   Future<void> _pickItem() async {
-    final items = ref.read(_itemListProvider).asData?.value ?? [];
+    // Exclude the held/bag variants of Z-crystals and similar duplicate forms
+    // (e.g. "incinium-z-held") — only the base name is useful when selecting
+    // a held item.
+    final items = (ref.read(_itemListProvider).asData?.value ?? [])
+        .where((n) => !n.endsWith('-held') && !n.endsWith('-bag'))
+        .toList();
     final result = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
