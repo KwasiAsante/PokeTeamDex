@@ -2487,16 +2487,30 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             currentSlotId: slot.id,
           ),
           const SizedBox(height: 12),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.link_off_rounded, size: 16),
-            label: const Text('Unlink'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: colorScheme.error,
-              side: BorderSide(
-                  color: colorScheme.error.withValues(alpha: 0.5)),
-              visualDensity: VisualDensity.compact,
-            ),
-            onPressed: _unlink,
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.tonalIcon(
+                icon: const Icon(Icons.add_link_rounded, size: 16),
+                label: const Text('Add child'),
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                ),
+                onPressed: () => _showOriginSubOptions(slot, speciesName),
+              ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.link_off_rounded, size: 16),
+                label: const Text('Unlink'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colorScheme.error,
+                  side: BorderSide(
+                      color: colorScheme.error.withValues(alpha: 0.5)),
+                  visualDensity: VisualDensity.compact,
+                ),
+                onPressed: _unlink,
+              ),
+            ],
           ),
         ] else ...[
           // ── Unlinked state ──
