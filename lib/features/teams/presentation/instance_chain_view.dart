@@ -151,14 +151,19 @@ class _ChainListState extends ConsumerState<_ChainList> {
       }
 
       // Include superseded nicknames stored in the instance's alias history.
-      final raw = inst.nicknameAliases;
-      if (raw != null && raw.isNotEmpty) {
-        try {
-          final parsed = (jsonDecode(raw) as List).cast<String>();
-          for (final a in parsed) {
-            if (!accumulated.contains(a)) accumulated.add(a);
-          }
-        } catch (_) {}
+      // Skip for the current instance — its nicknameAliases are the current
+      // slot's own rename history, not names inherited from prior appearances.
+      final isCurrentInstance = inst.id == _currentInstance.id;
+      if (!isCurrentInstance) {
+        final raw = inst.nicknameAliases;
+        if (raw != null && raw.isNotEmpty) {
+          try {
+            final parsed = (jsonDecode(raw) as List).cast<String>();
+            for (final a in parsed) {
+              if (!accumulated.contains(a)) accumulated.add(a);
+            }
+          } catch (_) {}
+        }
       }
 
       accumulatedPerIndex[i] = List.of(accumulated);

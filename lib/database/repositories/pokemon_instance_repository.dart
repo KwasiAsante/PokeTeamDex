@@ -14,13 +14,10 @@ class PokemonInstanceRepository {
   /// Creates a new origin instance for a Pokémon (no parent).
   Future<int> createOrigin({
     required int pokemonId,
-    String? nickname,
   }) async {
-    final aliases = nickname != null ? jsonEncode([nickname]) : null;
     final id = await _db.into(_db.pokemonInstances).insert(
           PokemonInstancesCompanion.insert(
             pokemonId: pokemonId,
-            nicknameAliases: Value(aliases),
             createdAt: Value(DateTime.now()),
             updatedAt: Value(DateTime.now()),
           ),
@@ -29,39 +26,30 @@ class PokemonInstanceRepository {
       operation: const Value('create'),
       entityType: const Value('pokemon_instance'),
       entityId: Value(id),
-      payload: Value(jsonEncode({
-        'pokemon_id': pokemonId,
-        if (aliases != null) 'nickname_aliases': aliases,
-      })),
+      payload: Value(jsonEncode({'pokemon_id': pokemonId})),
       createdAt: Value(DateTime.now()),
     ));
     return id;
   }
 
   /// Creates a new iteration linked to [parentInstanceId], inheriting its
-  /// ribbons and prepending any new nickname to the alias history.
+  /// ribbons. nicknameAliases starts null — aliases are written only by
+  /// [addNicknameAlias] when a slot is renamed.
   Future<int> createIteration({
     required int pokemonId,
     required int parentInstanceId,
-    String? newNickname,
   }) async {
     final parent = await getById(parentInstanceId);
     if (parent == null) throw Exception('Parent instance $parentInstanceId not found');
 
+    // Only ribbons propagate to the child — nicknameAliases always starts null.
+    // Aliases are only written by addNicknameAlias when a slot is renamed.
     final inheritedRibbons = parent.inheritedRibbons;
-
-    final existingAliases = parent.nicknameAliases != null
-        ? (jsonDecode(parent.nicknameAliases!) as List).cast<String>()
-        : <String>[];
-    final aliases = newNickname != null
-        ? jsonEncode([newNickname, ...existingAliases])
-        : parent.nicknameAliases;
 
     final id = await _db.into(_db.pokemonInstances).insert(
           PokemonInstancesCompanion.insert(
             pokemonId: pokemonId,
             parentInstanceId: Value(parentInstanceId),
-            nicknameAliases: Value(aliases),
             inheritedRibbons: Value(inheritedRibbons),
             createdAt: Value(DateTime.now()),
             updatedAt: Value(DateTime.now()),
@@ -74,7 +62,6 @@ class PokemonInstanceRepository {
       payload: Value(jsonEncode({
         'pokemon_id': pokemonId,
         'parent_instance_client_local_id': parentInstanceId,
-        if (aliases != null) 'nickname_aliases': aliases,
         if (inheritedRibbons != null) 'inherited_ribbons': inheritedRibbons,
       })),
       createdAt: Value(DateTime.now()),

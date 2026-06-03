@@ -213,12 +213,62 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
                     team_id=team_id, slot=op.slot,
                     pokemon_id=op.pokemon_id, nickname=op.nickname,
                     instance_id=instance_id,
+                    form_name=op.form_name, level=op.level, gender=op.gender,
+                    is_shiny=op.is_shiny, friendship=op.friendship,
+                    ability_name=op.ability_name, nature_name=op.nature_name,
+                    held_item_name=op.held_item_name,
+                    move1=op.move1, move2=op.move2, move3=op.move3, move4=op.move4,
+                    ev_hp=op.ev_hp, ev_atk=op.ev_atk, ev_def=op.ev_def,
+                    ev_spa=op.ev_spa, ev_spd=op.ev_spd, ev_spe=op.ev_spe,
+                    iv_hp=op.iv_hp, iv_atk=op.iv_atk, iv_def=op.iv_def,
+                    iv_spa=op.iv_spa, iv_spd=op.iv_spd, iv_spe=op.iv_spe,
+                    ribbons=op.ribbons,
+                    is_mega_evolved=op.is_mega_evolved, has_gigantamax=op.has_gigantamax,
+                    gigantamax_enabled=op.gigantamax_enabled, is_alpha=op.is_alpha,
+                    contest_cool=op.contest_cool, contest_beautiful=op.contest_beautiful,
+                    contest_cute=op.contest_cute, contest_clever=op.contest_clever,
+                    contest_tough=op.contest_tough, contest_sheen=op.contest_sheen,
                 )
                 db.add(slot)
             else:
                 slot.pokemon_id = op.pokemon_id
                 slot.nickname = op.nickname
                 slot.instance_id = instance_id
+                slot.form_name = op.form_name
+                slot.level = op.level
+                slot.gender = op.gender
+                slot.is_shiny = op.is_shiny
+                slot.friendship = op.friendship
+                slot.ability_name = op.ability_name
+                slot.nature_name = op.nature_name
+                slot.held_item_name = op.held_item_name
+                slot.move1 = op.move1
+                slot.move2 = op.move2
+                slot.move3 = op.move3
+                slot.move4 = op.move4
+                slot.ev_hp = op.ev_hp
+                slot.ev_atk = op.ev_atk
+                slot.ev_def = op.ev_def
+                slot.ev_spa = op.ev_spa
+                slot.ev_spd = op.ev_spd
+                slot.ev_spe = op.ev_spe
+                slot.iv_hp = op.iv_hp
+                slot.iv_atk = op.iv_atk
+                slot.iv_def = op.iv_def
+                slot.iv_spa = op.iv_spa
+                slot.iv_spd = op.iv_spd
+                slot.iv_spe = op.iv_spe
+                slot.ribbons = op.ribbons
+                slot.is_mega_evolved = op.is_mega_evolved
+                slot.has_gigantamax = op.has_gigantamax
+                slot.gigantamax_enabled = op.gigantamax_enabled
+                slot.is_alpha = op.is_alpha
+                slot.contest_cool = op.contest_cool
+                slot.contest_beautiful = op.contest_beautiful
+                slot.contest_cute = op.contest_cute
+                slot.contest_clever = op.contest_clever
+                slot.contest_tough = op.contest_tough
+                slot.contest_sheen = op.contest_sheen
                 slot.is_deleted = False
 
         elif isinstance(op, SlotDeleteOp):

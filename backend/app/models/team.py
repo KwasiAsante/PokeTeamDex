@@ -84,6 +84,60 @@ class TeamSlot(Base):
     instance_id: Mapped[int | None] = mapped_column(
         ForeignKey("pokemon_instances.id", ondelete="SET NULL"), nullable=True, index=True
     )
+
+    # Form / variant
+    form_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # Basics
+    level: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    gender: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    is_shiny: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    friendship: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+
+    # Build
+    ability_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    nature_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    held_item_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # Moves
+    move1: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    move2: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    move3: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    move4: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # EVs
+    ev_hp:  Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    ev_atk: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    ev_def: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    ev_spa: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    ev_spd: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    ev_spe: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+
+    # IVs
+    iv_hp:  Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    iv_atk: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    iv_def: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    iv_spa: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    iv_spd: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    iv_spe: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+
+    # Ribbons (JSON array of ribbon IDs)
+    ribbons: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Mega / Gigantamax / Alpha
+    is_mega_evolved:    Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    has_gigantamax:     Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    gigantamax_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    is_alpha:           Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+    # Contest conditions
+    contest_cool:      Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    contest_beautiful: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    contest_cute:      Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    contest_clever:    Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    contest_tough:     Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    contest_sheen:     Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

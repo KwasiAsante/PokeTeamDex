@@ -312,6 +312,42 @@ class SyncService {
           'slot': payload['slot'] as int,
           'pokemon_id': payload['pokemon_id'] as int,
           if (payload['nickname'] != null) 'nickname': payload['nickname'],
+          // Full slot config — pass through whatever the client stored.
+          if (payload['form_name'] != null) 'form_name': payload['form_name'],
+          if (payload['level'] != null) 'level': payload['level'],
+          if (payload['gender'] != null) 'gender': payload['gender'],
+          'is_shiny': payload['is_shiny'] ?? false,
+          if (payload['friendship'] != null) 'friendship': payload['friendship'],
+          if (payload['ability_name'] != null) 'ability_name': payload['ability_name'],
+          if (payload['nature_name'] != null) 'nature_name': payload['nature_name'],
+          if (payload['held_item_name'] != null) 'held_item_name': payload['held_item_name'],
+          if (payload['move1'] != null) 'move1': payload['move1'],
+          if (payload['move2'] != null) 'move2': payload['move2'],
+          if (payload['move3'] != null) 'move3': payload['move3'],
+          if (payload['move4'] != null) 'move4': payload['move4'],
+          if (payload['ev_hp'] != null) 'ev_hp': payload['ev_hp'],
+          if (payload['ev_atk'] != null) 'ev_atk': payload['ev_atk'],
+          if (payload['ev_def'] != null) 'ev_def': payload['ev_def'],
+          if (payload['ev_spa'] != null) 'ev_spa': payload['ev_spa'],
+          if (payload['ev_spd'] != null) 'ev_spd': payload['ev_spd'],
+          if (payload['ev_spe'] != null) 'ev_spe': payload['ev_spe'],
+          if (payload['iv_hp'] != null) 'iv_hp': payload['iv_hp'],
+          if (payload['iv_atk'] != null) 'iv_atk': payload['iv_atk'],
+          if (payload['iv_def'] != null) 'iv_def': payload['iv_def'],
+          if (payload['iv_spa'] != null) 'iv_spa': payload['iv_spa'],
+          if (payload['iv_spd'] != null) 'iv_spd': payload['iv_spd'],
+          if (payload['iv_spe'] != null) 'iv_spe': payload['iv_spe'],
+          if (payload['ribbons'] != null) 'ribbons': payload['ribbons'],
+          'is_mega_evolved': payload['is_mega_evolved'] ?? false,
+          'has_gigantamax': payload['has_gigantamax'] ?? false,
+          'gigantamax_enabled': payload['gigantamax_enabled'] ?? false,
+          'is_alpha': payload['is_alpha'] ?? false,
+          if (payload['contest_cool'] != null) 'contest_cool': payload['contest_cool'],
+          if (payload['contest_beautiful'] != null) 'contest_beautiful': payload['contest_beautiful'],
+          if (payload['contest_cute'] != null) 'contest_cute': payload['contest_cute'],
+          if (payload['contest_clever'] != null) 'contest_clever': payload['contest_clever'],
+          if (payload['contest_tough'] != null) 'contest_tough': payload['contest_tough'],
+          if (payload['contest_sheen'] != null) 'contest_sheen': payload['contest_sheen'],
         };
         if (creatingTeamIds.contains(teamLocalId)) {
           entry['team_client_local_id'] = teamLocalId;
@@ -330,8 +366,6 @@ class SyncService {
             if (inst?.remoteId != null) {
               entry['instance_remote_id'] = int.parse(inst!.remoteId!);
             } else {
-              // Instance not yet on server — still send upsert without it;
-              // the link will be pushed again when the instance create succeeds.
               entry['instance_client_local_id'] = instLocalId;
             }
           }
@@ -499,8 +533,14 @@ class SyncService {
         await (db.update(db.pokemonInstances)
               ..where((i) => i.id.equals(existing.id)))
             .write(PokemonInstancesCompanion(
-          nicknameAliases: Value(nicknameAliases),
-          inheritedRibbons: Value(inheritedRibbons),
+          // Only overwrite with server data when non-null — preserves locally-set
+          // data that hasn't reached the server yet (e.g. same-batch ordering).
+          nicknameAliases: nicknameAliases != null
+              ? Value(nicknameAliases)
+              : const Value.absent(),
+          inheritedRibbons: inheritedRibbons != null
+              ? Value(inheritedRibbons)
+              : const Value.absent(),
           updatedAt: Value(remoteUpdatedAt),
         ));
       }
@@ -540,24 +580,96 @@ class SyncService {
         localInstanceId = inst?.id;
       }
 
+      final companion = TeamSlotsCompanion(
+        pokemonId:        Value(pokemonId),
+        nickname:         Value(nickname),
+        instanceId:       Value(localInstanceId),
+        formName:         Value(rs['form_name'] as String?),
+        level:            Value(rs['level'] as int?),
+        gender:           Value(rs['gender'] as String?),
+        isShiny:          Value(rs['is_shiny'] as bool? ?? false),
+        friendship:       Value(rs['friendship'] as int?),
+        abilityName:      Value(rs['ability_name'] as String?),
+        natureName:       Value(rs['nature_name'] as String?),
+        heldItemName:     Value(rs['held_item_name'] as String?),
+        move1:            Value(rs['move1'] as String?),
+        move2:            Value(rs['move2'] as String?),
+        move3:            Value(rs['move3'] as String?),
+        move4:            Value(rs['move4'] as String?),
+        evHp:             Value(rs['ev_hp'] as int?),
+        evAtk:            Value(rs['ev_atk'] as int?),
+        evDef:            Value(rs['ev_def'] as int?),
+        evSpa:            Value(rs['ev_spa'] as int?),
+        evSpd:            Value(rs['ev_spd'] as int?),
+        evSpe:            Value(rs['ev_spe'] as int?),
+        ivHp:             Value(rs['iv_hp'] as int?),
+        ivAtk:            Value(rs['iv_atk'] as int?),
+        ivDef:            Value(rs['iv_def'] as int?),
+        ivSpa:            Value(rs['iv_spa'] as int?),
+        ivSpd:            Value(rs['iv_spd'] as int?),
+        ivSpe:            Value(rs['iv_spe'] as int?),
+        ribbons:          Value(rs['ribbons'] as String?),
+        isMegaEvolved:    Value(rs['is_mega_evolved'] as bool? ?? false),
+        hasGigantamax:    Value(rs['has_gigantamax'] as bool? ?? false),
+        gigantamaxEnabled: Value(rs['gigantamax_enabled'] as bool? ?? false),
+        isAlpha:          Value(rs['is_alpha'] as bool? ?? false),
+        contestCool:      Value(rs['contest_cool'] as int?),
+        contestBeautiful: Value(rs['contest_beautiful'] as int?),
+        contestCute:      Value(rs['contest_cute'] as int?),
+        contestClever:    Value(rs['contest_clever'] as int?),
+        contestTough:     Value(rs['contest_tough'] as int?),
+        contestSheen:     Value(rs['contest_sheen'] as int?),
+        updatedAt:        Value(remoteUpdatedAt),
+      );
+
       if (existing == null) {
         await slotRepo.insert(TeamSlotsCompanion(
-          teamId: Value(localTeam.id),
-          slot: Value(slotNumber),
-          pokemonId: Value(pokemonId),
-          nickname: Value(nickname),
-          instanceId: Value(localInstanceId),
-          updatedAt: Value(remoteUpdatedAt),
+          teamId:           Value(localTeam.id),
+          slot:             Value(slotNumber),
+          pokemonId:        companion.pokemonId,
+          nickname:         companion.nickname,
+          instanceId:       companion.instanceId,
+          formName:         companion.formName,
+          level:            companion.level,
+          gender:           companion.gender,
+          isShiny:          companion.isShiny,
+          friendship:       companion.friendship,
+          abilityName:      companion.abilityName,
+          natureName:       companion.natureName,
+          heldItemName:     companion.heldItemName,
+          move1:            companion.move1,
+          move2:            companion.move2,
+          move3:            companion.move3,
+          move4:            companion.move4,
+          evHp:             companion.evHp,
+          evAtk:            companion.evAtk,
+          evDef:            companion.evDef,
+          evSpa:            companion.evSpa,
+          evSpd:            companion.evSpd,
+          evSpe:            companion.evSpe,
+          ivHp:             companion.ivHp,
+          ivAtk:            companion.ivAtk,
+          ivDef:            companion.ivDef,
+          ivSpa:            companion.ivSpa,
+          ivSpd:            companion.ivSpd,
+          ivSpe:            companion.ivSpe,
+          ribbons:          companion.ribbons,
+          isMegaEvolved:    companion.isMegaEvolved,
+          hasGigantamax:    companion.hasGigantamax,
+          gigantamaxEnabled: companion.gigantamaxEnabled,
+          isAlpha:          companion.isAlpha,
+          contestCool:      companion.contestCool,
+          contestBeautiful: companion.contestBeautiful,
+          contestCute:      companion.contestCute,
+          contestClever:    companion.contestClever,
+          contestTough:     companion.contestTough,
+          contestSheen:     companion.contestSheen,
+          updatedAt:        companion.updatedAt,
         ));
       } else if (remoteUpdatedAt.isAfter(existing.updatedAt)) {
         await (db.update(db.teamSlots)
               ..where((s) => s.id.equals(existing.id)))
-            .write(TeamSlotsCompanion(
-          pokemonId: Value(pokemonId),
-          nickname: Value(nickname),
-          instanceId: Value(localInstanceId),
-          updatedAt: Value(remoteUpdatedAt),
-        ));
+            .write(companion);
       }
     }
   }
