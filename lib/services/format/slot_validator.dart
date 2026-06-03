@@ -66,8 +66,12 @@ Future<SlotValidation> validateSlot(
     }
   }
 
-  // ── Moves — per-game or per-gen learnset ─────────────────────────────────
-  final learnset = _buildLearnset(pokemonMoves, format);
+  // ── Moves — per-game or per-gen learnset (PS-supplemented) ──────────────
+  final learnset = buildLearnsetForFormat(
+    pokemonMoves, format,
+    pokemonName: pokemonName,
+    formatService: service,
+  );
   final moveSlots = {
     'move1': slot.move1,
     'move2': slot.move2,
@@ -116,7 +120,11 @@ SlotValidation validateSlotSync(
     }
   }
 
-  final learnset = _buildLearnset(pokemonMoves, format);
+  final learnset = buildLearnsetForFormat(
+    pokemonMoves, format,
+    pokemonName: pokemonName,
+    formatService: service,
+  );
   for (int i = 0; i < moves.length; i++) {
     final moveName = moves[i];
     if (moveName != null && !learnset.contains(moveName)) {
