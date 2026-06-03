@@ -48,4 +48,14 @@ class TeamSlotRepository {
   Future<int> updateSlotPosition(int id, int newSlot) =>
       (_db.update(_db.teamSlots)..where((s) => s.id.equals(id)))
           .write(TeamSlotsCompanion(slot: Value(newSlot)));
+
+  /// Partial-updates only instanceId, bumping syncStatus and updatedAt.
+  Future<int> setInstanceId(int slotId, int? instanceId) =>
+      (_db.update(_db.teamSlots)..where((s) => s.id.equals(slotId))).write(
+        TeamSlotsCompanion(
+          instanceId: Value(instanceId),
+          syncStatus: const Value('pending'),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
 }

@@ -843,7 +843,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               const SizedBox(height: 24),
               _SectionTitle('Pokémon Identity'),
               const SizedBox(height: 8),
-              _buildInstanceSection(slot),
+              _buildInstanceSection(slot, speciesName),
             ],
           ),
         );
@@ -2104,53 +2104,297 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // ── Pokémon Instance ──────────────────────────────────────────────────────
 
-  /// Called when the user picks a slot to link to from the picker sheet.
-  /// Creates instance records immediately so the chain view can render.
-  Future<void> _onLinkSelected(TeamSlot targetSlot) async {
+  // ── "Link as child" path ──
+  // Current slot is the child; the picked slot is (or becomes) the origin.
+
+  Future<void> _onLinkAsChild(TeamSlot currentSlot, TeamSlot targetSlot) async {
     final instanceRepo = ref.read(pokemonInstanceRepositoryProvider);
     final slotRepo = ref.read(teamSlotRepositoryProvider);
 
-    // 1. Ensure the target slot has an instance (create origin if needed).
+    // Ensure the target has an origin instance.
     int parentInstanceId;
     if (targetSlot.instanceId != null) {
       parentInstanceId = targetSlot.instanceId!;
     } else {
-      // Create an origin instance for the target slot.
       parentInstanceId = await instanceRepo.createOrigin(
         pokemonId: targetSlot.pokemonId,
         nickname: targetSlot.nickname,
       );
-      // Link the target slot to its new origin instance right away.
-      await slotRepo.update(
-        TeamSlotsCompanion(
-          id: Value(targetSlot.id),
-          teamId: Value(targetSlot.teamId),
-          slot: Value(targetSlot.slot),
-          pokemonId: Value(targetSlot.pokemonId),
-          instanceId: Value(parentInstanceId),
-          syncStatus: const Value('pending'),
-          updatedAt: Value(DateTime.now()),
-        ),
-      );
+      await slotRepo.setInstanceId(targetSlot.id, parentInstanceId);
     }
 
-    // 2. Create an iteration instance for the current slot.
-    final newInstanceId = await instanceRepo.createIteration(
-      pokemonId: targetSlot.pokemonId,
+    // Create an iteration for the current slot.
+    final childInstanceId = await instanceRepo.createIteration(
+      pokemonId: currentSlot.pokemonId,
       parentInstanceId: parentInstanceId,
       newNickname: _nicknameCtrl.text.trim().isEmpty
           ? null
           : _nicknameCtrl.text.trim(),
     );
 
-    setState(() => _instanceId = newInstanceId);
+    setState(() => _instanceId = childInstanceId);
   }
 
-  /// Unlinks this slot from its instance without deleting the instance itself
-  /// (other slots in the chain are unaffected).
+  // ── "Link as origin" path ──
+  // Current slot is the origin; the picked slot becomes the child.
+
+  Future<void> _onLinkAsOriginExisting(
+      TeamSlot currentSlot, TeamSlot targetSlot) async {
+    // Block if the target already has an origin.
+    if (targetSlot.instanceId != null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'That slot already has an origin. Unlink it from its config first.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final instanceRepo = ref.read(pokemonInstanceRepositoryProvider);
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+
+    // Ensure the current slot has an origin instance.
+    int originInstanceId;
+    if (_instanceId != null) {
+      originInstanceId = _instanceId!;
+    } else {
+      originInstanceId = await instanceRepo.createOrigin(
+        pokemonId: currentSlot.pokemonId,
+        nickname: _nicknameCtrl.text.trim().isEmpty
+            ? null
+            : _nicknameCtrl.text.trim(),
+      );
+      setState(() => _instanceId = originInstanceId);
+    }
+
+    // Create a child iteration for the target slot.
+    final childInstanceId = await instanceRepo.createIteration(
+      pokemonId: targetSlot.pokemonId,
+      parentInstanceId: originInstanceId,
+      newNickname: targetSlot.nickname,
+    );
+    await slotRepo.setInstanceId(targetSlot.id, childInstanceId);
+  }
+
+  Future<void> _onLinkAsOriginNewTeam(
+      TeamSlot currentSlot, String speciesName) async {
+    final instanceRepo = ref.read(pokemonInstanceRepositoryProvider);
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+    final teamRepo = ref.read(teamRepositoryProvider);
+
+    // 1. Create the new team (no format, no folder).
+    final allTeams = await teamRepo.getAll();
+    final newTeamId = await teamRepo.insert(
+      TeamsCompanion(
+        name: Value('$speciesName — Journey'),
+        sortOrder: Value(allTeams.length),
+        syncStatus: const Value('pending'),
+        createdAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+
+    // 2. Ensure the current slot has an origin instance.
+    int originInstanceId;
+    if (_instanceId != null) {
+      originInstanceId = _instanceId!;
+    } else {
+      originInstanceId = await instanceRepo.createOrigin(
+        pokemonId: currentSlot.pokemonId,
+        nickname: _nicknameCtrl.text.trim().isEmpty
+            ? null
+            : _nicknameCtrl.text.trim(),
+      );
+      setState(() => _instanceId = originInstanceId);
+    }
+
+    // 3. Create a child iteration for the new slot.
+    final childInstanceId = await instanceRepo.createIteration(
+      pokemonId: currentSlot.pokemonId,
+      parentInstanceId: originInstanceId,
+    );
+
+    // 4. Insert the new slot (copies species, gender, shiny).
+    await slotRepo.insert(
+      TeamSlotsCompanion(
+        teamId: Value(newTeamId),
+        slot: const Value(1),
+        pokemonId: Value(currentSlot.pokemonId),
+        gender: Value(currentSlot.gender),
+        isShiny: Value(currentSlot.isShiny),
+        instanceId: Value(childInstanceId),
+        syncStatus: const Value('pending'),
+        createdAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          '"$speciesName — Journey" created and linked as child.',
+        ),
+      ),
+    );
+  }
+
+  // ── Link-type chooser ──
+
+  void _showLinkTypeSheet(TeamSlot slot, String speciesName) {
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'How is this slot connected?',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Choose whether this slot is the original appearance or a later one.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── This slot is the CHILD ──
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(
+                  child: Icon(Icons.south_rounded, size: 18),
+                ),
+                title: const Text('This slot is the child'),
+                subtitle:
+                    const Text('Pick the earlier slot this Pokémon came from.'),
+                onTap: () {
+                  Navigator.of(sheetCtx).pop();
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    builder: (_) => InstancePickerSheet(
+                      pokemonId: slot.pokemonId,
+                      currentSlotId: slot.id,
+                      onPick: (targetSlot) {
+                        Navigator.of(context).pop();
+                        _onLinkAsChild(slot, targetSlot);
+                      },
+                    ),
+                  );
+                },
+              ),
+
+              const Divider(),
+
+              // ── This slot is the ORIGIN ──
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(
+                  child: Icon(Icons.north_rounded, size: 18),
+                ),
+                title: const Text('This slot is the origin'),
+                subtitle: const Text(
+                    'Link a later slot, or create a new team to track this Pokémon forward.'),
+                onTap: () {
+                  Navigator.of(sheetCtx).pop();
+                  _showOriginSubOptions(slot, speciesName);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showOriginSubOptions(TeamSlot slot, String speciesName) {
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Link as origin',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── Pick an existing slot ──
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(
+                  child: Icon(Icons.people_alt_rounded, size: 18),
+                ),
+                title: const Text('Link to an existing slot'),
+                subtitle: const Text(
+                    'Pick a slot on another team to become the child.'),
+                onTap: () {
+                  Navigator.of(sheetCtx).pop();
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    builder: (_) => InstancePickerSheet(
+                      pokemonId: slot.pokemonId,
+                      currentSlotId: slot.id,
+                      onPick: (targetSlot) {
+                        Navigator.of(context).pop();
+                        _onLinkAsOriginExisting(slot, targetSlot);
+                      },
+                    ),
+                  );
+                },
+              ),
+
+              const Divider(),
+
+              // ── Create new team ──
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(
+                  child: Icon(Icons.add_circle_outline_rounded, size: 18),
+                ),
+                title: const Text('Create a new team'),
+                subtitle: Text(
+                  'Creates "$speciesName — Journey" with this Pokémon in slot 1, linked as child.',
+                ),
+                onTap: () {
+                  Navigator.of(sheetCtx).pop();
+                  _onLinkAsOriginNewTeam(slot, speciesName);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _unlink() => setState(() => _instanceId = null);
 
-  Widget _buildInstanceSection(TeamSlot slot) {
+  Widget _buildInstanceSection(TeamSlot slot, String speciesName) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -2172,19 +2416,16 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             currentSlotId: slot.id,
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              OutlinedButton.icon(
-                icon: const Icon(Icons.link_off_rounded, size: 16),
-                label: const Text('Unlink'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: colorScheme.error,
-                  side: BorderSide(color: colorScheme.error.withValues(alpha: 0.5)),
-                  visualDensity: VisualDensity.compact,
-                ),
-                onPressed: _unlink,
-              ),
-            ],
+          OutlinedButton.icon(
+            icon: const Icon(Icons.link_off_rounded, size: 16),
+            label: const Text('Unlink'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: colorScheme.error,
+              side: BorderSide(
+                  color: colorScheme.error.withValues(alpha: 0.5)),
+              visualDensity: VisualDensity.compact,
+            ),
+            onPressed: _unlink,
           ),
         ] else ...[
           // ── Unlinked state ──
@@ -2214,19 +2455,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             style: FilledButton.styleFrom(
               visualDensity: VisualDensity.compact,
             ),
-            onPressed: () => showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              useSafeArea: true,
-              builder: (_) => InstancePickerSheet(
-                pokemonId: slot.pokemonId,
-                currentSlotId: slot.id,
-                onPick: (targetSlot) {
-                  Navigator.of(context).pop();
-                  _onLinkSelected(targetSlot);
-                },
-              ),
-            ),
+            onPressed: () => _showLinkTypeSheet(slot, speciesName),
           ),
         ],
       ],
