@@ -47,6 +47,9 @@ class TeamSlots extends Table {
   // Ribbons — JSON array of ribbon IDs, e.g. '["champion","effort"]'
   TextColumn get ribbons => text().nullable()();
 
+  // Optional link to a PokemonInstance for cross-team continuity tracking.
+  IntColumn get instanceId => integer().nullable()();
+
   // Mega Evolution toggle (Gen 6–7 only)
   BoolColumn get isMegaEvolved =>
       boolean().withDefault(const Constant(false))();
