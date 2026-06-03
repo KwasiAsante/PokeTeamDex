@@ -527,6 +527,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             ? GenerationMechanics.forGen(format.gen)
             : null;
         final pokemonMoves = pokemon.moves.cast<Map<String, dynamic>>();
+        // violations is recomputed as effectiveViolations after form data loads.
+        // ignore: unused_local_variable
         final violations = format != null
             ? _computeViolations(formatService, format, pokemon.name, pokemonMoves)
             : <String, String>{};
@@ -534,20 +536,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         // Learnable moves filtered by format version groups.
         // No format → show everything the Pokémon can ever learn.
         // Learnable moves supplemented by PS learnset to catch moves
-        // PokéAPI incorrectly attributes to later gens (e.g. Dragon Dance on
-        // Charizard is listed only for Gen 8/9 in PokéAPI but was available
-        // from Gen 6 via move tutors).
-        final learnableMoves = (format != null
-                ? buildLearnsetForFormat(
-                    pokemonMoves, format,
-                    pokemonName: pokemon.name,
-                    formatService: formatService,
-                  )
-                : pokemon.moves
-                    .map((m) => m['move']['name'] as String)
-                    .toSet())
-            .toList()
-          ..sort();
+        // Base learnset (overridden by effectiveLearnableMoves below when a form
+        // is active — kept here so the compiler doesn't complain about order).
 
         // Sprite resolution
         final useFormatSprites =
@@ -613,6 +603,43 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             ? ref.watch(pokemonByNameProvider(activeFallbackFormName))
             : null;
         final formPokemon = formPokemonAsync?.asData?.value;
+
+        // ── Form-specific abilities, moves, and base stats ─────────────────
+        // When a non-default form is active (e.g. Alolan Raichu, Galarian
+        // Rapidash) use that form's abilities and moves instead of the base
+        // form's data so the picker and validation reflect the correct options.
+        final effectiveAbilities = (formPokemon != null &&
+                formPokemon.abilities.isNotEmpty)
+            ? (formPokemon.abilities.map((a) => (
+                  name: a['ability']['name'] as String,
+                  isHidden: a['is_hidden'] as bool,
+                  abilitySlot: a['slot'] as int,
+                )).toList()
+              ..sort((a, b) => a.abilitySlot.compareTo(b.abilitySlot)))
+            : abilities;
+
+        final effectivePokemonMoves = formPokemon != null &&
+                formPokemon.moves.isNotEmpty
+            ? formPokemon.moves.cast<Map<String, dynamic>>()
+            : pokemonMoves;
+
+        // Re-compute violations and learnable moves with form-specific data.
+        final effectiveViolations = format != null
+            ? _computeViolations(
+                formatService, format, pokemon.name, effectivePokemonMoves)
+            : <String, String>{};
+
+        final effectiveLearnableMoves = (format != null
+                ? buildLearnsetForFormat(
+                    effectivePokemonMoves, format,
+                    pokemonName: formPokemon?.name ?? pokemon.name,
+                    formatService: formatService,
+                  )
+                : effectivePokemonMoves
+                    .map((m) => m['move']['name'] as String)
+                    .toSet())
+            .toList()
+          ..sort();
 
         // Form stats take highest priority (form > mega > base).
         final finalBaseStats = formPokemon != null
@@ -704,7 +731,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 const SizedBox(height: 24),
                 _SectionTitle('Ability'),
                 const SizedBox(height: 8),
-                _buildAbility(abilities, violations['ability']),
+                _buildAbility(effectiveAbilities, effectiveViolations['ability']),
                 // Mega form ability shown as read-only info when evolved.
                 if (canMegaEvolve && _isMegaEvolved && megaPokemon != null &&
                     megaPokemon.abilities.isNotEmpty) ...[
@@ -724,7 +751,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 const SizedBox(height: 24),
                 _SectionTitle('Held Item'),
                 const SizedBox(height: 8),
-                _buildHeldItem(violation: violations['item']),
+                _buildHeldItem(violation: effectiveViolations['item']),
               ],
               // ── Mega Evolution toggle (Gen 6–7, when applicable) ──
               if (canMegaEvolve) ...[
@@ -750,9 +777,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               const SizedBox(height: 24),
               _SectionTitle('Moves'),
               const SizedBox(height: 8),
-              _buildMoves(learnableMoves,
-                  violations: violations,
-                  pokemonName: pokemon.name,
+              _buildMoves(effectiveLearnableMoves,
+                  violations: effectiveViolations,
+                  pokemonName: formPokemon?.name ?? pokemon.name,
                   showMaxMoves: canDynamax,
                   useGMax: canGigantamax && _hasGigantamax && _gigantamaxEnabled),
               const SizedBox(height: 24),

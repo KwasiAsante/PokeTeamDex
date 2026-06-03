@@ -432,10 +432,8 @@ class _FilledSlotCard extends ConsumerWidget {
             nickname != null && nickname.isNotEmpty && nickname != speciesName;
         final displayName = hasNickname ? nickname : speciesName;
 
-        final primaryType =
-            pokemon.types[1] ?? pokemon.types.values.firstOrNull ?? 'normal';
-        final typeColor =
-            PokemonTypeColors.colors[primaryType] ?? colorScheme.primary;
+        // effectiveTypes/effectiveTypeColor are computed after formChangePokemon
+        // is resolved below and drive all type display in the slot card.
 
         // Base stats map
         final baseStats = <String, int>{
@@ -458,7 +456,10 @@ class _FilledSlotCard extends ConsumerWidget {
                 ?.value
             : null;
 
-        // Override base stats when mega-evolved; falls back to base form stats.
+        // Override base stats: form > mega > base.
+        // formEffectiveStats is computed below after formChangePokemon resolves.
+        // We use a late override pattern: compute tentative stats from mega/base
+        // first, then override with form stats in calcStats below.
         final effectiveBaseStats = megaPokemon != null
             ? <String, int>{
                 for (final s in megaPokemon.stats)
@@ -480,6 +481,25 @@ class _FilledSlotCard extends ConsumerWidget {
                 .asData
                 ?.value
             : null;
+        // Effective types and stats for the active form (used for type badges
+        // and stat bars — regional forms have different types/stats).
+        final effectiveTypes = (formChangePokemon != null &&
+                formChangePokemon.types.isNotEmpty)
+            ? formChangePokemon.types
+            : pokemon.types;
+        final effectivePrimaryType =
+            effectiveTypes[1] ?? effectiveTypes.values.firstOrNull ?? 'normal';
+        final effectiveTypeColor =
+            PokemonTypeColors.colors[effectivePrimaryType] ?? colorScheme.primary;
+
+        // Form-specific base stats (overrides mega stats too if both active).
+        final formEffectiveStats = formChangePokemon != null
+            ? <String, int>{
+                for (final s in formChangePokemon.stats)
+                  s['stat']['name'] as String: s['base_stat'] as int,
+              }
+            : null;
+
         // Use shiny form artwork when the slot is shiny.
         final formHomeUrl = formChangePokemon != null
             ? (slot.isShiny
@@ -523,12 +543,14 @@ class _FilledSlotCard extends ConsumerWidget {
           slot.ivHp ?? 31, slot.ivAtk ?? 31, slot.ivDef ?? 31,
           slot.ivSpa ?? 31, slot.ivSpd ?? 31, slot.ivSpe ?? 31,
         ];
+        // Form stats take priority over mega stats.
+        final resolvedStats = formEffectiveStats ?? effectiveBaseStats;
         final calcStats = <int>[
           for (int i = 0; i < _statKeys.length; i++)
             _statKeys[i] == 'hp'
-                ? _calcHP(effectiveBaseStats['hp'] ?? 45, ivs[0], evs[0], level)
+                ? _calcHP(resolvedStats['hp'] ?? 45, ivs[0], evs[0], level)
                 : _calcStat(
-                    effectiveBaseStats[_statKeys[i]] ?? 50,
+                    resolvedStats[_statKeys[i]] ?? 50,
                     ivs[i], evs[i], level,
                     _natureMod(slot.natureName, _statKeys[i]),
                   ),
@@ -592,7 +614,7 @@ class _FilledSlotCard extends ConsumerWidget {
                 // ── Coloured accent strip ──
                 Container(
                   width: double.infinity,
-                  color: typeColor.withValues(alpha: 0.15),
+                  color: effectiveTypeColor.withValues(alpha: 0.15),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   child: Row(
@@ -703,7 +725,7 @@ class _FilledSlotCard extends ConsumerWidget {
                             Wrap(
                               spacing: 4,
                               runSpacing: 2,
-                              children: pokemon.types.values
+                              children: effectiveTypes.values
                                   .map((t) => TypeBadge(type: t))
                                   .toList(),
                             ),
