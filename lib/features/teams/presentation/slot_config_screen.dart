@@ -2197,7 +2197,13 @@ class _ItemListTile extends ConsumerWidget {
 
     final entry = detailAsync.whenOrNull(data: (e) => e);
     final spriteUrl = entry?.spriteUrl;
-    final description = entry?.shortEffect;
+    // Prefer flavor text — shortEffect is a placeholder for many items
+    // (e.g. Z-crystals show "XXX new effect for …").
+    final description = entry == null
+        ? null
+        : entry.flavorTextEntries.isNotEmpty
+            ? entry.flavorTextEntries.last.text
+            : entry.shortEffect;
 
     return ListTile(
       dense: true,
