@@ -139,6 +139,7 @@ jobs:
           wix build windows/installer/installer.wxs windows/installer/components.wxs `
             -d Version=$version `
             -d BuildDir="$PWD\build\windows\x64\runner\Release" `
+            -d IconFile="$PWD\windows\runner\resources\app_icon.ico" `
             -ext WixToolset.UI.wixext `
             -o "PokeTeamDex-${{ needs.create-release.outputs.tag }}-Setup.msi"
 

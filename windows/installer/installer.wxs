@@ -113,7 +113,7 @@
                      KeyPath="yes" />
     </Component>
 
-    <Icon Id="AppIcon" SourceFile="$(BuildDir)\..\..\..\..\windows\runner\resources\app_icon.ico" />
+    <Icon Id="AppIcon" SourceFile="$(IconFile)" />
   </Fragment>
 
   <!-- ── Install sequence ─────────────────────────────────────────── -->
