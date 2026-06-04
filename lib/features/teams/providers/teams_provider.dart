@@ -111,6 +111,7 @@ Future<int> createTeam(
   String name, {
   int? folderId,
   String? formatLabel,
+  bool isBox = false,
 }) async {
   final repo = ref.read(teamRepositoryProvider);
   final syncQueue = ref.read(syncQueueRepositoryProvider);
@@ -120,6 +121,7 @@ Future<int> createTeam(
       name: Value(name),
       folderId: Value(folderId),
       formatLabel: Value(formatLabel),
+      isBox: Value(isBox),
       createdAt: Value(DateTime.now()),
       updatedAt: Value(DateTime.now()),
     ),

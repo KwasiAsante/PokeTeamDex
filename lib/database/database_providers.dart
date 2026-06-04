@@ -75,6 +75,6 @@ final psDirectoryProvider = StreamProvider<String?>((ref) {
   return ref.watch(appConfigRepositoryProvider).watchPsDirectory();
 });
 
-final maxPokemonPerTeamProvider = StreamProvider<int>((ref) {
-  return ref.watch(appConfigRepositoryProvider).watchMaxPokemonPerTeam();
+final maxBoxSizeProvider = StreamProvider<int>((ref) {
+  return ref.watch(appConfigRepositoryProvider).watchMaxBoxSize();
 });

@@ -85,7 +85,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
     final isWide = MediaQuery.sizeOf(context).width > 840;
     final teamAsync = ref.watch(teamByIdProvider(widget.teamId));
     final slotsAsync = ref.watch(teamSlotsProvider(widget.teamId));
-    final maxSlots = ref.watch(maxPokemonPerTeamProvider).asData?.value ?? 6;
+    final maxBoxSize = ref.watch(maxBoxSizeProvider).asData?.value ?? 60;
 
     // Reset selected slot when switching to narrow layout
     if (!isWide && _selectedSlot != null) {
@@ -152,14 +152,17 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
             body: slotsAsync.when(
               loading: () => const LoadingState(),
               error: (e, _) => ErrorState(error: e),
-              data: (slots) => isWide
-                  ? _buildWideLayout(slots, team, maxSlots)
-                  : _SlotList(
-                      teamId: widget.teamId,
-                      slots: slots,
-                      formatId: team.formatLabel,
-                      maxSlots: maxSlots,
-                    ),
+              data: (slots) {
+                final maxSlots = (team.isBox) ? maxBoxSize : 6;
+                return isWide
+                    ? _buildWideLayout(slots, team, maxSlots)
+                    : _SlotList(
+                        teamId: widget.teamId,
+                        slots: slots,
+                        formatId: team.formatLabel,
+                        maxSlots: maxSlots,
+                      );
+              },
             ),
           );
         },

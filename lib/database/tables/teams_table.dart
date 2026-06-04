@@ -8,6 +8,8 @@ class Teams extends Table {
   TextColumn get name => text()();
   TextColumn get remoteId => text().nullable()();
   TextColumn get formatLabel => text().nullable()(); // e.g. "VGC 2025"
+  BoolColumn get isBox =>
+      boolean().withDefault(const Constant(false))(); // true = box (>6 slots)
   IntColumn get sortOrder =>
       integer().withDefault(const Constant(0))(); // display order within folder
   BoolColumn get isDeleted =>

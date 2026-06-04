@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
+import 'package:poke_team_dex/database/repositories/app_config_repository.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/presentation/ps_import_sheet.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
@@ -153,13 +154,15 @@ class TeamsScreen extends ConsumerWidget {
 
   Future<void> _showTeamDialog(BuildContext context, WidgetRef ref,
       {int? folderId}) async {
-    final result = await showDialog<({String name, String? formatId})>(
+    final result = await showDialog<({String name, String? formatId, bool isBox})>(
       context: context,
-      builder: (ctx) => _CreateTeamDialog(),
+      builder: (ctx) => const _CreateTeamDialog(),
     );
     if (result != null && result.name.isNotEmpty) {
       await createTeam(ref, result.name,
-          folderId: folderId, formatLabel: result.formatId);
+          folderId: folderId,
+          formatLabel: result.formatId,
+          isBox: result.isBox);
     }
   }
 
@@ -616,12 +619,22 @@ class _TeamTile extends ConsumerWidget {
             ),
         ],
       ),
-      title: Text(team.name),
+      title: Row(
+        children: [
+          if (team.isBox) ...[
+            Icon(Icons.inventory_2_outlined,
+                size: 14,
+                color: colorScheme.onSurfaceVariant),
+            const SizedBox(width: 4),
+          ],
+          Expanded(child: Text(team.name)),
+        ],
+      ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Mini sprite row — 6 slots, Poké Ball for empty
+          // Mini sprite row — 6 slots (first 6 shown for boxes)
           _TeamSpriteRow(teamId: team.id),
           if (hasError)
             Text(
@@ -782,6 +795,7 @@ class _CreateTeamDialog extends ConsumerStatefulWidget {
 class _CreateTeamDialogState extends ConsumerState<_CreateTeamDialog> {
   final _ctrl = TextEditingController();
   GameFormat? _selectedFormat;
+  bool _isBox = false;
 
   @override
   void dispose() {
@@ -807,18 +821,48 @@ class _CreateTeamDialogState extends ConsumerState<_CreateTeamDialog> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
+    final maxBoxSize =
+        ref.watch(maxBoxSizeProvider).asData?.value ?? kDefaultMaxBoxSize;
+
     return AlertDialog(
       title: const Text('New Team'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Team type toggle ────────────────────────────────────────────────
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(
+                value: false,
+                icon: Icon(Icons.groups_outlined),
+                label: Text('Team'),
+              ),
+              ButtonSegment(
+                value: true,
+                icon: Icon(Icons.inventory_2_outlined),
+                label: Text('Box'),
+              ),
+            ],
+            selected: {_isBox},
+            onSelectionChanged: (s) => setState(() => _isBox = s.first),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _isBox
+                ? 'A box holds up to $maxBoxSize Pokémon.'
+                : 'A team holds up to 6 Pokémon.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 12),
           TextField(
             controller: _ctrl,
             autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'Team name',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              hintText: _isBox ? 'Box name' : 'Team name',
+              border: const OutlineInputBorder(),
               isDense: true,
             ),
             textCapitalization: TextCapitalization.words,
@@ -872,7 +916,8 @@ class _CreateTeamDialogState extends ConsumerState<_CreateTeamDialog> {
   void _submit() {
     Navigator.pop(context, (
       name: _ctrl.text.trim(),
-      formatId: _selectedFormat?.id, // store format id (e.g. "gen9")
+      formatId: _selectedFormat?.id,
+      isBox: _isBox,
     ));
   }
 }

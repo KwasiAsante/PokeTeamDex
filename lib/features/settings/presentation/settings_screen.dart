@@ -179,11 +179,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   .setUseFormatSprites(v),
             ),
           ),
-          // ── Box / team size ────────────────────────────────────────────────
+          // ── Box size ───────────────────────────────────────────────────────
           const SizedBox(height: 32),
           const Divider(),
           const SizedBox(height: 16),
-          _SectionHeader('Team Size'),
+          _SectionHeader('Box Size'),
           const SizedBox(height: 8),
           _BoxSizeTile(),
 
@@ -457,7 +457,7 @@ class _BoxSizeTileState extends ConsumerState<_BoxSizeTile> {
   }
 
   Future<void> _loadValue() async {
-    final v = await ref.read(appConfigRepositoryProvider).getMaxPokemonPerTeam();
+    final v = await ref.read(appConfigRepositoryProvider).getMaxBoxSize();
     if (mounted) _ctrl.text = v.toString();
   }
 
@@ -471,7 +471,7 @@ class _BoxSizeTileState extends ConsumerState<_BoxSizeTile> {
     final v = int.tryParse(_ctrl.text.trim());
     if (v == null) return;
     await ref.read(appConfigRepositoryProvider)
-        .setMaxPokemonPerTeam(v.clamp(1, kMaxPokemonPerTeamLimit));
+        .setMaxBoxSize(v.clamp(1, kMaxBoxSizeLimit));
     if (mounted) {
       setState(() => _dirty = false);
       showAppSnackBar(context, 'Team size saved');
@@ -484,13 +484,13 @@ class _BoxSizeTileState extends ConsumerState<_BoxSizeTile> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Max Pokémon per team',
+          'Max Pokémon per box',
           style: Theme.of(context).textTheme.labelLarge,
         ),
         const SizedBox(height: 4),
         Text(
-          'How many Pokémon slots each team shows (1–$kMaxPokemonPerTeamLimit). '
-          'Set to 6 for standard battles, higher for storage boxes.',
+          'How many Pokémon slots a Box holds (1–$kMaxBoxSizeLimit). '
+          'Does not affect regular teams, which always have 6 slots.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),

@@ -19,7 +19,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -100,6 +100,9 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 10) {
             await m.addColumn(pokemonInstances, pokemonInstances.remoteId);
+          }
+          if (from < 11) {
+            await m.addColumn(teams, teams.isBox);
           }
         },
       );

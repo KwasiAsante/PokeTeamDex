@@ -7,12 +7,12 @@ const _kUseFormatSprites = 'use_format_sprites';
 const _kSeedColor = 'seed_color';
 const _kThemeMode = 'theme_mode';
 const _kPsDirectory = 'ps_directory';
-const _kMaxPokemonPerTeam = 'max_pokemon_per_team';
+const _kMaxBoxSize = 'max_box_size';
 const kDefaultApiBaseUrl = 'https://poketeamdex.duckdns.org';
 // Default seed colour — Pokéball red
 const kDefaultSeedColor = 0xFFCC0000;
-const kDefaultMaxPokemonPerTeam = 6;
-const kMaxPokemonPerTeamLimit = 60;
+const kDefaultMaxBoxSize = 60;
+const kMaxBoxSizeLimit = 60;
 
 class AppConfigRepository {
   AppConfigRepository(this._db);
@@ -106,17 +106,17 @@ class AppConfigRepository {
   Stream<String?> watchPsDirectory() =>
       watch(_kPsDirectory).map((v) => (v == null || v.isEmpty) ? null : v);
 
-  // ── Max Pokémon per team (box size) ───────────────────────────────────────
+  // ── Max Pokémon per box ───────────────────────────────────────────────────
 
-  Future<int> getMaxPokemonPerTeam() async =>
-      (int.tryParse(await get(_kMaxPokemonPerTeam) ?? '') ?? kDefaultMaxPokemonPerTeam)
-          .clamp(1, kMaxPokemonPerTeamLimit);
+  Future<int> getMaxBoxSize() async =>
+      (int.tryParse(await get(_kMaxBoxSize) ?? '') ?? kDefaultMaxBoxSize)
+          .clamp(1, kMaxBoxSizeLimit);
 
-  Future<void> setMaxPokemonPerTeam(int value) =>
-      set(_kMaxPokemonPerTeam, value.clamp(1, kMaxPokemonPerTeamLimit).toString());
+  Future<void> setMaxBoxSize(int value) =>
+      set(_kMaxBoxSize, value.clamp(1, kMaxBoxSizeLimit).toString());
 
-  Stream<int> watchMaxPokemonPerTeam() =>
-      watch(_kMaxPokemonPerTeam).map((v) =>
-          (int.tryParse(v ?? '') ?? kDefaultMaxPokemonPerTeam)
-              .clamp(1, kMaxPokemonPerTeamLimit));
+  Stream<int> watchMaxBoxSize() =>
+      watch(_kMaxBoxSize).map((v) =>
+          (int.tryParse(v ?? '') ?? kDefaultMaxBoxSize)
+              .clamp(1, kMaxBoxSizeLimit));
 }
