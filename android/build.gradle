@@ -5,10 +5,16 @@ allprojects {
     }
 }
 
+// Flutter expects APK artifacts at <project_root>/build/app/outputs/…
+// This redirect is required for flutter build apk to locate the output.
+rootProject.buildDir = "../build"
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
 subprojects {
     project.evaluationDependsOn(":app")
 }
 
 tasks.register("clean", Delete) {
-    delete rootProject.layout.buildDirectory
+    delete rootProject.buildDir
 }

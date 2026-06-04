@@ -107,10 +107,10 @@ jobs:
         run: flutter build windows --release
 
       - name: Install WiX Toolset v4
-        run: dotnet tool install --global wix
+        run: dotnet tool install --global wix --version 4.0.5
 
       - name: Add WiX UI extension
-        run: wix extension add --global WixToolset.UI.wixext
+        run: wix extension add --global WixToolset.UI.wixext/4.0.5
 
       - name: Build MSI
         run: |
