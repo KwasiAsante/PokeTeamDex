@@ -36,7 +36,7 @@ class SyncService {
   final MetaRepository metaRepo;
   final TeamSyncApi api;
   final AppDatabase db;
-  final SyncStateNotifier notifier;
+  final SyncNotifier notifier;
 
   bool _running = false;
 

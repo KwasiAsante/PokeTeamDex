@@ -10,27 +10,38 @@ import 'package:poke_team_dex/services/sync/sync_status.dart';
 
 // ── Sync state ────────────────────────────────────────────────────────────────
 
+/// Minimal interface used by [SyncService] so the notifier can be faked in
+/// tests without needing a Riverpod [ProviderContainer].
+abstract class SyncNotifier {
+  void setSyncing();
+  void setSuccess();
+  void setError(String message);
+}
+
 final syncStateProvider = NotifierProvider<SyncStateNotifier, SyncState>(
   SyncStateNotifier.new,
 );
 
-class SyncStateNotifier extends Notifier<SyncState> {
+class SyncStateNotifier extends Notifier<SyncState> implements SyncNotifier {
   @override
   SyncState build() => const SyncState();
 
   // Clear any previous error when starting a new cycle so stale error
   // messages aren't shown while the new sync is in progress.
+  @override
   void setSyncing() => state = state.copyWith(
         status: SyncStatus.syncing,
         errorMessage: null,
       );
 
+  @override
   void setSuccess() => state = state.copyWith(
         status: SyncStatus.success,
         lastSyncAt: DateTime.now(),
         errorMessage: null,
       );
 
+  @override
   void setError(String message) => state = state.copyWith(
         status: SyncStatus.error,
         errorMessage: message,
