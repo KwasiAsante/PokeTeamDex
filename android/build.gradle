@@ -15,6 +15,12 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+gradle.afterProject { proj ->
+    if (proj.plugins.hasPlugin("com.android.library") || proj.plugins.hasPlugin("com.android.application")) {
+        proj.android.defaultConfig.minSdkVersion 24
+    }
+}
+
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
