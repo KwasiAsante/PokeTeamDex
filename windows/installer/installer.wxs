@@ -35,52 +35,35 @@
     <MediaTemplate EmbedCab="yes" />
 
     <!--
-      WixUI_Mondo: License → Setup Type → Directory → Feature tree → Install → Finish.
-      Choosing "Custom" exposes directory selection and optional feature toggles.
+      WixUI_InstallDir: License → Install Directory (with Browse button) → Install → Finish.
+      Simpler and more reliable than WixUI_Mondo for single-directory apps.
     -->
-    <ui:WixUI Id="WixUI_Mondo" />
+    <ui:WixUI Id="WixUI_InstallDir" />
     <WixVariable Id="WixUILicenseRtf" Value="$(sys.SOURCEFILEDIR)license.rtf" />
 
+    <!-- Required by WixUI_InstallDir to know which property holds the install path -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
     <!-- "Launch PokeTeamDex" checkbox on the Finish screen, ticked by default.
-         WiX 4's ExitDialog already calls WixShellExec (from Util extension) when
-         WIXUI_EXITDIALOGOPTIONALCHECKBOX=1 and Finish is clicked — no custom
-         InstallUISequence entry needed. -->
+         WiX 4's ExitDialog (from Util extension) wires this up automatically. -->
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch PokeTeamDex" />
 
-    <!-- Resolve [INSTALLFOLDER] into WixShellExecTarget after install completes
-         but before ExitDialog is shown (ExecuteAction = sequence 1300). -->
+    <!-- Resolve [INSTALLFOLDER] after install, before ExitDialog is shown -->
     <SetProperty Id="WixShellExecTarget"
       Value="[INSTALLFOLDER]poke_team_dex.exe"
       Sequence="ui"
       After="ExecuteAction" />
 
-    <!-- ── Features ─────────────────────────────────────────────────── -->
+    <!-- ── Single feature — all components always installed ───────────── -->
 
-    <!-- ProductComponents is harvested by `wix harvest dir` in CI
-         and compiled from windows/installer/components.wxs -->
-    <Feature Id="MainApplication"
+    <Feature Id="Complete"
              Title="PokeTeamDex"
-             Description="The PokeTeamDex application (required)."
              Level="1"
              AllowAdvertise="no"
              AllowAbsent="no">
       <ComponentGroupRef Id="ProductComponents" />
-    </Feature>
-
-    <Feature Id="StartMenuShortcut"
-             Title="Start Menu Shortcut"
-             Description="Add PokeTeamDex to the Start Menu."
-             Level="1"
-             AllowAdvertise="no">
       <ComponentRef Id="StartMenuShortcutComp" />
-    </Feature>
-
-    <Feature Id="DesktopShortcut"
-             Title="Desktop Shortcut"
-             Description="Create a shortcut on the Desktop."
-             Level="1"
-             AllowAdvertise="no">
       <ComponentRef Id="DesktopShortcutComp" />
     </Feature>
   </Package>
