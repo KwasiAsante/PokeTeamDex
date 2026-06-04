@@ -1,6 +1,6 @@
 # PokeTeamDex — Progress Tracker
 
-> Updated 2026-06-03 after chain row navigation (PR #84).
+> Updated 2026-06-03 after snackbar migration (PR #85).
 
 ---
 
@@ -207,7 +207,7 @@
 - [x] **Skeleton loaders in machine tiles** — replaced `LinearProgressIndicator` with `SkeletonBox` in move and item detail `_MachineTile`
 - [x] **Snackbar → floating** — `SnackBarBehavior.floating` applied to all 12 `showSnackBar` calls across settings, sync monitor, teams, slot picker, slot config, team detail screens
 - [x] **Error states** — add a branded error illustration and a clear retry CTA; current `ErrorState` widget is plain text
-- [ ] **Snackbar → toast migration** — use Material 3 `SnackBar` styling consistently; avoid stacking snackbars
+- [x] **Snackbar → toast migration** — use Material 3 `SnackBar` styling consistently; avoid stacking snackbars
 - [x] **Haptic feedback** — mediumImpact on slot card long-press; lightImpact on Showdown export copy
 
 ### Accessibility
