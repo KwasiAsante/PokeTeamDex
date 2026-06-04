@@ -84,7 +84,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ needs.create-release.outputs.tag }}" \
-            "build/app/outputs/flutter-apk/PokeTeamDex-${{ needs.create-release.outputs.tag }}.apk"
+            "build/app/outputs/flutter-apk/PokeTeamDex-${{ needs.create-release.outputs.tag }}.apk" \
+            --clobber
 
   # ── Windows MSI + EXE ─────────────────────────────────────────────────────
   build-windows:
@@ -163,7 +164,8 @@ jobs:
         run: |
           gh release upload "${{ needs.create-release.outputs.tag }}" \
             "PokeTeamDex-${{ needs.create-release.outputs.tag }}-Setup.msi" \
-            "PokeTeamDex-${{ needs.create-release.outputs.tag }}-Setup.exe"
+            "PokeTeamDex-${{ needs.create-release.outputs.tag }}-Setup.exe" \
+            --clobber
 
   # ── Backend Docker image ──────────────────────────────────────────────────
   build-backend-docker:
