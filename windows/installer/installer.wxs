@@ -38,19 +38,22 @@
       WixUI_Mondo: License → Setup Type → Directory → Feature tree → Install → Finish.
       Choosing "Custom" exposes directory selection and optional feature toggles.
     -->
-    <ui:WixUI Id="WixUI_Mondo">
-      <ui:Publish Dialog="ExitDlg" Control="Finish" Event="DoAction" Value="LaunchApp">
-        WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed
-      </ui:Publish>
-    </ui:WixUI>
+    <ui:WixUI Id="WixUI_Mondo" />
     <WixVariable Id="WixUILicenseRtf" Value="$(sys.SOURCEFILEDIR)license.rtf" />
 
-    <!-- Launch checkbox on the Finish screen (ticked by default) -->
+    <!-- "Launch PokeTeamDex" checkbox on the Finish screen, ticked by default -->
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch PokeTeamDex" />
 
-    <!-- Shell-launch the exe after install when checkbox is ticked -->
-    <Property Id="WixShellExecTarget" Value="[INSTALLFOLDER]poke_team_dex.exe" />
+    <!--
+      Shell-launch the exe after install when the checkbox is ticked.
+      SetProperty resolves [INSTALLFOLDER] at UI-sequence time (Property value
+      would be treated as a literal string, not expanded).
+    -->
+    <SetProperty Id="WixShellExecTarget"
+      Value="[INSTALLFOLDER]poke_team_dex.exe"
+      Sequence="ui"
+      Before="LaunchApp" />
     <CustomAction Id="LaunchApp"
       BinaryRef="Wix4UtilCA_X64"
       DllEntry="WixShellExec"
@@ -143,6 +146,12 @@
     <InstallExecuteSequence>
       <RemoveExistingProducts After="InstallInitialize" />
     </InstallExecuteSequence>
+    <InstallUISequence>
+      <!-- Run after the user clicks Finish, only on fresh install, only if checkbox ticked -->
+      <Custom Action="LaunchApp" After="ExitDialog">
+        WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed
+      </Custom>
+    </InstallUISequence>
   </Fragment>
 
 </Wix>
