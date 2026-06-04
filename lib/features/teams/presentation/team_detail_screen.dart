@@ -22,6 +22,7 @@ import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
+import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
@@ -225,21 +226,11 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
       await Clipboard.setData(ClipboardData(text: text));
       HapticFeedback.lightImpact();
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text('Showdown export copied to clipboard'),
-          ),
-        );
+        showAppSnackBar(context, 'Showdown export copied to clipboard');
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text('Export failed — try again'),
-          ),
-        );
+        showAppSnackBar(context, 'Export failed — try again', isError: true);
       }
     }
   }

@@ -16,6 +16,7 @@ import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
@@ -181,12 +182,7 @@ class _SlotPickerScreenState extends ConsumerState<SlotPickerScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text('Failed to add Pokémon: $e'),
-          ),
-        );
+        showAppSnackBar(context, 'Failed to add Pokémon: $e', isError: true);
         setState(() => _saving = false);
       }
     }

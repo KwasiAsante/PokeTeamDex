@@ -19,6 +19,7 @@ import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
+import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/stat_bar.dart';
@@ -1901,19 +1902,12 @@ class _AddToTeamSheetState extends State<_AddToTeamSheet> {
 
         Navigator.pop(context); // close sheet
 
-        messenger.hideCurrentSnackBar();
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              '${widget.pokemon.name.toCapitalCase()} added to '
-              '$teamName · Slot $slot',
-            ),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 5),
-            action: SnackBarAction(
-              label: 'View team',
-              onPressed: () => router.push('/teams/$teamId'),
-            ),
+        showAppSnackBar(
+          context,
+          '${widget.pokemon.name.toCapitalCase()} added to $teamName · Slot $slot',
+          action: SnackBarAction(
+            label: 'View team',
+            onPressed: () => router.push('/teams/$teamId'),
           ),
         );
       }
@@ -2329,13 +2323,9 @@ class _AddToTeamTabState extends State<_AddToTeamTab> {
             onPressed: _selectedSlot == null
                 ? null
                 : () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Team Builder coming soon — ${pokemon.name.toCapitalCase()} queued for slot $_selectedSlot!',
-                        ),
-                        behavior: SnackBarBehavior.floating,
-                      ),
+                    showAppSnackBar(
+                      context,
+                      'Team Builder coming soon — ${pokemon.name.toCapitalCase()} queued for slot $_selectedSlot!',
                     );
                   },
             icon: const Icon(Icons.add),

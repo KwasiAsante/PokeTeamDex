@@ -33,6 +33,7 @@ import 'package:poke_team_dex/features/teams/presentation/instance_chain_view.da
 import 'package:poke_team_dex/features/teams/presentation/instance_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/services/ps_export_service.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
+import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 import 'package:poke_team_dex/shared/widgets/move_type_chip.dart';
@@ -397,11 +398,10 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   Future<void> _save(TeamSlot existing) async {
     if (_evTotal > 510) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text('EV total exceeds 510 — reduce before saving.'),
-        ),
+      showAppSnackBar(
+        context,
+        'EV total exceeds 510 — reduce before saving.',
+        isError: true,
       );
       return;
     }
@@ -527,22 +527,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
       if (mounted) {
         setState(() => _dirty = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text('Saved'),
-          ),
-        );
+        showAppSnackBar(context, 'Saved');
         if (!widget.embedded) context.pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text('Save failed: $e'),
-          ),
-        );
+        showAppSnackBar(context, 'Save failed: $e', isError: true);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -2360,13 +2350,10 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     // Block if the target already has an origin.
     if (targetSlot.instanceId != null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(
-            'That slot already has an origin. Unlink it from its config first.',
-          ),
-        ),
+      showAppSnackBar(
+        context,
+        'That slot already has an origin. Unlink it from its config first.',
+        isError: true,
       );
       return;
     }
@@ -2444,14 +2431,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     );
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text(
-          '"$speciesName — Journey" created and linked as child.',
-        ),
-      ),
-    );
+    showAppSnackBar(context, '"$speciesName — Journey" created and linked as child.');
   }
 
   // ── Link-type chooser ──
@@ -2661,13 +2641,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     );
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text(
-            'Copied to "$targetTeamName" slot $targetSlotNum and linked.'),
-      ),
-    );
+    showAppSnackBar(context, 'Copied to "$targetTeamName" slot $targetSlotNum and linked.');
   }
 
   void _unlink() => setState(() { _instanceId = null; _dirty = true; });

@@ -1,6 +1,6 @@
 # PokeTeamDex — Progress Tracker
 
-> Updated 2026-06-03 after instance sync + full slot config sync (PR #82).
+> Updated 2026-06-03 after chain row navigation (PR #84).
 
 ---
 
@@ -90,8 +90,8 @@
 - [x] **gen-mechanics** — slot config UI gates sections by generation: abilities/nature hidden Gen 1–2, held item hidden Gen 1, shiny toggle hidden Gen 1, friendship hidden Gen 1, EVs labelled "Stat Experience" Gen 1–2, IVs renamed "DVs" with max 15, Gen 1 shows 5 stats (HP/Atk/Def/Spc/Spe)
 - [x] **gen-sprites** — PS transparent sprites for Gen 1–5 (gen5ani animated GIFs for BW), HOME/official artwork for Gen 6+; "Use generation sprites" toggle in Settings
 - [x] **gen-learnsets** — move picker filtered by format version groups; game formats check exact version-group, gen formats union all groups in that gen; validation flags illegal moves/abilities/items
-- [ ] **banlist** — Layer 2 competitive ban checking (Ubers, clause violations, format-specific bans) *(deferred)*
-- [ ] **custom-formats** — custom format builder UI *(deferred)*
+- [ ] **banlist** — Layer 2 competitive ban checking (Ubers, clause violations, format-specific bans) *(deferred — post-release)*
+- [ ] **custom-formats** — custom format builder UI *(deferred — post-release)*
 
 ---
 
@@ -152,7 +152,6 @@
 ### Navigation & Shell
 
 - [x] **Adaptive nav** — `BottomNavigationBar` < 600dp, `NavigationRail` 600–840dp, permanent `NavigationDrawer` > 840dp; overflow fixes for team tile sprites, slot card type badges, location encounter table
-- [ ] **App-wide back gesture / breadcrumb** — on wide layouts the detail screen should open in a side panel rather than pushing a new route (master-detail pattern for Pokédex, Teams)
 - [ ] **Pokéathlon tab** — removed; PokéAPI `/pokeathlon-stat/` only returns nature-affinity data, not per-Pokémon base values — no data source available
 - [x] **Connectivity status button** — wifi icon + coloured dot on every screen's AppBar; green = online + signed in, amber = online + not signed in, red = offline; tapping opens sheet with live Device / PokéAPI / Backend API / Account status rows + refresh button
 - [x] **Teams tab** — shows "On your teams" list (team name, slot #, nickname, format label, tap to navigate); "Add to a team" sheet with team picker → slot grid showing current occupants; replacement confirmation dialog; "New team" creation from the sheet; inserts slot with defaults (L50, IVs 31) and queues sync op
@@ -265,7 +264,13 @@
 - [x] **Data model** — `pokemon_instances` table (schema v9): `id`, `parent_instance_id` (nullable self-ref chain), `nickname_aliases` (JSON), `inherited_ribbons` (JSON); `team_slots.instance_id` nullable FK; `PokemonInstanceRepository` with full CRUD + `getChain` / `getDirectChildren`
 - [x] **Link UI** — "Pokémon Identity" section in slot config; link type chooser (child vs origin); instance picker sheet; chain view showing ancestors + current slot + direct children with origin/child badges; "Add child" button on linked state; copy-to-team-slot destination picker (new team or empty slot in existing team)
 - [x] **Data inheritance** — ribbon merging from `inheritedRibbons`; "Previously known as" alias display when nickname differs from parent; gender/isShiny propagated when copying to child slot
-- [ ] **Navigation** — tapping a chain row navigates to that slot's config screen
+- [x] **Navigation** — tapping a chain row navigates to that slot's config screen
+
+---
+
+## Optional / Post-release Enhancements
+
+- [ ] **Master-detail side panel** — on wide layouts (> 840dp) show Pokédex list + detail and Teams list + team detail as side-by-side panels rather than full navigations; primarily a desktop UX polish item, irrelevant on mobile
 
 ---
 

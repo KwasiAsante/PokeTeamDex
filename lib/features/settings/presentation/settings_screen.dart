@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
@@ -63,12 +64,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(appConfigRepositoryProvider).setApiBaseUrl(url);
     if (mounted) {
       setState(() { _saving = false; _urlDirty = false; });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('API URL saved'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showAppSnackBar(context, 'API URL saved');
     }
   }
 
@@ -248,14 +244,12 @@ void _syncNow(BuildContext context, WidgetRef ref) {
   final loggedIn = token != null && token.isNotEmpty;
   if (!loggedIn) {
     final router = GoRouter.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: const Text('Sign in to sync your teams to the cloud.'),
-        action: SnackBarAction(
-          label: 'Sign In',
-          onPressed: () => router.push('/login'),
-        ),
+    showAppSnackBar(
+      context,
+      'Sign in to sync your teams to the cloud.',
+      action: SnackBarAction(
+        label: 'Sign In',
+        onPressed: () => router.push('/login'),
       ),
     );
     return;

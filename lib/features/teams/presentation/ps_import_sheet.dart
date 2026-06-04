@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
+import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 
 // ── Parser models ─────────────────────────────────────────────────────────────
 
@@ -323,11 +324,10 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
       Navigator.pop(context);
 
       if (errors.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(
-              'Team imported with ${errors.length} skipped slot(s):\n${errors.join('\n')}'),
-        ));
+        showAppSnackBar(
+          context,
+          'Team imported with ${errors.length} skipped slot(s):\n${errors.join('\n')}',
+        );
       }
 
       context.push('/teams/$teamId');
