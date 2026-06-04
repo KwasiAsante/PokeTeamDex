@@ -90,8 +90,8 @@
 - [x] **gen-mechanics** — slot config UI gates sections by generation: abilities/nature hidden Gen 1–2, held item hidden Gen 1, shiny toggle hidden Gen 1, friendship hidden Gen 1, EVs labelled "Stat Experience" Gen 1–2, IVs renamed "DVs" with max 15, Gen 1 shows 5 stats (HP/Atk/Def/Spc/Spe)
 - [x] **gen-sprites** — PS transparent sprites for Gen 1–5 (gen5ani animated GIFs for BW), HOME/official artwork for Gen 6+; "Use generation sprites" toggle in Settings
 - [x] **gen-learnsets** — move picker filtered by format version groups; game formats check exact version-group, gen formats union all groups in that gen; validation flags illegal moves/abilities/items
-- [ ] **banlist** — Layer 2 competitive ban checking (Ubers, clause violations, format-specific bans) *(deferred)*
-- [ ] **custom-formats** — custom format builder UI *(deferred)*
+- [ ] **banlist** — Layer 2 competitive ban checking (Ubers, clause violations, format-specific bans) *(deferred — post-release)*
+- [ ] **custom-formats** — custom format builder UI *(deferred — post-release)*
 
 ---
 
