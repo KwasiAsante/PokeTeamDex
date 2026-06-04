@@ -112,14 +112,26 @@ jobs:
       - name: Add WiX UI extension
         run: wix extension add --global WixToolset.UI.wixext/4.0.5
 
-      - name: Harvest Windows build output
+      - name: Generate WiX component list from Flutter build output
         run: |
-          wix harvest dir "build\windows\x64\runner\Release" `
-            -cg ProductComponents `
-            -dr INSTALLFOLDER `
-            -template fragment `
-            -srd `
-            -out "windows\installer\components.wxs"
+          $buildDir = "$PWD\build\windows\x64\runner\Release"
+          $uid = 0
+          $lines = [System.Collections.Generic.List[string]]::new()
+          $lines.Add('<?xml version="1.0" encoding="UTF-8"?>')
+          $lines.Add('<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">')
+          $lines.Add('  <Fragment>')
+          $lines.Add('    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">')
+          Get-ChildItem $buildDir -Recurse -File | ForEach-Object {
+            $uid++
+            $rel  = $_.FullName.Substring($buildDir.Length + 1)
+            $dir  = [IO.Path]::GetDirectoryName($rel)
+            $sub  = if ($dir) { " Subdirectory=`"$dir`"" } else { "" }
+            $lines.Add("      <Component Id=`"C$uid`"$sub><File Source=`"$($_.FullName)`" KeyPath=`"yes`" /></Component>")
+          }
+          $lines.Add('    </ComponentGroup>')
+          $lines.Add('  </Fragment>')
+          $lines.Add('</Wix>')
+          $lines -join "`n" | Set-Content "windows\installer\components.wxs" -Encoding utf8NoBOM
 
       - name: Build MSI
         run: |
