@@ -179,6 +179,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   .setUseFormatSprites(v),
             ),
           ),
+          // ── Box / team size ────────────────────────────────────────────────
+          const SizedBox(height: 32),
+          const Divider(),
+          const SizedBox(height: 16),
+          _SectionHeader('Team Size'),
+          const SizedBox(height: 8),
+          _BoxSizeTile(),
+
           // ── Pokémon Showdown sync (desktop only) ──────────────────────────
           if (!kIsWeb &&
               (Platform.isWindows ||
@@ -426,6 +434,92 @@ class _ColorSwatch extends StatelessWidget {
               : null,
         ),
       ),
+    );
+  }
+}
+
+// ── Box / team size ───────────────────────────────────────────────────────────
+
+class _BoxSizeTile extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_BoxSizeTile> createState() => _BoxSizeTileState();
+}
+
+class _BoxSizeTileState extends ConsumerState<_BoxSizeTile> {
+  late TextEditingController _ctrl;
+  bool _dirty = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController();
+    _loadValue();
+  }
+
+  Future<void> _loadValue() async {
+    final v = await ref.read(appConfigRepositoryProvider).getMaxPokemonPerTeam();
+    if (mounted) _ctrl.text = v.toString();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final v = int.tryParse(_ctrl.text.trim());
+    if (v == null) return;
+    await ref.read(appConfigRepositoryProvider)
+        .setMaxPokemonPerTeam(v.clamp(1, kMaxPokemonPerTeamLimit));
+    if (mounted) {
+      setState(() => _dirty = false);
+      showAppSnackBar(context, 'Team size saved');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Max Pokémon per team',
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'How many Pokémon slots each team shows (1–$kMaxPokemonPerTeamLimit). '
+          'Set to 6 for standard battles, higher for storage boxes.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            SizedBox(
+              width: 80,
+              child: TextField(
+                controller: _ctrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                ),
+                onChanged: (_) => setState(() => _dirty = true),
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: _dirty ? _save : null,
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

@@ -85,6 +85,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
     final isWide = MediaQuery.sizeOf(context).width > 840;
     final teamAsync = ref.watch(teamByIdProvider(widget.teamId));
     final slotsAsync = ref.watch(teamSlotsProvider(widget.teamId));
+    final maxSlots = ref.watch(maxPokemonPerTeamProvider).asData?.value ?? 6;
 
     // Reset selected slot when switching to narrow layout
     if (!isWide && _selectedSlot != null) {
@@ -152,11 +153,12 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
               loading: () => const LoadingState(),
               error: (e, _) => ErrorState(error: e),
               data: (slots) => isWide
-                  ? _buildWideLayout(slots, team)
+                  ? _buildWideLayout(slots, team, maxSlots)
                   : _SlotList(
                       teamId: widget.teamId,
                       slots: slots,
                       formatId: team.formatLabel,
+                      maxSlots: maxSlots,
                     ),
             ),
           );
@@ -165,7 +167,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
     );
   }
 
-  Widget _buildWideLayout(List<TeamSlot> slots, Team team) {
+  Widget _buildWideLayout(List<TeamSlot> slots, Team team, int maxSlots) {
     return Row(
       children: [
         Semantics(
@@ -178,6 +180,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
               slots: slots,
               formatId: team.formatLabel,
               selectedSlot: _selectedSlot,
+              maxSlots: maxSlots,
               onSlotTap: (slotNumber) {
                 _canCloseNotifier.value = null;
                 setState(() => _selectedSlot = slotNumber);
@@ -334,6 +337,7 @@ class _SlotList extends ConsumerWidget {
   final List<TeamSlot> slots;
   final String? formatId;
   final int? selectedSlot;
+  final int maxSlots;
   final void Function(int slotNumber)? onSlotTap;
 
   const _SlotList({
@@ -341,14 +345,15 @@ class _SlotList extends ConsumerWidget {
     required this.slots,
     this.formatId,
     this.selectedSlot,
+    this.maxSlots = 6,
     this.onSlotTap,
   });
 
-  // Build a 6-element growable list keyed by position (0-based); null = empty slot.
+  // Build a maxSlots-element growable list keyed by position (0-based); null = empty slot.
   List<TeamSlot?> _positions() {
-    final pos = List<TeamSlot?>.filled(6, null, growable: true);
+    final pos = List<TeamSlot?>.filled(maxSlots, null, growable: true);
     for (final s in slots) {
-      if (s.slot >= 1 && s.slot <= 6) pos[s.slot - 1] = s;
+      if (s.slot >= 1 && s.slot <= maxSlots) pos[s.slot - 1] = s;
     }
     return pos;
   }
@@ -360,7 +365,7 @@ class _SlotList extends ConsumerWidget {
     pos.insert(newIndex, moved);
 
     final repo = ref.read(teamSlotRepositoryProvider);
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < maxSlots; i++) {
       final s = pos[i];
       if (s != null && s.slot != i + 1) {
         await repo.updateSlotPosition(s.id, i + 1);
@@ -376,7 +381,7 @@ class _SlotList extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       buildDefaultDragHandles: false, // explicit handles inside each card
       onReorder: (o, n) => _onReorder(ref, o, n),
-      itemCount: 6,
+      itemCount: maxSlots,
       itemBuilder: (_, i) {
         final slot = pos[i];
         return Padding(

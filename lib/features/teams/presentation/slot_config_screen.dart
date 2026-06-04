@@ -351,7 +351,17 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   }
 
   Future<void> _save(TeamSlot existing) async {
-    if (_evTotal > 510) {
+    // Resolve format to apply generation-specific validation rules.
+    final team = ref.read(teamByIdProvider(existing.teamId)).asData?.value;
+    final formatService = ref.read(formatServiceProvider);
+    final saveFormat = team?.formatLabel != null
+        ? formatService.formatById(team!.formatLabel!)
+        : null;
+    final saveGen = saveFormat?.gen;
+
+    // Gen 3+: 510 total EV cap. Gen 1-2 Stat Exp: no total cap, 252 per stat.
+    final hasTotalCap = saveGen == null || saveGen >= 3;
+    if (hasTotalCap && _evTotal > 510) {
       showAppSnackBar(
         context,
         'EV total exceeds 510 — reduce before saving.',
@@ -363,6 +373,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     try {
       final evs = _evCtrls.map((c) => (int.tryParse(c.text) ?? 0).clamp(0, 252)).toList();
       final ivs = _ivCtrls.map((c) => (int.tryParse(c.text) ?? 31).clamp(0, 31)).toList();
+      // Gen 1: no separate SpA/SpD — both mirror the single Special stat (index 3).
+      if (saveGen == 1) {
+        evs[4] = evs[3];
+        ivs[4] = ivs[3];
+      }
       final contest = _contestCtrls.map((c) => (int.tryParse(c.text) ?? 0).clamp(0, 255)).toList();
       final nickname = _nicknameCtrl.text.trim();
 
@@ -902,11 +917,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 const SizedBox(height: 8),
                 _buildContestStats(),
               ],
-              // ── Ribbons ──
-              const SizedBox(height: 24),
-              _SectionTitle('Ribbons'),
-              const SizedBox(height: 8),
-              _buildRibbons(),
+              // ── Ribbons (Gen 3+ only — introduced in Ruby/Sapphire) ──
+              if (mechanics == null || mechanics.gen >= 3) ...[
+                const SizedBox(height: 24),
+                _SectionTitle('Ribbons'),
+                const SizedBox(height: 8),
+                _buildRibbons(),
+              ],
               // ── Pokémon Instance ──
               const SizedBox(height: 24),
               _SectionTitle('Pokémon Identity'),
@@ -1182,6 +1199,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   Widget _buildBasics(GenerationMechanics? mechanics) {
     // Friendship exists from Gen 2 onward; Gen 1 has no friendship mechanic.
     final showFriendship = mechanics == null || mechanics.gen >= 2;
+    // Gender mechanic introduced in Gen 2; Gen 1 Pokémon have no gender.
+    final showGender = mechanics == null || mechanics.gen >= 2;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1207,19 +1226,21 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 8,
-          children: [
-            for (final g in [('male', '♂ Male'), ('female', '♀ Female'), ('genderless', '⚲ None')])
-              ChoiceChip(
-                label: Text(g.$2),
-                selected: _gender == g.$1,
-                onSelected: (_) =>
-                    setState(() { _gender = _gender == g.$1 ? null : g.$1; _dirty = true; }),
-              ),
-          ],
-        ),
+        if (showGender) ...[
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final g in [('male', '♂ Male'), ('female', '♀ Female'), ('genderless', '⚲ None')])
+                ChoiceChip(
+                  label: Text(g.$2),
+                  selected: _gender == g.$1,
+                  onSelected: (_) =>
+                      setState(() { _gender = _gender == g.$1 ? null : g.$1; _dirty = true; }),
+                ),
+            ],
+          ),
+        ],
         if (showFriendship) ...[
           const SizedBox(height: 8),
           Row(

@@ -74,3 +74,7 @@ final themeModeProvider = StreamProvider<ThemeMode>((ref) {
 final psDirectoryProvider = StreamProvider<String?>((ref) {
   return ref.watch(appConfigRepositoryProvider).watchPsDirectory();
 });
+
+final maxPokemonPerTeamProvider = StreamProvider<int>((ref) {
+  return ref.watch(appConfigRepositoryProvider).watchMaxPokemonPerTeam();
+});
