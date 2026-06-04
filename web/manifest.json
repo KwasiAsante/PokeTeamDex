@@ -1,6 +1,6 @@
 {
-    "name": "poke_team_dex",
-    "short_name": "poke_team_dex",
+    "name": "PokeTeamDex",
+    "short_name": "PokeTeamDex",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#ffffff",

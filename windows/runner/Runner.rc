@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.asante" "\0"
-            VALUE "FileDescription", "poke_team_dex" "\0"
+            VALUE "FileDescription", "PokeTeamDex" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "poke_team_dex" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2024 com.asante. All rights reserved." "\0"
+            VALUE "InternalName", "PokeTeamDex" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2024 Asante. All rights reserved." "\0"
             VALUE "OriginalFilename", "poke_team_dex.exe" "\0"
-            VALUE "ProductName", "poke_team_dex" "\0"
+            VALUE "ProductName", "PokeTeamDex" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
