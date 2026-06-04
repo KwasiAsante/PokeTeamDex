@@ -1,25 +1,27 @@
 import 'package:poke_team_dex/services/format/format_models.dart';
 
-const _psBase = 'https://play.pokemonshowdown.com/sprites';
+const _versionsBase = 'https://raw.githubusercontent.com/PokeAPI/sprites/'
+    'master/sprites/pokemon/versions';
 
-// Maps format game id → PS sprite directory name (for Gen 1-5 where PS
-// sprites have transparent backgrounds unlike PokéAPI's white-bg originals).
-const _gameIdToPsDir = <String, String>{
-  'rb':       'gen1',
-  'yellow':   'gen1',
-  'gs':       'gen2',
-  'crystal':  'gen2',
-  'rs':       'gen3',
-  'emerald':  'gen3',
-  'frlg':     'gen3',
-  'dp':       'gen4',
-  'platinum': 'gen4',
-  'hgss':     'gen4',
-  'bw':       'gen5ani',  // animated GIFs
-  'b2w2':     'gen5ani',
+// Maps format game id → PokeAPI versions path.
+// Uses raw.githubusercontent.com (CORS-safe) instead of play.pokemonshowdown.com
+// which blocks browser requests from Flutter Web.
+const _gameIdToVersionPath = <String, String>{
+  'rb':       'generation-i/red-blue',
+  'yellow':   'generation-i/yellow',
+  'gs':       'generation-ii/gold',
+  'crystal':  'generation-ii/crystal',
+  'rs':       'generation-iii/ruby-sapphire',
+  'emerald':  'generation-iii/emerald',
+  'frlg':     'generation-iii/firered-leafgreen',
+  'dp':       'generation-iv/diamond-pearl',
+  'platinum': 'generation-iv/platinum',
+  'hgss':     'generation-iv/heartgold-soulsilver',
+  'bw':       'generation-v/black-white',
+  'b2w2':     'generation-v/black-white',
 };
 
-// For general gen formats — use the latest game in that gen's PS sprites.
+// For general gen formats — use the most complete game in that gen.
 const _genToDefaultGameId = <int, String>{
   1: 'yellow',
   2: 'crystal',
@@ -31,10 +33,8 @@ const _genToDefaultGameId = <int, String>{
 /// Resolves the correct sprite URLs for a Pokémon given the team's format
 /// and the user's sprite-style preference.
 ///
-/// Gen 1-5 uses Pokémon Showdown sprites (transparent backgrounds).
+/// Gen 1-5 uses PokeAPI version sprites (raw.githubusercontent.com — CORS safe).
 /// Gen 6+ uses PokéAPI HOME / official artwork.
-///
-/// [pokemonName] must be the PokéAPI/PS name (e.g. "umbreon", "charizard-mega-x").
 ({String? defaultUrl, String? shinyUrl}) resolveSprite({
   required Map<String, dynamic>? sprites,
   required int pokemonId,
@@ -56,16 +56,22 @@ const _genToDefaultGameId = <int, String>{
       : _genToDefaultGameId[format.gen];
 
   if (gameId != null) {
-    final psDir = _gameIdToPsDir[gameId];
-    if (psDir != null) {
-      // Gen 1 has no shiny mechanic — use same sprite
+    final versionPath = _gameIdToVersionPath[gameId];
+    if (versionPath != null) {
+      // Gen 1 had no shiny mechanic — always use the default sprite.
       final noShiny = format.gen == 1;
-      final ext = psDir.contains('ani') ? '.gif' : '.png';
-      final shinyDir = noShiny ? psDir : '$psDir-shiny';
-      return (
-        defaultUrl: '$_psBase/$psDir/$pokemonName$ext',
-        shinyUrl: '$_psBase/$shinyDir/$pokemonName$ext',
-      );
+      // Gen 5 BW has animated GIF sprites.
+      final isAnimated = gameId == 'bw' || gameId == 'b2w2';
+      final ext = isAnimated ? '.gif' : '.png';
+      final animatedSegment = isAnimated ? '/animated' : '';
+
+      final defaultUrl =
+          '$_versionsBase/$versionPath$animatedSegment/$pokemonId$ext';
+      final shinyUrl = noShiny
+          ? defaultUrl
+          : '$_versionsBase/$versionPath${isAnimated ? '/animated' : ''}/shiny/$pokemonId$ext';
+
+      return (defaultUrl: defaultUrl, shinyUrl: shinyUrl);
     }
   }
 
