@@ -6,7 +6,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.routers import admin, auth, folders, instances, ps_data, sync, teams
 from app.routers.teams import slots_router
 
-app = FastAPI(title="PokeTeamDex API", version="1.0.0")
+app = FastAPI(
+    title="PokeTeamDex API",
+    version="1.0.0",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 app.add_middleware(
     CORSMiddleware,
