@@ -1,6 +1,6 @@
 # PokeTeamDex — Progress Tracker
 
-> Updated 2026-06-03 after unit tests (PR #86).
+> Updated 2026-06-03 after widget + integration tests (PR #87).
 
 ---
 
@@ -135,12 +135,12 @@
 - [x] Unit tests — `buildShowdownExport`
 - [x] Unit tests — stat formula calculator
 - [x] Unit tests — `filterFormChips`, `resolveZMove`, `gmaxMoveForSpecies`, `resolveMaxMove`, `GenerationMechanics.forGen`, `GameFormat`, `PsMoveEntry/PsItemEntry/PsAbilityEntry` (123 tests total across 7 files)
-- [ ] Widget tests — `TeamsScreen`, `TeamDetailScreen`, `PokemonDetailScreen`
-- [ ] Widget tests — slot config form (EV overflow, IV clamping)
-- [ ] Integration tests — full CRUD flow: create folder → team → add slots → verify Drift DB
-- [ ] Integration tests — offline → online sync (write offline, come online, verify push + pull)
-- [ ] Integration tests — conflict resolution (local newer, remote newer)
-- [ ] Manual test matrix — iOS, Android, Web (Chrome)
+- [x] Widget tests — `TeamsScreen`, `TeamDetailScreen`, `PokemonDetailScreen`
+- [x] Widget tests — slot config form (EV overflow, IV clamping)
+- [x] Integration tests — full CRUD flow: create folder → team → add slots → verify Drift DB
+- [x] Integration tests — conflict resolution (local newer, remote newer, remote deleted)
+- [ ] Integration tests — offline → online sync (write offline, come online, verify push + pull) *(requires HTTP mock layer; deferred post-release)*
+- [ ] Manual test matrix — iOS, Android, Web (Chrome) *(final pre-release gate)*
 
 ---
 
