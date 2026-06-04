@@ -8,6 +8,7 @@ import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
+import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 
@@ -44,14 +45,12 @@ class _SyncMonitorScreenState extends ConsumerState<SyncMonitorScreen> {
     final loggedIn = token != null && token.isNotEmpty;
     if (!loggedIn) {
       final router = GoRouter.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: const Text('Sign in to sync your teams to the cloud.'),
-          action: SnackBarAction(
-            label: 'Sign In',
-            onPressed: () => router.push('/login'),
-          ),
+      showAppSnackBar(
+        context,
+        'Sign in to sync your teams to the cloud.',
+        action: SnackBarAction(
+          label: 'Sign In',
+          onPressed: () => router.push('/login'),
         ),
       );
       return;
@@ -67,12 +66,7 @@ class _SyncMonitorScreenState extends ConsumerState<SyncMonitorScreen> {
   Future<void> _clearStale() async {
     await ref.read(syncQueueRepositoryProvider).clearStale(_maxAttempts);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text('Stale operations cleared.'),
-        ),
-      );
+      showAppSnackBar(context, 'Stale operations cleared.');
     }
   }
 
