@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 43200  # 30 days
 
+    # Set to true in local .env for Swagger UI; always false in production
+    debug: bool = False
+
     # Update notification
     app_version: str = "1.0.0"
     notify_update_secret: str = ""
