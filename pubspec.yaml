@@ -73,9 +73,30 @@ dev_dependencies:
   drift_dev: ^2.33.0
   build_runner: ^2.15.0
   mocktail: ^1.0.5
+  flutter_launcher_icons: ^0.14.3
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
+
+flutter_launcher_icons:
+  # Android icons are already generated via Android Studio (adaptive icons)
+  android: false
+  ios: true
+  image_path: "assets/images/app_icon.png"
+  remove_alpha_ios: true
+  macos:
+    generate: true
+    image_path: "assets/images/app_icon.png"
+  windows:
+    generate: true
+    image_path: "assets/images/app_icon.png"
+  linux:
+    generate: true
+    image_path: "assets/images/app_icon.png"
+  web:
+    generate: true
+    image_path: "assets/images/app_icon.png"
+    background_color: "#ffffff"
 
 # The following section is specific to Flutter packages.
 flutter:
