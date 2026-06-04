@@ -102,7 +102,11 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(pokemonInstances, pokemonInstances.remoteId);
           }
           if (from < 11) {
-            await m.addColumn(teams, teams.isBox);
+            // BoolColumn variance prevents m.addColumn — use raw SQL.
+            // Drift stores booleans as INTEGER; default 0 = false.
+            await customStatement(
+              'ALTER TABLE teams ADD COLUMN is_box INTEGER NOT NULL DEFAULT 0',
+            );
           }
         },
       );

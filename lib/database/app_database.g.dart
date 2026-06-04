@@ -562,6 +562,19 @@ class $TeamsTable extends Teams with TableInfo<$TeamsTable, Team> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _isBoxMeta = const VerificationMeta('isBox');
+  @override
+  late final GeneratedColumn<bool> isBox = GeneratedColumn<bool>(
+    'is_box',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_box" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _sortOrderMeta = const VerificationMeta(
     'sortOrder',
   );
@@ -632,6 +645,7 @@ class $TeamsTable extends Teams with TableInfo<$TeamsTable, Team> {
     name,
     remoteId,
     formatLabel,
+    isBox,
     sortOrder,
     isDeleted,
     syncStatus,
@@ -680,6 +694,12 @@ class $TeamsTable extends Teams with TableInfo<$TeamsTable, Team> {
           data['format_label']!,
           _formatLabelMeta,
         ),
+      );
+    }
+    if (data.containsKey('is_box')) {
+      context.handle(
+        _isBoxMeta,
+        isBox.isAcceptableOrUnknown(data['is_box']!, _isBoxMeta),
       );
     }
     if (data.containsKey('sort_order')) {
@@ -741,6 +761,10 @@ class $TeamsTable extends Teams with TableInfo<$TeamsTable, Team> {
         DriftSqlType.string,
         data['${effectivePrefix}format_label'],
       ),
+      isBox: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_box'],
+      )!,
       sortOrder: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}sort_order'],
@@ -776,6 +800,7 @@ class Team extends DataClass implements Insertable<Team> {
   final String name;
   final String? remoteId;
   final String? formatLabel;
+  final bool isBox;
   final int sortOrder;
   final bool isDeleted;
   final String syncStatus;
@@ -787,6 +812,7 @@ class Team extends DataClass implements Insertable<Team> {
     required this.name,
     this.remoteId,
     this.formatLabel,
+    required this.isBox,
     required this.sortOrder,
     required this.isDeleted,
     required this.syncStatus,
@@ -807,6 +833,7 @@ class Team extends DataClass implements Insertable<Team> {
     if (!nullToAbsent || formatLabel != null) {
       map['format_label'] = Variable<String>(formatLabel);
     }
+    map['is_box'] = Variable<bool>(isBox);
     map['sort_order'] = Variable<int>(sortOrder);
     map['is_deleted'] = Variable<bool>(isDeleted);
     map['sync_status'] = Variable<String>(syncStatus);
@@ -828,6 +855,7 @@ class Team extends DataClass implements Insertable<Team> {
       formatLabel: formatLabel == null && nullToAbsent
           ? const Value.absent()
           : Value(formatLabel),
+      isBox: Value(isBox),
       sortOrder: Value(sortOrder),
       isDeleted: Value(isDeleted),
       syncStatus: Value(syncStatus),
@@ -847,6 +875,7 @@ class Team extends DataClass implements Insertable<Team> {
       name: serializer.fromJson<String>(json['name']),
       remoteId: serializer.fromJson<String?>(json['remoteId']),
       formatLabel: serializer.fromJson<String?>(json['formatLabel']),
+      isBox: serializer.fromJson<bool>(json['isBox']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
       syncStatus: serializer.fromJson<String>(json['syncStatus']),
@@ -863,6 +892,7 @@ class Team extends DataClass implements Insertable<Team> {
       'name': serializer.toJson<String>(name),
       'remoteId': serializer.toJson<String?>(remoteId),
       'formatLabel': serializer.toJson<String?>(formatLabel),
+      'isBox': serializer.toJson<bool>(isBox),
       'sortOrder': serializer.toJson<int>(sortOrder),
       'isDeleted': serializer.toJson<bool>(isDeleted),
       'syncStatus': serializer.toJson<String>(syncStatus),
@@ -877,6 +907,7 @@ class Team extends DataClass implements Insertable<Team> {
     String? name,
     Value<String?> remoteId = const Value.absent(),
     Value<String?> formatLabel = const Value.absent(),
+    bool? isBox,
     int? sortOrder,
     bool? isDeleted,
     String? syncStatus,
@@ -888,6 +919,7 @@ class Team extends DataClass implements Insertable<Team> {
     name: name ?? this.name,
     remoteId: remoteId.present ? remoteId.value : this.remoteId,
     formatLabel: formatLabel.present ? formatLabel.value : this.formatLabel,
+    isBox: isBox ?? this.isBox,
     sortOrder: sortOrder ?? this.sortOrder,
     isDeleted: isDeleted ?? this.isDeleted,
     syncStatus: syncStatus ?? this.syncStatus,
@@ -903,6 +935,7 @@ class Team extends DataClass implements Insertable<Team> {
       formatLabel: data.formatLabel.present
           ? data.formatLabel.value
           : this.formatLabel,
+      isBox: data.isBox.present ? data.isBox.value : this.isBox,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
       syncStatus: data.syncStatus.present
@@ -921,6 +954,7 @@ class Team extends DataClass implements Insertable<Team> {
           ..write('name: $name, ')
           ..write('remoteId: $remoteId, ')
           ..write('formatLabel: $formatLabel, ')
+          ..write('isBox: $isBox, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('syncStatus: $syncStatus, ')
@@ -937,6 +971,7 @@ class Team extends DataClass implements Insertable<Team> {
     name,
     remoteId,
     formatLabel,
+    isBox,
     sortOrder,
     isDeleted,
     syncStatus,
@@ -952,6 +987,7 @@ class Team extends DataClass implements Insertable<Team> {
           other.name == this.name &&
           other.remoteId == this.remoteId &&
           other.formatLabel == this.formatLabel &&
+          other.isBox == this.isBox &&
           other.sortOrder == this.sortOrder &&
           other.isDeleted == this.isDeleted &&
           other.syncStatus == this.syncStatus &&
@@ -965,6 +1001,7 @@ class TeamsCompanion extends UpdateCompanion<Team> {
   final Value<String> name;
   final Value<String?> remoteId;
   final Value<String?> formatLabel;
+  final Value<bool> isBox;
   final Value<int> sortOrder;
   final Value<bool> isDeleted;
   final Value<String> syncStatus;
@@ -976,6 +1013,7 @@ class TeamsCompanion extends UpdateCompanion<Team> {
     this.name = const Value.absent(),
     this.remoteId = const Value.absent(),
     this.formatLabel = const Value.absent(),
+    this.isBox = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -988,6 +1026,7 @@ class TeamsCompanion extends UpdateCompanion<Team> {
     required String name,
     this.remoteId = const Value.absent(),
     this.formatLabel = const Value.absent(),
+    this.isBox = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -1000,6 +1039,7 @@ class TeamsCompanion extends UpdateCompanion<Team> {
     Expression<String>? name,
     Expression<String>? remoteId,
     Expression<String>? formatLabel,
+    Expression<bool>? isBox,
     Expression<int>? sortOrder,
     Expression<bool>? isDeleted,
     Expression<String>? syncStatus,
@@ -1012,6 +1052,7 @@ class TeamsCompanion extends UpdateCompanion<Team> {
       if (name != null) 'name': name,
       if (remoteId != null) 'remote_id': remoteId,
       if (formatLabel != null) 'format_label': formatLabel,
+      if (isBox != null) 'is_box': isBox,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (isDeleted != null) 'is_deleted': isDeleted,
       if (syncStatus != null) 'sync_status': syncStatus,
@@ -1026,6 +1067,7 @@ class TeamsCompanion extends UpdateCompanion<Team> {
     Value<String>? name,
     Value<String?>? remoteId,
     Value<String?>? formatLabel,
+    Value<bool>? isBox,
     Value<int>? sortOrder,
     Value<bool>? isDeleted,
     Value<String>? syncStatus,
@@ -1038,6 +1080,7 @@ class TeamsCompanion extends UpdateCompanion<Team> {
       name: name ?? this.name,
       remoteId: remoteId ?? this.remoteId,
       formatLabel: formatLabel ?? this.formatLabel,
+      isBox: isBox ?? this.isBox,
       sortOrder: sortOrder ?? this.sortOrder,
       isDeleted: isDeleted ?? this.isDeleted,
       syncStatus: syncStatus ?? this.syncStatus,
@@ -1063,6 +1106,9 @@ class TeamsCompanion extends UpdateCompanion<Team> {
     }
     if (formatLabel.present) {
       map['format_label'] = Variable<String>(formatLabel.value);
+    }
+    if (isBox.present) {
+      map['is_box'] = Variable<bool>(isBox.value);
     }
     if (sortOrder.present) {
       map['sort_order'] = Variable<int>(sortOrder.value);
@@ -1090,6 +1136,7 @@ class TeamsCompanion extends UpdateCompanion<Team> {
           ..write('name: $name, ')
           ..write('remoteId: $remoteId, ')
           ..write('formatLabel: $formatLabel, ')
+          ..write('isBox: $isBox, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('syncStatus: $syncStatus, ')
@@ -5423,6 +5470,7 @@ typedef $$TeamsTableCreateCompanionBuilder =
       required String name,
       Value<String?> remoteId,
       Value<String?> formatLabel,
+      Value<bool> isBox,
       Value<int> sortOrder,
       Value<bool> isDeleted,
       Value<String> syncStatus,
@@ -5436,6 +5484,7 @@ typedef $$TeamsTableUpdateCompanionBuilder =
       Value<String> name,
       Value<String?> remoteId,
       Value<String?> formatLabel,
+      Value<bool> isBox,
       Value<int> sortOrder,
       Value<bool> isDeleted,
       Value<String> syncStatus,
@@ -5508,6 +5557,11 @@ class $$TeamsTableFilterComposer extends Composer<_$AppDatabase, $TeamsTable> {
 
   ColumnFilters<String> get formatLabel => $composableBuilder(
     column: $table.formatLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isBox => $composableBuilder(
+    column: $table.isBox,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5614,6 +5668,11 @@ class $$TeamsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isBox => $composableBuilder(
+    column: $table.isBox,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
     builder: (column) => ColumnOrderings(column),
@@ -5685,6 +5744,9 @@ class $$TeamsTableAnnotationComposer
     column: $table.formatLabel,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get isBox =>
+      $composableBuilder(column: $table.isBox, builder: (column) => column);
 
   GeneratedColumn<int> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
@@ -5785,6 +5847,7 @@ class $$TeamsTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String?> remoteId = const Value.absent(),
                 Value<String?> formatLabel = const Value.absent(),
+                Value<bool> isBox = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
@@ -5796,6 +5859,7 @@ class $$TeamsTableTableManager
                 name: name,
                 remoteId: remoteId,
                 formatLabel: formatLabel,
+                isBox: isBox,
                 sortOrder: sortOrder,
                 isDeleted: isDeleted,
                 syncStatus: syncStatus,
@@ -5809,6 +5873,7 @@ class $$TeamsTableTableManager
                 required String name,
                 Value<String?> remoteId = const Value.absent(),
                 Value<String?> formatLabel = const Value.absent(),
+                Value<bool> isBox = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
@@ -5820,6 +5885,7 @@ class $$TeamsTableTableManager
                 name: name,
                 remoteId: remoteId,
                 formatLabel: formatLabel,
+                isBox: isBox,
                 sortOrder: sortOrder,
                 isDeleted: isDeleted,
                 syncStatus: syncStatus,
