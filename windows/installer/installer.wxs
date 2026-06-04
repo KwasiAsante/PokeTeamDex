@@ -148,9 +148,8 @@
     </InstallExecuteSequence>
     <InstallUISequence>
       <!-- Run after the user clicks Finish, only on fresh install, only if checkbox ticked -->
-      <Custom Action="LaunchApp" After="ExitDialog">
-        WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed
-      </Custom>
+      <Custom Action="LaunchApp" After="ExitDialog"
+              Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
     </InstallUISequence>
   </Fragment>
 
