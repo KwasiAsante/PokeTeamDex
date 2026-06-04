@@ -8,7 +8,7 @@
 PRODUCT_NAME = poke_team_dex
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = asante.dev.pokeTeamDex
+PRODUCT_BUNDLE_IDENTIFIER = com.asante.pokeTeamDex
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2024 asante.dev. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2024 com.asante. All rights reserved.

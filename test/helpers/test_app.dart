@@ -22,25 +22,25 @@ Future<void> pumpTestApp(
   final router = GoRouter(
     initialLocation: '/',
     routes: [
-      GoRoute(path: '/', builder: (_, __) => screen),
-      GoRoute(path: '/login', builder: (_, __) => const _Stub('Login')),
+      GoRoute(path: '/', builder: (_, _) => screen),
+      GoRoute(path: '/login', builder: (_, _) => const _Stub('Login')),
       GoRoute(
         path: '/teams/:teamId',
-        builder: (_, __) => const _Stub('Team Detail'),
+        builder: (_, _) => const _Stub('Team Detail'),
         routes: [
           GoRoute(
             path: 'config/:slot',
-            builder: (_, __) => const _Stub('Slot Config'),
+            builder: (_, _) => const _Stub('Slot Config'),
           ),
           GoRoute(
             path: 'pick/:slot',
-            builder: (_, __) => const _Stub('Slot Picker'),
+            builder: (_, _) => const _Stub('Slot Picker'),
           ),
         ],
       ),
       GoRoute(
         path: '/pokedex/:id',
-        builder: (_, __) => const _Stub('Pokémon Detail'),
+        builder: (_, _) => const _Stub('Pokémon Detail'),
       ),
     ],
   );
@@ -64,7 +64,7 @@ Future<void> pumpTestApp(
 
 class _Stub extends StatelessWidget {
   final String label;
-  const _Stub(this.label, {super.key});
+  const _Stub(this.label);
   @override
   Widget build(BuildContext context) => Scaffold(body: Center(child: Text(label)));
 }

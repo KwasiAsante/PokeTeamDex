@@ -16,7 +16,7 @@ class ConnectivityStatusButton extends ConsumerWidget {
     final isOnline = ref.watch(isOnlineProvider).when(
           data: (v) => v,
           loading: () => true,
-          error: (_, __) => false,
+          error: (_, _) => false,
         );
     final isLoggedIn = ref.watch(isLoggedInProvider);
 
@@ -55,7 +55,7 @@ class _StatusSheet extends ConsumerWidget {
     final isOnline = ref.watch(isOnlineProvider).when(
           data: (v) => v,
           loading: () => null,
-          error: (_, __) => false,
+          error: (_, _) => false,
         );
     final backendAsync = ref.watch(backendHealthProvider);
     final pokeApiAsync = ref.watch(pokeApiHealthProvider);
@@ -115,12 +115,12 @@ class _StatusSheet extends ConsumerWidget {
             icon: Icons.catching_pokemon_outlined,
             status: pokeApiAsync.when(
               loading: () => _RowStatus.checking,
-              error: (_, __) => _RowStatus.error,
+              error: (_, _) => _RowStatus.error,
               data: (s) => s == HealthStatus.healthy ? _RowStatus.ok : _RowStatus.error,
             ),
             statusText: pokeApiAsync.when(
               loading: () => 'Checking…',
-              error: (_, __) => 'Unreachable',
+              error: (_, _) => 'Unreachable',
               data: (s) => s == HealthStatus.healthy ? 'Healthy' : 'Unreachable',
             ),
           ),
@@ -129,12 +129,12 @@ class _StatusSheet extends ConsumerWidget {
             icon: Icons.cloud_outlined,
             status: backendAsync.when(
               loading: () => _RowStatus.checking,
-              error: (_, __) => _RowStatus.error,
+              error: (_, _) => _RowStatus.error,
               data: (s) => s == HealthStatus.healthy ? _RowStatus.ok : _RowStatus.error,
             ),
             statusText: backendAsync.when(
               loading: () => 'Checking…',
-              error: (_, __) => 'Unreachable',
+              error: (_, _) => 'Unreachable',
               data: (s) => s == HealthStatus.healthy ? 'Healthy' : 'Unreachable',
             ),
           ),

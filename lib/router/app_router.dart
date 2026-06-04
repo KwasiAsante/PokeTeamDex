@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poke_team_dex/shared/widgets/update_banner.dart';
 import 'package:poke_team_dex/features/abilities/presentation/abilities_screen.dart';
 import 'package:poke_team_dex/features/abilities/presentation/ability_detail_screen.dart';
 import 'package:poke_team_dex/features/auth/presentation/login_screen.dart';
@@ -39,10 +40,10 @@ GoRouter buildAppRouter(String? initialToken) {
     },
     routes: [
       // ── Auth ───────────────────────────────────────────────────────────────
-      GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
-      GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
-      GoRoute(path: '/sync-monitor', builder: (_, __) => const SyncMonitorScreen()),
+      GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+      GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
+      GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
+      GoRoute(path: '/sync-monitor', builder: (_, _) => const SyncMonitorScreen()),
 
       // ── Main shell ─────────────────────────────────────────────────────────
       StatefulShellRoute.indexedStack(
@@ -224,26 +225,29 @@ class ScaffoldWithNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
+    final index = navigationShell.currentIndex;
+    final shell = UpdateBanner(child: navigationShell);
 
-    if (width >= _kExpanded) return _ExpandedLayout(shell: navigationShell, onTap: _go);
-    if (width >= _kMedium)   return _MediumLayout(shell: navigationShell,   onTap: _go);
-    return                          _CompactLayout(shell: navigationShell,   onTap: _go);
+    if (width >= _kExpanded) return _ExpandedLayout(shell: shell, currentIndex: index, onTap: _go);
+    if (width >= _kMedium)   return _MediumLayout(shell: shell,   currentIndex: index, onTap: _go);
+    return                          _CompactLayout(shell: shell,   currentIndex: index, onTap: _go);
   }
 }
 
 // ── Compact (< 600dp) — bottom navigation bar ─────────────────────────────────
 
 class _CompactLayout extends StatelessWidget {
-  final StatefulNavigationShell shell;
+  final Widget shell;
+  final int currentIndex;
   final ValueChanged<int> onTap;
-  const _CompactLayout({required this.shell, required this.onTap});
+  const _CompactLayout({required this.shell, required this.currentIndex, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: shell,
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: shell.currentIndex,
+        currentIndex: currentIndex,
         onTap: onTap,
         items: [
           for (final d in _destinations)
@@ -261,9 +265,10 @@ class _CompactLayout extends StatelessWidget {
 // ── Medium (600–840dp) — navigation rail ──────────────────────────────────────
 
 class _MediumLayout extends StatelessWidget {
-  final StatefulNavigationShell shell;
+  final Widget shell;
+  final int currentIndex;
   final ValueChanged<int> onTap;
-  const _MediumLayout({required this.shell, required this.onTap});
+  const _MediumLayout({required this.shell, required this.currentIndex, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -272,7 +277,7 @@ class _MediumLayout extends StatelessWidget {
       body: Row(
         children: [
           NavigationRail(
-            selectedIndex: shell.currentIndex,
+            selectedIndex: currentIndex,
             onDestinationSelected: onTap,
             labelType: NavigationRailLabelType.all,
             useIndicator: true,
@@ -297,9 +302,10 @@ class _MediumLayout extends StatelessWidget {
 // ── Expanded (> 840dp) — permanent navigation drawer ─────────────────────────
 
 class _ExpandedLayout extends StatefulWidget {
-  final StatefulNavigationShell shell;
+  final Widget shell;
+  final int currentIndex;
   final ValueChanged<int> onTap;
-  const _ExpandedLayout({required this.shell, required this.onTap});
+  const _ExpandedLayout({required this.shell, required this.currentIndex, required this.onTap});
 
   @override
   State<_ExpandedLayout> createState() => _ExpandedLayoutState();
@@ -342,7 +348,7 @@ class _ExpandedLayoutState extends State<_ExpandedLayout> {
                       const SizedBox(height: 4),
                       Expanded(
                         child: _CollapsedRail(
-                          selectedIndex: widget.shell.currentIndex,
+                          selectedIndex: widget.currentIndex,
                           onTap: widget.onTap,
                         ),
                       ),
@@ -350,7 +356,7 @@ class _ExpandedLayoutState extends State<_ExpandedLayout> {
                   )
                 // ── Expanded: full NavigationDrawer ───────────────────────
                 : NavigationDrawer(
-                    selectedIndex: widget.shell.currentIndex,
+                    selectedIndex: widget.currentIndex,
                     onDestinationSelected: widget.onTap,
                     children: [
                       Padding(

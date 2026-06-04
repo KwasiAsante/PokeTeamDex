@@ -6,7 +6,6 @@ import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/features/teams/presentation/slot_config_screen.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
-import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
@@ -54,7 +53,7 @@ void main() {
   });
 
   /// Creates a team + slot in [db] and returns (teamId, slotId).
-  Future<(int, int)> _seedSlot(
+  Future<(int, int)> seedSlot(
     AppDatabase db, {
     int evHp = 0,
     int evAtk = 0,
@@ -100,7 +99,7 @@ void main() {
     testWidgets('renders without crashing when slot exists', (tester) async {
       final db = openTestDatabase();
 
-      final (teamId, _) = await _seedSlot(db);
+      final (teamId, _) = await seedSlot(db);
 
       await pumpTestApp(
         tester,
@@ -125,7 +124,7 @@ void main() {
     testWidgets('shows Save button once slot data is loaded', (tester) async {
       final db = openTestDatabase();
 
-      final (teamId, _) = await _seedSlot(db);
+      final (teamId, _) = await seedSlot(db);
 
       await pumpTestApp(
         tester,
@@ -150,7 +149,7 @@ void main() {
       final db = openTestDatabase();
 
       // Total: 252 + 252 + 10 = 514 (over the 510 cap)
-      final (teamId, _) = await _seedSlot(
+      final (teamId, _) = await seedSlot(
         db,
         evHp: 252,
         evAtk: 252,
@@ -186,7 +185,7 @@ void main() {
       final db = openTestDatabase();
 
       // EVs: 4 + 252 + 252 = 508 (within cap)
-      final (teamId, _) = await _seedSlot(
+      final (teamId, _) = await seedSlot(
         db,
         evHp: 4,
         evSpa: 252,
@@ -218,7 +217,7 @@ void main() {
     testWidgets('shows default IVs (31) when slot has no explicit IVs', (tester) async {
       final db = openTestDatabase();
 
-      final (teamId, _) = await _seedSlot(db);
+      final (teamId, _) = await seedSlot(db);
 
       await pumpTestApp(
         tester,

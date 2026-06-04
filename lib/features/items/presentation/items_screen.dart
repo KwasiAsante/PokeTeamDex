@@ -42,8 +42,8 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
     final sort = ref.watch(itemSortProvider);
 
     // Persist filter/sort state across tab switches
-    ref.listen(itemPocketFilterProvider, (_, __) {});
-    ref.listen(itemSortProvider, (_, __) {});
+    ref.listen(itemPocketFilterProvider, (_, _) {});
+    ref.listen(itemSortProvider, (_, _) {});
 
     return Scaffold(
       appBar: AppBar(
@@ -254,7 +254,7 @@ class _ItemTile extends ConsumerWidget {
               title: Text(_fmt(name)),
               subtitle: const SkeletonBox(width: 120),
             ),
-      error: (_, __) => isGrid
+      error: (_, _) => isGrid
           ? Card(margin: EdgeInsets.zero, child: Center(child: Text(_fmt(name))))
           : ListTile(title: Text(_fmt(name)), subtitle: const Text('—')),
       data: (item) => isGrid ? _ItemGridCard(item: item) : _ItemListItem(item: item),
@@ -285,7 +285,7 @@ class _ItemListItem extends StatelessWidget {
             ? CachedNetworkImage(
                 imageUrl: item.spriteUrl!,
                 fit: BoxFit.contain,
-                errorWidget: (_, __, ___) => Icon(
+                errorWidget: (_, _, _) => Icon(
                   Icons.inventory_2_outlined,
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -380,7 +380,7 @@ class _ItemGridCard extends StatelessWidget {
                     ? CachedNetworkImage(
                         imageUrl: item.spriteUrl!,
                         fit: BoxFit.contain,
-                        errorWidget: (_, __, ___) => Icon(
+                        errorWidget: (_, _, _) => Icon(
                           Icons.inventory_2_outlined,
                           color: colorScheme.onSurfaceVariant,
                           size: 20,

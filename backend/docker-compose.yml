@@ -29,7 +29,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: sh /app/start.sh
+    command: sh /app/start.sh --reload
     volumes:
       - .:/app
 

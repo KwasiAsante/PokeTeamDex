@@ -87,7 +87,7 @@ class _StatBarState extends State<StatBar>
           Expanded(
             child: AnimatedBuilder(
               animation: _progress,
-              builder: (_, __) => ClipRRect(
+              builder: (_, _) => ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
                   value: _progress.value * ratio,

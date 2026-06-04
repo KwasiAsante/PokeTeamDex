@@ -37,17 +37,17 @@ class PokemonSprite extends StatelessWidget {
       width: size,
       height: size,
       fit: fit,
-      placeholder: (_, __) => _placeholder(size),
+      placeholder: (_, _) => _placeholder(size),
       errorWidget: fallbackUrl != null
-          ? (_, __, ___) => CachedNetworkImage(
+          ? (_, _, _) => CachedNetworkImage(
                 imageUrl: fallbackUrl!,
                 width: size,
                 height: size,
                 fit: fit,
-                placeholder: (_, __) => _placeholder(size),
-                errorWidget: (_, __, ___) => _broken(size),
+                placeholder: (_, _) => _placeholder(size),
+                errorWidget: (_, _, _) => _broken(size),
               )
-          : (_, __, ___) => _broken(size),
+          : (_, _, _) => _broken(size),
     );
   }
 

@@ -996,7 +996,7 @@ class _AbilitiesTab extends ConsumerWidget {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: abilities.length,
-      separatorBuilder: (_, __) => const Divider(height: 24),
+      separatorBuilder: (_, _) => const Divider(height: 24),
       itemBuilder: (context, i) {
         final slot = abilities[i];
         final name = (slot['ability'] as Map)['name'] as String;
@@ -1242,12 +1242,12 @@ class _EvolutionNodeCard extends StatelessWidget {
               imageUrl: node.spriteUrl,
               width: 72,
               height: 72,
-              placeholder: (_, __) => const SizedBox(
+              placeholder: (_, _) => const SizedBox(
                 width: 72,
                 height: 72,
                 child: Icon(Icons.catching_pokemon, color: Colors.grey),
               ),
-              errorWidget: (_, __, ___) =>
+              errorWidget: (_, _, _) =>
                   const Icon(Icons.broken_image_outlined),
             ),
             const SizedBox(height: 4),
@@ -1317,7 +1317,7 @@ class _FormsTab extends ConsumerWidget {
         return ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: nonDefault.length,
-          separatorBuilder: (_, __) => const Divider(height: 24),
+          separatorBuilder: (_, _) => const Divider(height: 24),
           itemBuilder: (_, i) => _FormCard(variety: nonDefault[i]),
         );
       },
@@ -1482,7 +1482,7 @@ class _LocationsTabState extends ConsumerState<_LocationsTab> {
                   : ListView.separated(
                       padding: const EdgeInsets.all(16),
                       itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const Divider(height: 8),
+                      separatorBuilder: (_, _) => const Divider(height: 8),
                       itemBuilder: (_, i) {
                         final item = filtered[i];
                         return _LocationTile(
@@ -1518,7 +1518,7 @@ class _VersionFilterBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         itemCount: versions.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
         itemBuilder: (_, i) {
           final v = versions[i];
           final isSelected = v == selected;
@@ -1677,7 +1677,7 @@ class _TeamsTab extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               sliver: SliverList.separated(
                 itemCount: pairs.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
                 itemBuilder: (context, i) {
                   final (team, slot) = pairs[i];
                   return _OnTeamTile(
@@ -1896,7 +1896,7 @@ class _AddToTeamSheetState extends State<_AddToTeamSheet> {
         // Capture router and messenger BEFORE popping — the sheet's context
         // is deactivated after Navigator.pop and cannot be used for routing.
         final router = GoRouter.of(context);
-        final messenger = ScaffoldMessenger.of(context);
+        // final messenger = ScaffoldMessenger.of(context);
         final teamId = _selectedTeam!.id;
         final teamName = _selectedTeam!.name;
 
@@ -2013,7 +2013,7 @@ class _TeamPicker extends ConsumerWidget {
           controller: scrollController,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           itemCount: active.length + 1, // +1 for the new-team tile
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          separatorBuilder: (_, _) => const SizedBox(height: 8),
           itemBuilder: (_, i) {
             if (i == 0) return newTeamTile;
             final team = active[i - 1];
@@ -2140,9 +2140,9 @@ class _SlotCard extends StatelessWidget {
                     'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${occupied!.pokemonId}.png',
                 width: 52,
                 height: 52,
-                placeholder: (_, __) => Icon(Icons.catching_pokemon,
+                placeholder: (_, _) => Icon(Icons.catching_pokemon,
                     size: 40, color: colorScheme.onSurfaceVariant),
-                errorWidget: (_, __, ___) => Icon(Icons.catching_pokemon,
+                errorWidget: (_, _, _) => Icon(Icons.catching_pokemon,
                     size: 40, color: colorScheme.onSurfaceVariant),
               )
             else

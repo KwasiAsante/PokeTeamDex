@@ -1,0 +1,25 @@
+name: Notify Update
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send update notification to backend
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+          NOTIFY_UPDATE_SECRET: ${{ secrets.NOTIFY_UPDATE_SECRET }}
+        run: |
+          curl -f -X POST "${BACKEND_URL}/admin/notify-update" \
+            -H "Content-Type: application/json" \
+            -H "X-Notify-Secret: ${NOTIFY_UPDATE_SECRET}" \
+            -d '{
+              "version": "${{ github.event.release.tag_name }}",
+              "release_url": "${{ github.event.release.html_url }}"
+            }' \
+            --max-time 30 \
+            --retry 3 \
+            --retry-delay 5

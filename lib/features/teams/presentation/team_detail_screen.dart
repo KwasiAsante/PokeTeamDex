@@ -725,7 +725,7 @@ class _FilledSlotCard extends ConsumerWidget {
                                   imageUrl: itemEntry!.spriteUrl!,
                                   width: 36,
                                   height: 36,
-                                  errorWidget: (_, __, ___) =>
+                                  errorWidget: (_, _, _) =>
                                       const SizedBox.shrink(),
                                 ),
                               ),

@@ -74,7 +74,7 @@ class TeamSlotRepository {
       'slot': slot.slot,
       'pokemon_id': slot.pokemonId,
       if (slot.nickname != null && slot.nickname!.isNotEmpty) 'nickname': slot.nickname,
-      if (instanceId != null) 'instance_client_local_id': instanceId,
+      'instance_client_local_id': ?instanceId,
       if (slot.formName != null) 'form_name': slot.formName,
       'level': slot.level,
       if (slot.gender != null) 'gender': slot.gender,

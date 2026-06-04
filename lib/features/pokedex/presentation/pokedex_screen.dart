@@ -63,8 +63,8 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
   @override
   Widget build(BuildContext context) {
     // Reset pagination whenever the search query or filter state changes.
-    ref.listen(pokemonSearchProvider, (_, __) => _resetPage());
-    ref.listen(pokedexFilterProvider, (_, __) => _resetPage());
+    ref.listen(pokemonSearchProvider, (_, _) => _resetPage());
+    ref.listen(pokedexFilterProvider, (_, _) => _resetPage());
 
     final listAsync = ref.watch(filteredPokemonListProvider);
 

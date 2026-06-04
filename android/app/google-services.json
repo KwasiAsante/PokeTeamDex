@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "854467000036",
+    "project_id": "poketeamdex",
+    "storage_bucket": "poketeamdex.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:854467000036:android:1dce8542b7afe7d4565ef1",
+        "android_client_info": {
+          "package_name": "com.asante.poke_team_dex"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDg4gf1-sU0F2rN-onMRVGMB37m04NJWpo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

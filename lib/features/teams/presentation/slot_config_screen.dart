@@ -279,7 +279,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     final ribbons = <String>{};
     final aliases = <String>[];
 
-    void _addAlias(String? a) {
+    void addAlias(String? a) {
       if (a != null && a.isNotEmpty && !aliases.contains(a)) aliases.add(a);
     }
 
@@ -293,7 +293,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         // Skip the current slot so its own nickname doesn't appear.
         final slots = await repo.getSlotsForInstance(inst.id);
         for (final slot in slots) {
-          if (slot.id != currentSlotId) _addAlias(slot.nickname);
+          if (slot.id != currentSlotId) addAlias(slot.nickname);
         }
 
         // Include superseded names stored in the ancestor's alias history.
@@ -302,7 +302,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             final a =
                 (jsonDecode(inst.nicknameAliases!) as List).cast<String>();
             for (final alias in a) {
-              _addAlias(alias);
+              addAlias(alias);
             }
           } catch (_) {}
         }
@@ -431,7 +431,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             'level':           _level,
             if (_gender != null) 'gender': _gender,
             'is_shiny':        _isShiny,
-            if (_friendship != null) 'friendship': _friendship,
+            'friendship': _friendship,
             if (_abilityName != null) 'ability_name': _abilityName,
             if (_natureName != null) 'nature_name': _natureName,
             if (_heldItemName != null) 'held_item_name': _heldItemName,
@@ -2728,7 +2728,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                         width: 16,
                         height: 16,
                         fit: BoxFit.contain,
-                        errorWidget: (_, __, ___) => const Icon(
+                        errorWidget: (_, _, _) => const Icon(
                           Icons.workspace_premium_rounded,
                           size: 14,
                         ),
@@ -2783,7 +2783,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                         width: 20,
                         height: 20,
                         fit: BoxFit.contain,
-                        errorWidget: (_, __, ___) => const Icon(
+                        errorWidget: (_, _, _) => const Icon(
                           Icons.workspace_premium_rounded,
                           size: 16,
                         ),
@@ -3179,7 +3179,7 @@ class _MoveListTile extends ConsumerWidget {
           detailAsync.when(
             loading: () => const SizedBox(width: 60,
                 child: LinearProgressIndicator(minHeight: 2)),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
             data: (move) => Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -3361,7 +3361,7 @@ class _ItemListTile extends ConsumerWidget {
             ? CachedNetworkImage(
                 imageUrl: spriteUrl,
                 fit: BoxFit.contain,
-                errorWidget: (_, __, ___) => const Icon(Icons.inventory_2_outlined, size: 20),
+                errorWidget: (_, _, _) => const Icon(Icons.inventory_2_outlined, size: 20),
               )
             : const Icon(Icons.inventory_2_outlined, size: 20,
                 color: Colors.transparent),

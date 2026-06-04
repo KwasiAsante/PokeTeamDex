@@ -234,7 +234,7 @@ class _MoveTile extends ConsumerWidget {
               title: Text(_fmt(name)),
               subtitle: const SkeletonBox(width: 140),
             ),
-      error: (_, __) => isGrid
+      error: (_, _) => isGrid
           ? Card(margin: EdgeInsets.zero, child: Center(child: Text(_fmt(name))))
           : ListTile(title: Text(_fmt(name)), subtitle: const Text('—')),
       data: (move) {

@@ -135,7 +135,7 @@ class _Header extends StatelessWidget {
                     child: CachedNetworkImage(
                       imageUrl: item.spriteUrl!,
                       fit: BoxFit.contain,
-                      errorWidget: (_, __, ___) => Icon(
+                      errorWidget: (_, _, _) => Icon(
                         Icons.inventory_2_outlined,
                         size: 40,
                         color: colorScheme.onSurfaceVariant,
@@ -303,7 +303,7 @@ class _MachineTile extends ConsumerWidget {
           ),
           moveNameAsync.when(
             loading: () => const SkeletonBox(width: 80, height: 12),
-            error: (_, __) => Text('—', style: textTheme.bodySmall),
+            error: (_, _) => Text('—', style: textTheme.bodySmall),
             data: (moveName) => GestureDetector(
               onTap: moveName != null
                   ? () => context.push('/moves/$moveName')
@@ -411,12 +411,12 @@ class _HeldByTileState extends State<_HeldByTile> {
             width: 40,
             height: 30,
             fit: BoxFit.contain,
-            errorWidget: (_, __, ___) => CachedNetworkImage(
+            errorWidget: (_, _, _) => CachedNetworkImage(
               imageUrl: fallbackUrl,
               width: 40,
               height: 30,
               fit: BoxFit.contain,
-              errorWidget: (_, __, ___) => Icon(Icons.catching_pokemon,
+              errorWidget: (_, _, _) => Icon(Icons.catching_pokemon,
                   size: 28,
                   color: colorScheme.onSurfaceVariant
                       .withValues(alpha: 0.4)),

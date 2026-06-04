@@ -45,4 +45,14 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Android signing — never commit these
+android/key.properties
+*.jks
+*.keystore
+
+# Firebase service account — never commit these
+*firebase-adminsdk*.json
+.env.prod
+
 .worktrees/

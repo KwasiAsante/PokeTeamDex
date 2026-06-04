@@ -51,7 +51,7 @@ void main() {
   });
 
   /// Builds a fully wired SyncService backed by [db].
-  SyncService _makeService(dynamic db) {
+  SyncService makeService(dynamic db) {
     final syncQueue = SyncQueueRepository(db);
     return SyncService(
       syncQueue: syncQueue,
@@ -98,7 +98,7 @@ void main() {
         'instances': <dynamic>[],
       });
 
-      final svc = _makeService(db);
+      final svc = makeService(db);
       await svc.run(token: 'test-token');
 
       final repo = TeamFolderRepository(db);
@@ -134,7 +134,7 @@ void main() {
         'instances': <dynamic>[],
       });
 
-      final svc = _makeService(db);
+      final svc = makeService(db);
       await svc.run(token: 'test-token');
 
       final repo = TeamFolderRepository(db);
@@ -169,7 +169,7 @@ void main() {
         'instances': <dynamic>[],
       });
 
-      final svc = _makeService(db);
+      final svc = makeService(db);
       await svc.run(token: 'test-token');
 
       final repo = TeamFolderRepository(db);
@@ -197,7 +197,7 @@ void main() {
         'instances': <dynamic>[],
       });
 
-      final svc = _makeService(db);
+      final svc = makeService(db);
       await svc.run(token: 'test-token');
 
       final repo = TeamFolderRepository(db);
@@ -240,7 +240,7 @@ void main() {
         'instances': <dynamic>[],
       });
 
-      final svc = _makeService(db);
+      final svc = makeService(db);
       await svc.run(token: 'test-token');
 
       final team = (await TeamRepository(db).getAll()).single;
@@ -276,7 +276,7 @@ void main() {
         'instances': <dynamic>[],
       });
 
-      final svc = _makeService(db);
+      final svc = makeService(db);
       await svc.run(token: 'test-token');
 
       final team = (await TeamRepository(db).getAll()).single;
@@ -322,7 +322,7 @@ void main() {
         'instances': <dynamic>[],
       });
 
-      final svc = _makeService(db);
+      final svc = makeService(db);
       await svc.run(token: 'test-token');
 
       final teamRepo = TeamRepository(db);
@@ -353,7 +353,7 @@ void main() {
         'instances': <dynamic>[],
       });
 
-      final svc = _makeService(db);
+      final svc = makeService(db);
       await svc.run(token: 'test-token');
 
       final teams = await TeamRepository(db).getAll();
@@ -370,7 +370,7 @@ void main() {
       final db = openTestDatabase();
       addTearDown(db.close);
 
-      final svc = _makeService(db);
+      final svc = makeService(db);
       await svc.run(token: 'test-token');
 
       expect(notifier.calls, ['syncing', 'success']);
@@ -380,7 +380,7 @@ void main() {
       final db = openTestDatabase();
       addTearDown(db.close);
 
-      final svc = _makeService(db);
+      final svc = makeService(db);
       await svc.run(token: 'test-token');
 
       final stored = await MetaRepository(db).get('last_pull_at');

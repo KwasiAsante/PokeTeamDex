@@ -414,7 +414,7 @@ class _ContestCard extends ConsumerWidget {
           const SizedBox(height: 6),
           effectAsync.when(
             loading: () => const _HeartBarSkeleton(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
             data: (e) => Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -448,7 +448,7 @@ class _ContestCard extends ConsumerWidget {
           const SizedBox(height: 6),
           superAsync.when(
             loading: () => const _HeartBarSkeleton(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
             data: (s) => _HeartBarRow(
                 label: 'Appeal', filled: s.appeal, total: 6,
                 color: Colors.red),
@@ -563,7 +563,7 @@ class _MachineTile extends ConsumerWidget {
           ),
           machineAsync.when(
             loading: () => const SkeletonBox(width: 80, height: 12),
-            error: (_, __) => Text('—', style: textTheme.bodySmall),
+            error: (_, _) => Text('—', style: textTheme.bodySmall),
             data: (item) => GestureDetector(
               onTap: () => context.push('/items/${item['name']}'),
               child: Text(
@@ -644,12 +644,12 @@ class _PokemonListTile extends StatelessWidget {
         width: 40,
         height: 30,
         fit: BoxFit.contain,
-        errorWidget: (_, __, ___) => CachedNetworkImage(
+        errorWidget: (_, _, _) => CachedNetworkImage(
           imageUrl: fallbackUrl,
           width: 40,
           height: 30,
           fit: BoxFit.contain,
-          errorWidget: (_, __, ___) => Icon(
+          errorWidget: (_, _, _) => Icon(
             Icons.catching_pokemon,
             size: 28,
             color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),

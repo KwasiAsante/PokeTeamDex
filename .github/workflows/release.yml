@@ -1,0 +1,183 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+env:
+  FLUTTER_VERSION: stable
+
+jobs:
+  # ── Create the GitHub Release first ──────────────────────────────────────
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract tag name
+        id: tag
+        run: echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.tag.outputs.tag }}" \
+            --title "PokeTeamDex ${{ steps.tag.outputs.tag }}" \
+            --generate-notes \
+            --draft=false
+
+  # ── Android APK ──────────────────────────────────────────────────────────
+  build-android:
+    needs: create-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_BASE64" | base64 --decode > android/release.jks
+
+      - name: Write key.properties
+        env:
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=$KEY_STORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=../release.jks
+          EOF
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Rename APK
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk \
+             build/app/outputs/flutter-apk/PokeTeamDex-${{ needs.create-release.outputs.tag }}.apk
+
+      - name: Upload APK to Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ needs.create-release.outputs.tag }}" \
+            "build/app/outputs/flutter-apk/PokeTeamDex-${{ needs.create-release.outputs.tag }}.apk"
+
+  # ── Windows MSI + EXE ─────────────────────────────────────────────────────
+  build-windows:
+    needs: create-release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows
+        run: flutter build windows --release
+
+      - name: Install WiX Toolset v4
+        run: dotnet tool install --global wix
+
+      - name: Add WiX UI extension
+        run: wix extension add --global WixToolset.UI.wixext
+
+      - name: Build MSI
+        run: |
+          $version = "${{ needs.create-release.outputs.tag }}".TrimStart('v')
+          wix build windows/installer/installer.wxs `
+            -d Version=$version `
+            -d BuildDir="$PWD\build\windows\x64\runner\Release" `
+            -ext WixToolset.UI.wixext `
+            -o "PokeTeamDex-${{ needs.create-release.outputs.tag }}-Setup.msi"
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes
+
+      - name: Build EXE installer
+        run: |
+          $version = "${{ needs.create-release.outputs.tag }}".TrimStart('v')
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            /DAppVersion=$version `
+            /DBuildDir="$PWD\build\windows\x64\runner\Release" `
+            /DOutputDir="$PWD" `
+            /DOutputFilename="PokeTeamDex-${{ needs.create-release.outputs.tag }}-Setup" `
+            windows\installer\installer.iss
+
+      - name: Upload installers to Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release upload "${{ needs.create-release.outputs.tag }}" \
+            "PokeTeamDex-${{ needs.create-release.outputs.tag }}-Setup.msi" \
+            "PokeTeamDex-${{ needs.create-release.outputs.tag }}-Setup.exe"
+
+  # ── Backend Docker image ──────────────────────────────────────────────────
+  build-backend-docker:
+    needs: create-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/poketeamdex-backend
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,0 +1,21 @@
+{
+  "hosting": {
+    "public": "build/web",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }],
+    "headers": [
+      {
+        "source": "/flutter_bootstrap.js",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "/firebase-messaging-sw.js",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "**/*.@(js|css|wasm)",
+        "headers": [{ "key": "Cache-Control", "value": "max-age=31536000, immutable" }]
+      }
+    ]
+  },
+  "flutter":{"platforms":{"android":{"default":{"projectId":"poketeamdex","appId":"1:854467000036:android:1dce8542b7afe7d4565ef1","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"poketeamdex","configurations":{"android":"1:854467000036:android:1dce8542b7afe7d4565ef1","ios":"1:854467000036:ios:4b09497d83f47706565ef1","macos":"1:854467000036:ios:4b09497d83f47706565ef1","web":"1:854467000036:web:6b391b2b169c1611565ef1","windows":"1:854467000036:web:8cd399af5fd19181565ef1"}}}}}}

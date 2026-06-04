@@ -62,7 +62,7 @@ class PokemonInstanceRepository {
       payload: Value(jsonEncode({
         'pokemon_id': pokemonId,
         'parent_instance_client_local_id': parentInstanceId,
-        if (inheritedRibbons != null) 'inherited_ribbons': inheritedRibbons,
+        'inherited_ribbons': ?inheritedRibbons,
       })),
       createdAt: Value(DateTime.now()),
     ));

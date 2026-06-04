@@ -9,5 +9,10 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 43200  # 30 days
 
+    # Update notification
+    app_version: str = "1.0.0"
+    notify_update_secret: str = ""
+    firebase_service_account_json: str = "{}"
+
 
 settings = Settings()

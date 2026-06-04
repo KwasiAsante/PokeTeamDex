@@ -1,0 +1,9 @@
+services:
+  api:
+    image: ghcr.io/kwasiasante/poketeamdex-backend:latest
+    container_name: poketeamdex_api
+    restart: unless-stopped
+    env_file: .env.prod
+    ports:
+      - "8000:8000"
+    command: sh /app/start.sh

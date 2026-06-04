@@ -4,6 +4,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:poke_team_dex/services/update/update_provider.dart';
+import 'package:poke_team_dex/services/update/update_service.dart';
 import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +15,7 @@ import 'package:poke_team_dex/database/repositories/app_config_repository.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // Preset accent colours shown in the Appearance section.
 const _kPresetColors = [
@@ -161,7 +165,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 8),
           ref.watch(useFormatSpritesProvider).when(
             loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
             data: (useFormatSprites) => SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Use generation sprites'),
@@ -233,6 +237,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               label: const Text('Sign In'),
             ),
           ],
+
+          const SizedBox(height: 32),
+          const Divider(),
+          const SizedBox(height: 16),
+
+          // ── About ──────────────────────────────────────────────────────────
+          _SectionHeader('About'),
+          const SizedBox(height: 8),
+          _AppVersionTile(),
         ],
       ),
     );
@@ -273,7 +286,7 @@ class _SyncStatusTile extends ConsumerWidget {
     final pending = pendingCount.when(
       data: (v) => v,
       loading: () => 0,
-      error: (_, __) => 0,
+      error: (_, _) => 0,
     );
 
     return ListTile(
@@ -316,7 +329,7 @@ class _ThemeModePicker extends ConsumerWidget {
     final current = ref.watch(themeModeProvider).when(
           data: (v) => v,
           loading: () => ThemeMode.system,
-          error: (_, __) => ThemeMode.system,
+          error: (_, _) => ThemeMode.system,
         );
 
     return SegmentedButton<ThemeMode>(
@@ -351,7 +364,7 @@ class _AccentColorPicker extends ConsumerWidget {
     final currentValue = ref.watch(seedColorProvider).when(
           data: (v) => v,
           loading: () => kDefaultSeedColor,
-          error: (_, __) => kDefaultSeedColor,
+          error: (_, _) => kDefaultSeedColor,
         );
 
     return Wrap(
@@ -486,7 +499,7 @@ class _PsDirectoryTile extends ConsumerWidget {
             OutlinedButton(
               onPressed: () async {
                 final path =
-                    await FilePicker.platform.getDirectoryPath(
+                    await FilePicker.getDirectoryPath(
                   dialogTitle: 'Select Pokémon Showdown teams folder',
                 );
                 if (path != null) {
@@ -508,6 +521,96 @@ class _PsDirectoryTile extends ConsumerWidget {
               ),
             ],
           ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── App version + update check ────────────────────────────────────────────────
+
+class _AppVersionTile extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return FutureBuilder<PackageInfo>(
+      future: PackageInfo.fromPlatform(),
+      builder: (context, snap) {
+        final version = snap.data != null
+            ? '${snap.data!.version}+${snap.data!.buildNumber}'
+            : '…';
+
+        final updateAsync = ref.watch(updateCheckProvider);
+        final hasUpdate = updateAsync.asData?.value != null;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.info_outline),
+              title: const Text('App version'),
+              subtitle: Text(version),
+              trailing: hasUpdate
+                  ? Chip(
+                      label: Text(
+                        'Update available',
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                      backgroundColor:
+                          Theme.of(context).colorScheme.primaryContainer,
+                    )
+                  : null,
+            ),
+            const SizedBox(height: 4),
+            OutlinedButton.icon(
+              onPressed: updateAsync.isLoading
+                  ? null
+                  : () => ref.invalidate(updateCheckProvider),
+              icon: updateAsync.isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.system_update_outlined),
+              label: const Text('Check for updates'),
+            ),
+            if (hasUpdate) ...[
+              const SizedBox(height: 8),
+              _UpdateDownloadRow(info: updateAsync.asData!.value!),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _UpdateDownloadRow extends StatelessWidget {
+  const _UpdateDownloadRow({required this.info});
+  final dynamic info;
+
+  @override
+  Widget build(BuildContext context) {
+    final downloadUrl = platformDownloadUrl(info);
+    return Wrap(
+      spacing: 8,
+      children: [
+        if (downloadUrl != null)
+          FilledButton.icon(
+            onPressed: () async {
+              final uri = Uri.parse(downloadUrl);
+              if (await canLaunchUrl(uri)) await launchUrl(uri);
+            },
+            icon: const Icon(Icons.download_outlined),
+            label: Text('Download ${info.version}'),
+          ),
+        OutlinedButton(
+          onPressed: () async {
+            final uri = Uri.parse(info.releaseUrl);
+            if (await canLaunchUrl(uri)) await launchUrl(uri);
+          },
+          child: const Text("What's new"),
         ),
       ],
     );

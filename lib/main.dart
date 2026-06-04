@@ -21,6 +21,7 @@ import 'package:poke_team_dex/router/app_router.dart';
 import 'package:poke_team_dex/services/api/team_sync_api.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_service.dart';
+import 'package:poke_team_dex/services/firebase/fcm_service.dart';
 import 'package:poke_team_dex/services/tray/tray_service.dart';
 import 'package:poke_team_dex/shared/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -97,6 +98,8 @@ void main() async {
   if (TrayService.isSupported) {
     await windowManager.ensureInitialized();
   }
+
+  await FcmService.init();
 
   await Hive.initFlutter();
   await Hive.openBox('pokeapi_cache');
@@ -193,12 +196,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     final seedValue = ref.watch(seedColorProvider).when(
           data: (v) => v,
           loading: () => kDefaultSeedColor,
-          error: (_, __) => kDefaultSeedColor,
+          error: (_, _) => kDefaultSeedColor,
         );
     final themeMode = ref.watch(themeModeProvider).when(
           data: (v) => v,
           loading: () => ThemeMode.system,
-          error: (_, __) => ThemeMode.system,
+          error: (_, _) => ThemeMode.system,
         );
     final seed = Color(seedValue);
     return MaterialApp.router(

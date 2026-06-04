@@ -199,7 +199,7 @@ class _AbilityTile extends ConsumerWidget {
               title: Text(_fmt(name)),
               subtitle: const SkeletonBox(width: 200),
             ),
-      error: (_, __) => isGrid
+      error: (_, _) => isGrid
           ? Card(margin: EdgeInsets.zero, child: Center(child: Text(_fmt(name))))
           : ListTile(title: Text(_fmt(name)), subtitle: const Text('—')),
       data: (ability) =>

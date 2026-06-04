@@ -32,13 +32,13 @@ class TeamsScreen extends ConsumerWidget {
     final allTeamsAsync = ref.watch(allTeamsProvider);
     final syncState = ref.watch(syncStateProvider);
     final pendingCount = ref.watch(pendingSyncCountProvider);
-    final pending = pendingCount.when(data: (v) => v, loading: () => 0, error: (_, __) => 0);
+    final pending = pendingCount.when(data: (v) => v, loading: () => 0, error: (_, _) => 0);
     final isSyncing = syncState.status == SyncStatus.syncing;
-    final authToken = ref.watch(authTokenProvider);
+    // final authToken = ref.watch(authTokenProvider);
     final isOnline = ref.watch(isOnlineProvider).when(
       data: (v) => v,
       loading: () => true,
-      error: (_, __) => true,
+      error: (_, _) => true,
     );
 
     return Scaffold(
@@ -566,12 +566,12 @@ class _TeamTile extends ConsumerWidget {
     final pendingIds = ref.watch(pendingTeamIdsProvider).when(
           data: (ids) => ids,
           loading: () => <int>{},
-          error: (_, __) => <int>{},
+          error: (_, _) => <int>{},
         );
     final errorIds = ref.watch(errorTeamIdsProvider).when(
           data: (ids) => ids,
           loading: () => <int>{},
-          error: (_, __) => <int>{},
+          error: (_, _) => <int>{},
         );
     final hasError = errorIds.contains(team.id);
     final hasPending = !hasError && pendingIds.contains(team.id);
@@ -978,17 +978,17 @@ class _TeamSpriteRow extends ConsumerWidget {
               width: width,
               height: height,
               fit: BoxFit.contain,
-              errorWidget: (_, __, ___) => CachedNetworkImage(
+              errorWidget: (_, _, _) => CachedNetworkImage(
                 imageUrl: iconGen8,
                 width: width,
                 height: height,
                 fit: BoxFit.contain,
-                errorWidget: (_, __, ___) => CachedNetworkImage(
+                errorWidget: (_, _, _) => CachedNetworkImage(
                   imageUrl: fallback,
                   width: width,
                   height: height,
                   fit: BoxFit.contain,
-                  errorWidget: (_, __, ___) => Icon(
+                  errorWidget: (_, _, _) => Icon(
                     Icons.catching_pokemon,
                     size: 60,
                     color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),

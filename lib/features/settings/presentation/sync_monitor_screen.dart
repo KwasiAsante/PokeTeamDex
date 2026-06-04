@@ -275,7 +275,7 @@ class _HealthRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final (icon, color, text) = status.when(
       loading: () => (Icons.circle, Colors.grey, 'Checking…'),
-      error: (_, __) => (Icons.cancel_outlined, Colors.red, 'Error'),
+      error: (_, _) => (Icons.cancel_outlined, Colors.red, 'Error'),
       data: (h) => switch (h) {
         HealthStatus.healthy =>
           (Icons.check_circle_outline, Colors.green, 'Reachable'),
@@ -325,7 +325,7 @@ class _PendingQueueCard extends StatelessWidget {
     final count = pendingCount.when(
       data: (v) => v,
       loading: () => 0,
-      error: (_, __) => 0,
+      error: (_, _) => 0,
     );
 
     final ops = pendingOps.asData?.value ?? [];

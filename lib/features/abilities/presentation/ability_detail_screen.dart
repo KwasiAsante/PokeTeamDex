@@ -247,12 +247,12 @@ class _PokemonTile extends StatelessWidget {
         width: 40,
         height: 30,
         fit: BoxFit.contain,
-        errorWidget: (_, __, ___) => CachedNetworkImage(
+        errorWidget: (_, _, _) => CachedNetworkImage(
           imageUrl: fallbackUrl,
           width: 40,
           height: 30,
           fit: BoxFit.contain,
-          errorWidget: (_, __, ___) => Icon(Icons.catching_pokemon,
+          errorWidget: (_, _, _) => Icon(Icons.catching_pokemon,
               size: 28,
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
         ),

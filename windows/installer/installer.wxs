@@ -1,0 +1,147 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <Package Name="PokeTeamDex"
+           Manufacturer="Asante"
+           Version="$(Version)"
+           UpgradeCode="E3A7F1B2-4C5D-4E6F-8A9B-0C1D2E3F4A5B"
+           Scope="perMachine">
+
+    <!--
+      Version detection using the shared UpgradeCode.
+      Three properties are set depending on what is currently installed:
+        UPGRADE_FOUND      — an older build is installed (we are the newer installer)
+        SAME_VERSION_FOUND — the identical version is already installed
+        DOWNGRADE_FOUND    — a newer build is installed (we are an older installer)
+    -->
+    <Upgrade Id="E3A7F1B2-4C5D-4E6F-8A9B-0C1D2E3F4A5B">
+      <UpgradeVersion
+        Minimum="0.0.0"    IncludeMinimum="yes"
+        Maximum="$(Version)" IncludeMaximum="no"
+        Property="UPGRADE_FOUND"
+        MigrateFeatures="yes" />
+      <UpgradeVersion
+        Minimum="$(Version)" IncludeMinimum="yes"
+        Maximum="$(Version)" IncludeMaximum="yes"
+        Property="SAME_VERSION_FOUND" />
+      <UpgradeVersion
+        Minimum="$(Version)" IncludeMinimum="no"
+        Property="DOWNGRADE_FOUND" />
+    </Upgrade>
+
+    <!-- Block reinstall of identical version -->
+    <Launch Condition="NOT SAME_VERSION_FOUND"
+            Message="PokeTeamDex $(Version) is already installed on this computer.&#13;&#10;To reinstall, please uninstall the current version first." />
+
+    <!-- Warn before downgrade (user must confirm in the next dialog) -->
+    <Launch Condition="NOT DOWNGRADE_FOUND OR DOWNGRADE_CONFIRMED"
+            Message="A newer version of PokeTeamDex is already installed.&#13;&#10;&#13;&#10;Downgrading will remove the current installation. Run the newer installer to go back, or set DOWNGRADE_CONFIRMED=1 on the command line to proceed." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Feature-tree UI: shows license + feature selection (Start Menu / Desktop toggles) -->
+    <ui:WixUI Id="WixUI_FeatureTree" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(sys.SOURCEFILEDIR)license.rtf" />
+
+    <!-- ── Features ─────────────────────────────────────────────────────── -->
+
+    <Feature Id="MainApplication"
+             Title="PokeTeamDex"
+             Description="The PokeTeamDex application (required)."
+             Level="1"
+             AllowAdvertise="no"
+             Absent="disallow">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
+
+    <Feature Id="StartMenuShortcut"
+             Title="Start Menu Shortcut"
+             Description="Add PokeTeamDex to the Start Menu."
+             Level="1"
+             AllowAdvertise="no">
+      <ComponentRef Id="StartMenuShortcutComp" />
+    </Feature>
+
+    <Feature Id="DesktopShortcut"
+             Title="Desktop Shortcut"
+             Description="Create a shortcut on the Desktop."
+             Level="1"
+             AllowAdvertise="no">
+      <ComponentRef Id="DesktopShortcutComp" />
+    </Feature>
+  </Package>
+
+  <!-- ── Directory layout ─────────────────────────────────────────────── -->
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="PokeTeamDex" />
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="PokeTeamDex" />
+      </Directory>
+      <Directory Id="DesktopFolder" />
+    </Directory>
+  </Fragment>
+
+  <!-- ── Components ───────────────────────────────────────────────────── -->
+
+  <Fragment>
+    <!-- Harvest entire Flutter Windows build output recursively -->
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Files Include="$(BuildDir)\**\*.*" />
+    </ComponentGroup>
+
+    <Component Id="StartMenuShortcutComp" Directory="ApplicationProgramsFolder">
+      <Shortcut Id="StartMenuShortcutId"
+                Name="PokeTeamDex"
+                Target="[INSTALLFOLDER]poke_team_dex.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon" />
+      <RemoveFolder Id="CleanUpStartMenuFolder"
+                    Directory="ApplicationProgramsFolder"
+                    On="uninstall" />
+      <RegistryValue Root="HKCU"
+                     Key="Software\Asante\PokeTeamDex"
+                     Name="StartMenu"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+
+    <Component Id="DesktopShortcutComp" Directory="DesktopFolder">
+      <Shortcut Id="DesktopShortcutId"
+                Name="PokeTeamDex"
+                Target="[INSTALLFOLDER]poke_team_dex.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon" />
+      <RegistryValue Root="HKCU"
+                     Key="Software\Asante\PokeTeamDex"
+                     Name="Desktop"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+
+    <Icon Id="AppIcon" SourceFile="$(BuildDir)\..\..\..\..\windows\runner\resources\app_icon.ico" />
+  </Fragment>
+
+  <!-- ── Install sequence ─────────────────────────────────────────────── -->
+
+  <Fragment>
+    <InstallExecuteSequence>
+      <!--
+        Remove the existing installation before placing new files.
+        Scheduled after InstallInitialize so rollback is still possible
+        if the new installation fails mid-way.
+
+        NOTE: MSI does not automatically wipe AppData on downgrade.
+        User settings in %APPDATA%\com.asante.poke_team_dex are preserved.
+        For a full data wipe on downgrade, use the EXE installer instead.
+      -->
+      <RemoveExistingProducts After="InstallInitialize" />
+    </InstallExecuteSequence>
+  </Fragment>
+
+</Wix>

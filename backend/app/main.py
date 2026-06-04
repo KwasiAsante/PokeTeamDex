@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.routers import auth, folders, instances, ps_data, sync, teams
+from app.routers import admin, auth, folders, instances, ps_data, sync, teams
 from app.routers.teams import slots_router
 
 app = FastAPI(title="PokeTeamDex API", version="1.0.0")
@@ -24,6 +24,7 @@ app.include_router(teams.router)
 app.include_router(slots_router)
 app.include_router(sync.router)
 app.include_router(ps_data.router)
+app.include_router(admin.router)
 
 
 # Ensure CORS headers are present on all error responses.

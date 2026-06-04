@@ -172,13 +172,13 @@ class PokemonListTile extends ConsumerWidget {
                     child: CachedNetworkImage(
                       imageUrl: imageUrl,
                       fit: BoxFit.contain,
-                      errorWidget: (_, __, ___) => imageType == null
+                      errorWidget: (_, _, _) => imageType == null
                           ? CachedNetworkImage(
                               imageUrl: fallbackUrl,
                               width: imageSize,
                               height: imageSize,
                               fit: BoxFit.contain,
-                              errorWidget: (_, __, ___) => Icon(
+                              errorWidget: (_, _, _) => Icon(
                                 Icons.catching_pokemon,
                                 size: imageSize,
                                 color: colorScheme.onSurfaceVariant

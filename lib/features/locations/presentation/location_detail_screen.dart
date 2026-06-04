@@ -379,7 +379,7 @@ class _EncounterListTile extends StatelessWidget {
             width: 48,
             height: 36,
             fit: BoxFit.contain,
-            errorWidget: (_, __, ___) => const Icon(Icons.catching_pokemon,
+            errorWidget: (_, _, _) => const Icon(Icons.catching_pokemon,
                 size: 32),
           ),
           const SizedBox(width: 4),

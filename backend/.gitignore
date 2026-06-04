@@ -1,4 +1,6 @@
 .env
+.env.prod
+*firebase-adminsdk*.json
 __pycache__/
 *.pyc
 *.pyo
