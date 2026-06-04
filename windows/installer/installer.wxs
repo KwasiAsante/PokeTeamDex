@@ -41,25 +41,19 @@
     <ui:WixUI Id="WixUI_Mondo" />
     <WixVariable Id="WixUILicenseRtf" Value="$(sys.SOURCEFILEDIR)license.rtf" />
 
-    <!-- "Launch PokeTeamDex" checkbox on the Finish screen, ticked by default -->
+    <!-- "Launch PokeTeamDex" checkbox on the Finish screen, ticked by default.
+         WiX 4's ExitDialog already calls WixShellExec (from Util extension) when
+         WIXUI_EXITDIALOGOPTIONALCHECKBOX=1 and Finish is clicked — no custom
+         InstallUISequence entry needed. -->
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch PokeTeamDex" />
 
-    <!--
-      Shell-launch the exe after install when the checkbox is ticked.
-      SetProperty resolves [INSTALLFOLDER] at UI-sequence time (Property value
-      would be treated as a literal string, not expanded).
-    -->
+    <!-- Resolve [INSTALLFOLDER] into WixShellExecTarget after install completes
+         but before ExitDialog is shown (ExecuteAction = sequence 1300). -->
     <SetProperty Id="WixShellExecTarget"
       Value="[INSTALLFOLDER]poke_team_dex.exe"
       Sequence="ui"
-      Before="LaunchApp" />
-    <CustomAction Id="LaunchApp"
-      BinaryRef="Wix4UtilCA_X64"
-      DllEntry="WixShellExec"
-      Impersonate="yes"
-      Execute="immediate"
-      Return="ignore" />
+      After="ExecuteAction" />
 
     <!-- ── Features ─────────────────────────────────────────────────── -->
 
@@ -146,11 +140,6 @@
     <InstallExecuteSequence>
       <RemoveExistingProducts After="InstallInitialize" />
     </InstallExecuteSequence>
-    <InstallUISequence>
-      <!-- Run after the user clicks Finish, only on fresh install, only if checkbox ticked -->
-      <Custom Action="LaunchApp" After="ExitDialog"
-              Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
-    </InstallUISequence>
   </Fragment>
 
 </Wix>
