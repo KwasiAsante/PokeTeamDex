@@ -30,10 +30,17 @@ const _genToDefaultGameId = <int, String>{
   5: 'bw',
 };
 
+// Gen 1-2 sprites in PokeAPI have colored backgrounds in their base folder.
+// PokeAPI provides a /transparent/ subfolder where the backgrounds have been
+// removed, matching the look of the Pokémon Showdown sprites.
+// Gen 3-5 sprites are natively transparent PNGs/GIFs.
+bool _needsTransparentSubfolder(int gen) => gen <= 2;
+
 /// Resolves the correct sprite URLs for a Pokémon given the team's format
 /// and the user's sprite-style preference.
 ///
-/// Gen 1-5 uses PokeAPI version sprites (raw.githubusercontent.com — CORS safe).
+/// Gen 1-5 uses PokeAPI version sprites (raw.githubusercontent.com — CORS safe,
+/// transparent backgrounds via /transparent/ subfolder for Gen 1-2).
 /// Gen 6+ uses PokéAPI HOME / official artwork.
 ({String? defaultUrl, String? shinyUrl}) resolveSprite({
   required Map<String, dynamic>? sprites,
@@ -58,18 +65,35 @@ const _genToDefaultGameId = <int, String>{
   if (gameId != null) {
     final versionPath = _gameIdToVersionPath[gameId];
     if (versionPath != null) {
+      final gen = format.gen;
       // Gen 1 had no shiny mechanic — always use the default sprite.
-      final noShiny = format.gen == 1;
+      final noShiny = gen == 1;
       // Gen 5 BW has animated GIF sprites.
       final isAnimated = gameId == 'bw' || gameId == 'b2w2';
       final ext = isAnimated ? '.gif' : '.png';
-      final animatedSegment = isAnimated ? '/animated' : '';
+      // Gen 1-2 need the /transparent/ subfolder for background-free sprites.
+      final transparent = _needsTransparentSubfolder(gen) ? 'transparent/' : '';
+      // Animated Gen 5 sprites live in a nested /animated/ subfolder.
+      final animSeg = isAnimated ? 'animated/' : '';
 
+      // Default: versions/{path}/[animated/][transparent/]{id}.ext
       final defaultUrl =
-          '$_versionsBase/$versionPath$animatedSegment/$pokemonId$ext';
-      final shinyUrl = noShiny
-          ? defaultUrl
-          : '$_versionsBase/$versionPath${isAnimated ? '/animated' : ''}/shiny/$pokemonId$ext';
+          '$_versionsBase/$versionPath/$animSeg$transparent$pokemonId$ext';
+
+      // Shiny URL path differs by generation:
+      //   Animated (Gen 5): versions/{path}/animated/shiny/{id}.gif
+      //   Transparent (Gen 2): versions/{path}/shiny/transparent/{id}.png
+      //   Regular (Gen 3-4): versions/{path}/shiny/{id}.png
+      final String shinyUrl;
+      if (noShiny) {
+        shinyUrl = defaultUrl;
+      } else if (isAnimated) {
+        shinyUrl = '$_versionsBase/$versionPath/${animSeg}shiny/$pokemonId$ext';
+      } else if (transparent.isNotEmpty) {
+        shinyUrl = '$_versionsBase/$versionPath/shiny/$transparent$pokemonId$ext';
+      } else {
+        shinyUrl = '$_versionsBase/$versionPath/shiny/$pokemonId$ext';
+      }
 
       return (defaultUrl: defaultUrl, shinyUrl: shinyUrl);
     }
