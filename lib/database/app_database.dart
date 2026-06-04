@@ -99,7 +99,9 @@ class AppDatabase extends _$AppDatabase {
             } catch (_) {}
           }
           if (from < 10) {
-            await m.addColumn(pokemonInstances, pokemonInstances.remoteId);
+            try {
+              await m.addColumn(pokemonInstances, pokemonInstances.remoteId);
+            } catch (_) {}
           }
           if (from < 11) {
             // BoolColumn variance prevents m.addColumn — use raw SQL.

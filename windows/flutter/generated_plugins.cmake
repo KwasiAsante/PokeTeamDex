@@ -4,7 +4,6 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   connectivity_plus
-  firebase_auth
   firebase_core
   screen_retriever_windows
   tray_manager
