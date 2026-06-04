@@ -152,7 +152,6 @@
 ### Navigation & Shell
 
 - [x] **Adaptive nav** — `BottomNavigationBar` < 600dp, `NavigationRail` 600–840dp, permanent `NavigationDrawer` > 840dp; overflow fixes for team tile sprites, slot card type badges, location encounter table
-- [ ] **App-wide back gesture / breadcrumb** — on wide layouts the detail screen should open in a side panel rather than pushing a new route (master-detail pattern for Pokédex, Teams)
 - [ ] **Pokéathlon tab** — removed; PokéAPI `/pokeathlon-stat/` only returns nature-affinity data, not per-Pokémon base values — no data source available
 - [x] **Connectivity status button** — wifi icon + coloured dot on every screen's AppBar; green = online + signed in, amber = online + not signed in, red = offline; tapping opens sheet with live Device / PokéAPI / Backend API / Account status rows + refresh button
 - [x] **Teams tab** — shows "On your teams" list (team name, slot #, nickname, format label, tap to navigate); "Add to a team" sheet with team picker → slot grid showing current occupants; replacement confirmation dialog; "New team" creation from the sheet; inserts slot with defaults (L50, IVs 31) and queues sync op
@@ -266,6 +265,12 @@
 - [x] **Link UI** — "Pokémon Identity" section in slot config; link type chooser (child vs origin); instance picker sheet; chain view showing ancestors + current slot + direct children with origin/child badges; "Add child" button on linked state; copy-to-team-slot destination picker (new team or empty slot in existing team)
 - [x] **Data inheritance** — ribbon merging from `inheritedRibbons`; "Previously known as" alias display when nickname differs from parent; gender/isShiny propagated when copying to child slot
 - [x] **Navigation** — tapping a chain row navigates to that slot's config screen
+
+---
+
+## Optional / Post-release Enhancements
+
+- [ ] **Master-detail side panel** — on wide layouts (> 840dp) show Pokédex list + detail and Teams list + team detail as side-by-side panels rather than full navigations; primarily a desktop UX polish item, irrelevant on mobile
 
 ---
 
