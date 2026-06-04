@@ -1894,6 +1894,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // ── Stat preview ──────────────────────────────────────────────────────────
 
+  // Gen 1 stat preview uses the same 5-stat layout as the EV/IV grid.
+  // SpD is absent; Special (index 3) covers both SpA and SpD.
+  static const _gen1PreviewKeys = [
+    'hp', 'attack', 'defense', 'special-attack', 'speed',
+  ];
+
   Widget _buildStatPreview(Map<String, int> baseStats, GenerationMechanics? mechanics) {
     if (baseStats.isEmpty) return const SizedBox.shrink();
     final maxIv = mechanics?.statMax ?? 31;
@@ -1901,19 +1907,33 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     final ivs = _ivCtrls
         .map((c) => (int.tryParse(c.text) ?? maxIv).clamp(0, maxIv))
         .toList();
+
+    final isGen1 = mechanics?.gen == 1;
+    // Gen 1: SpD = SpA (both are the single Special stat).
+    // Sync the hidden SpD controller so the preview reflects what was typed.
+    if (isGen1) {
+      evs[4] = evs[3];
+      ivs[4] = ivs[3];
+    }
+
     // Gen 1: nature modifiers don't apply
     final useNature = mechanics == null || mechanics.hasAbilities;
 
+    final labels  = isGen1 ? _gen1StatLabels  : _statLabels;
+    final indices = isGen1 ? _gen1StatIndices  : List.generate(6, (i) => i);
+    final keys    = isGen1 ? _gen1PreviewKeys  : _statKeys;
+
     return Column(
       children: [
-        for (int i = 0; i < _statKeys.length; i++)
+        for (int i = 0; i < indices.length; i++)
           StatBar(
-            label: _statLabels[i],
-            value: _statKeys[i] == 'hp'
+            label: labels[i],
+            value: keys[i] == 'hp'
                 ? stat.calcHP(baseStats['hp'] ?? 0, ivs[0], evs[0], _level)
                 : stat.calcStat(
-                    baseStats[_statKeys[i]] ?? 0, ivs[i], evs[i], _level,
-                    useNature ? stat.natureMod(_natureName, _statKeys[i]) : 1.0),
+                    baseStats[keys[i]] ?? 0,
+                    ivs[indices[i]], evs[indices[i]], _level,
+                    useNature ? stat.natureMod(_natureName, keys[i]) : 1.0),
             maxValue: 700,
           ),
       ],

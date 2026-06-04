@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
+import 'package:poke_team_dex/database/repositories/app_config_repository.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 
@@ -86,7 +87,6 @@ _PsTeam _parseTeam(String text) {
   for (final block in blocks) {
     final slot = _parseBlock(block);
     if (slot != null) slots.add(slot);
-    if (slots.length >= 6) break;
   }
 
   return _PsTeam(name: teamName, formatId: formatId, slots: slots);
@@ -235,11 +235,15 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
       final syncQueue = ref.read(syncQueueRepositoryProvider);
       final now = DateTime.now();
 
+      // >6 Pokémon → import as a Box; ≤6 → regular team.
+      final isBox = parsed.slots.length > 6;
+
       // Create the team.
       final teamId = await teamRepo.insert(TeamsCompanion(
         name: Value(parsed.name),
         folderId: Value(widget.folderId),
         formatLabel: Value(parsed.formatId),
+        isBox: Value(isBox),
         createdAt: Value(now),
         updatedAt: Value(now),
       ));
@@ -326,8 +330,11 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
       if (errors.isNotEmpty) {
         showAppSnackBar(
           context,
-          'Team imported with ${errors.length} skipped slot(s):\n${errors.join('\n')}',
+          '${isBox ? 'Box' : 'Team'} imported with ${errors.length} skipped slot(s):\n${errors.join('\n')}',
         );
+      } else if (isBox) {
+        showAppSnackBar(context,
+            'Imported as a Box (${parsed.slots.length} Pokémon).');
       }
 
       context.push('/teams/$teamId');
