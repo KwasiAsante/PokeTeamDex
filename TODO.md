@@ -1,6 +1,6 @@
 # PokeTeamDex — Progress Tracker
 
-> Updated 2026-06-03 after snackbar migration (PR #85).
+> Updated 2026-06-03 after unit tests (PR #86).
 
 ---
 
@@ -131,9 +131,10 @@
 
 ## Phase 8 — Testing
 
-- [ ] Unit tests — `SyncService` (push drain, pull merge, conflict resolution)
-- [ ] Unit tests — `buildShowdownExport`
-- [ ] Unit tests — stat formula calculator
+- [x] Unit tests — `SyncService` (push drain, pull merge, conflict resolution)
+- [x] Unit tests — `buildShowdownExport`
+- [x] Unit tests — stat formula calculator
+- [x] Unit tests — `filterFormChips`, `resolveZMove`, `gmaxMoveForSpecies`, `resolveMaxMove`, `GenerationMechanics.forGen`, `GameFormat`, `PsMoveEntry/PsItemEntry/PsAbilityEntry` (123 tests total across 7 files)
 - [ ] Widget tests — `TeamsScreen`, `TeamDetailScreen`, `PokemonDetailScreen`
 - [ ] Widget tests — slot config form (EV overflow, IV clamping)
 - [ ] Integration tests — full CRUD flow: create folder → team → add slots → verify Drift DB
