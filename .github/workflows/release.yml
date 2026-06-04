@@ -112,10 +112,19 @@ jobs:
       - name: Add WiX UI extension
         run: wix extension add --global WixToolset.UI.wixext/4.0.5
 
+      - name: Harvest Windows build output
+        run: |
+          wix harvest dir "build\windows\x64\runner\Release" `
+            -cg ProductComponents `
+            -dr INSTALLFOLDER `
+            -template fragment `
+            -srd `
+            -out "windows\installer\components.wxs"
+
       - name: Build MSI
         run: |
           $version = "${{ needs.create-release.outputs.tag }}".TrimStart('v')
-          wix build windows/installer/installer.wxs `
+          wix build windows/installer/installer.wxs windows/installer/components.wxs `
             -d Version=$version `
             -d BuildDir="$PWD\build\windows\x64\runner\Release" `
             -ext WixToolset.UI.wixext `
