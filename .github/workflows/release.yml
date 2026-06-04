@@ -110,8 +110,10 @@ jobs:
       - name: Install WiX Toolset v4
         run: dotnet tool install --global wix --version 4.0.5
 
-      - name: Add WiX UI extension
-        run: wix extension add --global WixToolset.UI.wixext/4.0.5
+      - name: Add WiX extensions
+        run: |
+          wix extension add --global WixToolset.UI.wixext/4.0.5
+          wix extension add --global WixToolset.Util.wixext/4.0.5
 
       - name: Generate WiX component list from Flutter build output
         run: |
@@ -142,6 +144,7 @@ jobs:
             -d BuildDir="$PWD\build\windows\x64\runner\Release" `
             -d IconFile="$PWD\windows\runner\resources\app_icon.ico" `
             -ext WixToolset.UI.wixext `
+            -ext WixToolset.Util.wixext `
             -o "PokeTeamDex-${{ needs.create-release.outputs.tag }}-Setup.msi"
 
       - name: Install Inno Setup

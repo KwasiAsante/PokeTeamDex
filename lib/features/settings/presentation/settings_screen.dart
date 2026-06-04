@@ -96,9 +96,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 4),
           Text(
             'The address of the PokeTeamDex backend.\n'
-            '• Web / iOS simulator: http://localhost:8000\n'
-            '• Android emulator: http://10.0.2.2:8000\n'
-            '• Production: https://your-app.fly.dev',
+            '• Production: https://poketeamdex.duckdns.org (default)\n'
+            '• Local dev: http://localhost:8000\n'
+            '• Android emulator: http://10.0.2.2:8000',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),

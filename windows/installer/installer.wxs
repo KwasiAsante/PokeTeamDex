@@ -34,8 +34,29 @@
 
     <MediaTemplate EmbedCab="yes" />
 
-    <ui:WixUI Id="WixUI_FeatureTree" />
+    <!--
+      WixUI_Mondo: License → Setup Type → Directory → Feature tree → Install → Finish.
+      Choosing "Custom" exposes directory selection and optional feature toggles.
+    -->
+    <ui:WixUI Id="WixUI_Mondo">
+      <ui:Publish Dialog="ExitDlg" Control="Finish" Event="DoAction" Value="LaunchApp">
+        WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed
+      </ui:Publish>
+    </ui:WixUI>
     <WixVariable Id="WixUILicenseRtf" Value="$(sys.SOURCEFILEDIR)license.rtf" />
+
+    <!-- Launch checkbox on the Finish screen (ticked by default) -->
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch PokeTeamDex" />
+
+    <!-- Shell-launch the exe after install when checkbox is ticked -->
+    <Property Id="WixShellExecTarget" Value="[INSTALLFOLDER]poke_team_dex.exe" />
+    <CustomAction Id="LaunchApp"
+      BinaryRef="Wix4UtilCA_X64"
+      DllEntry="WixShellExec"
+      Impersonate="yes"
+      Execute="immediate"
+      Return="ignore" />
 
     <!-- ── Features ─────────────────────────────────────────────────── -->
 

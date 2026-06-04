@@ -7,7 +7,7 @@ const _kUseFormatSprites = 'use_format_sprites';
 const _kSeedColor = 'seed_color';
 const _kThemeMode = 'theme_mode';
 const _kPsDirectory = 'ps_directory';
-const kDefaultApiBaseUrl = 'http://localhost:8000';
+const kDefaultApiBaseUrl = 'https://poketeamdex.duckdns.org';
 // Default seed colour — Pokéball red
 const kDefaultSeedColor = 0xFFCC0000;
 

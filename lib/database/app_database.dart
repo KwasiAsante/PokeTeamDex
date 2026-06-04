@@ -92,7 +92,11 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 9) {
             await m.createTable(pokemonInstances);
-            await m.addColumn(teamSlots, teamSlots.instanceId);
+            // Guard against duplicate column if this migration was partially
+            // applied in a development build before the schema version was bumped.
+            try {
+              await m.addColumn(teamSlots, teamSlots.instanceId);
+            } catch (_) {}
           }
           if (from < 10) {
             await m.addColumn(pokemonInstances, pokemonInstances.remoteId);
