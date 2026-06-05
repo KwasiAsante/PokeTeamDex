@@ -814,18 +814,23 @@ The backend is a stateless FastAPI service that can be deployed anywhere Docker 
 
 ### Docker Compose (self-hosted / VPS)
 
+`start.sh` runs `alembic upgrade head` automatically before uvicorn starts — **you never need to run migrations manually**. The production compose file (`docker-compose.prod.yml`) runs only the API container; PostgreSQL is an external service configured via `DATABASE_URL` in `.env.prod`.
+
 ```bash
 cd backend
+# First deploy: copy and fill in the env file
+cp .env.example .env.prod   # set DATABASE_URL, SECRET_KEY, etc.
 
-# Build and start with production environment
-SECRET_KEY="your-long-random-secret" \
-DATABASE_URL="postgresql+asyncpg://user:pass@host:5432/poketeamdex" \
-docker-compose up -d --build
+# Every deploy (first or subsequent):
+docker compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.prod.yml up -d
 
 # Verify
 curl http://localhost:8000/health
 # → {"status": "ok"}
 ```
+
+> **Local dev** uses `docker-compose.yml` (no suffix), which also spins up a `postgres:16` container so no external DB is needed.
 
 ### Railway / Render / Fly.io
 
@@ -833,10 +838,10 @@ curl http://localhost:8000/health
 2. Set the environment variables in the platform dashboard:
    - `SECRET_KEY`
    - `DATABASE_URL` (the platform's managed PostgreSQL URL)
-3. The `start.sh` entrypoint runs migrations then starts the server:
+3. `start.sh` runs migrations then starts the server automatically — no extra step needed:
 
 ```bash
-# backend/start.sh
+# backend/start.sh (runs automatically on container start)
 alembic upgrade head
 uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
 ```
@@ -850,6 +855,7 @@ uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
 | `0003_add_is_deleted` | Soft-delete + sync status columns |
 | `0004_pokemon_instances` | PokemonInstances table |
 | `0005_full_slot_config` | All slot config columns (ribbons, contest stats, gimmicks) |
+| `0006_add_format_label_to_teams` | `format_label` column on teams |
 
 ```bash
 cd backend
