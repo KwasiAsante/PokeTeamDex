@@ -249,6 +249,8 @@ class SyncService {
           'type': 'team_create',
           'client_local_id': op.entityId,
           'name': payload['name'] as String,
+          if (payload['format_label'] != null)
+            'format_label': payload['format_label'] as String,
         };
         final folderLocalId = payload['folder_local_id'] as int?;
         if (folderLocalId != null) {
