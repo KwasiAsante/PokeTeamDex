@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Query
@@ -88,6 +88,7 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
             folder = r.scalar_one_or_none()
             if folder:
                 folder.name = op.name
+                folder.updated_at = datetime.now(timezone.utc)
 
         elif isinstance(op, FolderDeleteOp):
             r = await db.execute(
@@ -98,17 +99,21 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
             )
             folder = r.scalar_one_or_none()
             if folder:
+                now = datetime.now(timezone.utc)
                 folder.is_deleted = True
+                folder.updated_at = now
                 tr = await db.execute(
                     select(Team).where(Team.folder_id == folder.id, Team.is_deleted == False)  # noqa: E712
                 )
                 for team in tr.scalars():
                     team.is_deleted = True
+                    team.updated_at = now
                     sr = await db.execute(
                         select(TeamSlot).where(TeamSlot.team_id == team.id, TeamSlot.is_deleted == False)  # noqa: E712
                     )
                     for slot in sr.scalars():
                         slot.is_deleted = True
+                        slot.updated_at = now
 
         elif isinstance(op, TeamCreateOp):
             folder_id = op.folder_remote_id
@@ -131,6 +136,7 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
             team = r.scalar_one_or_none()
             if team:
                 team.name = op.name
+                team.updated_at = datetime.now(timezone.utc)
                 if op.update_folder:
                     folder_id = op.folder_remote_id
                     if folder_id is None and op.folder_client_local_id is not None:
@@ -153,12 +159,15 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
             )
             team = r.scalar_one_or_none()
             if team:
+                now = datetime.now(timezone.utc)
                 team.is_deleted = True
+                team.updated_at = now
                 sr = await db.execute(
                     select(TeamSlot).where(TeamSlot.team_id == team.id, TeamSlot.is_deleted == False)  # noqa: E712
                 )
                 for slot in sr.scalars():
                     slot.is_deleted = True
+                    slot.updated_at = now
 
         elif isinstance(op, InstanceCreateOp):
             parent_id = op.parent_instance_remote_id
@@ -193,6 +202,7 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
                     instance.nickname_aliases = op.nickname_aliases
                 if op.inherited_ribbons is not None:
                     instance.inherited_ribbons = op.inherited_ribbons
+                instance.updated_at = datetime.now(timezone.utc)
 
         elif isinstance(op, SlotUpsertOp):
             team_id = op.team_remote_id
@@ -270,6 +280,7 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
                 slot.contest_tough = op.contest_tough
                 slot.contest_sheen = op.contest_sheen
                 slot.is_deleted = False
+                slot.updated_at = datetime.now(timezone.utc)
 
         elif isinstance(op, SlotDeleteOp):
             team_id = op.team_remote_id
@@ -283,6 +294,7 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
             slot = r.scalar_one_or_none()
             if slot:
                 slot.is_deleted = True
+                slot.updated_at = datetime.now(timezone.utc)
 
     await db.commit()
     return SyncPushResponse(created=created)
