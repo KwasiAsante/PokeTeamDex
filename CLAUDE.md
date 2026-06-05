@@ -40,15 +40,50 @@ Follow conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`
 
 ---
 
-## Database Migrations
+## Database Migrations (SQLite / Drift)
 
-When adding columns to Drift tables:
-1. Add the column to the table class in `lib/database/tables/`
-2. Bump `schemaVersion` in `lib/database/app_database.dart`
-3. Add a migration in the `onUpgrade` handler
-4. Wrap ALL migrations in `try/catch` for idempotency (dev builds may already have the column)
+### Checklist for every schema change
+1. Add/change the column in the table class (`lib/database/tables/`)
+2. Bump `schemaVersion` in `lib/database/app_database.dart` (increment by 1)
+3. Add a migration step in the `onUpgrade` handler — one `if (from < N)` block per version
+4. Wrap **every** migration statement in `try/catch` (see pattern below)
 5. Run `dart run build_runner build --delete-conflicting-outputs` to regenerate `app_database.g.dart`
-6. Commit the generated `.g.dart` file alongside the migration
+6. Commit the generated `.g.dart` alongside the hand-written migration
+
+### onUpgrade pattern
+
+```dart
+MigrationStrategy(
+  onCreate: (m, details) async {
+    await m.createAll();
+  },
+  onUpgrade: (m, from, to) async {
+    // Step through each version in order.
+    // Never skip a version or merge two steps into one block.
+    if (from < 2) {
+      try {
+        await m.addColumn(teams, teams.formatLabel);
+      } catch (_) {
+        // Column may already exist on dev builds that were ahead of this migration.
+      }
+    }
+    if (from < 3) {
+      try {
+        await m.addColumn(teamSlots, teamSlots.isAlpha);
+      } catch (_) {}
+    }
+    // … add a new `if (from < N)` block for every future version
+  },
+)
+```
+
+### Rules
+- **Always step through versions sequentially.** A user upgrading from v2 to v4 will hit `from < 3` and `from < 4` in order. Never merge two steps.
+- **Wrap every statement in `try/catch`.** Dev builds often apply migrations manually before the version number is bumped, leaving the column already present. A bare `addColumn` will crash on those builds. Catch silently — the column already existing is the desired end state.
+- **Only catch `Exception` / `_` — never swallow logic errors silently in non-migration code.**
+- **`BoolColumn` cannot be passed to `m.addColumn()`.** Use `customStatement('ALTER TABLE … ADD COLUMN … INTEGER NOT NULL DEFAULT 0')` for boolean columns.
+- **`schemaVersion` must be a single monotonically increasing integer.** Never reset or reuse a version number.
+- **Test both paths:** fresh install (onCreate) and upgrade from the previous version (onUpgrade).
 
 ---
 
