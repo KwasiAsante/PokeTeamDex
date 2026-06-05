@@ -57,6 +57,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sign In'),
+        // Show a close button when navigated to (e.g. from connectivity sheet).
+        // automaticallyImplyLeading handles the back-arrow when pushed, but an
+        // explicit close icon is clearer than a generic arrow.
+        leading: context.canPop()
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: 'Cancel',
+                onPressed: () => context.pop(),
+              )
+            : null,
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),

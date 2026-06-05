@@ -635,6 +635,7 @@ class _AppVersionTile extends ConsumerWidget {
 
         final updateAsync = ref.watch(updateCheckProvider);
         final hasUpdate = updateAsync.asData?.value != null;
+        final hasError  = updateAsync.hasError;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -666,8 +667,12 @@ class _AppVersionTile extends ConsumerWidget {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.system_update_outlined),
-              label: const Text('Check for updates'),
+                  : Icon(hasError
+                      ? Icons.error_outline
+                      : Icons.system_update_outlined),
+              label: Text(hasError
+                  ? 'Check failed — tap to retry'
+                  : 'Check for updates'),
             ),
             if (hasUpdate) ...[
               const SizedBox(height: 8),

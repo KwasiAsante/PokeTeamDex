@@ -208,3 +208,23 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ── Notify backend (runs in same workflow to bypass GITHUB_TOKEN restriction) ─
+  # notify-update.yml with `on: release: published` never fires when the release
+  # is created by GITHUB_TOKEN — GitHub blocks cross-workflow triggers from tokens.
+  notify-backend:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify backend of new release
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+          NOTIFY_UPDATE_SECRET: ${{ secrets.NOTIFY_UPDATE_SECRET }}
+        run: |
+          curl -f -X POST "${BACKEND_URL}/admin/notify-update" \
+            -H "Content-Type: application/json" \
+            -H "X-Notify-Secret: ${NOTIFY_UPDATE_SECRET}" \
+            -d "{\"version\":\"${{ needs.create-release.outputs.tag }}\",\"release_url\":\"${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.create-release.outputs.tag }}\"}" \
+            --max-time 30 \
+            --retry 3 \
+            --retry-delay 5

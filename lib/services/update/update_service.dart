@@ -34,8 +34,9 @@ class UpdateService {
         exeUrl: _findAssetUrl(assets, '-Setup.exe'),
         webUrl: _webUrl,
       );
-    } catch (_) {
-      return null;
+    } catch (e) {
+      debugPrint('Update check failed: $e');
+      rethrow; // let FutureProvider surface the error state for UI feedback
     }
   }
 

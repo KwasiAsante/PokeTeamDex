@@ -105,10 +105,12 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 11) {
             // BoolColumn variance prevents m.addColumn — use raw SQL.
-            // Drift stores booleans as INTEGER; default 0 = false.
-            await customStatement(
-              'ALTER TABLE teams ADD COLUMN is_box INTEGER NOT NULL DEFAULT 0',
-            );
+            // Guard against duplicate column from dev builds (same as migrations 9 & 10).
+            try {
+              await customStatement(
+                'ALTER TABLE teams ADD COLUMN is_box INTEGER NOT NULL DEFAULT 0',
+              );
+            } catch (_) {}
           }
         },
       );

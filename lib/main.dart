@@ -21,7 +21,9 @@ import 'package:poke_team_dex/router/app_router.dart';
 import 'package:poke_team_dex/services/api/team_sync_api.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:poke_team_dex/services/firebase/fcm_service.dart';
+import 'package:poke_team_dex/services/update/update_provider.dart';
 import 'package:poke_team_dex/services/tray/tray_service.dart';
 import 'package:poke_team_dex/shared/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,6 +31,17 @@ import 'package:window_manager/window_manager.dart';
 import 'package:workmanager/workmanager.dart';
 
 const _syncTaskName = 'poketeamdex.sync';
+const _kPendingUpdateKey = 'pending_update_check';
+
+// Top-level handler for FCM messages received while app is killed or in background.
+// Runs in a separate isolate — no Riverpod access. Stores a flag for the next resume.
+@pragma('vm:entry-point')
+Future<void> _onBackgroundMessage(RemoteMessage message) async {
+  if (message.data['type'] == 'app_update') {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kPendingUpdateKey, true);
+  }
+}
 
 @pragma('vm:entry-point')
 void _workmanagerCallback() {
@@ -101,6 +114,11 @@ void main() async {
 
   await FcmService.init();
 
+  // Register background FCM handler (must be top-level, called before runApp).
+  if (FcmService.isSupported) {
+    FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
+  }
+
   await Hive.initFlutter();
   await Hive.openBox('pokeapi_cache');
 
@@ -164,6 +182,16 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         if (online) _triggerSync();
       });
     }
+
+    // Foreground FCM handler — app is open when message arrives.
+    // Directly invalidates the update provider so the banner shows immediately.
+    if (FcmService.isSupported) {
+      FirebaseMessaging.onMessage.listen((message) {
+        if (message.data['type'] == 'app_update') {
+          ref.invalidate(updateCheckProvider);
+        }
+      });
+    }
   }
 
   @override
@@ -174,10 +202,19 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  // Sync when the app is foregrounded (covers lock-screen unlock, tab switch, etc.)
+  // Called when app is foregrounded (lock-screen unlock, tab switch, notification tap, etc.)
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _triggerSync();
+    if (state == AppLifecycleState.resumed) {
+      _triggerSync();
+      // If a background FCM message flagged a pending update, check now.
+      SharedPreferences.getInstance().then((prefs) {
+        if (prefs.getBool(_kPendingUpdateKey) == true) {
+          prefs.remove(_kPendingUpdateKey);
+          ref.invalidate(updateCheckProvider);
+        }
+      });
+    }
   }
 
   void _triggerSync() {

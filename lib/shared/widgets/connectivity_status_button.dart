@@ -148,7 +148,7 @@ class _StatusSheet extends ConsumerWidget {
                 ? null
                 : () {
                     Navigator.of(context).pop();
-                    context.go('/login');
+                    context.push('/login'); // push so back/cancel returns here
                   },
           ),
         ],
