@@ -90,6 +90,7 @@ Apply this whenever:
 
 ## Windows Installer
 
+- **Known issue #96**: MSI "Launch after Finish" checkbox does not start the app — do not re-attempt without new information; use the EXE installer as the primary download for now
 - WiX Toolset v4.0.5 (pinned — do not upgrade to v5+ without testing)
 - `wix harvest` does not exist in v4.0.5 — components are generated via PowerShell in CI
 - `Condition` in `<Custom>` elements uses attribute syntax, not inner text
