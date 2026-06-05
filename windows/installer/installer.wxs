@@ -170,7 +170,7 @@
         dismisses the dialog, respecting the checkbox state.
         NOT REMOVE prevents launch during uninstall.
       -->
-      <Custom Action="WixShellExec" After="ExitDialog">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT REMOVE</Custom>
+      <Custom Action="WixShellExec" After="ExitDialog" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT REMOVE" />
     </InstallUISequence>
   </Fragment>
 
