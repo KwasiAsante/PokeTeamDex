@@ -26,6 +26,7 @@ import 'package:poke_team_dex/services/firebase/fcm_service.dart';
 import 'package:poke_team_dex/services/update/update_provider.dart';
 import 'package:poke_team_dex/services/tray/tray_service.dart';
 import 'package:poke_team_dex/shared/theme/app_theme.dart';
+import 'package:poke_team_dex/utils/app_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:workmanager/workmanager.dart';
@@ -107,6 +108,24 @@ void _workmanagerCallback() {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Capture Flutter framework errors (widget build failures, etc.)
+  FlutterError.onError = (details) {
+    AppLogger().e(
+      'Flutter error: ${details.exceptionAsString()}',
+      error: details.exception,
+      stackTrace: details.stack,
+    );
+    FlutterError.presentError(details);
+  };
+
+  // Capture uncaught async errors (dart:async zone errors)
+  PlatformDispatcher.instance.onError = (error, stack) {
+    AppLogger().e('Unhandled error', error: error, stackTrace: stack);
+    return false;
+  };
+
+  AppLogger().i('App starting');
+
   // window_manager must be initialised before runApp on desktop.
   if (TrayService.isSupported) {
     await windowManager.ensureInitialized();
@@ -160,6 +179,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       ref.read(authTokenProvider.notifier).state = widget.initialToken ?? '';
 
+      // Wire the dynamic logs URL from the DB into the singleton logger.
+      final configRepo = ref.read(appConfigRepositoryProvider);
+      final logsUrl = await configRepo.getLogsApiBaseUrl();
+      AppLogger.configure(logsUrl);
+      configRepo.watchLogsApiBaseUrl().listen(AppLogger.configure);
+
       // Initialize system tray after the first frame so the window is ready.
       if (TrayService.isSupported) {
         _trayService = TrayService(onSyncNow: _triggerSync);
@@ -205,6 +230,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   // Called when app is foregrounded (lock-screen unlock, tab switch, notification tap, etc.)
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    AppLogger().d('Lifecycle: ${state.name}');
     if (state == AppLifecycleState.resumed) {
       _triggerSync();
       // If a background FCM message flagged a pending update, check now.

@@ -78,3 +78,7 @@ final psDirectoryProvider = StreamProvider<String?>((ref) {
 final maxBoxSizeProvider = StreamProvider<int>((ref) {
   return ref.watch(appConfigRepositoryProvider).watchMaxBoxSize();
 });
+
+final logsApiBaseUrlProvider = StreamProvider<String>((ref) {
+  return ref.watch(appConfigRepositoryProvider).watchLogsApiBaseUrl();
+});

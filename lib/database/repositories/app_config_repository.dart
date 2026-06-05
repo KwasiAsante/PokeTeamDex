@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 
 const _kApiBaseUrl = 'api_base_url';
+const _kLogsApiBaseUrl = 'logs_api_base_url';
 const _kUseFormatSprites = 'use_format_sprites';
 const _kSeedColor = 'seed_color';
 const _kThemeMode = 'theme_mode';
 const _kPsDirectory = 'ps_directory';
 const _kMaxBoxSize = 'max_box_size';
 const kDefaultApiBaseUrl = 'https://poketeamdex.duckdns.org';
+const kDefaultLogsApiBaseUrl = 'https://kwasi-utilitybills.duckdns.org';
 // Default seed colour — Pokéball red
 const kDefaultSeedColor = 0xFFCC0000;
 const kDefaultMaxBoxSize = 60;
@@ -50,6 +52,16 @@ class AppConfigRepository {
 
   Stream<String> watchApiBaseUrl() =>
       watch(_kApiBaseUrl).map((v) => v ?? kDefaultApiBaseUrl);
+
+  // ── Logs API URL ──────────────────────────────────────────────────────────
+
+  Future<String> getLogsApiBaseUrl() async =>
+      (await get(_kLogsApiBaseUrl)) ?? kDefaultLogsApiBaseUrl;
+
+  Future<void> setLogsApiBaseUrl(String url) => set(_kLogsApiBaseUrl, url);
+
+  Stream<String> watchLogsApiBaseUrl() =>
+      watch(_kLogsApiBaseUrl).map((v) => v ?? kDefaultLogsApiBaseUrl);
 
   // ── Sprite style ──────────────────────────────────────────────────────────
 

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/database/repositories/app_config_repository.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
+import 'package:poke_team_dex/utils/app_logger.dart';
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient(
@@ -22,6 +23,7 @@ class ApiClient {
       receiveTimeout: const Duration(seconds: 10),
     ));
     _dio.interceptors.add(_AppInterceptor(configRepo, getToken));
+    _dio.interceptors.add(_ErrorLogInterceptor());
     if (kDebugMode) {
       _dio.interceptors.add(LogInterceptor(
         requestHeader: true,
@@ -36,6 +38,18 @@ class ApiClient {
   late final Dio _dio;
 
   Dio get dio => _dio;
+}
+
+class _ErrorLogInterceptor extends Interceptor {
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    final req = err.requestOptions;
+    AppLogger().w(
+      'API error: ${req.method} ${req.path} → ${err.response?.statusCode ?? err.type.name}',
+      error: err,
+    );
+    handler.next(err);
+  }
 }
 
 class _AppInterceptor extends Interceptor {
