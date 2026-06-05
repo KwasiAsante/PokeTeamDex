@@ -81,22 +81,18 @@
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch PokeTeamDex" />
 
     <!--
-      Launch the app after install when the checkbox is ticked.
-      Uses InstallExecuteSequence (not InstallUISequence) so [INSTALLFOLDER] is
-      already resolved. WIXUI_EXITDIALOGOPTIONALCHECKBOX is a public property
-      so it's available in the execute sequence.
-      The app starts in the background while the Finish dialog is still open.
+      Launch the app when the user clicks Finish (not before the dialog appears).
+      WiX 4's ExitDialog already has a built-in Finish-button event that calls
+      WixShellExec (from WixToolset.Util.wixext) when WIXUI_EXITDIALOGOPTIONALCHECKBOX=1.
+      We only need to set WixShellExecTarget in the UI sequence so [INSTALLFOLDER]
+      is resolved by the time the user clicks Finish.
+      Scheduled After="ExecuteAction" (sequence 1300) — install is done,
+      ExitDialog hasn't shown yet, so [INSTALLFOLDER] is fully resolved.
     -->
     <SetProperty Id="WixShellExecTarget"
       Value="[INSTALLFOLDER]poke_team_dex.exe"
-      Before="LaunchApp"
-      Sequence="execute" />
-    <CustomAction Id="LaunchApp"
-      BinaryRef="Wix4UtilCA_X64"
-      DllEntry="WixShellExec"
-      Impersonate="yes"
-      Execute="immediate"
-      Return="ignore" />
+      After="ExecuteAction"
+      Sequence="ui" />
 
     <!-- ── Single feature — all components always installed ───────────── -->
 
@@ -165,10 +161,6 @@
   <Fragment>
     <InstallExecuteSequence>
       <RemoveExistingProducts After="InstallInitialize" />
-      <!-- Launch app after install if checkbox is ticked (public property
-           WIXUI_EXITDIALOGOPTIONALCHECKBOX is passed to execute sequence) -->
-      <Custom Action="LaunchApp" After="InstallFinalize"
-              Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
     </InstallExecuteSequence>
   </Fragment>
 
