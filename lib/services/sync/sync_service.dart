@@ -271,6 +271,10 @@ class SyncService {
           'remote_id': int.parse(team!.remoteId!),
           'name': payload['name'] as String? ?? team.name,
         };
+        if (payload.containsKey('format_label')) {
+          entry['update_format_label'] = true;
+          entry['format_label'] = payload['format_label'] as String?;
+        }
         if (payload.containsKey('folder_local_id')) {
           entry['update_folder'] = true;
           final folderLocalId = payload['folder_local_id'] as int?;
@@ -490,6 +494,7 @@ class SyncService {
       }
 
       final remoteName = rt['name'] as String;
+      final remoteFormatLabel = rt['format_label'] as String?;
       final remoteFolderId = rt['folder_id'];
 
       int? localFolderId;
@@ -503,6 +508,7 @@ class SyncService {
         await teamRepo.insert(TeamsCompanion(
           name: Value(remoteName),
           remoteId: Value(remoteId),
+          formatLabel: Value(remoteFormatLabel),
           folderId: Value(localFolderId),
           updatedAt: Value(remoteUpdatedAt),
         ));
@@ -510,6 +516,7 @@ class SyncService {
         await (db.update(db.teams)..where((t) => t.id.equals(existing.id)))
             .write(TeamsCompanion(
           name: Value(remoteName),
+          formatLabel: Value(remoteFormatLabel),
           folderId: Value(localFolderId),
           updatedAt: Value(remoteUpdatedAt),
         ));

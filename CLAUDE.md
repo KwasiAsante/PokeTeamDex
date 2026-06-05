@@ -88,6 +88,33 @@ Apply this whenever:
 
 ---
 
+## Frontend ↔ Backend Data Contract
+
+**Any change to a synced field must be updated in ALL of the following places. Never update one without the others.**
+
+### Adding or changing a field on a synced entity (Team, TeamFolder, TeamSlot, PokemonInstance):
+
+| Layer | File | What to update |
+|---|---|---|
+| Backend DB model | `backend/app/models/team.py` | Add/change the column |
+| Backend migration | `backend/alembic/versions/<next>.py` | `op.add_column` / `op.alter_column` |
+| Backend push schema | `backend/app/schemas/team.py` | Add field to the Op schema (CreateOp / UpdateOp) |
+| Backend push handler | `backend/app/routers/sync.py` | Read the field from `op.*` and write it to the model |
+| Backend pull schema | `backend/app/schemas/team.py` | Add field to the Response schema |
+| Flutter push (_buildOp) | `lib/services/sync/sync_service.dart` | Include the field in the op map |
+| Flutter pull (_mergeX) | `lib/services/sync/sync_service.dart` | Read the field from the response map and write it to the local DB |
+| Flutter local table | `lib/database/tables/*.dart` | Add/change the Drift column (then bump schema version + migration) |
+
+### Rules
+- The backend **Op schemas** define what the server accepts on push. If a field isn't there, the server silently ignores it.
+- The backend **Response schemas** define what the server returns on pull. If a field isn't there, Flutter never receives it.
+- The Flutter **_mergeX** functions define what Flutter actually writes locally from pull data. A field in the Response schema that isn't read here is silently discarded.
+- Use `update_<field>: bool = False` flag pattern (like `update_folder`) when a field can be legitimately absent from an update op (to distinguish "not changing this field" from "setting it to null").
+- After any backend schema or model change, run the Alembic migration before testing.
+- After any Flutter table change, bump `schemaVersion`, add a migration, and run `dart run build_runner build --delete-conflicting-outputs`.
+
+---
+
 ## Windows Installer
 
 - **Known issue #96**: MSI "Launch after Finish" checkbox does not start the app — do not re-attempt without new information; use the EXE installer as the primary download for now
