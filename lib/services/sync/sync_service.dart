@@ -71,6 +71,11 @@ class SyncService {
 
   // ── Push ────────────────────────────────────────────────────────────────────
 
+  // Sentinel returned by _buildOp to mean "discard this op — it can never
+  // succeed and should be removed from the queue immediately." Distinct from
+  // null which means "skip for now, dependency not yet ready."
+  static final _kDiscard = <String, dynamic>{};
+
   Future<bool> _drain() async {
     final ops = await syncQueue.getPending();
     if (ops.isEmpty) return true;
@@ -108,7 +113,10 @@ class SyncService {
         creatingTeamIds,
         creatingInstanceIds,
       );
-      if (entry != null) {
+      if (identical(entry, _kDiscard)) {
+        // Op is permanently unprocessable — drop it without sending to server.
+        await syncQueue.delete(op.id);
+      } else if (entry != null) {
         batchOps.add(entry);
         includedOps.add(op);
       }
@@ -222,16 +230,17 @@ class SyncService {
 
       case 'team_folder:update':
         final folder = await folderRepo.getByIdOrNull(op.entityId);
-        if (folder?.remoteId == null) return null;
+        if (folder == null) return _kDiscard; // deleted locally, nothing to update
+        if (folder.remoteId == null) return null; // wait for create
         return {
           'type': 'folder_update',
-          'remote_id': int.parse(folder!.remoteId!),
+          'remote_id': int.parse(folder.remoteId!),
           'name': payload['name'] as String,
         };
 
       case 'team_folder:delete':
         final remoteId = payload['remote_id'] as String?;
-        if (remoteId == null) return null;
+        if (remoteId == null) return _kDiscard; // never reached server
         return {'type': 'folder_delete', 'remote_id': int.parse(remoteId)};
 
       // ── Teams ─────────────────────────────────────────────────────────────
@@ -255,7 +264,8 @@ class SyncService {
 
       case 'team:update':
         final team = await teamRepo.getByIdOrNull(op.entityId);
-        if (team?.remoteId == null) return null;
+        if (team == null) return _kDiscard; // deleted locally, nothing to update
+        if (team.remoteId == null) return null; // wait for create (heal handles this)
         final entry = <String, dynamic>{
           'type': 'team_update',
           'remote_id': int.parse(team!.remoteId!),
@@ -278,7 +288,7 @@ class SyncService {
 
       case 'team:delete':
         final remoteId = payload['remote_id'] as String?;
-        if (remoteId == null) return null;
+        if (remoteId == null) return _kDiscard; // never reached server
         return {'type': 'team_delete', 'remote_id': int.parse(remoteId)};
 
       // ── Instances ─────────────────────────────────────────────────────────
@@ -307,10 +317,11 @@ class SyncService {
 
       case 'pokemon_instance:update':
         final inst = await instanceRepo.getById(op.entityId);
-        if (inst?.remoteId == null) return null; // not yet created on server
+        if (inst == null) return _kDiscard; // deleted locally
+        if (inst.remoteId == null) return null; // wait for create
         return {
           'type': 'instance_update',
-          'remote_id': int.parse(inst!.remoteId!),
+          'remote_id': int.parse(inst.remoteId!),
           if (payload['nickname_aliases'] != null)
             'nickname_aliases': payload['nickname_aliases'],
           if (payload['inherited_ribbons'] != null)
@@ -366,8 +377,9 @@ class SyncService {
           entry['team_client_local_id'] = teamLocalId;
         } else {
           final team = await teamRepo.getByIdOrNull(teamLocalId);
-          if (team?.remoteId == null) return null;
-          entry['team_remote_id'] = int.parse(team!.remoteId!);
+          if (team == null) return _kDiscard; // team deleted
+          if (team.remoteId == null) return null; // wait for team create
+          entry['team_remote_id'] = int.parse(team.remoteId!);
         }
         // Resolve instance reference if present.
         final instLocalId = payload['instance_client_local_id'] as int?;
@@ -395,8 +407,9 @@ class SyncService {
           entry['team_client_local_id'] = teamLocalId;
         } else {
           final team = await teamRepo.getByIdOrNull(teamLocalId);
-          if (team?.remoteId == null) return null;
-          entry['team_remote_id'] = int.parse(team!.remoteId!);
+          if (team == null) return _kDiscard; // team deleted
+          if (team.remoteId == null) return null; // wait for team create
+          entry['team_remote_id'] = int.parse(team.remoteId!);
         }
         return entry;
 
