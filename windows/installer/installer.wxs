@@ -81,17 +81,18 @@
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch PokeTeamDex" />
 
     <!--
-      Launch the app when the user clicks Finish (not before the dialog appears).
-      WiX 4's ExitDialog already has a built-in Finish-button event that calls
-      WixShellExec (from WixToolset.Util.wixext) when WIXUI_EXITDIALOGOPTIONALCHECKBOX=1.
-      We only need to set WixShellExecTarget in the UI sequence so [INSTALLFOLDER]
-      is resolved by the time the user clicks Finish.
-      Scheduled After="ExecuteAction" (sequence 1300) — install is done,
-      ExitDialog hasn't shown yet, so [INSTALLFOLDER] is fully resolved.
+      Launch the app after the user clicks Finish.
+      ExitDialog is a blocking action in the InstallUISequence — the sequence
+      pauses while the dialog is shown and resumes only after the user dismisses
+      it. By scheduling WixShellExec After="ExitDialog" (see InstallUISequence
+      fragment below) the app launches only once the user has clicked Finish,
+      not before the dialog appears.
+      SetProperty is placed Before="WixShellExec" so [INSTALLFOLDER] is
+      resolved when WixShellExec fires.
     -->
     <SetProperty Id="WixShellExecTarget"
       Value="[INSTALLFOLDER]poke_team_dex.exe"
-      After="ExecuteAction"
+      Before="WixShellExec"
       Sequence="ui" />
 
     <!-- ── Single feature — all components always installed ───────────── -->
@@ -162,6 +163,15 @@
     <InstallExecuteSequence>
       <RemoveExistingProducts After="InstallInitialize" />
     </InstallExecuteSequence>
+    <InstallUISequence>
+      <!--
+        ExitDialog blocks the UISequence until Finish is clicked.
+        WixShellExec After="ExitDialog" therefore only fires after the user
+        dismisses the dialog, respecting the checkbox state.
+        NOT REMOVE prevents launch during uninstall.
+      -->
+      <Custom Action="WixShellExec" After="ExitDialog">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT REMOVE</Custom>
+    </InstallUISequence>
   </Fragment>
 
 </Wix>
