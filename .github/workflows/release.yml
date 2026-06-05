@@ -213,7 +213,7 @@ jobs:
   # notify-update.yml with `on: release: published` never fires when the release
   # is created by GITHUB_TOKEN — GitHub blocks cross-workflow triggers from tokens.
   notify-backend:
-    needs: create-release
+    needs: [build-android, build-windows, build-backend-docker]
     runs-on: ubuntu-latest
     steps:
       - name: Notify backend of new release
