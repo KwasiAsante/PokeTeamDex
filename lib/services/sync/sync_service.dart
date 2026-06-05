@@ -241,6 +241,8 @@ class SyncService {
           'client_local_id': op.entityId,
           'name': payload['name'] as String,
         };
+        final formatLabel = payload['format_label'] as String?;
+        if (formatLabel != null) entry['format_label'] = formatLabel;
         final folderLocalId = payload['folder_local_id'] as int?;
         if (folderLocalId != null) {
           if (creatingFolderIds.contains(folderLocalId)) {
@@ -261,6 +263,9 @@ class SyncService {
           'remote_id': int.parse(team!.remoteId!),
           'name': payload['name'] as String? ?? team.name,
         };
+        if (payload.containsKey('format_label')) {
+          entry['format_label'] = payload['format_label'] as String?;
+        }
         if (payload.containsKey('folder_local_id')) {
           entry['update_folder'] = true;
           final folderLocalId = payload['folder_local_id'] as int?;
