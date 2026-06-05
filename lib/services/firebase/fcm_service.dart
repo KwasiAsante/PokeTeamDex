@@ -12,7 +12,7 @@ const _vapidKey = 'BFO-cOPo8-ZOFk95-_PDxiXcQt-Epz8fVhjbc3QnyQrERTutZ4wGNl7BX8PhI
 
 class FcmService {
   static Future<void> init() async {
-    if (!_isSupported) return;
+    if (!isSupported) return;
 
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -42,7 +42,7 @@ class FcmService {
 
   // FCM is supported on Android, iOS, macOS and Web.
   // Windows uses polling via the GitHub Releases API instead.
-  static bool get _isSupported {
+  static bool get isSupported {
     if (kIsWeb) return true;
     return Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
   }
