@@ -70,6 +70,24 @@ When adding columns to Drift tables:
 
 ---
 
+## Research & Documentation
+
+When stuck on a build error, unfamiliar API, or tool behaviour, search online before guessing.
+Prefer in this order:
+
+1. **Official docs** — Flutter/Dart (docs.flutter.dev, api.dart.dev), WiX (wixtoolset.org/docs), Firebase (firebase.google.com/docs), GitHub Actions (docs.github.com)
+2. **Package pub.dev pages** — README, changelog, and example tabs for any Dart/Flutter package
+3. **GitHub issues & source** — the package or tool's own repo; search closed issues for the exact error message
+4. **Community** — Stack Overflow, Reddit r/FlutterDev, WiX mailing list / Discussions
+
+Apply this whenever:
+- A CI build fails with an error that isn't immediately obvious from the code
+- A package API doesn't behave as expected
+- A tool flag or syntax seems off (e.g. WiX 3 vs WiX 4 differences)
+- The fix would benefit from knowing the canonical/recommended approach
+
+---
+
 ## Windows Installer
 
 - WiX Toolset v4.0.5 (pinned — do not upgrade to v5+ without testing)
