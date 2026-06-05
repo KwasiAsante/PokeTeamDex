@@ -45,6 +45,8 @@ Follow conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`
   - `release.yml` — builds APK, Windows MSI/EXE, Docker image, and notifies backend on tag
 - **Web hosting**: Firebase Hosting → `https://poketeamdex.web.app`
 - **Backend hosting**: Self-hosted server via Docker Compose, `https://poketeamdex.duckdns.org`
+  - **Deploying**: `docker compose down && docker compose up -d` is all that's needed — `start.sh` runs `alembic upgrade head` automatically on every container start, so migrations never need to be run by hand.
+  - **Local vs prod DB**: local `docker-compose.yml` spins up a `postgres:16` container alongside the API. `docker-compose.prod.yml` runs only the API container and connects to an external PostgreSQL via `DATABASE_URL` in `.env.prod` (no Postgres container in prod).
 
 ---
 
