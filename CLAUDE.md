@@ -16,6 +16,14 @@
 - Single-line compile/build hotfixes that are blocking an in-flight CI run
 - `CLAUDE.md` updates
 
+### PR discipline — investigate first, then open one PR
+
+Before opening any PR for a bug or feature:
+1. **Trace the full path end-to-end first.** For a sync field: Flutter local table → `_buildOp` → backend push schema → backend push handler → backend model/migration → backend pull schema → Flutter `_mergeX`. For a UI bug: read all affected widgets and their data sources. Do this before writing any code.
+2. **Identify every layer that needs to change.** Write down the list before touching any file.
+3. **Commit all related changes to one branch and one PR.** Do not open incremental PRs as each layer of the problem is revealed — that produces a chain of dependent, half-finished PRs.
+4. **Only open a separate PR** for a genuinely unrelated issue discovered during investigation (a bug in a completely different subsystem). If it is the same root cause or required for the same feature to work, it belongs in the same PR.
+
 ### Commit messages
 Follow conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`
 
@@ -40,15 +48,50 @@ Follow conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`
 
 ---
 
-## Database Migrations
+## Database Migrations (SQLite / Drift)
 
-When adding columns to Drift tables:
-1. Add the column to the table class in `lib/database/tables/`
-2. Bump `schemaVersion` in `lib/database/app_database.dart`
-3. Add a migration in the `onUpgrade` handler
-4. Wrap ALL migrations in `try/catch` for idempotency (dev builds may already have the column)
+### Checklist for every schema change
+1. Add/change the column in the table class (`lib/database/tables/`)
+2. Bump `schemaVersion` in `lib/database/app_database.dart` (increment by 1)
+3. Add a migration step in the `onUpgrade` handler — one `if (from < N)` block per version
+4. Wrap **every** migration statement in `try/catch` (see pattern below)
 5. Run `dart run build_runner build --delete-conflicting-outputs` to regenerate `app_database.g.dart`
-6. Commit the generated `.g.dart` file alongside the migration
+6. Commit the generated `.g.dart` alongside the hand-written migration
+
+### onUpgrade pattern
+
+```dart
+MigrationStrategy(
+  onCreate: (m, details) async {
+    await m.createAll();
+  },
+  onUpgrade: (m, from, to) async {
+    // Step through each version in order.
+    // Never skip a version or merge two steps into one block.
+    if (from < 2) {
+      try {
+        await m.addColumn(teams, teams.formatLabel);
+      } catch (_) {
+        // Column may already exist on dev builds that were ahead of this migration.
+      }
+    }
+    if (from < 3) {
+      try {
+        await m.addColumn(teamSlots, teamSlots.isAlpha);
+      } catch (_) {}
+    }
+    // … add a new `if (from < N)` block for every future version
+  },
+)
+```
+
+### Rules
+- **Always step through versions sequentially.** A user upgrading from v2 to v4 will hit `from < 3` and `from < 4` in order. Never merge two steps.
+- **Wrap every statement in `try/catch`.** Dev builds often apply migrations manually before the version number is bumped, leaving the column already present. A bare `addColumn` will crash on those builds. Catch silently — the column already existing is the desired end state.
+- **Only catch `Exception` / `_` — never swallow logic errors silently in non-migration code.**
+- **`BoolColumn` cannot be passed to `m.addColumn()`.** Use `customStatement('ALTER TABLE … ADD COLUMN … INTEGER NOT NULL DEFAULT 0')` for boolean columns.
+- **`schemaVersion` must be a single monotonically increasing integer.** Never reset or reuse a version number.
+- **Test both paths:** fresh install (onCreate) and upgrade from the previous version (onUpgrade).
 
 ---
 
@@ -85,6 +128,33 @@ Apply this whenever:
 - A package API doesn't behave as expected
 - A tool flag or syntax seems off (e.g. WiX 3 vs WiX 4 differences)
 - The fix would benefit from knowing the canonical/recommended approach
+
+---
+
+## Frontend ↔ Backend Data Contract
+
+**Any change to a synced field must be updated in ALL of the following places. Never update one without the others.**
+
+### Adding or changing a field on a synced entity (Team, TeamFolder, TeamSlot, PokemonInstance):
+
+| Layer | File | What to update |
+|---|---|---|
+| Backend DB model | `backend/app/models/team.py` | Add/change the column |
+| Backend migration | `backend/alembic/versions/<next>.py` | `op.add_column` / `op.alter_column` |
+| Backend push schema | `backend/app/schemas/team.py` | Add field to the Op schema (CreateOp / UpdateOp) |
+| Backend push handler | `backend/app/routers/sync.py` | Read the field from `op.*` and write it to the model |
+| Backend pull schema | `backend/app/schemas/team.py` | Add field to the Response schema |
+| Flutter push (_buildOp) | `lib/services/sync/sync_service.dart` | Include the field in the op map |
+| Flutter pull (_mergeX) | `lib/services/sync/sync_service.dart` | Read the field from the response map and write it to the local DB |
+| Flutter local table | `lib/database/tables/*.dart` | Add/change the Drift column (then bump schema version + migration) |
+
+### Rules
+- The backend **Op schemas** define what the server accepts on push. If a field isn't there, the server silently ignores it.
+- The backend **Response schemas** define what the server returns on pull. If a field isn't there, Flutter never receives it.
+- The Flutter **_mergeX** functions define what Flutter actually writes locally from pull data. A field in the Response schema that isn't read here is silently discarded.
+- Use `update_<field>: bool = False` flag pattern (like `update_folder`) when a field can be legitimately absent from an update op (to distinguish "not changing this field" from "setting it to null").
+- After any backend schema or model change, run the Alembic migration before testing.
+- After any Flutter table change, bump `schemaVersion`, add a migration, and run `dart run build_runner build --delete-conflicting-outputs`.
 
 ---
 

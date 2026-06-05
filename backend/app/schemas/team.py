@@ -40,6 +40,7 @@ class TeamResponse(BaseModel):
     user_id: int
     folder_id: int | None
     name: str
+    format_label: str | None
     is_deleted: bool
     created_at: datetime
     updated_at: datetime
@@ -188,6 +189,7 @@ class TeamCreateOp(BaseModel):
     type: Literal["team_create"]
     client_local_id: int
     name: str
+    format_label: str | None = None
     # Exactly one of these two should be set when a folder is involved.
     # folder_remote_id: folder already synced — server ID known.
     # folder_client_local_id: folder being created in the same batch.
@@ -199,6 +201,8 @@ class TeamUpdateOp(BaseModel):
     type: Literal["team_update"]
     remote_id: int
     name: str
+    format_label: str | None = None
+    update_format_label: bool = False
     # Folder change — only applied when update_folder is True so that a
     # plain rename (which has no folder info) doesn't accidentally clear it.
     update_folder: bool = False

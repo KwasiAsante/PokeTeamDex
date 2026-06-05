@@ -119,7 +119,12 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
             folder_id = op.folder_remote_id
             if folder_id is None and op.folder_client_local_id is not None:
                 folder_id = folder_map.get(op.folder_client_local_id)
-            team = Team(user_id=current_user.id, name=op.name, folder_id=folder_id)
+            team = Team(
+                user_id=current_user.id,
+                name=op.name,
+                format_label=op.format_label,
+                folder_id=folder_id,
+            )
             db.add(team)
             await db.flush()
             team_map[op.client_local_id] = team.id
@@ -137,6 +142,8 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
             if team:
                 team.name = op.name
                 team.updated_at = datetime.now(timezone.utc)
+                if op.update_format_label:
+                    team.format_label = op.format_label
                 if op.update_folder:
                     folder_id = op.folder_remote_id
                     if folder_id is None and op.folder_client_local_id is not None:
