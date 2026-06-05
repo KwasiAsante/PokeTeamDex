@@ -16,6 +16,14 @@
 - Single-line compile/build hotfixes that are blocking an in-flight CI run
 - `CLAUDE.md` updates
 
+### PR discipline — investigate first, then open one PR
+
+Before opening any PR for a bug or feature:
+1. **Trace the full path end-to-end first.** For a sync field: Flutter local table → `_buildOp` → backend push schema → backend push handler → backend model/migration → backend pull schema → Flutter `_mergeX`. For a UI bug: read all affected widgets and their data sources. Do this before writing any code.
+2. **Identify every layer that needs to change.** Write down the list before touching any file.
+3. **Commit all related changes to one branch and one PR.** Do not open incremental PRs as each layer of the problem is revealed — that produces a chain of dependent, half-finished PRs.
+4. **Only open a separate PR** for a genuinely unrelated issue discovered during investigation (a bug in a completely different subsystem). If it is the same root cause or required for the same feature to work, it belongs in the same PR.
+
 ### Commit messages
 Follow conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`
 
