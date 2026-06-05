@@ -1551,11 +1551,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          _moves[i]?.toCapitalCase() ?? '— None —',
-                          style: textTheme.bodyMedium,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            _moves[i]?.toCapitalCase() ?? '— None —',
+                            style: textTheme.bodyMedium,
+                          ),
                         ),
                       ),
                       // Inline type + special-move chip + stats when selected
