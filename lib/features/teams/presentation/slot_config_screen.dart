@@ -1551,9 +1551,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          _moves[i]?.toCapitalCase() ?? '— None —',
-                          style: textTheme.bodyMedium,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            _moves[i]?.toCapitalCase() ?? '— None —',
+                            style: textTheme.bodyMedium,
+                          ),
                         ),
                       ),
                       // Inline type + special-move chip + stats when selected
@@ -1570,14 +1574,18 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                           );
                         }),
                         const SizedBox(width: 6),
-                        Text(
-                          [
-                            if (moveDetail.power != null) 'Pow ${moveDetail.power}',
-                            if (moveDetail.accuracy != null) '${moveDetail.accuracy}%',
-                            if (moveDetail.pp != null) 'PP ${moveDetail.pp}',
-                          ].join('  '),
-                          style: textTheme.labelSmall
-                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                        Flexible(
+                          child: Text(
+                            [
+                              if (moveDetail.power != null) 'Pow ${moveDetail.power}',
+                              if (moveDetail.accuracy != null) '${moveDetail.accuracy}%',
+                              if (moveDetail.pp != null) 'PP ${moveDetail.pp}',
+                            ].join('  '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.labelSmall
+                                ?.copyWith(color: colorScheme.onSurfaceVariant),
+                          ),
                         ),
                         const SizedBox(width: 4),
                       ],
