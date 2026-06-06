@@ -8,6 +8,7 @@ const _kSeedColor = 'seed_color';
 const _kThemeMode = 'theme_mode';
 const _kPsDirectory = 'ps_directory';
 const _kMaxBoxSize = 'max_box_size';
+const _kMinimizeToTray = 'minimize_to_tray';
 const kDefaultApiBaseUrl = 'https://poketeamdex.duckdns.org';
 // Default seed colour — Pokéball red
 const kDefaultSeedColor = 0xFFCC0000;
@@ -119,4 +120,16 @@ class AppConfigRepository {
       watch(_kMaxBoxSize).map((v) =>
           (int.tryParse(v ?? '') ?? kDefaultMaxBoxSize)
               .clamp(1, kMaxBoxSizeLimit));
+
+  // ── Minimize to tray (desktop) ────────────────────────────────────────────
+
+  /// Whether closing the window hides the app to the system tray. Defaults to false.
+  Future<bool> getMinimizeToTray() async =>
+      (await get(_kMinimizeToTray)) == 'true';
+
+  Future<void> setMinimizeToTray(bool value) =>
+      set(_kMinimizeToTray, value.toString());
+
+  Stream<bool> watchMinimizeToTray() =>
+      watch(_kMinimizeToTray).map((v) => v == 'true');
 }

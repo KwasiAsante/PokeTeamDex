@@ -198,6 +198,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _PsDirectoryTile(),
           ],
 
+          // ── Window behaviour (desktop only) ───────────────────────────────
+          if (!kIsWeb &&
+              (Platform.isWindows ||
+                  Platform.isMacOS ||
+                  Platform.isLinux)) ...[
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 16),
+            _SectionHeader('Window'),
+            const SizedBox(height: 8),
+            ref.watch(minimizeToTrayProvider).when(
+              loading: () => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
+              data: (minimizeToTray) => SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Minimize to system tray'),
+                subtitle: const Text(
+                  'When closing the window, keep the app running '
+                  'in the system tray instead of exiting.',
+                ),
+                value: minimizeToTray,
+                onChanged: (v) => ref
+                    .read(appConfigRepositoryProvider)
+                    .setMinimizeToTray(v),
+              ),
+            ),
+          ],
+
           const SizedBox(height: 32),
           const Divider(),
           const SizedBox(height: 16),
