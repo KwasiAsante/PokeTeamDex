@@ -765,16 +765,15 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         // Sprite priority: G-Max > Mega > Form change > default.
         final gmaxHomeUrl = gmaxPokemon != null ? pokemonHomeUrl(gmaxPokemon.id) : null;
         // ── Gender-specific base sprite ─────────────────────────────────────
-        // Try female HOME url first for female slots; CachedNetworkImage falls
-        // back to the regular HOME url if no female sprite exists for this species.
         final isFemale = _gender == 'female';
-        final hasFemaleSprite = pokemon.sprites?['front_female'] != null;
-        final genderBaseUrl = isFemale && hasFemaleSprite
+        // Gender-specific sprites only exist from Gen 4 onward.
+        final genderSpritesAvailable = format == null || format.gen >= 4;
+        final genderBaseUrl = isFemale && genderSpritesAvailable
             ? (_isShiny
                 ? pokemonHomeShinyFemaleUrl(pokemon.id)
                 : pokemonHomeFemaleUrl(pokemon.id))
             : null;
-        final genderBaseFallback = isFemale && hasFemaleSprite
+        final genderBaseFallback = isFemale && genderSpritesAvailable
             ? (_isShiny ? pokemonHomeShinyUrl(pokemon.id) : pokemonHomeUrl(pokemon.id))
             : null;
 
