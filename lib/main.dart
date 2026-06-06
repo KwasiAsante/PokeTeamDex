@@ -28,6 +28,8 @@ import 'package:poke_team_dex/services/tray/tray_service.dart';
 import 'package:poke_team_dex/shared/theme/app_theme.dart';
 import 'package:poke_team_dex/utils/app_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:poke_team_dex/shared/widgets/shutdown_dialog.dart';
+import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:workmanager/workmanager.dart';
 
@@ -169,6 +171,7 @@ class MyApp extends ConsumerStatefulWidget {
 class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   Timer? _periodicSync;
   TrayService? _trayService;
+  final _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -188,7 +191,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
       // Initialize system tray after the first frame so the window is ready.
       if (TrayService.isSupported) {
-        _trayService = TrayService(onSyncNow: _triggerSync);
+        _trayService = TrayService(
+          onSyncNow: _triggerSync,
+          onQuit: _handleQuit,
+        );
         await _trayService!.init();
       }
     });
@@ -253,6 +259,23 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _handleQuit() async {
+    await windowManager.show();
+    await windowManager.focus();
+    final ctx = _navigatorKey.currentContext;
+    if (ctx != null && ctx.mounted) {
+      showDialog(
+        context: ctx,
+        barrierDismissible: false,
+        builder: (_) => const ShutdownDialog(),
+      );
+      // Give the dialog one frame to render before destroying.
+      await Future.delayed(const Duration(milliseconds: 400));
+    }
+    await trayManager.destroy();
+    await windowManager.destroy();
+  }
+
   @override
   Widget build(BuildContext context) {
     // Rebuild router when auth state changes so redirect logic re-evaluates
@@ -273,7 +296,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       theme: AppTheme.light(seed),
       darkTheme: AppTheme.dark(seed),
       themeMode: themeMode,
-      routerConfig: buildAppRouter(token),
+      routerConfig: buildAppRouter(token, navigatorKey: _navigatorKey),
       // Cap text scaling at 1.3× to prevent overflow in fixed-height
       // list tiles and grid cells throughout the app.
       builder: (context, child) => MediaQuery.withClampedTextScaling(

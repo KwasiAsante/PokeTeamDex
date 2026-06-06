@@ -23,8 +23,12 @@ import 'package:poke_team_dex/features/settings/presentation/settings_screen.dar
 import 'package:poke_team_dex/features/settings/presentation/sync_monitor_screen.dart';
 import 'package:poke_team_dex/features/types/presentation/types_screen.dart';
 
-GoRouter buildAppRouter(String? initialToken) {
+GoRouter buildAppRouter(
+  String? initialToken, {
+  GlobalKey<NavigatorState>? navigatorKey,
+}) {
   return GoRouter(
+    navigatorKey: navigatorKey,
     initialLocation: '/pokedex',
     redirect: (context, state) {
       // Teams are local-first and always accessible without auth.
