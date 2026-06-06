@@ -282,9 +282,12 @@ Future<void> duplicateTeam(WidgetRef ref, int teamId) async {
 
 Future<void> deleteTeam(WidgetRef ref, int id) async {
   final repo = ref.read(teamRepositoryProvider);
+  final slotRepo = ref.read(teamSlotRepositoryProvider);
   final syncQueue = ref.read(syncQueueRepositoryProvider);
 
   final team = await repo.getById(id);
+  // Delete slots first — team row deletion doesn't cascade in SQLite.
+  await slotRepo.deleteAllForTeam(id);
   await repo.delete(id);
 
   await syncQueue.enqueue(PendingSyncOpsCompanion(

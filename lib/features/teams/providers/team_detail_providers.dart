@@ -76,10 +76,17 @@ final linkableSlotsProvider =
     speciesWithSameForm = const {};
   }
 
+  // Snapshot valid (non-deleted) team IDs so orphaned slots from previously
+  // hard-deleted teams are excluded even if their slot rows were not cleaned up.
+  final validTeams = await ref.read(teamRepositoryProvider).getAll();
+  final validTeamIds = validTeams.map((t) => t.id).toSet();
+
   final allSlots = await slotRepo.watchAll().first;
 
   return allSlots.where((s) {
     if (s.id == params.currentSlotId) return false;
+    // Exclude slots belonging to teams that no longer exist.
+    if (!validTeamIds.contains(s.teamId)) return false;
 
     final candidatePokemonId = s.pokemonId;
     final candidateFormName = s.formName;
@@ -102,10 +109,10 @@ final linkableSlotsProvider =
         return candidateFormName == null;
       }
     } else {
-      // Form-variant slot (pokemonId > 10000): match by formName.
-      // NOTE: this does not verify the candidate's species is in forwardSpeciesIds
-      // because resolving speciesId for form variants requires an extra API call.
-      // False positives (wrong-species same-form slots) are rare in practice.
+      // Form-variant slot (pokemonId > 10000): require a non-null formName
+      // matching the origin's. Slots with null formName are anomalous and
+      // excluded to prevent false positives from unrelated species.
+      if (candidateFormName == null) return false;
       return candidateFormName == params.originFormName;
     }
   }).toList();
