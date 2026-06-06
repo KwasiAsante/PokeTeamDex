@@ -415,6 +415,11 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
               PopupMenuButton<String>(
                 onSelected: (v) => _onFolderAction(context, v),
                 itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: 'import',
+                    child: Text('Import from Showdown'),
+                  ),
+                  PopupMenuDivider(),
                   PopupMenuItem(value: 'rename', child: Text('Rename')),
                   PopupMenuItem(value: 'delete', child: Text('Delete')),
                 ],
@@ -499,7 +504,13 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
 
   Future<void> _onFolderAction(
       BuildContext context, String action) async {
-    if (action == 'rename') {
+    if (action == 'import') {
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => PsImportSheet(folderId: widget.folder.id),
+      );
+    } else if (action == 'rename') {
       final controller =
           TextEditingController(text: widget.folder.name);
       final name = await showDialog<String>(
