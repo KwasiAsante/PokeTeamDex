@@ -48,3 +48,11 @@ final pokemonEncountersProvider =
   final repo = ref.read(pokeApiRepositoryProvider);
   return repo.fetchPokemonEncounters(id);
 });
+
+/// Each prior-evolution species' display name + raw PokeAPI moves list, oldest
+/// ancestor first. Empty for Pokémon with no prior evolutions.
+final priorEvoMoveSetsProvider = FutureProvider.autoDispose.family<
+    List<({String speciesName, List<Map<String, dynamic>> moves})>, int>(
+  (ref, pokemonId) =>
+      ref.read(pokeApiRepositoryProvider).fetchPriorEvoMoveSets(pokemonId),
+);

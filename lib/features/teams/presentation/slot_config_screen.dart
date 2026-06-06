@@ -711,11 +711,49 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             ? formPokemon.moves.cast<Map<String, dynamic>>()
             : pokemonMoves;
 
-        // Re-compute violations and learnable moves with form-specific data.
-        final effectiveViolations = format != null
-            ? _computeViolations(
-                formatService, format, pokemon.name, effectivePokemonMoves)
-            : <String, String>{};
+        // Prior-evolution-exclusive moves (computed first so violations can be
+        // suppressed for them below).
+        final priorEvoMoveSetsAsync =
+            ref.watch(priorEvoMoveSetsProvider(slot.pokemonId));
+        final effectivePriorEvoMoves =
+            priorEvoMoveSetsAsync.whenOrNull(data: (sets) {
+          if (sets.isEmpty) return const <String>{};
+          final ancestorMoveLists = sets.map((s) => s.moves).toList();
+          if (format == null) {
+            final currentAll = effectivePokemonMoves
+                .map((m) => (m['move'] as Map)['name'] as String)
+                .toSet();
+            final ancestorAll = <String>{};
+            for (final aMoves in ancestorMoveLists) {
+              for (final m in aMoves) {
+                ancestorAll.add((m['move'] as Map)['name'] as String);
+              }
+            }
+            return ancestorAll.difference(currentAll);
+          }
+          return buildPriorEvoExclusiveMoveNames(
+            currentMoves: effectivePokemonMoves,
+            ancestorMoveLists: ancestorMoveLists,
+            format: format,
+            pokemonName: formPokemon?.name ?? pokemon.name,
+            formatService: formatService,
+          );
+        }) ??
+            const <String>{};
+
+        // Re-compute violations with form-specific data; prior-evo moves are
+        // intentionally excluded from violation checking.
+        final effectiveViolations = {
+          for (final entry in (format != null
+                  ? _computeViolations(formatService, format, pokemon.name,
+                      effectivePokemonMoves)
+                  : <String, String>{})
+              .entries)
+            if (!entry.key.startsWith('move') ||
+                !effectivePriorEvoMoves.contains(
+                    _moves[int.parse(entry.key.substring(4)) - 1]))
+              entry.key: entry.value,
+        };
 
         final effectiveLearnableMoves = (format != null
                 ? buildLearnsetForFormat(
@@ -728,6 +766,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     .toSet())
             .toList()
           ..sort();
+
+        // Combined sorted move list: regular + prior-evo-exclusive.
+        final allPickableMoves = {
+          ...effectiveLearnableMoves,
+          ...effectivePriorEvoMoves,
+        }.toList()..sort();
 
         // Form stats take highest priority (form > mega > base).
         final finalBaseStats = formPokemon != null
@@ -854,11 +898,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               const SizedBox(height: 24),
               _SectionTitle('Moves'),
               const SizedBox(height: 8),
-              _buildMoves(effectiveLearnableMoves,
+              _buildMoves(allPickableMoves,
                   violations: effectiveViolations,
                   pokemonName: formPokemon?.name ?? pokemon.name,
                   showMaxMoves: canDynamax,
-                  useGMax: canGigantamax && _hasGigantamax && _gigantamaxEnabled),
+                  useGMax: canGigantamax && _hasGigantamax && _gigantamaxEnabled,
+                  priorEvoMoves: effectivePriorEvoMoves),
               const SizedBox(height: 24),
               // ── EVs / Stat Exp. ──
               _SectionTitle(
@@ -1510,6 +1555,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     String pokemonName = '',
     bool showMaxMoves = false,
     bool useGMax = false,
+    Set<String> priorEvoMoves = const {},
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -1529,7 +1575,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             children: [
               // Tap target row
               InkWell(
-                onTap: () => _pickMove(i, learnableMoves),
+                onTap: () => _pickMove(i, learnableMoves, priorEvoMoves: priorEvoMoves),
                 borderRadius: BorderRadius.circular(4),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1557,6 +1603,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                           ),
                         ),
                       ),
+                      if (_moves[i] != null && priorEvoMoves.contains(_moves[i]))
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, right: 2),
+                          child: _PreEvoBadge(),
+                        ),
                       // Inline type + special-move chip + stats when selected
                       if (moveDetail != null) ...[
                         if (moveDetail.typeName != null)
@@ -1973,7 +2024,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     }
   }
 
-  Future<void> _pickMove(int moveIndex, List<String> learnableMoves) async {
+  Future<void> _pickMove(
+    int moveIndex,
+    List<String> learnableMoves, {
+    Set<String> priorEvoMoves = const {},
+  }) async {
     final result = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -1981,6 +2036,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         moves: learnableMoves,
         current: _moves[moveIndex],
         label: 'Move ${moveIndex + 1}',
+        priorEvoMoves: priorEvoMoves,
       ),
     );
     if (result != null) setState(() { _moves[moveIndex] = result; _dirty = true; });
@@ -3096,11 +3152,13 @@ class _MovePickerSheet extends ConsumerStatefulWidget {
   final List<String> moves;
   final String? current;
   final String label;
+  final Set<String> priorEvoMoves;
 
   const _MovePickerSheet({
     required this.moves,
     required this.label,
     this.current,
+    this.priorEvoMoves = const {},
   });
 
   @override
@@ -3184,6 +3242,7 @@ class _MovePickerSheetState extends ConsumerState<_MovePickerSheet> {
               itemBuilder: (_, i) => _MoveListTile(
                 moveName: _filtered[i],
                 isSelected: _filtered[i] == widget.current,
+                isPriorEvo: widget.priorEvoMoves.contains(_filtered[i]),
                 onTap: () => Navigator.pop(context, _filtered[i]),
               ),
             ),
@@ -3198,12 +3257,14 @@ class _MovePickerSheetState extends ConsumerState<_MovePickerSheet> {
 class _MoveListTile extends ConsumerWidget {
   final String moveName;
   final bool isSelected;
+  final bool isPriorEvo;
   final VoidCallback onTap;
 
   const _MoveListTile({
     required this.moveName,
     required this.isSelected,
     required this.onTap,
+    this.isPriorEvo = false,
   });
 
   @override
@@ -3218,9 +3279,20 @@ class _MoveListTile extends ConsumerWidget {
       title: Row(
         children: [
           Expanded(
-            child: Text(moveName.toCapitalCase(),
-                style: textTheme.bodyMedium
-                    ?.copyWith(fontWeight: isSelected ? FontWeight.bold : null)),
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(moveName.toCapitalCase(),
+                      style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: isSelected ? FontWeight.bold : null),
+                      overflow: TextOverflow.ellipsis),
+                ),
+                if (isPriorEvo) ...[
+                  const SizedBox(width: 4),
+                  _PreEvoBadge(),
+                ],
+              ],
+            ),
           ),
           detailAsync.when(
             loading: () => const SizedBox(width: 60,
@@ -3258,6 +3330,30 @@ class _MoveListTile extends ConsumerWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis)
             : null,
+      ),
+    );
+  }
+}
+
+// Small badge shown on prior-evolution-exclusive moves in the picker and slot.
+class _PreEvoBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: colorScheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        'Pre-evo',
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: colorScheme.onTertiaryContainer,
+          letterSpacing: 0.3,
+        ),
       ),
     );
   }
