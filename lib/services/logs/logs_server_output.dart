@@ -63,10 +63,11 @@ class LogsServerOutput extends LogOutput {
   }
 
   void _send(List<String> lines) {
-    final url = '$_logsBaseUrl/logs/device';
+    final uri = Uri.parse('$_logsBaseUrl/logs/device')
+        .replace(queryParameters: {'app_name': 'poketeamdex'});
     http
         .post(
-          Uri.parse(url),
+          uri,
           headers: {
             'Content-Type': 'application/json',
             'x-device-id': _deviceId,

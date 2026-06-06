@@ -93,8 +93,9 @@ class _ServerHandler(logging.Handler):
         lines = [self._format_record(r) for r in records]
         try:
             data = json.dumps(lines).encode()
+            url = f"{self._url}?app_name=poketeamdex_api"
             req = urllib.request.Request(
-                self._url,
+                url,
                 data=data,
                 headers={
                     "Content-Type": "application/json",
