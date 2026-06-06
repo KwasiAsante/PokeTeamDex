@@ -249,36 +249,131 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
     }
   }
 
-  /// Replaces all slots in an existing team with the parsed Pokémon.
+  /// Appends parsed Pokémon into empty slots on the existing team.
+  ///
+  /// If all 6 team slots fill up, the team is automatically promoted to a Box
+  /// so remaining Pokémon can continue filling up to [maxBoxSize] slots.
+  /// If the box is also at capacity, remaining Pokémon are skipped and the
+  /// user is informed of the count.
   Future<void> _importIntoTeam(_PsTeam parsed, int teamId) async {
-    final repo = ref.read(pokeApiRepositoryProvider);
+    final pokeRepo = ref.read(pokeApiRepositoryProvider);
     final slotRepo = ref.read(teamSlotRepositoryProvider);
+    final teamRepo = ref.read(teamRepositoryProvider);
     final syncQueue = ref.read(syncQueueRepositoryProvider);
+    final configRepo = ref.read(appConfigRepositoryProvider);
     final now = DateTime.now();
 
-    await slotRepo.deleteAllForTeam(teamId);
+    final team = await teamRepo.getById(teamId);
+    final existing = await slotRepo.getByTeam(teamId);
+    final maxBoxSize = await configRepo.getMaxBoxSize();
 
-    final errors = await _insertSlots(
-      parsed: parsed,
-      teamId: teamId,
-      repo: repo,
-      slotRepo: slotRepo,
-      syncQueue: syncQueue,
-      now: now,
-    );
+    final occupied = {for (final s in existing) s.slot};
+    bool isBox = team.isBox;
+    int capacity = isBox ? maxBoxSize : 6;
+
+    // Returns the lowest unoccupied slot number, or capacity+1 if full.
+    int nextFree() {
+      for (var n = 1; n <= capacity; n++) {
+        if (!occupied.contains(n)) return n;
+      }
+      return capacity + 1;
+    }
+
+    final resolveErrors = <String>[];
+    int imported = 0;
+    int skipped = 0;
+    bool promoted = false;
+
+    for (final s in parsed.slots) {
+      var slot = nextFree();
+
+      // Auto-promote to box if we've exhausted the 6-slot team limit.
+      if (slot > capacity && !isBox) {
+        await teamRepo.setIsBox(teamId, isBox: true);
+        isBox = true;
+        capacity = maxBoxSize;
+        promoted = true;
+        slot = nextFree();
+      }
+
+      if (slot > capacity) {
+        skipped++;
+        continue;
+      }
+
+      int? pokemonId;
+      try {
+        final entry = await pokeRepo.fetchPokemonByNameOrDefault(s.species);
+        pokemonId = entry.id;
+      } catch (_) {
+        resolveErrors.add(s.species);
+        continue;
+      }
+
+      const ivDefault = 31;
+      await slotRepo.insert(TeamSlotsCompanion(
+        teamId: Value(teamId),
+        slot: Value(slot),
+        pokemonId: Value(pokemonId),
+        nickname: Value(s.nickname),
+        heldItemName: Value(s.item),
+        abilityName: Value(s.ability),
+        natureName: Value(s.nature),
+        level: Value(s.level.clamp(1, 100)),
+        isShiny: Value(s.isShiny),
+        gender: Value(s.gender),
+        evHp:  Value(s.evs['hp']  ?? 0),
+        evAtk: Value(s.evs['attack'] ?? 0),
+        evDef: Value(s.evs['defense'] ?? 0),
+        evSpa: Value(s.evs['special-attack'] ?? 0),
+        evSpd: Value(s.evs['special-defense'] ?? 0),
+        evSpe: Value(s.evs['speed'] ?? 0),
+        ivHp:  Value(s.ivs['hp']  ?? ivDefault),
+        ivAtk: Value(s.ivs['attack'] ?? ivDefault),
+        ivDef: Value(s.ivs['defense'] ?? ivDefault),
+        ivSpa: Value(s.ivs['special-attack'] ?? ivDefault),
+        ivSpd: Value(s.ivs['special-defense'] ?? ivDefault),
+        ivSpe: Value(s.ivs['speed'] ?? ivDefault),
+        move1: Value(s.moves.isNotEmpty ? s.moves[0] : null),
+        move2: Value(s.moves.length > 1 ? s.moves[1] : null),
+        move3: Value(s.moves.length > 2 ? s.moves[2] : null),
+        move4: Value(s.moves.length > 3 ? s.moves[3] : null),
+        createdAt: Value(now),
+        updatedAt: Value(now),
+      ));
+
+      await syncQueue.enqueue(PendingSyncOpsCompanion(
+        operation: const Value('upsert'),
+        entityType: const Value('team_slot'),
+        entityId: Value(teamId),
+        payload: Value(jsonEncode({
+          'team_local_id': teamId,
+          'slot': slot,
+          'pokemon_id': pokemonId,
+          'nickname': s.nickname,
+          'level': s.level.clamp(1, 100),
+        })),
+        createdAt: Value(now),
+      ));
+
+      occupied.add(slot);
+      imported++;
+    }
 
     if (!mounted) return;
     Navigator.pop(context);
 
-    final count = parsed.slots.length - errors.length;
-    if (errors.isNotEmpty) {
-      showAppSnackBar(
-        context,
-        'Imported $count Pokémon, ${errors.length} skipped:\n${errors.join('\n')}',
-      );
-    } else {
-      showAppSnackBar(context, 'Imported $count Pokémon into team.');
+    final parts = <String>[];
+    if (imported > 0) parts.add('Imported $imported Pokémon.');
+    if (promoted) parts.add('Team promoted to Box.');
+    if (skipped > 0) parts.add('$skipped skipped — box is full.');
+    if (resolveErrors.isNotEmpty) {
+      parts.add('${resolveErrors.length} not found: ${resolveErrors.join(', ')}.');
     }
+    if (imported == 0 && skipped == 0 && resolveErrors.isEmpty) {
+      parts.add('No empty slots.');
+    }
+    showAppSnackBar(context, parts.join(' '));
   }
 
   /// Creates a new team record and populates it with the parsed Pokémon.
@@ -451,7 +546,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
                 widget.targetTeamId != null
-                    ? 'Paste a Showdown export below. Existing slots will be replaced.'
+                    ? 'Paste a Showdown export below. Pokémon will fill empty slots; the team auto-promotes to a Box if needed.'
                     : 'Paste a Pokémon Showdown team export below.',
                 style: textTheme.bodySmall
                     ?.copyWith(color: colorScheme.onSurfaceVariant),

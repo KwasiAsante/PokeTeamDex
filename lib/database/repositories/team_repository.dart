@@ -63,4 +63,11 @@ class TeamRepository {
             formatLabel: Value(formatLabel),
             updatedAt: Value(DateTime.now()),
           ));
+
+  Future<int> setIsBox(int id, {required bool isBox}) =>
+      (_db.update(_db.teams)..where((t) => t.id.equals(id)))
+          .write(TeamsCompanion(
+            isBox: Value(isBox),
+            updatedAt: Value(DateTime.now()),
+          ));
 }
