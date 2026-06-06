@@ -8,15 +8,15 @@ import 'package:poke_team_dex/services/logs/logs_server_output.dart';
 /// Singleton logger with three independent sinks:
 ///   • console (debug builds only)
 ///   • daily rotating file (non-web)
-///   • HTTP push to UtilityBillsServer /logs/device
+///   • HTTP push to PokeTeamDex backend /logs/device
 ///
 /// Usage:
 ///   AppLogger().i('message');
 ///   AppLogger().e('error', error: e, stackTrace: st);
 ///
-/// After the DB is ready, wire in the dynamic URL:
-///   AppLogger.configure(url: await configRepo.getLogsApiBaseUrl());
-///   configRepo.watchLogsApiBaseUrl().listen(AppLogger.configure);
+/// After the DB is ready, wire in the dynamic URL and auth token:
+///   AppLogger.configure(await configRepo.getApiBaseUrl());
+///   AppLogger.configureToken(storedToken);
 class AppLogger {
   static final AppLogger _instance = AppLogger._internal();
   factory AppLogger() => _instance;
@@ -41,9 +41,14 @@ class AppLogger {
     );
   }
 
-  /// Update the Logs API base URL at runtime (called after DB loads).
+  /// Update the backend URL at runtime (called after DB loads).
   static void configure(String url) {
     _instance._serverOutput.updateLogsUrl(url);
+  }
+
+  /// Update the auth token at runtime (call after login/logout).
+  static void configureToken(String? token) {
+    _instance._serverOutput.updateToken(token);
   }
 
   void d(String message, {Object? error, StackTrace? stackTrace}) =>

@@ -1,29 +1,31 @@
 """Structured logging setup for PokeTeamDex backend.
 
 Three sinks:
-  • stdout   — JSON lines (Docker/Loki compatible)
-  • file     — rotating file (LOG_DIR env var, default ./logs)
-  • server   — background thread POSTing batches to UtilityBillsServer /logs/device
+  • stdout — JSON lines (Docker/Loki compatible)
+  • file   — rotating file (LOG_DIR env var, default ./logs)
+  • loki   — background thread pushing batches directly to Loki /loki/api/v1/push
 """
 
-import json
 import logging
 import logging.handlers
 import os
 import queue
 import threading
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-_DEVICE_ID = "poketeamdex-backend"
+from app.core.loki import push_sync
+
 
 # ---------------------------------------------------------------------------
 # Formatters
 # ---------------------------------------------------------------------------
 
 class _JsonFormatter(logging.Formatter):
+    import json as _json
+
     def format(self, record: logging.LogRecord) -> str:
+        import json
         entry: dict = {
             "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
             "level": record.levelname,
@@ -48,20 +50,22 @@ class _PlainFormatter(logging.Formatter):
 
 
 # ---------------------------------------------------------------------------
-# UtilityBillsServer HTTP handler (background thread, non-blocking)
+# Loki handler (background thread, non-blocking)
 # ---------------------------------------------------------------------------
 
-class _ServerHandler(logging.Handler):
-    """Buffers log lines and flushes every 3s or 20 records to /logs/device."""
+class _LokiHandler(logging.Handler):
+    """Buffers server log records and flushes directly to Loki every 3s or 20 records."""
 
     BATCH_SIZE = 20
     FLUSH_INTERVAL = 3  # seconds
 
-    def __init__(self, logs_api_base_url: str) -> None:
+    _BASE_LABELS = {"job": "server", "source": "direct", "app": "poketeamdex_api"}
+
+    def __init__(self, loki_url: str) -> None:
         super().__init__()
-        self._url = f"{logs_api_base_url.rstrip('/')}/logs/device"
+        self._loki_url = loki_url
         self._queue: queue.Queue[logging.LogRecord] = queue.Queue(maxsize=500)
-        self._thread = threading.Thread(target=self._worker, daemon=True, name="log-flusher")
+        self._thread = threading.Thread(target=self._worker, daemon=True, name="loki-flusher")
         self._thread.start()
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -76,39 +80,25 @@ class _ServerHandler(logging.Handler):
             try:
                 record = self._queue.get(timeout=self.FLUSH_INTERVAL)
                 buf.append(record)
-                # Drain any immediately available records up to batch size.
                 while len(buf) < self.BATCH_SIZE:
                     try:
                         buf.append(self._queue.get_nowait())
                     except queue.Empty:
                         break
-                self._send(buf)
+                self._flush(buf)
                 buf.clear()
             except queue.Empty:
                 if buf:
-                    self._send(buf)
+                    self._flush(buf)
                     buf.clear()
 
-    def _send(self, records: list[logging.LogRecord]) -> None:
-        lines = [self._format_record(r) for r in records]
-        try:
-            data = json.dumps(lines).encode()
-            url = f"{self._url}?app_name=poketeamdex_api"
-            req = urllib.request.Request(
-                url,
-                data=data,
-                headers={
-                    "Content-Type": "application/json",
-                    "x-device-id": _DEVICE_ID,
-                    "x-level": records[-1].levelname,
-                },
-            )
-            urllib.request.urlopen(req, timeout=5)
-        except Exception:
-            pass  # Drop silently — never block the app over logging failures
+    def _flush(self, records: list[logging.LogRecord]) -> None:
+        labels = {**self._BASE_LABELS, "level": records[-1].levelname}
+        lines = [self._fmt(r) for r in records]
+        push_sync(self._loki_url, labels, lines)
 
     @staticmethod
-    def _format_record(record: logging.LogRecord) -> str:
+    def _fmt(record: logging.LogRecord) -> str:
         ts = datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat()
         level = record.levelname.ljust(5)
         return f"[{ts}] [{level}] [{record.name}] {record.getMessage()}"
@@ -118,8 +108,8 @@ class _ServerHandler(logging.Handler):
 # Setup
 # ---------------------------------------------------------------------------
 
-def setup_logging(logs_api_base_url: str) -> None:
-    """Configure root logger with stdout, rotating file, and HTTP sinks."""
+def setup_logging(loki_url: str) -> None:
+    """Configure root logger with stdout, rotating file, and Loki sinks."""
     root = logging.getLogger()
     root.setLevel(logging.INFO)
 
@@ -140,10 +130,8 @@ def setup_logging(logs_api_base_url: str) -> None:
     file_handler.setFormatter(_PlainFormatter())
     root.addHandler(file_handler)
 
-    # UtilityBillsServer HTTP push
-    server_handler = _ServerHandler(logs_api_base_url)
-    server_handler.setFormatter(_PlainFormatter())
-    root.addHandler(server_handler)
+    # Direct Loki push
+    root.addHandler(_LokiHandler(loki_url))
 
     # Quiet noisy third-party loggers
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
