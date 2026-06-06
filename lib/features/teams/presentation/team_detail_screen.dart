@@ -10,6 +10,7 @@ import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider
 import 'package:poke_team_dex/features/teams/data/dynamax_data.dart';
 import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
+import 'package:poke_team_dex/features/teams/presentation/ps_import_sheet.dart';
 import 'package:poke_team_dex/features/teams/presentation/slot_config_screen.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
@@ -133,6 +134,16 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
                   icon: const Icon(Icons.tune_outlined),
                   tooltip: 'Change format',
                   onPressed: () => _editFormat(context, team),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.download_outlined),
+                  tooltip: 'Import from Showdown',
+                  onPressed: () => showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) =>
+                        PsImportSheet(targetTeamId: widget.teamId),
+                  ),
                 ),
                 if (slots.isNotEmpty)
                   IconButton(
