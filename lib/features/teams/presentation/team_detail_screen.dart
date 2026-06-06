@@ -724,18 +724,22 @@ class _FilledSlotCard extends ConsumerWidget {
                           children: [
                             Builder(builder: (ctx) {
                               final isFemale = slot.gender == 'female';
-                              // Gender-specific sprites only exist from Gen 4 onward.
-                              final genderSpritesAvailable =
-                                  format == null || format.gen >= 4;
-                              final genderUrl = isFemale && genderSpritesAvailable
+                              // femaleUrl is non-null only for Gen 4+ and HOME
+                              // sprites that have gender variants.
+                              final genderUrl = isFemale
+                                  ? (slot.isShiny
+                                      ? spriteUrls.femaleShinyUrl
+                                      : spriteUrls.femaleUrl)
+                                  : null;
+                              // When gender sprite is used, chain:
+                              //   gen female → gen default/shiny → HOME female
+                              final genFallback = slot.isShiny
+                                  ? spriteUrls.shinyUrl
+                                  : spriteUrls.defaultUrl;
+                              final homeFemaleUrl = isFemale
                                   ? (slot.isShiny
                                       ? pokemonHomeShinyFemaleUrl(pokemon.id)
                                       : pokemonHomeFemaleUrl(pokemon.id))
-                                  : null;
-                              final genderFallback = isFemale && genderSpritesAvailable
-                                  ? (slot.isShiny
-                                      ? pokemonHomeShinyUrl(pokemon.id)
-                                      : pokemonHomeUrl(pokemon.id))
                                   : null;
                               return PokemonSprite(
                                 defaultUrl: megaArtworkUrl ??
@@ -744,9 +748,14 @@ class _FilledSlotCard extends ConsumerWidget {
                                 fallbackUrl: megaArtworkUrl != null
                                     ? megaArtworkFallback
                                     : genderUrl != null
-                                        ? genderFallback
+                                        ? genFallback
                                         : null,
-                                shinyUrl: (megaArtworkUrl == null && genderUrl == null)
+                                fallbackUrl2: megaArtworkUrl == null &&
+                                        genderUrl != null
+                                    ? homeFemaleUrl
+                                    : null,
+                                shinyUrl: (megaArtworkUrl == null &&
+                                        genderUrl == null)
                                     ? spriteUrls.shinyUrl
                                     : null,
                                 shiny: megaArtworkUrl == null &&

@@ -764,18 +764,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
         // Sprite priority: G-Max > Mega > Form change > default.
         final gmaxHomeUrl = gmaxPokemon != null ? pokemonHomeUrl(gmaxPokemon.id) : null;
-        // ── Gender-specific base sprite ─────────────────────────────────────
-        final isFemale = _gender == 'female';
-        // Gender-specific sprites only exist from Gen 4 onward.
-        final genderSpritesAvailable = format == null || format.gen >= 4;
-        final genderBaseUrl = isFemale && genderSpritesAvailable
-            ? (_isShiny
-                ? pokemonHomeShinyFemaleUrl(pokemon.id)
-                : pokemonHomeFemaleUrl(pokemon.id))
-            : null;
-        final genderBaseFallback = isFemale && genderSpritesAvailable
-            ? (_isShiny ? pokemonHomeShinyUrl(pokemon.id) : pokemonHomeUrl(pokemon.id))
-            : null;
+        // Gender sprite selection is now handled inside _buildHeader using
+        // spriteUrls.femaleUrl / femaleShinyUrl (set for Gen 4+ and HOME).
 
         final effectiveMegaArtworkUrl =
             gmaxHomeUrl ?? megaArtworkUrl ?? formHomeUrl;
@@ -805,8 +795,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               _buildHeader(slot, spriteUrls, mechanics,
                   megaArtworkUrl: effectiveMegaArtworkUrl,
                   megaFallbackUrl: effectiveMegaFallbackUrl,
-                  genderBaseUrl: genderBaseUrl,
-                  genderBaseFallback: genderBaseFallback,
                   isFormLoading: formPokemonAsync?.isLoading ?? false),
               // ── Form selector (when Pokémon has multiple forms) ──
               if (hasMultipleForms) ...[
@@ -1086,17 +1074,27 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   Widget _buildHeader(
     TeamSlot slot,
-    ({String? defaultUrl, String? shinyUrl}) spriteUrls,
+    ({String? defaultUrl, String? shinyUrl, String? femaleUrl, String? femaleShinyUrl}) spriteUrls,
     GenerationMechanics? mechanics, {
     String? megaArtworkUrl,
     String? megaFallbackUrl,
-    // Gender-specific base sprite (female HOME url when slot is female).
-    String? genderBaseUrl,
-    String? genderBaseFallback,
     bool isFormLoading = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
+    // femaleUrl is non-null for Gen 4+ and HOME sprites that carry a female
+    // variant; use it as the primary, falling back through gen default → HOME.
+    final isFemale = _gender == 'female';
+    final genderUrl = isFemale
+        ? (_isShiny ? spriteUrls.femaleShinyUrl : spriteUrls.femaleUrl)
+        : null;
+    final genFallback = _isShiny ? spriteUrls.shinyUrl : spriteUrls.defaultUrl;
+    final homeFemaleUrl = isFemale
+        ? (_isShiny
+            ? pokemonHomeShinyFemaleUrl(slot.pokemonId)
+            : pokemonHomeFemaleUrl(slot.pokemonId))
+        : null;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1105,21 +1103,20 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           alignment: Alignment.bottomRight,
           children: [
             PokemonSprite(
-              // Priority: form/mega/gmax override > female base > default sprite.
-              defaultUrl: megaArtworkUrl ??
-                  genderBaseUrl ??
-                  spriteUrls.defaultUrl,
+              // Priority: form/mega/gmax override > gen female > gen default.
+              defaultUrl: megaArtworkUrl ?? genderUrl ?? spriteUrls.defaultUrl,
               fallbackUrl: megaArtworkUrl != null
                   ? megaFallbackUrl
-                  : genderBaseUrl != null
-                      ? genderBaseFallback
+                  : genderUrl != null
+                      ? genFallback
                       : null,
-              shinyUrl: (megaArtworkUrl == null && genderBaseUrl == null)
+              fallbackUrl2: megaArtworkUrl == null && genderUrl != null
+                  ? homeFemaleUrl
+                  : null,
+              shinyUrl: (megaArtworkUrl == null && genderUrl == null)
                   ? spriteUrls.shinyUrl
                   : null,
-              shiny: megaArtworkUrl == null &&
-                  genderBaseUrl == null &&
-                  _isShiny,
+              shiny: megaArtworkUrl == null && genderUrl == null && _isShiny,
               size: 140,
             ),
             // Loading overlay while form sprite is fetching
