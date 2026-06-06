@@ -17,8 +17,8 @@ class Settings(BaseSettings):
     notify_update_secret: str = ""
     firebase_service_account_json: str = "{}"
 
-    # Structured logging — UtilityBillsServer endpoint
-    logs_api_base_url: str = "https://kwasi-utilitybills.duckdns.org"
+    # Structured logging — Loki push endpoint (Docker internal default)
+    loki_url: str = "http://loki:3100"
 
 
 settings = Settings()

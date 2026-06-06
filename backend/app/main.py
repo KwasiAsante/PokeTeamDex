@@ -8,10 +8,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
 from app.core.logging import setup_logging
-from app.routers import admin, auth, folders, instances, ps_data, sync, teams
+from app.routers import admin, auth, folders, instances, logs, ps_data, sync, teams
 from app.routers.teams import slots_router
 
-setup_logging(settings.logs_api_base_url)
+setup_logging(settings.loki_url)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -39,6 +39,7 @@ app.include_router(slots_router)
 app.include_router(sync.router)
 app.include_router(ps_data.router)
 app.include_router(admin.router)
+app.include_router(logs.router)
 
 
 @app.middleware("http")

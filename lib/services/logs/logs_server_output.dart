@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 
-/// Posts buffered log lines to UtilityBillsServer /logs/device.
+/// Posts buffered log lines to the PokeTeamDex backend /logs/device endpoint.
 /// Flushes every [flushInterval] or when [batchSize] lines accumulate.
 /// Drops silently on any network/server failure.
 class LogsServerOutput extends LogOutput {
@@ -18,7 +18,8 @@ class LogsServerOutput extends LogOutput {
   final int batchSize;
 
   // Mutable URL — updated after the DB is ready via [updateLogsUrl].
-  String _logsBaseUrl = 'https://kwasi-utilitybills.duckdns.org';
+  String _logsBaseUrl = 'https://poketeamdex.duckdns.org';
+  String? _token;
   final List<String> _buffer = [];
   Timer? _flushTimer;
 
@@ -35,7 +36,11 @@ class LogsServerOutput extends LogOutput {
   }
 
   void updateLogsUrl(String url) {
-    _logsBaseUrl = url.isEmpty ? 'https://kwasi-utilitybills.duckdns.org' : url;
+    _logsBaseUrl = url.isEmpty ? 'https://poketeamdex.duckdns.org' : url;
+  }
+
+  void updateToken(String? token) {
+    _token = token;
   }
 
   @override
@@ -63,6 +68,8 @@ class LogsServerOutput extends LogOutput {
   }
 
   void _send(List<String> lines) {
+    final token = _token;
+    if (token == null || token.isEmpty) return;
     final uri = Uri.parse('$_logsBaseUrl/logs/device')
         .replace(queryParameters: {'app_name': 'poketeamdex'});
     http
@@ -70,6 +77,7 @@ class LogsServerOutput extends LogOutput {
           uri,
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
             'x-device-id': _deviceId,
           },
           body: jsonEncode(lines),
