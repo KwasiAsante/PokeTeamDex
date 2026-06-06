@@ -711,26 +711,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             ? formPokemon.moves.cast<Map<String, dynamic>>()
             : pokemonMoves;
 
-        // Re-compute violations and learnable moves with form-specific data.
-        final effectiveViolations = format != null
-            ? _computeViolations(
-                formatService, format, pokemon.name, effectivePokemonMoves)
-            : <String, String>{};
-
-        final effectiveLearnableMoves = (format != null
-                ? buildLearnsetForFormat(
-                    effectivePokemonMoves, format,
-                    pokemonName: formPokemon?.name ?? pokemon.name,
-                    formatService: formatService,
-                  )
-                : effectivePokemonMoves
-                    .map((m) => m['move']['name'] as String)
-                    .toSet())
-            .toList()
-          ..sort();
-
-        // Prior-evolution-exclusive moves — learnable by ancestors but NOT by
-        // the current Pokémon. Available regardless of format selection.
+        // Prior-evolution-exclusive moves (computed first so violations can be
+        // suppressed for them below).
         final priorEvoMoveSetsAsync =
             ref.watch(priorEvoMoveSetsProvider(slot.pokemonId));
         final effectivePriorEvoMoves =
@@ -758,6 +740,32 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           );
         }) ??
             const <String>{};
+
+        // Re-compute violations with form-specific data; prior-evo moves are
+        // intentionally excluded from violation checking.
+        final effectiveViolations = {
+          for (final entry in (format != null
+                  ? _computeViolations(formatService, format, pokemon.name,
+                      effectivePokemonMoves)
+                  : <String, String>{})
+              .entries)
+            if (!entry.key.startsWith('move') ||
+                !effectivePriorEvoMoves.contains(
+                    _moves[int.parse(entry.key.substring(4)) - 1]))
+              entry.key: entry.value,
+        };
+
+        final effectiveLearnableMoves = (format != null
+                ? buildLearnsetForFormat(
+                    effectivePokemonMoves, format,
+                    pokemonName: formPokemon?.name ?? pokemon.name,
+                    formatService: formatService,
+                  )
+                : effectivePokemonMoves
+                    .map((m) => m['move']['name'] as String)
+                    .toSet())
+            .toList()
+          ..sort();
 
         // Combined sorted move list: regular + prior-evo-exclusive.
         final allPickableMoves = {

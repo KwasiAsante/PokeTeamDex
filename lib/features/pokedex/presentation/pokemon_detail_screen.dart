@@ -843,6 +843,7 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     final priorEvoGroups = priorEvoAsync.whenOrNull(
       data: (sets) => _buildPriorEvoGroups(_selectedVersion, sets),
     ) ?? const [];
+    final priorEvoLoading = priorEvoAsync.isLoading;
 
     return Column(
       children: [
@@ -883,6 +884,28 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
                               rows: grouped[method]!,
                               showLevel: method == 'level-up',
                             )),
+                    if (priorEvoLoading)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: colorScheme.tertiary,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Loading prior evolution moves…',
+                              style: textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ),
                     if (priorEvoGroups.isNotEmpty) ...[
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
