@@ -48,10 +48,43 @@ class TeamSlotRepository {
             ))
           .watch();
 
+  /// Marks a slot as locally modified so the slot config UI shows it as pending.
+  Future<void> markPending(int id) =>
+      (_db.update(_db.teamSlots)..where((s) => s.id.equals(id))).write(
+        TeamSlotsCompanion(
+          syncStatus: const Value('pending'),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+
   /// Updates only the slot-position column — safe to call during reorder.
   Future<int> updateSlotPosition(int id, int newSlot) =>
       (_db.update(_db.teamSlots)..where((s) => s.id.equals(id)))
           .write(TeamSlotsCompanion(slot: Value(newSlot)));
+
+  /// Marks every slot in [slots] as pending and enqueues a full upsert sync op
+  /// for each one. Returns the number of slots processed.
+  Future<int> saveAll(List<TeamSlot> slots) async {
+    int count = 0;
+    for (final slot in slots) {
+      await (_db.update(_db.teamSlots)..where((s) => s.id.equals(slot.id))).write(
+        TeamSlotsCompanion(
+          syncStatus: const Value('pending'),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+      final payload = _buildPayload(slot, slot.instanceId);
+      await _syncQueue.enqueue(PendingSyncOpsCompanion(
+        operation: const Value('upsert'),
+        entityType: const Value('team_slot'),
+        entityId: Value(slot.id),
+        payload: Value(jsonEncode(payload)),
+        createdAt: Value(DateTime.now()),
+      ));
+      count++;
+    }
+    return count;
+  }
 
   /// Partial-updates only instanceId, bumping syncStatus and enqueueing a sync
   /// op so the link is pushed to the server on the next sync cycle.
@@ -69,37 +102,7 @@ class TeamSlotRepository {
         .getSingleOrNull();
     if (slot == null) return;
 
-    final payload = <String, dynamic>{
-      'team_local_id': slot.teamId,
-      'slot': slot.slot,
-      'pokemon_id': slot.pokemonId,
-      if (slot.nickname != null && slot.nickname!.isNotEmpty) 'nickname': slot.nickname,
-      'instance_client_local_id': ?instanceId,
-      if (slot.formName != null) 'form_name': slot.formName,
-      'level': slot.level,
-      if (slot.gender != null) 'gender': slot.gender,
-      'is_shiny': slot.isShiny,
-      if (slot.friendship != null) 'friendship': slot.friendship,
-      if (slot.abilityName != null) 'ability_name': slot.abilityName,
-      if (slot.natureName != null) 'nature_name': slot.natureName,
-      if (slot.heldItemName != null) 'held_item_name': slot.heldItemName,
-      if (slot.move1 != null) 'move1': slot.move1,
-      if (slot.move2 != null) 'move2': slot.move2,
-      if (slot.move3 != null) 'move3': slot.move3,
-      if (slot.move4 != null) 'move4': slot.move4,
-      'ev_hp': slot.evHp, 'ev_atk': slot.evAtk, 'ev_def': slot.evDef,
-      'ev_spa': slot.evSpa, 'ev_spd': slot.evSpd, 'ev_spe': slot.evSpe,
-      'iv_hp': slot.ivHp, 'iv_atk': slot.ivAtk, 'iv_def': slot.ivDef,
-      'iv_spa': slot.ivSpa, 'iv_spd': slot.ivSpd, 'iv_spe': slot.ivSpe,
-      if (slot.ribbons != null) 'ribbons': slot.ribbons,
-      'is_mega_evolved': slot.isMegaEvolved,
-      'has_gigantamax': slot.hasGigantamax,
-      'gigantamax_enabled': slot.gigantamaxEnabled,
-      'is_alpha': slot.isAlpha,
-      'contest_cool': slot.contestCool, 'contest_beautiful': slot.contestBeautiful,
-      'contest_cute': slot.contestCute, 'contest_clever': slot.contestClever,
-      'contest_tough': slot.contestTough, 'contest_sheen': slot.contestSheen,
-    };
+    final payload = _buildPayload(slot, instanceId);
     await _syncQueue.enqueue(PendingSyncOpsCompanion(
       operation: const Value('upsert'),
       entityType: const Value('team_slot'),
@@ -108,4 +111,36 @@ class TeamSlotRepository {
       createdAt: Value(DateTime.now()),
     ));
   }
+
+  Map<String, dynamic> _buildPayload(TeamSlot slot, int? instanceId) => {
+    'team_local_id': slot.teamId,
+    'slot': slot.slot,
+    'pokemon_id': slot.pokemonId,
+    if (slot.nickname != null && slot.nickname!.isNotEmpty) 'nickname': slot.nickname,
+    'instance_client_local_id': ?instanceId,
+    if (slot.formName != null) 'form_name': slot.formName,
+    'level': slot.level,
+    if (slot.gender != null) 'gender': slot.gender,
+    'is_shiny': slot.isShiny,
+    if (slot.friendship != null) 'friendship': slot.friendship,
+    if (slot.abilityName != null) 'ability_name': slot.abilityName,
+    if (slot.natureName != null) 'nature_name': slot.natureName,
+    if (slot.heldItemName != null) 'held_item_name': slot.heldItemName,
+    if (slot.move1 != null) 'move1': slot.move1,
+    if (slot.move2 != null) 'move2': slot.move2,
+    if (slot.move3 != null) 'move3': slot.move3,
+    if (slot.move4 != null) 'move4': slot.move4,
+    'ev_hp': slot.evHp, 'ev_atk': slot.evAtk, 'ev_def': slot.evDef,
+    'ev_spa': slot.evSpa, 'ev_spd': slot.evSpd, 'ev_spe': slot.evSpe,
+    'iv_hp': slot.ivHp, 'iv_atk': slot.ivAtk, 'iv_def': slot.ivDef,
+    'iv_spa': slot.ivSpa, 'iv_spd': slot.ivSpd, 'iv_spe': slot.ivSpe,
+    if (slot.ribbons != null) 'ribbons': slot.ribbons,
+    'is_mega_evolved': slot.isMegaEvolved,
+    'has_gigantamax': slot.hasGigantamax,
+    'gigantamax_enabled': slot.gigantamaxEnabled,
+    'is_alpha': slot.isAlpha,
+    'contest_cool': slot.contestCool, 'contest_beautiful': slot.contestBeautiful,
+    'contest_cute': slot.contestCute, 'contest_clever': slot.contestClever,
+    'contest_tough': slot.contestTough, 'contest_sheen': slot.contestSheen,
+  };
 }

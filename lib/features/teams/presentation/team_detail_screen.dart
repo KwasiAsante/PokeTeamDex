@@ -145,12 +145,18 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
                         PsImportSheet(targetTeamId: widget.teamId),
                   ),
                 ),
-                if (slots.isNotEmpty)
+                if (slots.isNotEmpty) ...[
+                  IconButton(
+                    icon: const Icon(Icons.save_rounded),
+                    tooltip: 'Save all slots',
+                    onPressed: () => _saveAllSlots(context, slots),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.upload_outlined),
                     tooltip: 'Export to Showdown',
                     onPressed: () => _exportShowdown(context, slots, team),
                   ),
+                ],
                 IconButton(
                   icon: const Icon(Icons.delete_outline),
                   tooltip: 'Delete team',
@@ -229,6 +235,15 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _saveAllSlots(
+      BuildContext context, List<TeamSlot> slots) async {
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+    final count = await slotRepo.saveAll(slots);
+    if (context.mounted) {
+      showAppSnackBar(context, 'Saved $count slot${count == 1 ? '' : 's'}.');
+    }
   }
 
   Future<void> _exportShowdown(
