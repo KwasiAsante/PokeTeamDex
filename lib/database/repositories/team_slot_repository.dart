@@ -48,6 +48,9 @@ class TeamSlotRepository {
             ))
           .watch();
 
+  Stream<List<TeamSlot>> watchAll() =>
+      (_db.select(_db.teamSlots)..where((s) => s.isDeleted.equals(false))).watch();
+
   /// Marks a slot as locally modified so the slot config UI shows it as pending.
   Future<void> markPending(int id) =>
       (_db.update(_db.teamSlots)..where((s) => s.id.equals(id))).write(

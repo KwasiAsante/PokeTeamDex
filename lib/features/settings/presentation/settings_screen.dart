@@ -276,6 +276,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const Divider(),
           const SizedBox(height: 16),
 
+          // ── Maintenance ────────────────────────────────────────────────────
+          _SectionHeader('Maintenance'),
+          const SizedBox(height: 8),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.cleaning_services_outlined),
+            title: const Text('Clean up database'),
+            subtitle: const Text(
+                'Remove orphaned slots and tracking records left by deleted teams.'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => _runDbCleanup(context, ref),
+            icon: const Icon(Icons.delete_sweep_outlined),
+            label: const Text('Run cleanup'),
+          ),
+
+          const SizedBox(height: 32),
+          const Divider(),
+          const SizedBox(height: 16),
+
           // ── About ──────────────────────────────────────────────────────────
           _SectionHeader('About'),
           const SizedBox(height: 8),
@@ -283,6 +304,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+}
+
+Future<void> _runDbCleanup(BuildContext context, WidgetRef ref) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Clean up database'),
+      content: const Text(
+        'This will permanently remove orphaned slot rows left by deleted teams '
+        'and unused Pokémon tracking records. This cannot be undone.\n\n'
+        'Continue?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Clean up'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+  if (!context.mounted) return;
+
+  final repo = ref.read(databaseMaintenanceRepositoryProvider);
+  try {
+    final result = await repo.cleanup();
+    if (context.mounted) showAppSnackBar(context, result.summary);
+  } catch (e) {
+    if (context.mounted) {
+      showAppSnackBar(context, 'Cleanup failed: $e', isError: true);
+    }
   }
 }
 

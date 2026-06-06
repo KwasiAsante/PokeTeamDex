@@ -43,7 +43,10 @@ bool _needsTransparentSubfolder(int gen) => gen <= 2;
 /// Gen 1-5 uses PokeAPI version sprites (raw.githubusercontent.com — CORS safe,
 /// transparent backgrounds via /transparent/ subfolder for Gen 1-2).
 /// Gen 6+ uses PokéAPI HOME / official artwork.
-({String? defaultUrl, String? shinyUrl}) resolveSprite({
+///
+/// [femaleUrl] and [femaleShinyUrl] are non-null for Gen 4+ formats (and HOME)
+/// where female-specific sprites exist in the PokeAPI sprites repository.
+({String? defaultUrl, String? shinyUrl, String? femaleUrl, String? femaleShinyUrl}) resolveSprite({
   required Map<String, dynamic>? sprites,
   required int pokemonId,
   required String pokemonName,
@@ -101,7 +104,17 @@ bool _needsTransparentSubfolder(int gen) => gen <= 2;
         shinyUrl = '$_versionsBase/$versionPath/shiny/$pokemonId$ext';
       }
 
-      return (defaultUrl: defaultUrl, shinyUrl: shinyUrl);
+      // Female sprites exist in PokeAPI from Gen 4 onward.
+      String? femaleUrl;
+      String? femaleShinyUrl;
+      if (gen >= 4) {
+        femaleUrl = '$_versionsBase/$versionPath/${animSeg}female/$pokemonId$ext';
+        femaleShinyUrl = noShiny
+            ? femaleUrl
+            : '$_versionsBase/$versionPath/${animSeg}shiny/female/$pokemonId$ext';
+      }
+
+      return (defaultUrl: defaultUrl, shinyUrl: shinyUrl, femaleUrl: femaleUrl, femaleShinyUrl: femaleShinyUrl);
     }
   }
 
@@ -109,7 +122,7 @@ bool _needsTransparentSubfolder(int gen) => gen <= 2;
   return _homeOrArtwork(sprites, rawDefault, rawShiny);
 }
 
-({String? defaultUrl, String? shinyUrl}) _homeOrArtwork(
+({String? defaultUrl, String? shinyUrl, String? femaleUrl, String? femaleShinyUrl}) _homeOrArtwork(
   Map<String, dynamic>? sprites,
   String rawDefault,
   String rawShiny,
@@ -123,6 +136,8 @@ bool _needsTransparentSubfolder(int gen) => gen <= 2;
     shinyUrl: home?['front_shiny'] as String? ??
         artwork?['front_shiny'] as String? ??
         rawShiny,
+    femaleUrl: home?['front_female'] as String?,
+    femaleShinyUrl: home?['front_shiny_female'] as String?,
   );
 }
 

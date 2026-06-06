@@ -5,29 +5,38 @@ import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
 
-/// Bottom sheet that lists every other team slot containing [pokemonId] so
-/// the user can pick one to link the current slot's Pokémon instance to.
+/// Bottom sheet that lists every other team slot that is a valid evolution-aware
+/// link target for [originSlot], following the rules of issue #102:
+/// - Only forward-reachable species in the origin's evolution chain are shown.
+/// - Regional variants are treated as separate lines.
 ///
 /// Returns the selected [TeamSlot] via [onPick]; the caller is responsible for
 /// creating / chaining the instance records.
 class InstancePickerSheet extends ConsumerWidget {
-  final int pokemonId;
+  final TeamSlot originSlot;
 
-  /// ID of the slot currently being configured — excluded from the list.
-  final int currentSlotId;
+  /// true  → current slot is the ORIGIN; show forward-evolution (child) candidates.
+  /// false → current slot is the CHILD;  show backward-evolution (origin) candidates.
+  final bool forwardDirection;
 
   final void Function(TeamSlot slot) onPick;
 
   const InstancePickerSheet({
     super.key,
-    required this.pokemonId,
-    required this.currentSlotId,
+    required this.originSlot,
+    required this.forwardDirection,
     required this.onPick,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final slotsAsync = ref.watch(slotsBySpeciesProvider(pokemonId));
+    final params = (
+      originPokemonId: originSlot.pokemonId,
+      currentSlotId: originSlot.id,
+      originFormName: originSlot.formName,
+      forwardDirection: forwardDirection,
+    );
+    final slotsAsync = ref.watch(linkableSlotsProvider(params));
     final teamsAsync = ref.watch(allTeamsProvider);
 
     final colorScheme = Theme.of(context).colorScheme;
@@ -66,10 +75,7 @@ class InstancePickerSheet extends ConsumerWidget {
               loading: () =>
                   const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
-              data: (allSlots) {
-                final slots = allSlots
-                    .where((s) => s.id != currentSlotId)
-                    .toList();
+              data: (slots) {
 
                 if (slots.isEmpty) {
                   return Center(
@@ -83,7 +89,7 @@ class InstancePickerSheet extends ConsumerWidget {
                               color: colorScheme.onSurfaceVariant),
                           const SizedBox(height: 12),
                           Text(
-                            'No other slots have this Pokémon.',
+                            'No other slots have this Pokémon or its evolutions.',
                             style: textTheme.bodyMedium?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                             ),

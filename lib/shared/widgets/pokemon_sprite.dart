@@ -7,9 +7,12 @@ import 'package:flutter/material.dart';
 class PokemonSprite extends StatelessWidget {
   final String? defaultUrl;
   final String? shinyUrl;
-  /// Shown when [defaultUrl] fails to load (e.g. official artwork as fallback
-  /// for HOME sprites that may not exist for all forms).
+  /// First fallback shown when [defaultUrl] fails (e.g. gen default when gen
+  /// female sprite 404s).
   final String? fallbackUrl;
+  /// Second fallback shown when both [defaultUrl] and [fallbackUrl] fail
+  /// (e.g. HOME sprite as the final safety net).
+  final String? fallbackUrl2;
   final bool shiny;
   final double size;
   final BoxFit fit;
@@ -19,6 +22,7 @@ class PokemonSprite extends StatelessWidget {
     required this.defaultUrl,
     this.shinyUrl,
     this.fallbackUrl,
+    this.fallbackUrl2,
     this.shiny = false,
     this.size = 96,
     this.fit = BoxFit.contain,
@@ -45,7 +49,16 @@ class PokemonSprite extends StatelessWidget {
                 height: size,
                 fit: fit,
                 placeholder: (_, _) => _placeholder(size),
-                errorWidget: (_, _, _) => _broken(size),
+                errorWidget: fallbackUrl2 != null
+                    ? (_, _, _) => CachedNetworkImage(
+                          imageUrl: fallbackUrl2!,
+                          width: size,
+                          height: size,
+                          fit: fit,
+                          placeholder: (_, _) => _placeholder(size),
+                          errorWidget: (_, _, _) => _broken(size),
+                        )
+                    : (_, _, _) => _broken(size),
               )
           : (_, _, _) => _broken(size),
     );

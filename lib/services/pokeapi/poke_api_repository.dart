@@ -168,6 +168,97 @@ class PokeApiRepository {
     return EvolutionNode.fromJson(data['chain'] as Map<String, dynamic>);
   }
 
+  /// Returns the set of species IDs reachable FORWARD in the evolution chain
+  /// from [originPokemonId] (inclusive), plus the resolved species ID for the
+  /// origin itself. Used by the evolution-aware instance picker.
+  ///
+  /// For form-variant pokemonIds (> 10000) a lightweight `/pokemon/{id}` fetch
+  /// resolves the national-dex species ID first.
+  Future<({Set<int> forwardSpeciesIds, int originSpeciesId})>
+      fetchForwardEvolutionInfo(int originPokemonId) async {
+    final originSpeciesId = await _getSpeciesIdForPokemon(originPokemonId);
+    final species = await fetchPokemonSpecies(originSpeciesId);
+    final chainId = species.evolutionChainId;
+    if (chainId == null) {
+      return (forwardSpeciesIds: {originSpeciesId}, originSpeciesId: originSpeciesId);
+    }
+    final root = await fetchEvolutionChain(chainId);
+    final forward = _collectSubtreeFrom(root, originSpeciesId) ?? {originSpeciesId};
+    return (forwardSpeciesIds: forward, originSpeciesId: originSpeciesId);
+  }
+
+  /// Returns all species IDs on the ancestor path from the chain root DOWN TO
+  /// [originPokemonId] (inclusive). Used by the child-role picker to show only
+  /// valid pre-evolution origin slots — e.g. Electivire's ancestors are
+  /// {Elekid, Electabuzz, Electivire}, not its (nonexistent) evolutions.
+  Future<({Set<int> ancestorSpeciesIds, int originSpeciesId})>
+      fetchBackwardEvolutionInfo(int originPokemonId) async {
+    final originSpeciesId = await _getSpeciesIdForPokemon(originPokemonId);
+    final species = await fetchPokemonSpecies(originSpeciesId);
+    final chainId = species.evolutionChainId;
+    if (chainId == null) {
+      return (ancestorSpeciesIds: {originSpeciesId}, originSpeciesId: originSpeciesId);
+    }
+    final root = await fetchEvolutionChain(chainId);
+    final path = _findPathTo(root, originSpeciesId, []);
+    final ancestors = path != null ? path.toSet() : {originSpeciesId};
+    return (ancestorSpeciesIds: ancestors, originSpeciesId: originSpeciesId);
+  }
+
+  /// Returns true if [speciesId]'s varieties include a form whose name ends
+  /// with '-[formName]'. Used to determine whether a forward-evolution species
+  /// has a regional counterpart for the origin's form.
+  Future<bool> fetchSpeciesHasForm(int speciesId, String formName) async {
+    final species = await fetchPokemonSpecies(speciesId);
+    return species.varieties.any((v) => v.name.endsWith('-$formName'));
+  }
+
+  Future<int> _getSpeciesIdForPokemon(int pokemonId) async {
+    if (pokemonId <= 10000) return pokemonId;
+    final cacheKey = 'species_id_for_pokemon_$pokemonId';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is int) return cached;
+    final response = await _pokeApiClient.client.get('/pokemon/$pokemonId');
+    if (response.statusCode != 200) return pokemonId; // best-effort fallback
+    final speciesUrl = (response.data['species'] as Map)['url'] as String;
+    final segments = Uri.parse(speciesUrl).pathSegments;
+    final speciesId = int.parse(segments.lastWhere((s) => s.isNotEmpty));
+    _pokeApiCache.putWithTTL(cacheKey, speciesId, const Duration(days: 7));
+    return speciesId;
+  }
+
+  /// Returns the path of species IDs from [node] down to [targetSpeciesId]
+  /// (inclusive), or null if the target is not in this subtree.
+  List<int>? _findPathTo(EvolutionNode node, int targetSpeciesId, List<int> path) {
+    final current = [...path, node.speciesId];
+    if (node.speciesId == targetSpeciesId) return current;
+    for (final child in node.evolvesTo) {
+      final result = _findPathTo(child, targetSpeciesId, current);
+      if (result != null) return result;
+    }
+    return null;
+  }
+
+  /// Finds [originSpeciesId] in the tree rooted at [node] and returns all
+  /// species IDs at that node and every descendant. Returns null if the
+  /// species is not in the subtree.
+  Set<int>? _collectSubtreeFrom(EvolutionNode node, int originSpeciesId) {
+    if (node.speciesId == originSpeciesId) return _collectAll(node);
+    for (final child in node.evolvesTo) {
+      final result = _collectSubtreeFrom(child, originSpeciesId);
+      if (result != null) return result;
+    }
+    return null;
+  }
+
+  Set<int> _collectAll(EvolutionNode node) {
+    final ids = <int>{node.speciesId};
+    for (final child in node.evolvesTo) {
+      ids.addAll(_collectAll(child));
+    }
+    return ids;
+  }
+
   Future<MoveEntry> fetchMove(String name) async {
     final cacheKey = 'move_$name';
     final cached = _pokeApiCache.getIfValid(cacheKey);
