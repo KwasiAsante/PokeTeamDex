@@ -768,12 +768,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         // Try female HOME url first for female slots; CachedNetworkImage falls
         // back to the regular HOME url if no female sprite exists for this species.
         final isFemale = _gender == 'female';
-        final genderBaseUrl = isFemale
+        final hasFemaleSprite = pokemon.sprites?['front_female'] != null;
+        final genderBaseUrl = isFemale && hasFemaleSprite
             ? (_isShiny
                 ? pokemonHomeShinyFemaleUrl(pokemon.id)
                 : pokemonHomeFemaleUrl(pokemon.id))
             : null;
-        final genderBaseFallback = isFemale
+        final genderBaseFallback = isFemale && hasFemaleSprite
             ? (_isShiny ? pokemonHomeShinyUrl(pokemon.id) : pokemonHomeUrl(pokemon.id))
             : null;
 

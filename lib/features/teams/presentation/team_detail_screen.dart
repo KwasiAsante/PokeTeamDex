@@ -709,12 +709,14 @@ class _FilledSlotCard extends ConsumerWidget {
                           children: [
                             Builder(builder: (ctx) {
                               final isFemale = slot.gender == 'female';
-                              final genderUrl = isFemale
+                              final hasFemaleSprite =
+                                  pokemon.sprites?['front_female'] != null;
+                              final genderUrl = isFemale && hasFemaleSprite
                                   ? (slot.isShiny
                                       ? pokemonHomeShinyFemaleUrl(pokemon.id)
                                       : pokemonHomeFemaleUrl(pokemon.id))
                                   : null;
-                              final genderFallback = isFemale
+                              final genderFallback = isFemale && hasFemaleSprite
                                   ? (slot.isShiny
                                       ? pokemonHomeShinyUrl(pokemon.id)
                                       : pokemonHomeUrl(pokemon.id))
