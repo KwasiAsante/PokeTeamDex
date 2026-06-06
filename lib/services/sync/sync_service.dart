@@ -11,6 +11,7 @@ import 'package:poke_team_dex/database/repositories/team_repository.dart';
 import 'package:poke_team_dex/database/repositories/team_slot_repository.dart';
 import 'package:poke_team_dex/services/api/team_sync_api.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
+import 'package:poke_team_dex/utils/app_logger.dart';
 
 const _maxAttempts = 5;
 const _metaKeyLastPullAt = 'last_pull_at';
@@ -48,22 +49,27 @@ class SyncService {
     if (token == null || token.isEmpty) return;
     _running = true;
     notifier.setSyncing();
+    AppLogger().i('Sync started');
     bool pushOk = true;
     try {
       pushOk = await _drain();
-    } catch (e) {
+    } catch (e, st) {
+      AppLogger().e('Push phase failed', error: e, stackTrace: st);
       pushOk = false;
     }
     try {
       await _pull();
-    } catch (e) {
+    } catch (e, st) {
+      AppLogger().e('Pull phase failed', error: e, stackTrace: st);
       notifier.setError(e.toString());
       _running = false;
       return;
     }
     if (pushOk) {
+      AppLogger().i('Sync complete');
       notifier.setSuccess();
     } else {
+      AppLogger().w('Sync complete with push errors — will retry');
       notifier.setError('Some changes failed to sync and will retry automatically.');
     }
     _running = false;
@@ -124,10 +130,13 @@ class SyncService {
 
     if (batchOps.isEmpty) return true;
 
+    AppLogger().d('Push: sending ${batchOps.length} op(s)');
     try {
       final result = await api.pushBatch(batchOps);
+      final created = (result['created'] as List).cast<Map<String, dynamic>>();
+      AppLogger().i('Push: ${batchOps.length} op(s) sent, ${created.length} entity(ies) created');
 
-      for (final c in (result['created'] as List).cast<Map<String, dynamic>>()) {
+      for (final c in created) {
         final localId = c['client_local_id'] as int;
         final remoteId = (c['remote_id'] as int).toString();
         switch (c['entity_type'] as String) {
@@ -149,12 +158,14 @@ class SyncService {
         await syncQueue.delete(op.id);
       }
       return true;
-    } on DioException {
+    } on DioException catch (e) {
+      AppLogger().w('Push failed (DioException) — will retry', error: e);
       for (final op in includedOps) {
         await syncQueue.markAttempted(op.id, op.attempts);
       }
       return false;
-    } on StateError {
+    } on StateError catch (e) {
+      AppLogger().w('Push: bad op data discarded', error: e);
       for (final op in includedOps) {
         await syncQueue.delete(op.id);
       }
@@ -429,14 +440,24 @@ class SyncService {
   Future<void> _pull() async {
     final sinceStr = await metaRepo.get(_metaKeyLastPullAt);
     final since = sinceStr != null ? DateTime.parse(sinceStr) : null;
+    AppLogger().d('Pull: since=${since?.toIso8601String() ?? 'full'}');
 
     final pullStart = DateTime.now().toUtc();
     final data = await api.pullSince(since);
 
-    await _mergeFolders(data['folders'] as List);
-    await _mergeTeams(data['teams'] as List);
-    await _mergeInstances(data['instances'] as List? ?? []);
-    await _mergeSlots(data['slots'] as List);
+    final folders = data['folders'] as List;
+    final teams = data['teams'] as List;
+    final instances = data['instances'] as List? ?? [];
+    final slots = data['slots'] as List;
+    AppLogger().i(
+      'Pull: ${folders.length} folder(s), ${teams.length} team(s), '
+      '${instances.length} instance(s), ${slots.length} slot(s)',
+    );
+
+    await _mergeFolders(folders);
+    await _mergeTeams(teams);
+    await _mergeInstances(instances);
+    await _mergeSlots(slots);
 
     await metaRepo.set(_metaKeyLastPullAt, pullStart.toIso8601String());
   }

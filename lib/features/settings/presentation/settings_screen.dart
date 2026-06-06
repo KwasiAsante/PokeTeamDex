@@ -12,6 +12,7 @@ import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/database/repositories/app_config_repository.dart';
+import 'package:poke_team_dex/utils/app_logger.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
@@ -42,22 +43,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _urlDirty = false;
   bool _saving = false;
 
+  final _logsUrlController = TextEditingController();
+  bool _logsUrlDirty = false;
+  bool _logsUrlSaving = false;
+
   @override
   void initState() {
     super.initState();
     _loadUrl();
+    _loadLogsUrl();
   }
 
   Future<void> _loadUrl() async {
     final url = await ref.read(appConfigRepositoryProvider).getApiBaseUrl();
-    if (mounted) {
-      _urlController.text = url;
-    }
+    if (mounted) _urlController.text = url;
+  }
+
+  Future<void> _loadLogsUrl() async {
+    final url = await ref.read(appConfigRepositoryProvider).getLogsApiBaseUrl();
+    if (mounted) _logsUrlController.text = url;
   }
 
   @override
   void dispose() {
     _urlController.dispose();
+    _logsUrlController.dispose();
     super.dispose();
   }
 
@@ -72,11 +82,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<void> _saveLogsUrl() async {
+    final url = _logsUrlController.text.trim();
+    if (url.isEmpty) return;
+    setState(() => _logsUrlSaving = true);
+    await ref.read(appConfigRepositoryProvider).setLogsApiBaseUrl(url);
+    AppLogger.configure(url);
+    if (mounted) {
+      setState(() { _logsUrlSaving = false; _logsUrlDirty = false; });
+      showAppSnackBar(context, 'Logs API URL saved');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokenAsync = ref.watch(authTokenProvider);
     final isLoggedIn = tokenAsync != null && tokenAsync.isNotEmpty;
     final apiUrlAsync = ref.watch(apiBaseUrlProvider);
+    final logsUrlAsync = ref.watch(logsApiBaseUrlProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -125,6 +148,52 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 FilledButton(
                   onPressed: (_urlDirty && !_saving) ? _saveUrl : null,
                   child: _saving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Save'),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+          Text(
+            'Logs API Base URL',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'The address of the UtilityBillsServer instance that receives structured logs.\n'
+            '• Default: https://kwasi-utilitybills.duckdns.org',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 8),
+          logsUrlAsync.when(
+            loading: () => const LinearProgressIndicator(),
+            error: (e, _) => Text('Error: $e'),
+            data: (_) => Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _logsUrlController,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      hintText: kDefaultLogsApiBaseUrl,
+                    ),
+                    keyboardType: TextInputType.url,
+                    onChanged: (_) => setState(() => _logsUrlDirty = true),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: (_logsUrlDirty && !_logsUrlSaving) ? _saveLogsUrl : null,
+                  child: _logsUrlSaving
                       ? const SizedBox(
                           width: 16,
                           height: 16,

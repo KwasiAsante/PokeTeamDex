@@ -1,11 +1,18 @@
+import logging
+import time
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
+from app.core.logging import setup_logging
 from app.routers import admin, auth, folders, instances, ps_data, sync, teams
 from app.routers.teams import slots_router
+
+setup_logging(settings.logs_api_base_url)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="PokeTeamDex API",
@@ -32,6 +39,29 @@ app.include_router(slots_router)
 app.include_router(sync.router)
 app.include_router(ps_data.router)
 app.include_router(admin.router)
+
+
+@app.middleware("http")
+async def _log_requests(request: Request, call_next):
+    # Skip health-check and CORS preflight to keep logs clean.
+    if request.url.path == "/health" or request.method == "OPTIONS":
+        return await call_next(request)
+    start = time.perf_counter()
+    response = await call_next(request)
+    ms = (time.perf_counter() - start) * 1000
+    level = logging.WARNING if response.status_code >= 400 else logging.INFO
+    logger.log(level, "%s %s → %d (%.0fms)", request.method, request.url.path, response.status_code, ms)
+    return response
+
+
+@app.on_event("startup")
+async def _on_startup():
+    logger.info("PokeTeamDex backend started (version=%s)", settings.app_version)
+
+
+@app.on_event("shutdown")
+async def _on_shutdown():
+    logger.info("PokeTeamDex backend shutting down")
 
 
 # Ensure CORS headers are present on all error responses.
