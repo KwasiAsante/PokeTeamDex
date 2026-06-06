@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/repositories/app_config_repository.dart';
+import 'package:poke_team_dex/database/repositories/database_maintenance_repository.dart';
 import 'package:poke_team_dex/database/repositories/favorites_repository.dart';
 import 'package:poke_team_dex/database/repositories/pokemon_instance_repository.dart';
 import 'package:poke_team_dex/database/repositories/meta_repository.dart';
@@ -81,4 +82,9 @@ final maxBoxSizeProvider = StreamProvider<int>((ref) {
 
 final minimizeToTrayProvider = StreamProvider<bool>((ref) {
   return ref.watch(appConfigRepositoryProvider).watchMinimizeToTray();
+});
+
+final databaseMaintenanceRepositoryProvider =
+    Provider<DatabaseMaintenanceRepository>((ref) {
+  return DatabaseMaintenanceRepository(ref.read(appDatabaseProvider));
 });
