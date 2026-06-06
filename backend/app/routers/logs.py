@@ -15,11 +15,7 @@ async def device_logs(
     x_device_id: str = Header(...),
     x_level: str = Header(default="UNKNOWN"),
 ) -> dict:
-    """Accept a JSON array of log lines from a Flutter device and push to Loki.
-
-    Mirrors the UtilityBillsServer /logs/device interface so the Flutter
-    LogsServerOutput needs no changes beyond pointing at this backend.
-    """
+    """Accept a JSON array of log lines from a Flutter device and push to Loki."""
     if len(x_device_id) > 64:
         raise HTTPException(status_code=400, detail="x-device-id must be 64 characters or fewer")
 
