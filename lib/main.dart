@@ -171,6 +171,7 @@ class MyApp extends ConsumerStatefulWidget {
 class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   Timer? _periodicSync;
   TrayService? _trayService;
+  StreamSubscription<bool>? _minimizeToTraySub;
   final _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
@@ -196,6 +197,19 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           onQuit: _handleQuit,
         );
         await _trayService!.init();
+
+        // Apply the persisted setting, then watch for future changes.
+        final configRepo = ref.read(appConfigRepositoryProvider);
+        final initiallyEnabled = await configRepo.getMinimizeToTray();
+        if (initiallyEnabled) await _trayService!.enable();
+
+        _minimizeToTraySub = configRepo.watchMinimizeToTray().listen((enabled) {
+          if (enabled) {
+            _trayService?.enable();
+          } else {
+            _trayService?.disable();
+          }
+        });
       }
     });
 
@@ -228,6 +242,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _minimizeToTraySub?.cancel();
     _periodicSync?.cancel();
     _trayService?.dispose();
     WidgetsBinding.instance.removeObserver(this);

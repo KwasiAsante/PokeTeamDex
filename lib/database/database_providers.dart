@@ -78,3 +78,7 @@ final psDirectoryProvider = StreamProvider<String?>((ref) {
 final maxBoxSizeProvider = StreamProvider<int>((ref) {
   return ref.watch(appConfigRepositoryProvider).watchMaxBoxSize();
 });
+
+final minimizeToTrayProvider = StreamProvider<bool>((ref) {
+  return ref.watch(appConfigRepositoryProvider).watchMinimizeToTray();
+});
