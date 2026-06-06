@@ -2482,6 +2482,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     useSafeArea: true,
                     builder: (_) => InstancePickerSheet(
                       originSlot: slot,
+                      forwardDirection: false, // child role → show ancestors
                       onPick: (targetSlot) {
                         Navigator.of(context).pop();
                         _onLinkAsChild(slot, targetSlot);
@@ -2550,6 +2551,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     useSafeArea: true,
                     builder: (_) => InstancePickerSheet(
                       originSlot: slot,
+                      forwardDirection: true, // origin role → show evolutions
                       onPick: (targetSlot) {
                         Navigator.of(context).pop();
                         _onLinkAsOriginExisting(slot, targetSlot);

@@ -29,10 +29,15 @@ final slotsBySpeciesProvider =
         ref.watch(teamSlotRepositoryProvider).watchByPokemonId(pokemonId));
 
 /// Named record used as the family key for [linkableSlotsProvider].
+///
+/// [forwardDirection] controls which end of the evolution chain is shown:
+/// - true  → slot acts as ORIGIN, show forward-evolution (child) targets
+/// - false → slot acts as CHILD, show backward-evolution (origin/ancestor) targets
 typedef LinkableSlotParams = ({
   int originPokemonId,
   int currentSlotId,
   String? originFormName,
+  bool forwardDirection,
 });
 
 /// Returns all slots that are valid link targets for [params.originPokemonId].
@@ -55,29 +60,40 @@ final linkableSlotsProvider =
   final pokeApi = ref.read(pokeApiRepositoryProvider);
   final slotRepo = ref.read(teamSlotRepositoryProvider);
 
-  final (:forwardSpeciesIds, :originSpeciesId) =
-      await pokeApi.fetchForwardEvolutionInfo(params.originPokemonId);
+  // Resolve the valid species set depending on the picker role.
+  final Set<int> validSpeciesIds;
+  final int originSpeciesId;
+  Set<int> speciesWithSameForm = const {};
 
-  // For regional-form origins, pre-compute which forward species also carry
-  // the same regional form (e.g. Persian has an Alolan form → exclude its
-  // standard form from Alolan Meowth's results so only Alolan Persian appears).
-  final Set<int> speciesWithSameForm;
-  if (params.originFormName != null) {
-    final futures = forwardSpeciesIds
-        .where((id) => id != originSpeciesId)
-        .map((id) async {
-          final hasForm =
-              await pokeApi.fetchSpeciesHasForm(id, params.originFormName!);
-          return hasForm ? id : null;
-        });
-    final resolved = await Future.wait(futures);
-    speciesWithSameForm = resolved.whereType<int>().toSet();
+  if (params.forwardDirection) {
+    // Origin role → show slots of FORWARD (post-evolution) species.
+    final info = await pokeApi.fetchForwardEvolutionInfo(params.originPokemonId);
+    validSpeciesIds = info.forwardSpeciesIds;
+    originSpeciesId = info.originSpeciesId;
+
+    // Pre-compute which forward species also carry the origin's regional form
+    // so the standard-form slot for that species is suppressed (the regional
+    // form slot appears via the pokemonId > 10000 path instead).
+    if (params.originFormName != null) {
+      final futures = validSpeciesIds
+          .where((id) => id != originSpeciesId)
+          .map((id) async {
+            final hasForm =
+                await pokeApi.fetchSpeciesHasForm(id, params.originFormName!);
+            return hasForm ? id : null;
+          });
+      final resolved = await Future.wait(futures);
+      speciesWithSameForm = resolved.whereType<int>().toSet();
+    }
   } else {
-    speciesWithSameForm = const {};
+    // Child role → show slots of BACKWARD (pre-evolution / ancestor) species.
+    final info = await pokeApi.fetchBackwardEvolutionInfo(params.originPokemonId);
+    validSpeciesIds = info.ancestorSpeciesIds;
+    originSpeciesId = info.originSpeciesId;
+    // No speciesWithSameForm needed for backward direction.
   }
 
-  // Snapshot valid (non-deleted) team IDs so orphaned slots from previously
-  // hard-deleted teams are excluded even if their slot rows were not cleaned up.
+  // Snapshot valid (non-deleted) team IDs to exclude orphaned slot rows.
   final validTeams = await ref.read(teamRepositoryProvider).getAll();
   final validTeamIds = validTeams.map((t) => t.id).toSet();
 
@@ -85,7 +101,6 @@ final linkableSlotsProvider =
 
   return allSlots.where((s) {
     if (s.id == params.currentSlotId) return false;
-    // Exclude slots belonging to teams that no longer exist.
     if (!validTeamIds.contains(s.teamId)) return false;
 
     final candidatePokemonId = s.pokemonId;
@@ -93,25 +108,18 @@ final linkableSlotsProvider =
 
     if (candidatePokemonId <= 10000) {
       // Standard-form slot: speciesId == pokemonId.
-      if (!forwardSpeciesIds.contains(candidatePokemonId)) return false;
+      if (!validSpeciesIds.contains(candidatePokemonId)) return false;
 
       if (params.originFormName == null) {
-        // Standard-form origin → standard-form targets only.
         return candidateFormName == null;
       } else {
-        // Regional-form origin + standard-form candidate:
-        // Block same-species (would be a backward/same-species cross-form link).
+        // Regional-form origin:
         if (candidatePokemonId == originSpeciesId) return false;
-        // Block species that have the origin's form (those slots appear via
-        // the form-variant path below).
         if (speciesWithSameForm.contains(candidatePokemonId)) return false;
-        // Allow standard-form evolution targets (e.g. Perrserker for Galarian Meowth).
         return candidateFormName == null;
       }
     } else {
-      // Form-variant slot (pokemonId > 10000): require a non-null formName
-      // matching the origin's. Slots with null formName are anomalous and
-      // excluded to prevent false positives from unrelated species.
+      // Form-variant slot (pokemonId > 10000): require matching non-null formName.
       if (candidateFormName == null) return false;
       return candidateFormName == params.originFormName;
     }

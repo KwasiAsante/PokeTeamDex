@@ -187,6 +187,24 @@ class PokeApiRepository {
     return (forwardSpeciesIds: forward, originSpeciesId: originSpeciesId);
   }
 
+  /// Returns all species IDs on the ancestor path from the chain root DOWN TO
+  /// [originPokemonId] (inclusive). Used by the child-role picker to show only
+  /// valid pre-evolution origin slots — e.g. Electivire's ancestors are
+  /// {Elekid, Electabuzz, Electivire}, not its (nonexistent) evolutions.
+  Future<({Set<int> ancestorSpeciesIds, int originSpeciesId})>
+      fetchBackwardEvolutionInfo(int originPokemonId) async {
+    final originSpeciesId = await _getSpeciesIdForPokemon(originPokemonId);
+    final species = await fetchPokemonSpecies(originSpeciesId);
+    final chainId = species.evolutionChainId;
+    if (chainId == null) {
+      return (ancestorSpeciesIds: {originSpeciesId}, originSpeciesId: originSpeciesId);
+    }
+    final root = await fetchEvolutionChain(chainId);
+    final path = _findPathTo(root, originSpeciesId, []);
+    final ancestors = path != null ? path.toSet() : {originSpeciesId};
+    return (ancestorSpeciesIds: ancestors, originSpeciesId: originSpeciesId);
+  }
+
   /// Returns true if [speciesId]'s varieties include a form whose name ends
   /// with '-[formName]'. Used to determine whether a forward-evolution species
   /// has a regional counterpart for the origin's form.
@@ -207,6 +225,18 @@ class PokeApiRepository {
     final speciesId = int.parse(segments.lastWhere((s) => s.isNotEmpty));
     _pokeApiCache.putWithTTL(cacheKey, speciesId, const Duration(days: 7));
     return speciesId;
+  }
+
+  /// Returns the path of species IDs from [node] down to [targetSpeciesId]
+  /// (inclusive), or null if the target is not in this subtree.
+  List<int>? _findPathTo(EvolutionNode node, int targetSpeciesId, List<int> path) {
+    final current = [...path, node.speciesId];
+    if (node.speciesId == targetSpeciesId) return current;
+    for (final child in node.evolvesTo) {
+      final result = _findPathTo(child, targetSpeciesId, current);
+      if (result != null) return result;
+    }
+    return null;
   }
 
   /// Finds [originSpeciesId] in the tree rooted at [node] and returns all

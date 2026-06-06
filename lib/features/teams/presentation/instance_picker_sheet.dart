@@ -14,11 +14,17 @@ import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
 /// creating / chaining the instance records.
 class InstancePickerSheet extends ConsumerWidget {
   final TeamSlot originSlot;
+
+  /// true  → current slot is the ORIGIN; show forward-evolution (child) candidates.
+  /// false → current slot is the CHILD;  show backward-evolution (origin) candidates.
+  final bool forwardDirection;
+
   final void Function(TeamSlot slot) onPick;
 
   const InstancePickerSheet({
     super.key,
     required this.originSlot,
+    required this.forwardDirection,
     required this.onPick,
   });
 
@@ -28,6 +34,7 @@ class InstancePickerSheet extends ConsumerWidget {
       originPokemonId: originSlot.pokemonId,
       currentSlotId: originSlot.id,
       originFormName: originSlot.formName,
+      forwardDirection: forwardDirection,
     );
     final slotsAsync = ref.watch(linkableSlotsProvider(params));
     final teamsAsync = ref.watch(allTeamsProvider);
