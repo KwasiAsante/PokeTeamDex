@@ -55,6 +55,7 @@ final abilitiesForGenProvider =
 
 /// Validates a single slot against the team's format (Layer 1 only).
 /// Fetches pokemon data internally to access version_group learnsets.
+/// Prior-evolution-exclusive moves are excluded from violations.
 final slotValidationProvider = FutureProvider.autoDispose
     .family<SlotValidation, ({TeamSlot slot, String formatId})>(
         (ref, args) async {
@@ -65,5 +66,29 @@ final slotValidationProvider = FutureProvider.autoDispose
   final pokemon = await ref.watch(
       pokemonDetailProvider(args.slot.pokemonId).future);
   final moves = pokemon.moves.cast<Map<String, dynamic>>();
-  return validateSlot(args.slot, pokemon.name, moves, format, svc);
+  final base = await validateSlot(args.slot, pokemon.name, moves, format, svc);
+  if (base.isValid) return base;
+
+  // Fetch prior-evo move sets and suppress move violations for exclusive moves.
+  final priorEvoSets = await ref.watch(
+      priorEvoMoveSetsProvider(args.slot.pokemonId).future);
+  if (priorEvoSets.isEmpty) return base;
+  final priorEvoMoves = buildPriorEvoExclusiveMoveNames(
+    currentMoves: moves,
+    ancestorMoveLists: priorEvoSets.map((s) => s.moves).toList(),
+    format: format,
+    pokemonName: pokemon.name,
+    formatService: svc,
+  );
+  if (priorEvoMoves.isEmpty) return base;
+
+  final filtered = {
+    for (final entry in base.violations.entries)
+      if (!entry.key.startsWith('move') ||
+          !priorEvoMoves.contains(
+              [args.slot.move1, args.slot.move2, args.slot.move3, args.slot.move4]
+                  [int.parse(entry.key.substring(4)) - 1]))
+        entry.key: entry.value,
+  };
+  return SlotValidation(filtered);
 });
