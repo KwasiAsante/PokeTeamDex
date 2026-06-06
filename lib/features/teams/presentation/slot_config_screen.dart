@@ -2481,8 +2481,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     isScrollControlled: true,
                     useSafeArea: true,
                     builder: (_) => InstancePickerSheet(
-                      pokemonId: slot.pokemonId,
-                      currentSlotId: slot.id,
+                      originSlot: slot,
                       onPick: (targetSlot) {
                         Navigator.of(context).pop();
                         _onLinkAsChild(slot, targetSlot);
@@ -2550,8 +2549,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     isScrollControlled: true,
                     useSafeArea: true,
                     builder: (_) => InstancePickerSheet(
-                      pokemonId: slot.pokemonId,
-                      currentSlotId: slot.id,
+                      originSlot: slot,
                       onPick: (targetSlot) {
                         Navigator.of(context).pop();
                         _onLinkAsOriginExisting(slot, targetSlot);
