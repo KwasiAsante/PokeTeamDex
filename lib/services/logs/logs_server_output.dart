@@ -7,6 +7,7 @@ import 'package:logger/logger.dart';
 
 /// Posts buffered log lines to the PokeTeamDex backend /logs/device endpoint.
 /// Flushes every [flushInterval] or when [batchSize] lines accumulate.
+/// Lines are grouped by level so each push carries the correct x-level label.
 /// Drops silently on any network/server failure.
 class LogsServerOutput extends LogOutput {
   LogsServerOutput({
@@ -20,7 +21,9 @@ class LogsServerOutput extends LogOutput {
   // Mutable URL — updated after the DB is ready via [updateLogsUrl].
   String _logsBaseUrl = 'https://poketeamdex.duckdns.org';
   String? _token;
-  final List<String> _buffer = [];
+
+  // Buffer keyed by level so each flush sends correct x-level per group.
+  final Map<Level, List<String>> _buffer = {};
   Timer? _flushTimer;
 
   static String get _deviceId {
@@ -50,8 +53,9 @@ class LogsServerOutput extends LogOutput {
 
   @override
   void output(OutputEvent event) {
-    _buffer.addAll(event.lines);
-    if (_buffer.length >= batchSize) _flush();
+    _buffer.putIfAbsent(event.level, () => []).addAll(event.lines);
+    final total = _buffer.values.fold(0, (sum, lines) => sum + lines.length);
+    if (total >= batchSize) _flush();
   }
 
   @override
@@ -62,12 +66,16 @@ class LogsServerOutput extends LogOutput {
 
   void _flush() {
     if (_buffer.isEmpty) return;
-    final lines = List<String>.from(_buffer);
+    final snapshot = Map<Level, List<String>>.from(
+      _buffer.map((k, v) => MapEntry(k, List<String>.from(v))),
+    );
     _buffer.clear();
-    _send(lines);
+    for (final entry in snapshot.entries) {
+      if (entry.value.isNotEmpty) _send(entry.value, entry.key);
+    }
   }
 
-  void _send(List<String> lines) {
+  void _send(List<String> lines, Level level) {
     final token = _token;
     if (token == null || token.isEmpty) return;
     final uri = Uri.parse('$_logsBaseUrl/logs/device')
@@ -79,6 +87,7 @@ class LogsServerOutput extends LogOutput {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
             'x-device-id': _deviceId,
+            'x-level': level.name.toUpperCase(),
           },
           body: jsonEncode(lines),
         )
