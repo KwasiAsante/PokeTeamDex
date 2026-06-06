@@ -788,25 +788,30 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     return groups;
   }
 
-  /// All move names the current Pokémon can learn in ANY version group.
-  Set<String> get _currentAllMoveNames => {
-    for (final m in widget.pokemon.moves)
-      (m['move'] as Map)['name'] as String,
-  };
-
   /// For each ancestor, returns exclusive move rows learnable in [selectedVg]
-  /// that the current Pokémon can NEVER learn.
+  /// that the current Pokémon cannot learn in [selectedVg].
   List<({String speciesName, List<_MoveRow> rows})> _buildPriorEvoGroups(
     String? selectedVg,
     List<({String speciesName, List<Map<String, dynamic>> moves})> ancestorSets,
   ) {
-    final currentAll = _currentAllMoveNames;
+    // Moves the current Pokémon can learn in the selected version group.
+    final currentInVg = <String>{};
+    for (final m in widget.pokemon.moves) {
+      final moveName = (m['move'] as Map)['name'] as String;
+      for (final vgd in m['version_group_details'] as List) {
+        final vg = ((vgd as Map)['version_group'] as Map)['name'] as String;
+        if (selectedVg == null || vg == selectedVg) {
+          currentInVg.add(moveName);
+          break;
+        }
+      }
+    }
     final groups = <({String speciesName, List<_MoveRow> rows})>[];
     for (final ancestor in ancestorSets) {
       final rows = <_MoveRow>[];
       for (final m in ancestor.moves) {
         final moveName = (m['move'] as Map)['name'] as String;
-        if (currentAll.contains(moveName)) continue;
+        if (currentInVg.contains(moveName)) continue;
         for (final vgd in m['version_group_details'] as List) {
           final vg = ((vgd as Map)['version_group'] as Map)['name'] as String;
           if (selectedVg != null && vg != selectedVg) continue;
