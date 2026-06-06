@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:poke_team_dex/services/format/format_models.dart';
 
 const _versionsBase = 'https://raw.githubusercontent.com/PokeAPI/sprites/'
@@ -82,7 +83,7 @@ bool _needsTransparentSubfolder(int gen) => gen <= 2;
 
       // Shiny URL path differs by generation:
       //   Animated (Gen 5): versions/{path}/animated/shiny/{id}.gif
-      //   Transparent (Gen 2): versions/{path}/shiny/transparent/{id}.png
+      //   Gen 2: Showdown gen2-shiny/{name}.png (non-web) or PokeAPI shiny/{id}.png (web)
       //   Regular (Gen 3-4): versions/{path}/shiny/{id}.png
       final String shinyUrl;
       if (noShiny) {
@@ -90,7 +91,12 @@ bool _needsTransparentSubfolder(int gen) => gen <= 2;
       } else if (isAnimated) {
         shinyUrl = '$_versionsBase/$versionPath/${animSeg}shiny/$pokemonId$ext';
       } else if (transparent.isNotEmpty) {
-        shinyUrl = '$_versionsBase/$versionPath/shiny/$transparent$pokemonId$ext';
+        // PokeAPI has no transparent/shiny subfolder for Gen 2.
+        // On non-web: use Pokémon Showdown which has transparent Gen 2 shiny sprites.
+        // On web: fall back to PokeAPI non-transparent shiny (Showdown is CORS-blocked in browsers).
+        shinyUrl = kIsWeb
+            ? '$_versionsBase/$versionPath/shiny/$pokemonId$ext'
+            : 'https://play.pokemonshowdown.com/sprites/gen2-shiny/$pokemonName.png';
       } else {
         shinyUrl = '$_versionsBase/$versionPath/shiny/$pokemonId$ext';
       }
