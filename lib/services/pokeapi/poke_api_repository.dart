@@ -259,6 +259,28 @@ class PokeApiRepository {
     return ids;
   }
 
+  /// Returns each ancestor Pokémon's display name and raw moves list, in chain
+  /// order (oldest first). Returns an empty list if [pokemonId] has no prior
+  /// evolutions (e.g. unevolved or a baby with no pre-baby).
+  Future<List<({String speciesName, List<Map<String, dynamic>> moves})>>
+      fetchPriorEvoMoveSets(int pokemonId) async {
+    final speciesId = await _getSpeciesIdForPokemon(pokemonId);
+    final species = await fetchPokemonSpecies(speciesId);
+    final chainId = species.evolutionChainId;
+    if (chainId == null) return [];
+    final root = await fetchEvolutionChain(chainId);
+    final path = _findPathTo(root, speciesId, []);
+    if (path == null || path.length <= 1) return [];
+    // All species IDs that precede the current one in the evolution path.
+    final ancestorIds = path.sublist(0, path.length - 1);
+    final result = <({String speciesName, List<Map<String, dynamic>> moves})>[];
+    for (final ancestorId in ancestorIds) {
+      final pokemon = await fetchPokemon(ancestorId);
+      result.add((speciesName: pokemon.name, moves: pokemon.moves));
+    }
+    return result;
+  }
+
   Future<MoveEntry> fetchMove(String name) async {
     final cacheKey = 'move_$name';
     final cached = _pokeApiCache.getIfValid(cacheKey);

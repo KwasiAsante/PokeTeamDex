@@ -788,11 +788,56 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     return groups;
   }
 
+  /// All move names the current Pokémon can learn in ANY version group.
+  Set<String> get _currentAllMoveNames => {
+    for (final m in widget.pokemon.moves)
+      (m['move'] as Map)['name'] as String,
+  };
+
+  /// For each ancestor, returns exclusive move rows learnable in [selectedVg]
+  /// that the current Pokémon can NEVER learn.
+  List<({String speciesName, List<_MoveRow> rows})> _buildPriorEvoGroups(
+    String? selectedVg,
+    List<({String speciesName, List<Map<String, dynamic>> moves})> ancestorSets,
+  ) {
+    final currentAll = _currentAllMoveNames;
+    final groups = <({String speciesName, List<_MoveRow> rows})>[];
+    for (final ancestor in ancestorSets) {
+      final rows = <_MoveRow>[];
+      for (final m in ancestor.moves) {
+        final moveName = (m['move'] as Map)['name'] as String;
+        if (currentAll.contains(moveName)) continue;
+        for (final vgd in m['version_group_details'] as List) {
+          final vg = ((vgd as Map)['version_group'] as Map)['name'] as String;
+          if (selectedVg != null && vg != selectedVg) continue;
+          final level = vgd['level_learned_at'] as int? ?? 0;
+          if (!rows.any((r) => r.moveName == moveName)) {
+            rows.add(_MoveRow(moveName: moveName, level: level));
+          }
+          break;
+        }
+      }
+      rows.sort((a, b) => a.moveName.compareTo(b.moveName));
+      if (rows.isNotEmpty) {
+        groups.add((speciesName: ancestor.speciesName, rows: rows));
+      }
+    }
+    return groups;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     final versions = _versions;
     _selectedVersion ??= versions.isNotEmpty ? versions.first : null;
     final grouped = _grouped(_selectedVersion);
+
+    final priorEvoAsync = ref.watch(priorEvoMoveSetsProvider(widget.pokemon.id));
+    final priorEvoGroups = priorEvoAsync.whenOrNull(
+      data: (sets) => _buildPriorEvoGroups(_selectedVersion, sets),
+    ) ?? const [];
 
     return Column(
       children: [
@@ -818,28 +863,67 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
           ),
         const Divider(height: 1),
         Expanded(
-          child: grouped.isEmpty
+          child: (grouped.isEmpty && priorEvoGroups.isEmpty)
               ? const EmptyState(
                   icon: Icons.search_off,
                   title: 'No moves found',
                   subtitle: 'Try selecting a different game version.',
                 )
               : ListView(
-                  children: _methodOrder
-                      .where((m) => grouped.containsKey(m))
-                      .map((method) {
-                    final rows = grouped[method]!;
-                    return _MoveGroup(
-                      label: _methodLabels[method] ?? method,
-                      rows: rows,
-                      showLevel: method == 'level-up',
-                    );
-                  }).toList(),
+                  children: [
+                    ..._methodOrder
+                        .where((m) => grouped.containsKey(m))
+                        .map((method) => _MoveGroup(
+                              label: _methodLabels[method] ?? method,
+                              rows: grouped[method]!,
+                              showLevel: method == 'level-up',
+                            )),
+                    if (priorEvoGroups.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
+                        child: Row(
+                          children: [
+                            Icon(Icons.history_edu_outlined,
+                                size: 16, color: colorScheme.tertiary),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Prior Evolution Exclusive',
+                              style: textTheme.titleSmall?.copyWith(
+                                color: colorScheme.tertiary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '— must be learned before evolving',
+                                style: textTheme.labelSmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1, indent: 16),
+                      for (final g in priorEvoGroups)
+                        _MoveGroup(
+                          label: _fmtSpeciesName(g.speciesName),
+                          rows: g.rows,
+                          showLevel: false,
+                        ),
+                    ],
+                  ],
                 ),
         ),
       ],
     );
   }
+
+  static String _fmtSpeciesName(String name) => name
+      .split('-')
+      .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+      .join(' ');
 }
 
 class _MoveRow {

@@ -221,6 +221,30 @@ Set<String> _buildLearnset(
   return result;
 }
 
+/// Returns move names learnable by any prior evolution (in [ancestorMoveLists])
+/// for [format] that the current Pokémon ([currentMoves]) cannot learn in
+/// [format]. These are moves that must be learned before the Pokémon evolves.
+///
+/// [pokemonName] and [formatService] are forwarded to [buildLearnsetForFormat]
+/// for the PS supplementary learnset cross-check.
+Set<String> buildPriorEvoExclusiveMoveNames({
+  required List<Map<String, dynamic>> currentMoves,
+  required List<List<Map<String, dynamic>>> ancestorMoveLists,
+  required GameFormat format,
+  String? pokemonName,
+  FormatService? formatService,
+}) {
+  final current = buildLearnsetForFormat(
+    currentMoves, format,
+    pokemonName: pokemonName, formatService: formatService,
+  );
+  final ancestorAll = <String>{};
+  for (final aMoves in ancestorMoveLists) {
+    ancestorAll.addAll(buildLearnsetForFormat(aMoves, format));
+  }
+  return ancestorAll.difference(current);
+}
+
 /// PokéAPI uses hyphenated names ("choice-specs"); PS ids strip hyphens ("choicespecs").
 String _toPsId(String pokeApiName) => pokeApiName.replaceAll('-', '').toLowerCase();
 
