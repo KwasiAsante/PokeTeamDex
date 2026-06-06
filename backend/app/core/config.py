@@ -19,6 +19,10 @@ class Settings(BaseSettings):
 
     # Structured logging — UtilityBillsServer endpoint
     logs_api_base_url: str = "https://kwasi-utilitybills.duckdns.org"
+    # Service account credentials for authenticating with UtilityBillsServer
+    # Leave empty to skip auth (works when UtilityBillsServer has no users registered)
+    logs_api_email: str = ""
+    logs_api_password: str = ""
 
 
 settings = Settings()

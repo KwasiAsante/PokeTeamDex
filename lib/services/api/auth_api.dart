@@ -25,4 +25,15 @@ class AuthApi {
     );
     return res.data!['access_token'] as String;
   }
+
+  /// Fetch the cached UtilityBillsServer session token from the backend.
+  /// Returns null if the backend has not yet authenticated (503) or on any error.
+  Future<String?> getLogsToken() async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('/meta/logs-token');
+      return res.data?['token'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
 }

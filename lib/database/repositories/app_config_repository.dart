@@ -4,6 +4,7 @@ import 'package:poke_team_dex/database/app_database.dart';
 
 const _kApiBaseUrl = 'api_base_url';
 const _kLogsApiBaseUrl = 'logs_api_base_url';
+const _kLogsApiToken = 'logs_api_token';
 const _kUseFormatSprites = 'use_format_sprites';
 const _kSeedColor = 'seed_color';
 const _kThemeMode = 'theme_mode';
@@ -62,6 +63,18 @@ class AppConfigRepository {
 
   Stream<String> watchLogsApiBaseUrl() =>
       watch(_kLogsApiBaseUrl).map((v) => v ?? kDefaultLogsApiBaseUrl);
+
+  // ── Logs API token ─────────────────────────────────────────────────────────
+
+  Future<String?> getLogsApiToken() => get(_kLogsApiToken);
+
+  Future<void> setLogsApiToken(String token) => set(_kLogsApiToken, token);
+
+  Future<void> clearLogsApiToken() async {
+    await (_db.delete(_db.appConfigs)
+          ..where((c) => c.key.equals(_kLogsApiToken)))
+        .go();
+  }
 
   // ── Sprite style ──────────────────────────────────────────────────────────
 

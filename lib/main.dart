@@ -179,11 +179,13 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       ref.read(authTokenProvider.notifier).state = widget.initialToken ?? '';
 
-      // Wire the dynamic logs URL from the DB into the singleton logger.
+      // Wire the dynamic logs URL and cached token from the DB.
       final configRepo = ref.read(appConfigRepositoryProvider);
       final logsUrl = await configRepo.getLogsApiBaseUrl();
       AppLogger.configure(logsUrl);
       configRepo.watchLogsApiBaseUrl().listen(AppLogger.configure);
+      final logsToken = await configRepo.getLogsApiToken();
+      AppLogger.configureToken(logsToken);
 
       // Initialize system tray after the first frame so the window is ready.
       if (TrayService.isSupported) {

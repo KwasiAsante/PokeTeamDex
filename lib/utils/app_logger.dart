@@ -46,6 +46,11 @@ class AppLogger {
     _instance._serverOutput.updateLogsUrl(url);
   }
 
+  /// Update the UtilityBillsServer Bearer token (called after login/register).
+  static void configureToken(String? token) {
+    _instance._serverOutput.updateToken(token);
+  }
+
   void d(String message, {Object? error, StackTrace? stackTrace}) =>
       _logger.d(message, error: error, stackTrace: stackTrace);
 

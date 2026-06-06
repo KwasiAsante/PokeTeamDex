@@ -17,8 +17,9 @@ class LogsServerOutput extends LogOutput {
   final Duration flushInterval;
   final int batchSize;
 
-  // Mutable URL — updated after the DB is ready via [updateLogsUrl].
+  // Mutable URL and token — updated after DB/auth are ready.
   String _logsBaseUrl = 'https://kwasi-utilitybills.duckdns.org';
+  String? _token;
   final List<String> _buffer = [];
   Timer? _flushTimer;
 
@@ -36,6 +37,10 @@ class LogsServerOutput extends LogOutput {
 
   void updateLogsUrl(String url) {
     _logsBaseUrl = url.isEmpty ? 'https://kwasi-utilitybills.duckdns.org' : url;
+  }
+
+  void updateToken(String? token) {
+    _token = (token == null || token.isEmpty) ? null : token;
   }
 
   @override
@@ -65,15 +70,15 @@ class LogsServerOutput extends LogOutput {
   void _send(List<String> lines) {
     final uri = Uri.parse('$_logsBaseUrl/logs/device')
         .replace(queryParameters: {'app_name': 'poketeamdex'});
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'x-device-id': _deviceId,
+    };
+    if (_token != null) {
+      headers['authorization'] = 'Bearer $_token';
+    }
     http
-        .post(
-          uri,
-          headers: {
-            'Content-Type': 'application/json',
-            'x-device-id': _deviceId,
-          },
-          body: jsonEncode(lines),
-        )
+        .post(uri, headers: headers, body: jsonEncode(lines))
         .timeout(const Duration(seconds: 5))
         .ignore();
   }
