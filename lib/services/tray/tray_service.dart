@@ -11,9 +11,10 @@ import 'package:window_manager/window_manager.dart';
 /// of terminating the process, so the 15-minute periodic sync timer keeps
 /// running in the background.
 class TrayService with TrayListener, WindowListener {
-  TrayService({required this.onSyncNow});
+  TrayService({required this.onSyncNow, required this.onQuit});
 
   final VoidCallback onSyncNow;
+  final Future<void> Function() onQuit;
 
   bool _initialized = false;
 
@@ -96,8 +97,7 @@ class TrayService with TrayListener, WindowListener {
       case 'sync':
         onSyncNow();
       case 'quit':
-        await trayManager.destroy();
-        await windowManager.destroy();
+        await onQuit();
     }
   }
 }
