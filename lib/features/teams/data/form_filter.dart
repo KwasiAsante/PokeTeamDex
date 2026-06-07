@@ -1,8 +1,8 @@
 // Form chip filtering rules for the slot config form selector.
 //
 // Rules:
-// 1. Always exclude: mega, primal, gmax, gender forms — handled by separate
-//    toggles or the gender selector.
+// 1. Always exclude: mega, gmax, gender forms — handled by separate toggles
+//    or the gender selector.
 // 2. Ability-gated: form chip shown only when the required ability is selected.
 // 3. Item-gated: form chip shown only when the required item is held.
 // 4. Everything else: shown freely as a chip.
@@ -10,9 +10,16 @@
 // ── Always-exclude patterns ────────────────────────────────────────────────
 
 /// Form name suffixes that should never appear as chips.
+///
+/// Primal Reversion (`-primal`) is deliberately NOT here — unlike Mega
+/// Evolution (an optional in-battle action the trainer chooses to trigger,
+/// modelled as a separate toggle), Primal Reversion happens automatically
+/// and unavoidably whenever Primal Groudon/Kyogre enters battle holding its
+/// orb. That makes it mechanically identical to Giratina's Origin Forme —
+/// an automatic, item-bound form change — so it's gated the same way, via
+/// [kItemGatedForms] below.
 const Set<String> kExcludeFormSuffixes = {
   '-mega', '-mega-x', '-mega-y', '-mega-z',
-  '-primal',
   '-gmax',
   '-eternamax',
   '-female',       // Gender forms — handled by gender selector
@@ -62,6 +69,8 @@ const Map<String, Set<String>> kItemGatedForms = {
   'calyrex-shadow-rider':  {'reins-of-unity'},
   'dialga-origin':         {'adamant-crystal'},
   'palkia-origin':         {'lustrous-globe'},
+  'groudon-primal':        {'red-orb'},
+  'kyogre-primal':         {'blue-orb'},
 };
 
 /// Arceus type forms each need the matching plate.

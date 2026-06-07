@@ -695,9 +695,10 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final cosmeticFormEntries =
             cosmeticFormsAsync.asData?.value ?? const <PokemonFormEntry>[];
         final cosmeticForms = cosmeticFormEntries.map((f) => f.name).toList();
-        // Filter: exclude mega/primal/gmax/gender; gate ability/item forms
-        // on their prerequisite being selected. Variety-based and cosmetic
-        // candidates run through the same gating rules.
+        // Filter: exclude mega/gmax/gender; gate ability/item forms (incl.
+        // Primal Reversion via the Red/Blue Orb) on their prerequisite being
+        // selected. Variety-based and cosmetic candidates run through the
+        // same gating rules.
         final availableForms = filterFormChips(
           varieties: allVarieties,
           cosmeticForms: cosmeticForms,
