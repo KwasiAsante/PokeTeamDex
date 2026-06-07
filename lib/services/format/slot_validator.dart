@@ -165,13 +165,19 @@ Set<String> buildLearnsetForFormat(
 }) {
   final result = _buildLearnset(pokemonMoves, format);
 
-  // PS supplementary pass — catches moves PokéAPI links to the wrong gen.
+  // PS supplementary pass — catches moves PokéAPI links to the wrong gen,
+  // plus genuine event/gift-Pokémon moves PokéAPI has no category for at all
+  // (e.g. Pokémon Crystal's gift Dratini knowing Extreme Speed from the
+  // start — `eventMovesForGen` surfaces it via PS's detailed-learnset source
+  // even though it never appears in Dratini's PokéAPI moves list for any
+  // Gen-2 version group).
   if (pokemonName != null &&
       formatService != null &&
       formatService.isInitialized) {
-    final psMoveIds = formatService
-        .learnsetForGen(pokemonName.toLowerCase(), format.gen)
-        .toSet();
+    final psMoveIds = {
+      ...formatService.learnsetForGen(pokemonName.toLowerCase(), format.gen),
+      ...formatService.eventMovesForGen(pokemonName.toLowerCase(), format.gen),
+    };
     if (psMoveIds.isNotEmpty) {
       for (final moveData in pokemonMoves) {
         final moveName = (moveData['move'] as Map)['name'] as String;

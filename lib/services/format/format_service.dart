@@ -21,18 +21,27 @@ class FormatService {
   Map<String, PsMoveEntry> _moves = {};
   Map<String, PsItemEntry> _items = {};
   Map<String, PsAbilityEntry> _abilities = {};
+  /// Full-fidelity learnset data built from PS's raw source files —
+  /// supplements [_learnsets] with genuine event/gift-Pokémon movesets
+  /// (`eventData`) and full source-code strings (so "S" = event sources can
+  /// be told apart from level-up/egg/tutor/machine). PokéAPI has no
+  /// equivalent category for event movesets at all.
+  /// Maps pokémon name → (move name → full source-code strings, e.g. "2S1").
+  Map<String, Map<String, List<String>>> _detailedLearnsets = {};
+  Map<String, List<PsEventEntry>> _eventData = {};
   bool _initialized = false;
 
   bool get isInitialized => _initialized;
 
   // Hive box keys
   static const _boxName = 'ps_data';
-  static const _keyLearnsets   = 'learnsets';
-  static const _keyG6Allowlist = 'learnsets_g6_allowlist';
-  static const _keyMoves       = 'moves';
-  static const _keyItems       = 'items';
-  static const _keyAbilities   = 'abilities';
-  static const _keyVersion     = 'version';
+  static const _keyLearnsets        = 'learnsets';
+  static const _keyG6Allowlist      = 'learnsets_g6_allowlist';
+  static const _keyMoves            = 'moves';
+  static const _keyItems            = 'items';
+  static const _keyAbilities        = 'abilities';
+  static const _keyEventLearnsets   = 'event_learnsets';
+  static const _keyVersion          = 'version';
 
   // ---------------------------------------------------------------------------
   // Initialization
@@ -44,15 +53,17 @@ class FormatService {
     final box = await Hive.openBox<String>(_boxName);
 
     // 1. Load from Hive cache if available, otherwise fall back to bundled assets.
-    final learnsets   = await _loadJson(box, _keyLearnsets,   'assets/data/ps/learnsets.json');
-    final g6Allowlist = await _loadJson(box, _keyG6Allowlist, 'assets/data/ps/learnsets-g6-allowlist.json');
-    final moves       = await _loadJson(box, _keyMoves,       'assets/data/ps/moves.json');
-    final items       = await _loadJson(box, _keyItems,       'assets/data/ps/items.json');
-    final abilities   = await _loadJson(box, _keyAbilities,   'assets/data/ps/abilities.json');
-    final formatsRaw  = await _loadAsset('assets/data/ps/formats.json');
+    final learnsets       = await _loadJson(box, _keyLearnsets,      'assets/data/ps/learnsets.json');
+    final g6Allowlist     = await _loadJson(box, _keyG6Allowlist,    'assets/data/ps/learnsets-g6-allowlist.json');
+    final moves           = await _loadJson(box, _keyMoves,          'assets/data/ps/moves.json');
+    final items           = await _loadJson(box, _keyItems,          'assets/data/ps/items.json');
+    final abilities       = await _loadJson(box, _keyAbilities,      'assets/data/ps/abilities.json');
+    final eventLearnsets  = await _loadJson(box, _keyEventLearnsets, 'assets/data/ps/event_learnsets.json');
+    final formatsRaw      = await _loadAsset('assets/data/ps/formats.json');
 
     _parseAll(learnsets, moves, items, abilities, formatsRaw);
     _parseG6Allowlist(g6Allowlist);
+    _parseEventLearnsets(eventLearnsets);
     _initialized = true;
 
     // 2. Check for updates in the background (non-blocking).
@@ -76,6 +87,36 @@ class FormatService {
           MapEntry(k, (v as List).cast<String>().toSet()));
     } catch (_) {
       _g6Allowlist = {};
+    }
+  }
+
+  /// Parses `event_learnsets.json` — built from PS's raw learnset sources.
+  /// Format: { "dratini": { "learnset": {"extremespeed": ["2S1","4E",...]},
+  ///                        "eventData": [{"generation": 2, "level": 15, ...}] } }
+  void _parseEventLearnsets(String raw) {
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final learnsets = <String, Map<String, List<String>>>{};
+      final events = <String, List<PsEventEntry>>{};
+      for (final entry in map.entries) {
+        final data = entry.value as Map<String, dynamic>;
+        final learnset = data['learnset'] as Map<String, dynamic>?;
+        if (learnset != null) {
+          learnsets[entry.key] = learnset.map(
+              (move, codes) => MapEntry(move, (codes as List).cast<String>()));
+        }
+        final eventData = data['eventData'] as List?;
+        if (eventData != null && eventData.isNotEmpty) {
+          events[entry.key] = eventData
+              .map((e) => PsEventEntry.fromJson(e as Map<String, dynamic>))
+              .toList();
+        }
+      }
+      _detailedLearnsets = learnsets;
+      _eventData = events;
+    } catch (_) {
+      _detailedLearnsets = {};
+      _eventData = {};
     }
   }
 
@@ -140,10 +181,11 @@ class FormatService {
 
       // Download each file that has changed.
       final fileMap = {
-        _keyLearnsets: ('learnsets.json', 'assets/data/ps/learnsets.json'),
-        _keyMoves:     ('moves.json',     'assets/data/ps/moves.json'),
-        _keyItems:     ('items.json',     'assets/data/ps/items.json'),
-        _keyAbilities: ('abilities.json', 'assets/data/ps/abilities.json'),
+        _keyLearnsets:      ('learnsets.json',       'assets/data/ps/learnsets.json'),
+        _keyMoves:          ('moves.json',           'assets/data/ps/moves.json'),
+        _keyItems:          ('items.json',           'assets/data/ps/items.json'),
+        _keyAbilities:      ('abilities.json',       'assets/data/ps/abilities.json'),
+        _keyEventLearnsets: ('event_learnsets.json', 'assets/data/ps/event_learnsets.json'),
       };
 
       bool anyUpdated = false;
@@ -161,12 +203,14 @@ class FormatService {
       if (anyUpdated) {
         await box.put(_keyVersion, jsonEncode(remoteSha));
         // Re-parse with the updated data.
-        final learnsets  = box.get(_keyLearnsets)  ?? await _loadAsset('assets/data/ps/learnsets.json');
-        final moves      = box.get(_keyMoves)      ?? await _loadAsset('assets/data/ps/moves.json');
-        final items      = box.get(_keyItems)      ?? await _loadAsset('assets/data/ps/items.json');
-        final abilities  = box.get(_keyAbilities)  ?? await _loadAsset('assets/data/ps/abilities.json');
-        final formats    = await _loadAsset('assets/data/ps/formats.json');
+        final learnsets      = box.get(_keyLearnsets)      ?? await _loadAsset('assets/data/ps/learnsets.json');
+        final moves          = box.get(_keyMoves)          ?? await _loadAsset('assets/data/ps/moves.json');
+        final items          = box.get(_keyItems)          ?? await _loadAsset('assets/data/ps/items.json');
+        final abilities      = box.get(_keyAbilities)      ?? await _loadAsset('assets/data/ps/abilities.json');
+        final eventLearnsets = box.get(_keyEventLearnsets) ?? await _loadAsset('assets/data/ps/event_learnsets.json');
+        final formats        = await _loadAsset('assets/data/ps/formats.json');
         _parseAll(learnsets, moves, items, abilities, formats);
+        _parseEventLearnsets(eventLearnsets);
       }
     } catch (_) {
       // Version check is best-effort; silently ignore network errors.
@@ -212,6 +256,68 @@ class FormatService {
       if (genMoves != null) moves.addAll(genMoves);
     }
     return moves.toList()..sort();
+  }
+
+  /// Cumulative learnset for [pokemonName] in [gen] from the full-fidelity
+  /// detailed-learnset source (built from PS's raw learnset sources — see
+  /// [_detailedLearnsets]). Source-agnostic: includes a move if ANY of its
+  /// source codes (e.g. "2S1", "4E", "8M") has a leading generation digit
+  /// ≤ [gen]. Supplements [learnsetForGen] with moves PS's compiled data
+  /// endpoints — and therefore the bundled `learnsets.json` — don't carry,
+  /// most notably genuine event/gift sources ("S").
+  Set<String> detailedLearnsetForGen(String pokemonName, int gen) {
+    final learnset = _detailedLearnsets[pokemonName.toLowerCase()];
+    if (learnset == null) return const {};
+    final moves = <String>{};
+    for (final entry in learnset.entries) {
+      if (entry.value.any((code) => _codeGen(code) <= gen)) moves.add(entry.key);
+    }
+    return moves;
+  }
+
+  /// Moves [pokemonName] is only known to learn via a real event/gift
+  /// encounter in generations 1–[gen] — i.e. PS source-codes it with "S"
+  /// (e.g. "2S1") or it appears in a structured `eventData` record for that
+  /// generation (Pokémon Crystal's gift Dratini knowing Extreme Speed is
+  /// exactly this case). PokéAPI has no equivalent category at all.
+  Set<String> eventMovesForGen(String pokemonName, int gen) {
+    final key = pokemonName.toLowerCase();
+    final moves = <String>{};
+
+    final learnset = _detailedLearnsets[key];
+    if (learnset != null) {
+      for (final entry in learnset.entries) {
+        if (entry.value.any((code) {
+          final g = _codeGen(code);
+          return g <= gen && code.length > 1 && code[1] == 'S';
+        })) {
+          moves.add(entry.key);
+        }
+      }
+    }
+
+    final events = _eventData[key];
+    if (events != null) {
+      for (final event in events) {
+        if (event.generation <= gen) moves.addAll(event.moves);
+      }
+    }
+
+    return moves;
+  }
+
+  /// Raw event/gift-Pokémon encounter records for [pokemonName] (any
+  /// generation) — for any future richer display of event details
+  /// (level, shininess, full gift moveset, etc).
+  List<PsEventEntry> eventsForSpecies(String pokemonName) =>
+      List.unmodifiable(_eventData[pokemonName.toLowerCase()] ?? const []);
+
+  /// Leading generation digit of a PS source-code string (e.g. "2S1" → 2).
+  /// Malformed/empty codes sort last (gen 99) so they never spuriously match.
+  static int _codeGen(String code) {
+    if (code.isEmpty) return 99;
+    final digit = int.tryParse(code[0]);
+    return digit ?? 99;
   }
 
   /// Items available in [gen], optionally filtered by [mechanics].

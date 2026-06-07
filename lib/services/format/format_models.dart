@@ -41,6 +41,17 @@ const kGenToVersionGroups = <int, List<String>>{
   9: ['scarlet-violet'],
 };
 
+/// Reverse lookup of [kGenToVersionGroups]: which generation a PokéAPI
+/// version-group belongs to. Needed wherever PS data (keyed by raw generation
+/// number, e.g. `eventData[].generation`) must be cross-referenced against the
+/// version-group-driven move tables/chips PokéAPI data is organised around.
+int? genForVersionGroup(String versionGroup) {
+  for (final entry in kGenToVersionGroups.entries) {
+    if (entry.value.contains(versionGroup)) return entry.key;
+  }
+  return null;
+}
+
 /// A competitive or game-specific format that can be assigned to a team.
 class GameFormat {
   final String id;
@@ -389,5 +400,38 @@ class PsAbilityEntry {
         id: id,
         name: _str(j['name']) ?? id,
         gen: _int(j['gen']) ?? 3,
+      );
+}
+
+/// A real gift/event Pokémon encounter, sourced from PS's `eventData` records
+/// (e.g. Pokémon Crystal's gift Dratini). PokéAPI has no equivalent — these
+/// movesets only exist in PS's raw learnset source files.
+class PsEventEntry {
+  final int generation;
+  final int level;
+  final List<String> moves;
+  final bool shiny;
+  final String? gender;
+  final bool isHidden;
+  final String? pokeball;
+
+  const PsEventEntry({
+    required this.generation,
+    required this.level,
+    required this.moves,
+    this.shiny = false,
+    this.gender,
+    this.isHidden = false,
+    this.pokeball,
+  });
+
+  factory PsEventEntry.fromJson(Map<String, dynamic> j) => PsEventEntry(
+        generation: _int(j['generation']) ?? 1,
+        level: _int(j['level']) ?? 1,
+        moves: (j['moves'] as List?)?.cast<String>() ?? const [],
+        shiny: j['shiny'] != null && j['shiny'] != false,
+        gender: _str(j['gender']),
+        isHidden: j['isHidden'] == true,
+        pokeball: _str(j['pokeball']),
       );
 }
