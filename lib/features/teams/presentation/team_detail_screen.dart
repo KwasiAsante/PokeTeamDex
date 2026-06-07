@@ -18,6 +18,7 @@ import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/services/format/sprite_resolver.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
 import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
@@ -537,12 +538,35 @@ class _FilledSlotCard extends ConsumerWidget {
         // ── Form change sprite ──────────────────────────────────────────────
         final isFormActive = slot.formName != null &&
             slot.formName!.isNotEmpty;
-        final formChangePokemon = isFormActive
+        // Cosmetic forms (e.g. Burmy's cloaks, Shellos' seas, Cherrim's
+        // Sunshine Form) have no separate `/pokemon` resource of their own —
+        // `pokemonByNameProvider` 404s for them. They only exist as
+        // `pokemon-form` entries and differ from the base species solely by
+        // sprite, so resolve the full set via `cosmeticFormsProvider` (which
+        // returns `[]` for species without them — see its doc comment for why
+        // a name-based check like `slot.formName != pokemon.name` doesn't
+        // reliably identify them) and look up the active one by name, keeping
+        // `formChangePokemon` null so stats/types fall through to `pokemon`.
+        final cosmeticFormEntries =
+            ref.watch(cosmeticFormsProvider(pokemon.name)).asData?.value ??
+                const <PokemonFormEntry>[];
+        final isCosmeticFormActive = isFormActive &&
+            cosmeticFormEntries.any((f) => f.name == slot.formName);
+        final formChangePokemon = (isFormActive && !isCosmeticFormActive)
             ? ref
                 .watch(pokemonByNameProvider(slot.formName!))
                 .asData
                 ?.value
             : null;
+        PokemonFormEntry? cosmeticFormChange;
+        if (isCosmeticFormActive) {
+          for (final entry in cosmeticFormEntries) {
+            if (entry.name == slot.formName) {
+              cosmeticFormChange = entry;
+              break;
+            }
+          }
+        }
         // Effective types and stats for the active form (used for type badges
         // and stat bars — regional forms have different types/stats).
         final effectiveTypes = (formChangePokemon != null &&
@@ -562,18 +586,67 @@ class _FilledSlotCard extends ConsumerWidget {
               }
             : null;
 
+        // Sprite resolution — use format-aware sprites when setting is on.
+        // Computed here (ahead of `spriteUrls` below) because the cosmetic
+        // form-artwork block immediately following also needs them.
+        final useFormatSprites = ref
+            .watch(useFormatSpritesProvider)
+            .asData?.value ?? true;
+        final format = formatId != null
+            ? ref.watch(formatServiceProvider).formatById(formatId!)
+            : null;
+
         // Use shiny form artwork when the slot is shiny.
+        // Cosmetic forms (Burmy cloaks, Shellos seas, Cherrim's Sunshine Form,
+        // …) share their base species' `/pokemon` resource and so have no
+        // extended Pokédex id of their own — `pokemon-form.id` is just the
+        // form *resource's* id (a separate counter that happens to collide
+        // with real Pokédex ids, e.g. burmy-sandy's id 10034 == Mega
+        // Charizard X's, which is why pokemonHomeUrl(cosmeticFormChange.id)
+        // rendered the wrong artwork entirely). Every sprite tier — raw,
+        // per-generation versioned, AND HOME — instead files them as
+        // "{baseSpeciesId}-{nameSuffix}" (e.g. Burmy Sandy Cloak is
+        // "412-sandy", base id 412 + suffix "sandy" from "burmy-sandy"). Run
+        // that stem through the same format-aware [resolveSprite] the base
+        // sprite uses (HOME override for "no format"/Gen 6+, versioned
+        // sprites for Gen 1-5) so cosmetic forms display correctly for the
+        // selected format, just like the default form does.
+        final cosmeticFormChangeSuffix =
+            cosmeticFormChange?.name.substring(pokemon.name.length + 1);
+        final cosmeticFormChangeSpriteUrls = cosmeticFormChangeSuffix != null
+            ? resolveSprite(
+                sprites: null,
+                pokemonId: pokemon.id,
+                pokemonName: cosmeticFormChange!.name,
+                format: format,
+                useFormatSprites: useFormatSprites,
+                spriteFileStem: '${pokemon.id}-$cosmeticFormChangeSuffix',
+                homeUrl:
+                    cosmeticFormHomeUrl(pokemon.id, cosmeticFormChangeSuffix),
+                homeShinyUrl: cosmeticFormHomeShinyUrl(
+                    pokemon.id, cosmeticFormChangeSuffix),
+              )
+            : null;
         final formHomeUrl = formChangePokemon != null
             ? (slot.isShiny
                 ? pokemonHomeShinyUrl(formChangePokemon.id)
                 : pokemonHomeUrl(formChangePokemon.id))
-            : null;
+            : cosmeticFormChangeSpriteUrls != null
+                ? (slot.isShiny
+                    ? cosmeticFormChangeSpriteUrls.shinyUrl
+                    : cosmeticFormChangeSpriteUrls.defaultUrl)
+                : null;
         final formOfficialUrl = formChangePokemon != null
             ? (slot.isShiny
                 ? (formChangePokemon.officialArtworkShinyUrl ??
                     formChangePokemon.officialArtworkUrl)
                 : formChangePokemon.officialArtworkUrl)
-            : null;
+            : cosmeticFormChange != null
+                ? (slot.isShiny
+                    ? (cosmeticFormChange.spriteShinyUrl ??
+                        cosmeticFormChange.spriteUrl)
+                    : cosmeticFormChange.spriteUrl)
+                : null;
 
         // ── Gigantamax sprite ───────────────────────────────────────────────
         // Use the actively-selected form (e.g. Urshifu Rapid Strike, Toxtricity
@@ -631,13 +704,6 @@ class _FilledSlotCard extends ConsumerWidget {
         // Item detail (for sprite)
         final itemEntry = itemAsync?.whenOrNull(data: (e) => e);
 
-        // Sprite resolution — use format-aware sprites when setting is on
-        final useFormatSprites = ref
-            .watch(useFormatSpritesProvider)
-            .asData?.value ?? true;
-        final format = formatId != null
-            ? ref.watch(formatServiceProvider).formatById(formatId!)
-            : null;
         final spriteUrls = resolveSprite(
           sprites: pokemon.sprites,
           pokemonId: slot.pokemonId,

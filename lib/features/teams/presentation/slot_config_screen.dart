@@ -20,6 +20,7 @@ import 'package:poke_team_dex/services/format/sprite_resolver.dart';
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'dart:math' as math;
 
@@ -683,19 +684,49 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 .map((v) => v.name)
                 .toList() ??
             <String>[];
+        // Cosmetic forms (e.g. Burmy's cloaks, Shellos' seas, Cherrim's
+        // Sunshine Form) share the base species' single `/pokemon` resource
+        // and exist only as `pokemon-form` entries, differing solely by
+        // sprite. The provider resolves the full set (already filtered to
+        // non-default — see its doc comment for why name-equality with
+        // `pokemon.name` is NOT a reliable way to spot the default form) and
+        // returns `[]` for species without them, so it's safe to watch always.
+        final cosmeticFormsAsync = ref.watch(cosmeticFormsProvider(pokemon.name));
+        final cosmeticFormEntries =
+            cosmeticFormsAsync.asData?.value ?? const <PokemonFormEntry>[];
+        final cosmeticForms = cosmeticFormEntries.map((f) => f.name).toList();
         // Filter: exclude mega/primal/gmax/gender; gate ability/item forms
-        // on their prerequisite being selected.
+        // on their prerequisite being selected. Variety-based and cosmetic
+        // candidates run through the same gating rules.
         final availableForms = filterFormChips(
           varieties: allVarieties,
+          cosmeticForms: cosmeticForms,
           heldItem: _heldItemName,
           abilityName: _abilityName,
         );
         final hasMultipleForms = availableForms.isNotEmpty;
-        // Fetch form data whenever a non-default form is selected (_formName != null).
-        final formPokemonAsync = _formName != null
+        final isCosmeticFormSelected =
+            _formName != null && cosmeticForms.contains(_formName);
+        // Fetch form data whenever a non-default variety-based form is
+        // selected. Cosmetic forms have no `/pokemon` resource of their own —
+        // their stats/abilities/moves are identical to the base species, so
+        // `formPokemon` stays null and everything falls through to `pokemon`.
+        final formPokemonAsync = (_formName != null && !isCosmeticFormSelected)
             ? ref.watch(pokemonByNameProvider(_formName!))
             : null;
         final formPokemon = formPokemonAsync?.asData?.value;
+        // Cosmetic forms were already resolved above as part of the full set —
+        // just look up the selected one (sprite-only data layered on the base
+        // species' stats/abilities/moves).
+        PokemonFormEntry? cosmeticForm;
+        if (isCosmeticFormSelected) {
+          for (final entry in cosmeticFormEntries) {
+            if (entry.name == _formName) {
+              cosmeticForm = entry;
+              break;
+            }
+          }
+        }
 
         // ── Form-specific abilities, moves, and base stats ─────────────────
         // When a non-default form is active (e.g. Alolan Raichu, Galarian
@@ -826,17 +857,54 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final gmaxPokemon = gmaxPokemonAsync?.asData?.value;
 
         // Form artwork — use shiny version when slot is shiny.
+        // Cosmetic forms (Burmy cloaks, Shellos seas, Cherrim's Sunshine Form,
+        // …) share their base species' `/pokemon` resource and so have no
+        // extended Pokédex id of their own — `pokemon-form.id` is just the
+        // form *resource's* id (a separate counter that happens to collide
+        // with real Pokédex ids, e.g. burmy-sandy's id 10034 == Mega
+        // Charizard X's, which is why pokemonHomeUrl(cosmeticForm.id) renders
+        // the wrong artwork entirely). Every sprite tier — raw, per-generation
+        // versioned, AND HOME — instead files them as
+        // "{baseSpeciesId}-{nameSuffix}" (e.g. Burmy Sandy Cloak is "412-sandy",
+        // base id 412 + suffix "sandy" from "burmy-sandy"). Run that stem
+        // through the same format-aware [resolveSprite] the base sprite uses
+        // (HOME override for "no format"/Gen 6+, versioned sprites for Gen 1-5)
+        // so cosmetic forms display correctly for the selected format, just
+        // like the default form does.
+        final cosmeticFormSuffix =
+            cosmeticForm?.name.substring(pokemon.name.length + 1);
+        final cosmeticFormSpriteUrls = cosmeticFormSuffix != null
+            ? resolveSprite(
+                sprites: null,
+                pokemonId: pokemon.id,
+                pokemonName: cosmeticForm!.name,
+                format: format,
+                useFormatSprites: useFormatSprites,
+                spriteFileStem: '${pokemon.id}-$cosmeticFormSuffix',
+                homeUrl: cosmeticFormHomeUrl(pokemon.id, cosmeticFormSuffix),
+                homeShinyUrl:
+                    cosmeticFormHomeShinyUrl(pokemon.id, cosmeticFormSuffix),
+              )
+            : null;
         final formHomeUrl = formPokemon != null
             ? (_isShiny
                 ? pokemonHomeShinyUrl(formPokemon.id)
                 : pokemonHomeUrl(formPokemon.id))
-            : null;
+            : cosmeticFormSpriteUrls != null
+                ? (_isShiny
+                    ? cosmeticFormSpriteUrls.shinyUrl
+                    : cosmeticFormSpriteUrls.defaultUrl)
+                : null;
         final formFallbackUrl = formPokemon != null
             ? (_isShiny
                 ? (formPokemon.officialArtworkShinyUrl ??
                     formPokemon.officialArtworkUrl)
                 : formPokemon.officialArtworkUrl)
-            : null;
+            : cosmeticForm != null
+                ? (_isShiny
+                    ? (cosmeticForm.spriteShinyUrl ?? cosmeticForm.spriteUrl)
+                    : cosmeticForm.spriteUrl)
+                : null;
 
         // Sprite priority: G-Max > Mega > Form change > default.
         final gmaxHomeUrl = gmaxPokemon != null
@@ -881,7 +949,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               _buildHeader(slot, spriteUrls, mechanics,
                   megaArtworkUrl: effectiveMegaArtworkUrl,
                   megaFallbackUrl: effectiveMegaFallbackUrl,
-                  isFormLoading: formPokemonAsync?.isLoading ?? false),
+                  isFormLoading: (formPokemonAsync?.isLoading ?? false) ||
+                      (isCosmeticFormSelected && cosmeticFormsAsync.isLoading)),
               // ── Form selector (when Pokémon has multiple forms) ──
               if (hasMultipleForms) ...[
                 const SizedBox(height: 16),

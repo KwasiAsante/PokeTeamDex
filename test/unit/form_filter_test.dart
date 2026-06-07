@@ -269,4 +269,64 @@ void main() {
       expect(result, containsAll(['rotom-heat', 'rotom-wash', 'rotom-frost']));
     });
   });
+
+  group('filterFormChips — cosmetic forms', () {
+    // Cosmetic-form species (Burmy, Shellos, Deerling, Cherrim, Xerneas, Unown,
+    // …) have only ONE variety — the candidate list comes entirely from
+    // [cosmeticForms], run through the same gating rules as varieties.
+    test('cosmetic forms shown freely when unrecognised (Burmy cloaks)', () {
+      final result = filterFormChips(
+        varieties: ['burmy'],
+        cosmeticForms: ['burmy-sandy', 'burmy-trash'],
+        heldItem: null,
+        abilityName: null,
+      );
+      expect(result, containsAll(['burmy-sandy', 'burmy-trash']));
+    });
+
+    test('cosmetic forms shown freely when unrecognised (Shellos seas)', () {
+      final result = filterFormChips(
+        varieties: ['shellos'],
+        cosmeticForms: ['shellos-east'],
+        heldItem: null,
+        abilityName: null,
+      );
+      expect(result, contains('shellos-east'));
+    });
+
+    test('cherrim-sunshine gated on flower-gift ability (cosmetic form)', () {
+      final shown = filterFormChips(
+        varieties: ['cherrim'],
+        cosmeticForms: ['cherrim-sunshine'],
+        heldItem: null,
+        abilityName: 'flower-gift',
+      );
+      expect(shown, contains('cherrim-sunshine'));
+
+      final hidden = filterFormChips(
+        varieties: ['cherrim'],
+        cosmeticForms: ['cherrim-sunshine'],
+        heldItem: null,
+        abilityName: null,
+      );
+      expect(hidden, isNot(contains('cherrim-sunshine')));
+    });
+
+    test('returns empty when there are no varieties and no cosmetic forms', () {
+      expect(
+        filterFormChips(varieties: ['ditto'], heldItem: null, abilityName: null),
+        isEmpty,
+      );
+    });
+
+    test('combines variety-based and cosmetic candidates', () {
+      final result = filterFormChips(
+        varieties: ['aegislash', 'aegislash-blade'],
+        cosmeticForms: ['burmy-sandy'],
+        heldItem: null,
+        abilityName: 'stance-change',
+      );
+      expect(result, containsAll(['aegislash-blade', 'burmy-sandy']));
+    });
+  });
 }

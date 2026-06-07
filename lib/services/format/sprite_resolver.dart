@@ -52,14 +52,27 @@ bool _needsTransparentSubfolder(int gen) => gen <= 2;
   required String pokemonName,
   required GameFormat? format,
   required bool useFormatSprites,
+  // Override the "{pokemonId}" filename stem used in every sprite path below.
+  // Cosmetic forms (Burmy cloaks, Shellos seas, …) share their base species'
+  // `/pokemon` resource and have no extended Pokédex id of their own — every
+  // sprite tier (raw, versioned, HOME) instead files them under
+  // "{baseSpeciesId}-{nameSuffix}" (e.g. Shellos East Sea is "422-east").
+  String? spriteFileStem,
+  // Override the HOME-tier URLs `_homeOrArtwork` would otherwise derive from
+  // [sprites] (which is the *base* species' sprites JSON and so has no entry
+  // for a cosmetic form's own HOME artwork — see [cosmeticFormHomeUrl]).
+  String? homeUrl,
+  String? homeShinyUrl,
 }) {
+  final stem = spriteFileStem ?? '$pokemonId';
   final rawDefault = 'https://raw.githubusercontent.com/PokeAPI/sprites/'
-      'master/sprites/pokemon/$pokemonId.png';
+      'master/sprites/pokemon/$stem.png';
   final rawShiny = 'https://raw.githubusercontent.com/PokeAPI/sprites/'
-      'master/sprites/pokemon/shiny/$pokemonId.png';
+      'master/sprites/pokemon/shiny/$stem.png';
 
   if (!useFormatSprites || format == null) {
-    return _homeOrArtwork(sprites, rawDefault, rawShiny);
+    return _homeOrArtwork(sprites, rawDefault, rawShiny,
+        homeUrl: homeUrl, homeShinyUrl: homeShinyUrl);
   }
 
   final gameId = format.type == FormatType.game
@@ -80,38 +93,38 @@ bool _needsTransparentSubfolder(int gen) => gen <= 2;
       // Animated Gen 5 sprites live in a nested /animated/ subfolder.
       final animSeg = isAnimated ? 'animated/' : '';
 
-      // Default: versions/{path}/[animated/][transparent/]{id}.ext
+      // Default: versions/{path}/[animated/][transparent/]{stem}.ext
       final defaultUrl =
-          '$_versionsBase/$versionPath/$animSeg$transparent$pokemonId$ext';
+          '$_versionsBase/$versionPath/$animSeg$transparent$stem$ext';
 
       // Shiny URL path differs by generation:
-      //   Animated (Gen 5): versions/{path}/animated/shiny/{id}.gif
-      //   Gen 2: Showdown gen2-shiny/{name}.png (non-web) or PokeAPI shiny/{id}.png (web)
-      //   Regular (Gen 3-4): versions/{path}/shiny/{id}.png
+      //   Animated (Gen 5): versions/{path}/animated/shiny/{stem}.gif
+      //   Gen 2: Showdown gen2-shiny/{name}.png (non-web) or PokeAPI shiny/{stem}.png (web)
+      //   Regular (Gen 3-4): versions/{path}/shiny/{stem}.png
       final String shinyUrl;
       if (noShiny) {
         shinyUrl = defaultUrl;
       } else if (isAnimated) {
-        shinyUrl = '$_versionsBase/$versionPath/${animSeg}shiny/$pokemonId$ext';
+        shinyUrl = '$_versionsBase/$versionPath/${animSeg}shiny/$stem$ext';
       } else if (transparent.isNotEmpty) {
         // PokeAPI has no transparent/shiny subfolder for Gen 2.
         // On non-web: use Pokémon Showdown which has transparent Gen 2 shiny sprites.
         // On web: fall back to PokeAPI non-transparent shiny (Showdown is CORS-blocked in browsers).
         shinyUrl = kIsWeb
-            ? '$_versionsBase/$versionPath/shiny/$pokemonId$ext'
+            ? '$_versionsBase/$versionPath/shiny/$stem$ext'
             : 'https://play.pokemonshowdown.com/sprites/gen2-shiny/$pokemonName.png';
       } else {
-        shinyUrl = '$_versionsBase/$versionPath/shiny/$pokemonId$ext';
+        shinyUrl = '$_versionsBase/$versionPath/shiny/$stem$ext';
       }
 
       // Female sprites exist in PokeAPI from Gen 4 onward.
       String? femaleUrl;
       String? femaleShinyUrl;
       if (gen >= 4) {
-        femaleUrl = '$_versionsBase/$versionPath/${animSeg}female/$pokemonId$ext';
+        femaleUrl = '$_versionsBase/$versionPath/${animSeg}female/$stem$ext';
         femaleShinyUrl = noShiny
             ? femaleUrl
-            : '$_versionsBase/$versionPath/${animSeg}shiny/female/$pokemonId$ext';
+            : '$_versionsBase/$versionPath/${animSeg}shiny/female/$stem$ext';
       }
 
       return (defaultUrl: defaultUrl, shinyUrl: shinyUrl, femaleUrl: femaleUrl, femaleShinyUrl: femaleShinyUrl);
@@ -119,21 +132,26 @@ bool _needsTransparentSubfolder(int gen) => gen <= 2;
   }
 
   // Gen 6+ — PokéAPI HOME / official artwork
-  return _homeOrArtwork(sprites, rawDefault, rawShiny);
+  return _homeOrArtwork(sprites, rawDefault, rawShiny,
+      homeUrl: homeUrl, homeShinyUrl: homeShinyUrl);
 }
 
 ({String? defaultUrl, String? shinyUrl, String? femaleUrl, String? femaleShinyUrl}) _homeOrArtwork(
   Map<String, dynamic>? sprites,
   String rawDefault,
-  String rawShiny,
-) {
+  String rawShiny, {
+  String? homeUrl,
+  String? homeShinyUrl,
+}) {
   final home    = sprites == null ? null : _nav(sprites['other'], ['home']);
   final artwork = sprites == null ? null : _nav(sprites['other'], ['official-artwork']);
   return (
-    defaultUrl: home?['front_default'] as String? ??
+    defaultUrl: homeUrl ??
+        home?['front_default'] as String? ??
         artwork?['front_default'] as String? ??
         rawDefault,
-    shinyUrl: home?['front_shiny'] as String? ??
+    shinyUrl: homeShinyUrl ??
+        home?['front_shiny'] as String? ??
         artwork?['front_shiny'] as String? ??
         rawShiny,
     femaleUrl: home?['front_female'] as String?,
