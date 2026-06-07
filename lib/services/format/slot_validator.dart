@@ -227,15 +227,19 @@ Set<String> _buildLearnset(
   return result;
 }
 
-/// Returns move names learnable by any prior evolution (in [ancestorMoveLists])
+/// Returns move names learnable by any prior evolution (in [ancestorMoveSets])
 /// for [format] that the current Pokémon ([currentMoves]) cannot learn in
 /// [format]. These are moves that must be learned before the Pokémon evolves.
 ///
 /// [pokemonName] and [formatService] are forwarded to [buildLearnsetForFormat]
-/// for the PS supplementary learnset cross-check.
+/// for the current Pokémon's PS supplementary learnset cross-check. Each
+/// ancestor's PS cross-check is keyed by that ancestor's own species name —
+/// e.g. gift Dratini's event-exclusive Extreme Speed must be looked up under
+/// "dratini", not "dragonite", or it would never be recognized as learnable
+/// by any prior evolution.
 Set<String> buildPriorEvoExclusiveMoveNames({
   required List<Map<String, dynamic>> currentMoves,
-  required List<List<Map<String, dynamic>>> ancestorMoveLists,
+  required List<({String speciesName, List<Map<String, dynamic>> moves})> ancestorMoveSets,
   required GameFormat format,
   String? pokemonName,
   FormatService? formatService,
@@ -245,8 +249,11 @@ Set<String> buildPriorEvoExclusiveMoveNames({
     pokemonName: pokemonName, formatService: formatService,
   );
   final ancestorAll = <String>{};
-  for (final aMoves in ancestorMoveLists) {
-    ancestorAll.addAll(buildLearnsetForFormat(aMoves, format));
+  for (final ancestor in ancestorMoveSets) {
+    ancestorAll.addAll(buildLearnsetForFormat(
+      ancestor.moves, format,
+      pokemonName: ancestor.speciesName, formatService: formatService,
+    ));
   }
   return ancestorAll.difference(current);
 }

@@ -718,14 +718,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final effectivePriorEvoMoves =
             priorEvoMoveSetsAsync.whenOrNull(data: (sets) {
           if (sets.isEmpty) return const <String>{};
-          final ancestorMoveLists = sets.map((s) => s.moves).toList();
           if (format == null) {
             final currentAll = effectivePokemonMoves
                 .map((m) => (m['move'] as Map)['name'] as String)
                 .toSet();
             final ancestorAll = <String>{};
-            for (final aMoves in ancestorMoveLists) {
-              for (final m in aMoves) {
+            for (final ancestor in sets) {
+              for (final m in ancestor.moves) {
                 ancestorAll.add((m['move'] as Map)['name'] as String);
               }
             }
@@ -733,7 +732,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           }
           return buildPriorEvoExclusiveMoveNames(
             currentMoves: effectivePokemonMoves,
-            ancestorMoveLists: ancestorMoveLists,
+            ancestorMoveSets: sets,
             format: format,
             pokemonName: formPokemon?.name ?? pokemon.name,
             formatService: formatService,
