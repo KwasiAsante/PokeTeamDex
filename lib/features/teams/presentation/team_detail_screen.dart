@@ -519,10 +519,20 @@ class _FilledSlotCard extends ConsumerWidget {
               }
             : baseStats;
         // Prefer HOME artwork; fall back to official artwork.
+        // Use shiny variants when the slot is shiny (mirrors form-change handling
+        // below) — otherwise a shiny mega/G-Max Pokémon renders in its regular
+        // colours since mega/gmax artwork takes priority over the gen sprite.
         final megaHomeUrl = megaPokemon != null
-            ? pokemonHomeUrl(megaPokemon.id)
+            ? (slot.isShiny
+                ? pokemonHomeShinyUrl(megaPokemon.id)
+                : pokemonHomeUrl(megaPokemon.id))
             : null;
-        final megaOfficialUrl = megaPokemon?.officialArtworkUrl;
+        final megaOfficialUrl = megaPokemon != null
+            ? (slot.isShiny
+                ? (megaPokemon.officialArtworkShinyUrl ??
+                    megaPokemon.officialArtworkUrl)
+                : megaPokemon.officialArtworkUrl)
+            : null;
 
         // ── Form change sprite ──────────────────────────────────────────────
         final isFormActive = slot.formName != null &&
@@ -574,13 +584,19 @@ class _FilledSlotCard extends ConsumerWidget {
                 .asData
                 ?.value
             : null;
-        final gmaxHomeUrl =
-            gmaxPokemon != null ? pokemonHomeUrl(gmaxPokemon.id) : null;
+        final gmaxHomeUrl = gmaxPokemon != null
+            ? (slot.isShiny
+                ? pokemonHomeShinyUrl(gmaxPokemon.id)
+                : pokemonHomeUrl(gmaxPokemon.id))
+            : null;
 
         // Sprite priority: G-Max > Mega > Form change > default.
         final megaArtworkUrl = gmaxHomeUrl ?? megaHomeUrl ?? formHomeUrl;
         final megaArtworkFallback = gmaxHomeUrl != null
-            ? gmaxPokemon?.officialArtworkUrl
+            ? (slot.isShiny
+                ? (gmaxPokemon?.officialArtworkShinyUrl ??
+                    gmaxPokemon?.officialArtworkUrl)
+                : gmaxPokemon?.officialArtworkUrl)
             : megaHomeUrl != null
                 ? megaOfficialUrl
                 : formOfficialUrl;
