@@ -90,3 +90,16 @@ String pokemonHomeFemaleUrl(int id) =>
 
 String pokemonHomeShinyFemaleUrl(int id) =>
     'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/female/$id.png';
+
+// Helper — build a PokéAPI HOME artwork URL for a cosmetic `pokemon-form`
+// (Burmy's cloaks, Shellos' seas, Cherrim's Sunshine Form, …). These forms
+// share their base species' `/pokemon` resource and so have no extended
+// Pokédex id of their own — unlike variety-based forms (Rotom, Aegislash),
+// their HOME artwork is filed under "{baseSpeciesId}-{nameSuffix}.png",
+// mirroring the raw front-sprite naming (e.g. Burmy Sandy Cloak's HOME
+// artwork is "412-sandy.png", base id 412 + suffix "sandy").
+String cosmeticFormHomeUrl(int baseSpeciesId, String nameSuffix) =>
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/$baseSpeciesId-$nameSuffix.png';
+
+String cosmeticFormHomeShinyUrl(int baseSpeciesId, String nameSuffix) =>
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/$baseSpeciesId-$nameSuffix.png';

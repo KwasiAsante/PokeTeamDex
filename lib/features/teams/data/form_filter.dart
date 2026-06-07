@@ -95,22 +95,34 @@ const Map<String, String> kSilvallyMemoryForms = {
 /// Returns the non-default form names that should be shown as chips.
 ///
 /// [varieties] — all varieties from the species endpoint.
+/// [cosmeticForms] — sprite-only form names that have no separate `/pokemon`
+///   resource of their own (e.g. Burmy's cloaks, Shellos' seas, Unown's
+///   letters) — see [PokemonEntry.formNames] filtered to exclude the
+///   species' own name.
 /// [heldItem]  — current held item (PokéAPI hyphenated name, or null).
 /// [abilityName] — current ability (PokéAPI hyphenated name, or null).
 ///
 /// The default form (varieties.first) is never included — it is the
-/// implicit "no chip selected" state.
+/// implicit "no chip selected" state. Variety-based and cosmetic candidates
+/// are run through the same gating rules below so e.g. an ability-gated
+/// cosmetic form (Cherrim's Sunshine Form) is filtered identically to an
+/// ability-gated variety (Aegislash's Blade Forme).
 List<String> filterFormChips({
   required List<String> varieties,
+  List<String> cosmeticForms = const [],
   required String? heldItem,
   required String? abilityName,
 }) {
-  if (varieties.length <= 1) return [];
+  final candidates = [
+    if (varieties.length > 1) ...varieties.skip(1),
+    ...cosmeticForms,
+  ];
+  if (candidates.isEmpty) return [];
 
   final item     = heldItem?.toLowerCase() ?? '';
   final ability  = abilityName?.toLowerCase() ?? '';
 
-  return varieties.skip(1).where((form) {
+  return candidates.where((form) {
     // 1. Always exclude by suffix
     for (final suffix in kExcludeFormSuffixes) {
       if (form.endsWith(suffix)) return false;
