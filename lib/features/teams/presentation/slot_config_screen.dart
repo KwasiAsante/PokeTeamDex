@@ -811,11 +811,15 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
         // ── Gigantamax / Dynamax ────────────────────────────────────────────
         final canDynamax = mechanics == null || mechanics.hasGigantamax;
-        final gmaxMove = gmaxMoveForSpecies(pokemon.name);
+        // Use the actively-selected form (e.g. Urshifu Rapid Strike, Toxtricity
+        // Low Key) rather than the base species — species with multiple forms
+        // can have different G-Max moves/artwork per form.
+        final effectiveSpeciesName = formPokemon?.name ?? pokemon.name;
+        final gmaxMove = gmaxMoveForSpecies(effectiveSpeciesName);
         final canGigantamax = canDynamax && gmaxMove != null;
 
         // Fetch G-Max form sprite when G-Max is active.
-        final gmaxFormName = canGigantamax ? '${pokemon.name}-gmax' : null;
+        final gmaxFormName = canGigantamax ? '$effectiveSpeciesName-gmax' : null;
         final gmaxPokemonAsync = (canGigantamax && _hasGigantamax && _gigantamaxEnabled)
             ? ref.watch(pokemonByNameProvider(gmaxFormName!))
             : null;
@@ -884,7 +888,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 _buildFormSelector(availableForms),
               ],
               const SizedBox(height: 24),
-              _buildBasics(mechanics),
+              _buildBasics(mechanics, speciesAsync.asData?.value.genderRate),
               // ── Ability (Gen 3+) ──
               if (mechanics == null || mechanics.hasAbilities) ...[
                 const SizedBox(height: 24),
@@ -1277,11 +1281,22 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // ── Basics ────────────────────────────────────────────────────────────────
 
-  Widget _buildBasics(GenerationMechanics? mechanics) {
+  Widget _buildBasics(GenerationMechanics? mechanics, int? genderRate) {
     // Friendship exists from Gen 2 onward; Gen 1 has no friendship mechanic.
     final showFriendship = mechanics == null || mechanics.gen >= 2;
     // Gender mechanic introduced in Gen 2; Gen 1 Pokémon have no gender.
     final showGender = mechanics == null || mechanics.gen >= 2;
+    // Restrict gender chips to what the species can actually be — e.g.
+    // Wormadam (rate 8) can only ever be female, Tauros (rate 0) only male,
+    // Magnemite (rate -1) is genderless. Mixed-ratio species (1-7) can be
+    // either but never genderless.
+    final genderOptions = switch (genderRate) {
+      -1 => const [('genderless', '⚲ None')],
+      0 => const [('male', '♂ Male')],
+      8 => const [('female', '♀ Female')],
+      null => const [('male', '♂ Male'), ('female', '♀ Female'), ('genderless', '⚲ None')],
+      _ => const [('male', '♂ Male'), ('female', '♀ Female')],
+    };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1312,7 +1327,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           Wrap(
             spacing: 8,
             children: [
-              for (final g in [('male', '♂ Male'), ('female', '♀ Female'), ('genderless', '⚲ None')])
+              for (final g in genderOptions)
                 ChoiceChip(
                   label: Text(g.$2),
                   selected: _gender == g.$1,

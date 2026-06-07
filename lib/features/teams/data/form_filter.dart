@@ -49,15 +49,19 @@ const Map<String, String> kAbilityGatedForms = {
 
 // ── Item-gated forms ──────────────────────────────────────────────────────
 
-/// Form chip shown only when the required held item is selected.
-const Map<String, String> kItemGatedForms = {
-  'giratina-origin':       'griseous-orb',
-  'zacian-crowned':        'rusted-sword',
-  'zamazenta-crowned':     'rusted-shield',
-  'calyrex-ice-rider':     'reins-of-unity',
-  'calyrex-shadow-rider':  'reins-of-unity',
-  'dialga-origin':         'adamant-crystal',
-  'palkia-origin':         'lustrous-globe',
+/// Form chip shown only when one of the required held items is selected.
+///
+/// Most forms are gated by a single item, but Giratina's Origin Forme can be
+/// triggered by either the Griseous Orb (Gen 4-8) or the Griseous Core (Gen 9
+/// onward — Scarlet/Violet renamed the item), so each form maps to a set.
+const Map<String, Set<String>> kItemGatedForms = {
+  'giratina-origin':       {'griseous-orb', 'griseous-core'},
+  'zacian-crowned':        {'rusted-sword'},
+  'zamazenta-crowned':     {'rusted-shield'},
+  'calyrex-ice-rider':     {'reins-of-unity'},
+  'calyrex-shadow-rider':  {'reins-of-unity'},
+  'dialga-origin':         {'adamant-crystal'},
+  'palkia-origin':         {'lustrous-globe'},
 };
 
 /// Arceus type forms each need the matching plate.
@@ -120,7 +124,7 @@ List<String> filterFormChips({
 
     // 3. Simple item-gated
     if (kItemGatedForms.containsKey(form)) {
-      return item == kItemGatedForms[form];
+      return kItemGatedForms[form]!.contains(item);
     }
 
     // 4. Arceus plate forms

@@ -171,6 +171,15 @@ void main() {
       expect(result, contains('giratina-origin'));
     });
 
+    test('giratina-origin shown when holding griseous-core (Gen 9 renamed item)', () {
+      final result = filterFormChips(
+        varieties: ['giratina', 'giratina-origin'],
+        heldItem: 'griseous-core',
+        abilityName: null,
+      );
+      expect(result, contains('giratina-origin'));
+    });
+
     test('giratina-origin hidden without the item', () {
       final result = filterFormChips(
         varieties: ['giratina', 'giratina-origin'],
