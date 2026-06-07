@@ -718,14 +718,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final effectivePriorEvoMoves =
             priorEvoMoveSetsAsync.whenOrNull(data: (sets) {
           if (sets.isEmpty) return const <String>{};
-          final ancestorMoveLists = sets.map((s) => s.moves).toList();
           if (format == null) {
             final currentAll = effectivePokemonMoves
                 .map((m) => (m['move'] as Map)['name'] as String)
                 .toSet();
             final ancestorAll = <String>{};
-            for (final aMoves in ancestorMoveLists) {
-              for (final m in aMoves) {
+            for (final ancestor in sets) {
+              for (final m in ancestor.moves) {
                 ancestorAll.add((m['move'] as Map)['name'] as String);
               }
             }
@@ -733,13 +732,49 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           }
           return buildPriorEvoExclusiveMoveNames(
             currentMoves: effectivePokemonMoves,
-            ancestorMoveLists: ancestorMoveLists,
+            ancestorMoveSets: sets,
             format: format,
             pokemonName: formPokemon?.name ?? pokemon.name,
             formatService: formatService,
           );
         }) ??
             const <String>{};
+
+        // Genuine event/gift-Pokémon-exclusive moves (e.g. Pokémon Crystal's
+        // gift Dratini knowing Extreme Speed from the start) — surfaced purely
+        // for the picker's "Event" badge. Selectability/validation already
+        // flow through buildLearnsetForFormat's PS event-move supplementary
+        // pass (see slot_validator.dart), so this only affects display.
+        //
+        // Checked against `effectiveLearnableMoves` rather than
+        // `effectivePokemonMoves` — some genuinely event-exclusive moves
+        // (e.g. Eevee's Gen-2 event-exclusive Growth) never appear in
+        // PokéAPI's move list for the species at all, so they only exist in
+        // the learnable set via buildLearnsetForFormat's PS-name fallback.
+        final effectiveLearnableMoves = (format != null
+                ? buildLearnsetForFormat(
+                    effectivePokemonMoves, format,
+                    pokemonName: formPokemon?.name ?? pokemon.name,
+                    formatService: formatService,
+                  )
+                : effectivePokemonMoves
+                    .map((m) => m['move']['name'] as String)
+                    .toSet())
+            .toList()
+          ..sort();
+
+        final effectiveEventMoves = <String>{};
+        if (format != null && formatService.isInitialized) {
+          final eventIds = formatService.eventMovesForGen(
+              formPokemon?.name ?? pokemon.name, format.gen);
+          if (eventIds.isNotEmpty) {
+            for (final name in effectiveLearnableMoves) {
+              if (eventIds.contains(name.replaceAll('-', '').toLowerCase())) {
+                effectiveEventMoves.add(name);
+              }
+            }
+          }
+        }
 
         // Re-compute violations with form-specific data; prior-evo moves are
         // intentionally excluded from violation checking.
@@ -754,18 +789,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     _moves[int.parse(entry.key.substring(4)) - 1]))
               entry.key: entry.value,
         };
-
-        final effectiveLearnableMoves = (format != null
-                ? buildLearnsetForFormat(
-                    effectivePokemonMoves, format,
-                    pokemonName: formPokemon?.name ?? pokemon.name,
-                    formatService: formatService,
-                  )
-                : effectivePokemonMoves
-                    .map((m) => m['move']['name'] as String)
-                    .toSet())
-            .toList()
-          ..sort();
 
         // Combined sorted move list: regular + prior-evo-exclusive.
         final allPickableMoves = {
@@ -903,7 +926,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   pokemonName: formPokemon?.name ?? pokemon.name,
                   showMaxMoves: canDynamax,
                   useGMax: canGigantamax && _hasGigantamax && _gigantamaxEnabled,
-                  priorEvoMoves: effectivePriorEvoMoves),
+                  priorEvoMoves: effectivePriorEvoMoves,
+                  eventMoves: effectiveEventMoves),
               const SizedBox(height: 24),
               // ── EVs / Stat Exp. ──
               _SectionTitle(
@@ -1556,6 +1580,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     bool showMaxMoves = false,
     bool useGMax = false,
     Set<String> priorEvoMoves = const {},
+    Set<String> eventMoves = const {},
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -1575,7 +1600,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             children: [
               // Tap target row
               InkWell(
-                onTap: () => _pickMove(i, learnableMoves, priorEvoMoves: priorEvoMoves),
+                onTap: () => _pickMove(i, learnableMoves,
+                    priorEvoMoves: priorEvoMoves, eventMoves: eventMoves),
                 borderRadius: BorderRadius.circular(4),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1607,6 +1633,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                         Padding(
                           padding: const EdgeInsets.only(left: 4, right: 2),
                           child: _PreEvoBadge(),
+                        ),
+                      if (_moves[i] != null && eventMoves.contains(_moves[i]))
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, right: 2),
+                          child: _EventMoveBadge(),
                         ),
                       // Inline type + special-move chip + stats when selected
                       if (moveDetail != null) ...[
@@ -2028,6 +2059,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     int moveIndex,
     List<String> learnableMoves, {
     Set<String> priorEvoMoves = const {},
+    Set<String> eventMoves = const {},
   }) async {
     final result = await showModalBottomSheet<String>(
       context: context,
@@ -2037,6 +2069,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         current: _moves[moveIndex],
         label: 'Move ${moveIndex + 1}',
         priorEvoMoves: priorEvoMoves,
+        eventMoves: eventMoves,
       ),
     );
     if (result != null) setState(() { _moves[moveIndex] = result; _dirty = true; });
@@ -3153,12 +3186,14 @@ class _MovePickerSheet extends ConsumerStatefulWidget {
   final String? current;
   final String label;
   final Set<String> priorEvoMoves;
+  final Set<String> eventMoves;
 
   const _MovePickerSheet({
     required this.moves,
     required this.label,
     this.current,
     this.priorEvoMoves = const {},
+    this.eventMoves = const {},
   });
 
   @override
@@ -3243,6 +3278,7 @@ class _MovePickerSheetState extends ConsumerState<_MovePickerSheet> {
                 moveName: _filtered[i],
                 isSelected: _filtered[i] == widget.current,
                 isPriorEvo: widget.priorEvoMoves.contains(_filtered[i]),
+                isEvent: widget.eventMoves.contains(_filtered[i]),
                 onTap: () => Navigator.pop(context, _filtered[i]),
               ),
             ),
@@ -3258,6 +3294,7 @@ class _MoveListTile extends ConsumerWidget {
   final String moveName;
   final bool isSelected;
   final bool isPriorEvo;
+  final bool isEvent;
   final VoidCallback onTap;
 
   const _MoveListTile({
@@ -3265,6 +3302,7 @@ class _MoveListTile extends ConsumerWidget {
     required this.isSelected,
     required this.onTap,
     this.isPriorEvo = false,
+    this.isEvent = false,
   });
 
   @override
@@ -3290,6 +3328,10 @@ class _MoveListTile extends ConsumerWidget {
                 if (isPriorEvo) ...[
                   const SizedBox(width: 4),
                   _PreEvoBadge(),
+                ],
+                if (isEvent) ...[
+                  const SizedBox(width: 4),
+                  _EventMoveBadge(),
                 ],
               ],
             ),
@@ -3352,6 +3394,31 @@ class _PreEvoBadge extends StatelessWidget {
           fontSize: 9,
           fontWeight: FontWeight.w600,
           color: colorScheme.onTertiaryContainer,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+// Small badge shown on genuine event/gift-Pokémon-exclusive moves (e.g.
+// Pokémon Crystal's gift Dratini knowing Extreme Speed) in the picker and slot.
+class _EventMoveBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        'Event',
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: colorScheme.onSecondaryContainer,
           letterSpacing: 0.3,
         ),
       ),

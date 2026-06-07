@@ -280,4 +280,78 @@ void main() {
       expect(entry.gen, 3);
     });
   });
+
+  group('PsEventEntry.fromJson', () {
+    test('parses a real gift-Pokémon encounter (Crystal gift Dratini)', () {
+      // Mirrors the actual eventData record for Dratini in PS's gen2 mod —
+      // the motivating case for issue #103 (gift Dratini knows Extreme Speed).
+      final entry = PsEventEntry.fromJson({
+        'generation': 2,
+        'level': 15,
+        'moves': ['wrap', 'thunderwave', 'twister', 'extremespeed'],
+        'shiny': 1,
+      });
+      expect(entry.generation, 2);
+      expect(entry.level, 15);
+      expect(entry.moves, ['wrap', 'thunderwave', 'twister', 'extremespeed']);
+      expect(entry.shiny, isTrue);
+      expect(entry.gender, isNull);
+      expect(entry.isHidden, isFalse);
+      expect(entry.pokeball, isNull);
+    });
+
+    test('parses gender, hidden-ability and pokeball fields', () {
+      final entry = PsEventEntry.fromJson({
+        'generation': 5,
+        'level': 100,
+        'moves': ['extremespeed', 'firepunch', 'dragondance', 'outrage'],
+        'gender': 'M',
+        'isHidden': true,
+        'pokeball': 'cherishball',
+      });
+      expect(entry.gender, 'M');
+      expect(entry.isHidden, isTrue);
+      expect(entry.pokeball, 'cherishball');
+      expect(entry.shiny, isFalse);
+    });
+
+    test('shiny: false is treated as not shiny', () {
+      final entry = PsEventEntry.fromJson({
+        'generation': 4,
+        'level': 50,
+        'moves': ['outrage'],
+        'shiny': false,
+      });
+      expect(entry.shiny, isFalse);
+    });
+
+    test('missing fields default to generation 1, level 1, no moves', () {
+      final entry = PsEventEntry.fromJson({});
+      expect(entry.generation, 1);
+      expect(entry.level, 1);
+      expect(entry.moves, isEmpty);
+      expect(entry.shiny, isFalse);
+      expect(entry.isHidden, isFalse);
+    });
+  });
+
+  group('genForVersionGroup', () {
+    test('maps known version groups to their generation', () {
+      expect(genForVersionGroup('red-blue'), 1);
+      expect(genForVersionGroup('crystal'), 2);
+      expect(genForVersionGroup('gold-silver'), 2);
+      expect(genForVersionGroup('emerald'), 3);
+      expect(genForVersionGroup('platinum'), 4);
+      expect(genForVersionGroup('black-2-white-2'), 5);
+      expect(genForVersionGroup('omega-ruby-alpha-sapphire'), 6);
+      expect(genForVersionGroup('ultra-sun-ultra-moon'), 7);
+      expect(genForVersionGroup('legends-arceus'), 8);
+      expect(genForVersionGroup('scarlet-violet'), 9);
+    });
+
+    test('unknown version group returns null', () {
+      expect(genForVersionGroup('lets-go-pikachu-lets-go-eevee'), isNull);
+      expect(genForVersionGroup('not-a-real-version-group'), isNull);
+    });
+  });
 }

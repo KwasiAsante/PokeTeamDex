@@ -75,7 +75,7 @@ final slotValidationProvider = FutureProvider.autoDispose
   if (priorEvoSets.isEmpty) return base;
   final priorEvoMoves = buildPriorEvoExclusiveMoveNames(
     currentMoves: moves,
-    ancestorMoveLists: priorEvoSets.map((s) => s.moves).toList(),
+    ancestorMoveSets: priorEvoSets,
     format: format,
     pokemonName: pokemon.name,
     formatService: svc,

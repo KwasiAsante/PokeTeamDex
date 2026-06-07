@@ -165,25 +165,56 @@ Set<String> buildLearnsetForFormat(
 }) {
   final result = _buildLearnset(pokemonMoves, format);
 
-  // PS supplementary pass — catches moves PokéAPI links to the wrong gen.
+  // PS supplementary pass — catches moves PokéAPI links to the wrong gen,
+  // plus genuine event/gift-Pokémon moves PokéAPI has no category for at all
+  // (e.g. Pokémon Crystal's gift Dratini knowing Extreme Speed from the
+  // start — `eventMovesForGen` surfaces it via PS's detailed-learnset source
+  // even though it never appears in Dratini's PokéAPI moves list for any
+  // Gen-2 version group).
   if (pokemonName != null &&
       formatService != null &&
       formatService.isInitialized) {
-    final psMoveIds = formatService
-        .learnsetForGen(pokemonName.toLowerCase(), format.gen)
-        .toSet();
-    if (psMoveIds.isNotEmpty) {
+    final name = pokemonName.toLowerCase();
+    final regularPsIds = formatService.learnsetForGen(name, format.gen);
+    final eventPsIds = formatService.eventMovesForGen(name, format.gen);
+
+    final matchedPsIds = <String>{};
+    if (regularPsIds.isNotEmpty || eventPsIds.isNotEmpty) {
       for (final moveData in pokemonMoves) {
         final moveName = (moveData['move'] as Map)['name'] as String;
         // Convert PokéAPI name to PS id (strip hyphens) for comparison.
         final psId = _toPsId(moveName);
-        if (psMoveIds.contains(psId)) result.add(moveName);
+        if (regularPsIds.contains(psId) || eventPsIds.contains(psId)) {
+          result.add(moveName);
+          matchedPsIds.add(psId);
+        }
       }
+    }
+
+    // Some genuinely event-exclusive moves never appear in PokéAPI's move
+    // list for this species at all — under ANY method or generation — e.g.
+    // Eevee's Gen-2 event-exclusive Growth (a Stadium 2 / gift encounter
+    // PokéAPI has zero record of, unlike Dratini's Extreme Speed which it at
+    // least lists under a later-gen egg/tutor method). The cross-check above
+    // can never recover these since there's no `pokemonMoves` entry to match
+    // against — fall back to PS's own move database for a displayable name.
+    for (final psId in eventPsIds.difference(matchedPsIds)) {
+      final entry = formatService.moveDetail(psId);
+      if (entry != null) result.add(_apiSlugForPsName(entry.name));
     }
   }
 
   return result;
 }
+
+/// Converts a PS move display name (e.g. "King's Shield", "U-turn") to its
+/// PokéAPI-style hyphenated slug ("kings-shield", "u-turn") — the inverse of
+/// [_toPsId] for names PS tracks but that never surface in `pokemonMoves`
+/// (so there's no existing PokéAPI name string to reuse verbatim). PokéAPI
+/// slugs drop apostrophes outright and hyphenate on whitespace; PS names
+/// already preserve official punctuation/hyphenation, so this is reliable.
+String _apiSlugForPsName(String name) =>
+    name.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
 
 Set<String> _buildLearnset(
   List<Map<String, dynamic>> pokemonMoves,
@@ -221,15 +252,19 @@ Set<String> _buildLearnset(
   return result;
 }
 
-/// Returns move names learnable by any prior evolution (in [ancestorMoveLists])
+/// Returns move names learnable by any prior evolution (in [ancestorMoveSets])
 /// for [format] that the current Pokémon ([currentMoves]) cannot learn in
 /// [format]. These are moves that must be learned before the Pokémon evolves.
 ///
 /// [pokemonName] and [formatService] are forwarded to [buildLearnsetForFormat]
-/// for the PS supplementary learnset cross-check.
+/// for the current Pokémon's PS supplementary learnset cross-check. Each
+/// ancestor's PS cross-check is keyed by that ancestor's own species name —
+/// e.g. gift Dratini's event-exclusive Extreme Speed must be looked up under
+/// "dratini", not "dragonite", or it would never be recognized as learnable
+/// by any prior evolution.
 Set<String> buildPriorEvoExclusiveMoveNames({
   required List<Map<String, dynamic>> currentMoves,
-  required List<List<Map<String, dynamic>>> ancestorMoveLists,
+  required List<({String speciesName, List<Map<String, dynamic>> moves})> ancestorMoveSets,
   required GameFormat format,
   String? pokemonName,
   FormatService? formatService,
@@ -239,8 +274,11 @@ Set<String> buildPriorEvoExclusiveMoveNames({
     pokemonName: pokemonName, formatService: formatService,
   );
   final ancestorAll = <String>{};
-  for (final aMoves in ancestorMoveLists) {
-    ancestorAll.addAll(buildLearnsetForFormat(aMoves, format));
+  for (final ancestor in ancestorMoveSets) {
+    ancestorAll.addAll(buildLearnsetForFormat(
+      ancestor.moves, format,
+      pokemonName: ancestor.speciesName, formatService: formatService,
+    ));
   }
   return ancestorAll.difference(current);
 }

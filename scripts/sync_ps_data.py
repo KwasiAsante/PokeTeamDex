@@ -36,6 +36,10 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 PS_BASE = "https://play.pokemonshowdown.com/data"
+# Raw TypeScript source on GitHub — carries data the compiled /data endpoints strip out,
+# notably `eventData` (gift/event-Pokémon movesets) and full per-move source codes
+# (e.g. "2S1" = Gen 2 event/special source — the compiled endpoints collapse this to "2").
+PS_GITHUB_RAW = "https://raw.githubusercontent.com/smogon/pokemon-showdown/master"
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "assets", "data", "ps")
 os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -53,12 +57,16 @@ def fetch_json_endpoint(path: str) -> dict:
     return r.json()
 
 
-def fetch_js_endpoint(path: str) -> dict:
+def fetch_js_endpoint(path: str, base: str = PS_BASE) -> dict:
     """
-    Fetch a PS .js data file (JS object literal) and parse it via json5.
-    Format: 'use strict';\nexports.BattleX={unquotedKey:{...},...};
+    Fetch a JS/TS data file containing a single object-literal export and parse
+    it via json5. Handles both PS's compiled format
+    ('use strict';\nexports.BattleX={unquotedKey:{...},...};) and raw TypeScript
+    source (export const Learnsets: SomeType = {unquotedKey:{...},...};) — in
+    both cases we just locate the first '{' and hand the rest to json5, which
+    tolerates unquoted keys, single-quoted strings, and trailing commas.
     """
-    url = f"{PS_BASE}/{path}"
+    url = f"{base}/{path}"
     print(f"  GET {url}")
     r = requests.get(url, timeout=60)
     r.raise_for_status()
@@ -95,6 +103,71 @@ def transform_learnsets(raw: dict) -> dict:
             result[pokemon] = {
                 str(g): sorted(moves) for g, moves in sorted(by_gen.items())
             }
+    return result
+
+
+def transform_detailed_learnsets(main_raw: dict, mod_raws: dict[int, dict]) -> dict:
+    """
+    Build a full-fidelity learnset dataset from PS's raw TypeScript sources —
+    the main `data/learnsets.ts` plus any per-generation mod overrides
+    (`data/mods/gen{N}/learnsets.ts`).
+
+    Unlike `transform_learnsets` (which keeps only the leading generation digit
+    of each source code, discarding the method letter), this keeps the full
+    source-code string — e.g. "2S1" — so a later layer can tell genuine
+    event/gift sources (S) apart from level-up/egg/tutor/machine (L/E/T/M).
+    It also carries through each species' `eventData`: structured records of
+    real gift/event Pokémon encounters (generation, level, moveset, shininess,
+    etc.) that PokéAPI has no equivalent category for at all.
+
+    Merge rule — union, never drop: a mod file's data for a generation is
+    *complementary* to the main file's (e.g. the gen2 mod covers gens 1-2 with
+    its own accurate "2S1"/"2E"/"2M" codes, while main's Dratini entry only has
+    gen-3+ sources — no overlap for the motivating case). Even where overlap
+    could occur for other species, unioning can only ever add legality
+    information, never incorrectly suppress it — the right bias for a
+    supplementary gap-filling source.
+
+    Input:  main_raw  = { "dratini": { "learnset": {...}, "eventData": [...] } }
+            mod_raws  = { 2: { "dratini": { "learnset": {...}, "eventData": [...] } } }
+    Output: { "dratini": { "learnset": { "extremespeed": ["2S1","4E",...] },
+                           "eventData": [ {"generation": 2, "level": 15, ...} ] } }
+    """
+    sources: list[dict] = [main_raw] + [mod_raws[g] for g in sorted(mod_raws)]
+
+    species: set[str] = set()
+    for raw in sources:
+        species.update(raw.keys())
+
+    result: dict[str, dict] = {}
+    for pokemon in species:
+        learnset: dict[str, set[str]] = {}
+        event_data: list[dict] = []
+        for raw in sources:
+            data = raw.get(pokemon)
+            if not data:
+                continue
+            for move, codes in (data.get("learnset") or {}).items():
+                learnset.setdefault(move, set()).update(
+                    c for c in codes if c and c[0].isdigit()
+                )
+            for ev in (data.get("eventData") or []):
+                entry = {
+                    k: ev[k]
+                    for k in ("generation", "level", "moves", "shiny", "gender",
+                              "isHidden", "pokeball")
+                    if k in ev
+                }
+                if entry not in event_data:
+                    event_data.append(entry)
+        if not learnset and not event_data:
+            continue
+        entry: dict = {}
+        if learnset:
+            entry["learnset"] = {m: sorted(c) for m, c in sorted(learnset.items())}
+        if event_data:
+            entry["eventData"] = event_data
+        result[pokemon] = entry
     return result
 
 
@@ -234,14 +307,35 @@ def main() -> None:
     abilities = transform_abilities(fetch_js_endpoint("abilities.js"))
     ab_sha = write_json("abilities.json", abilities)
 
+    print("\nEvent learnsets (raw TS source on GitHub)…")
+    try:
+        main_raw = fetch_js_endpoint("data/learnsets.ts", base=PS_GITHUB_RAW)
+        mod_raws: dict[int, dict] = {}
+        for gen in range(1, 10):
+            try:
+                mod_raws[gen] = fetch_js_endpoint(
+                    f"data/mods/gen{gen}/learnsets.ts", base=PS_GITHUB_RAW
+                )
+            except Exception:
+                continue  # no mod-specific learnset override for this gen
+        detailed = transform_detailed_learnsets(main_raw, mod_raws)
+        ev_sha = write_json("event_learnsets.json", detailed)
+        with_events = sum(1 for d in detailed.values() if d.get("eventData"))
+        print(f"  Built detailed learnsets for {len(detailed)} Pokémon "
+              f"({with_events} with eventData; mods found for gens {sorted(mod_raws)})")
+    except Exception as e:
+        print(f"  WARNING: Could not build event learnsets: {e}")
+        ev_sha = "0" * 16
+
     # Version manifest
     version = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "sha": {
-            "learnsets": ls_sha,
-            "moves":     mv_sha,
-            "items":     it_sha,
-            "abilities": ab_sha,
+            "learnsets":      ls_sha,
+            "moves":          mv_sha,
+            "items":          it_sha,
+            "abilities":      ab_sha,
+            "event_learnsets": ev_sha,
         },
     }
     version_path = os.path.join(OUT_DIR, "version.json")
@@ -249,7 +343,9 @@ def main() -> None:
         json.dump(version, f, indent=2)
     print(f"\n  -> version.json  ({version['generated_at']})")
 
-    # Copy version to backend static dir for the /ps-data/version endpoint
+    # Copy version + data files to backend static dir so /ps-data/version and
+    # /ps-data/file/:name (see backend/app/routers/ps_data.py) can serve them —
+    # this is how the Flutter app refreshes its Hive cache post-install.
     backend_static = os.path.join(
         os.path.dirname(__file__), "..", "backend", "app", "static"
     )
@@ -259,8 +355,26 @@ def main() -> None:
         json.dump(version, f, indent=2)
     print(f"  -> backend/app/static/ps_data_version.json")
 
-    print("\nSync complete. Commit assets/data/ps/ and "
-          "backend/app/static/ps_data_version.json.\n")
+    # Must match the _ALLOWED_FILES set in backend/app/routers/ps_data.py and
+    # the fileMap in FormatService._checkForUpdates.
+    served_files = [
+        "learnsets.json",
+        "moves.json",
+        "items.json",
+        "abilities.json",
+        "event_learnsets.json",
+    ]
+    for filename in served_files:
+        src = os.path.join(OUT_DIR, filename)
+        if not os.path.exists(src):
+            continue
+        with open(src, encoding="utf-8") as f:
+            contents = f.read()
+        with open(os.path.join(backend_static, filename), "w", encoding="utf-8") as f:
+            f.write(contents)
+    print(f"  -> backend/app/static/{{{', '.join(served_files)}}}")
+
+    print("\nSync complete. Commit assets/data/ps/ and backend/app/static/.\n")
 
 
 if __name__ == "__main__":
