@@ -32,15 +32,6 @@ void main() {
       expect(result, isEmpty);
     });
 
-    test('excludes -primal forms', () {
-      final result = filterFormChips(
-        varieties: ['kyogre', 'kyogre-primal'],
-        heldItem: null,
-        abilityName: null,
-      );
-      expect(result, isEmpty);
-    });
-
     test('excludes -gmax forms', () {
       final result = filterFormChips(
         varieties: ['charizard', 'charizard-gmax'],
@@ -205,6 +196,58 @@ void main() {
         abilityName: null,
       );
       expect(result, contains('giratina-origin'));
+    });
+  });
+
+  group('filterFormChips — Primal Reversion (item-gated, not blanket-excluded)', () {
+    // Unlike Mega Evolution (an optional in-battle action modelled as a
+    // separate toggle), Primal Reversion triggers automatically and
+    // unavoidably while Primal Groudon/Kyogre holds its orb — mechanically
+    // identical to Giratina's Origin Forme, so it's gated the same way
+    // rather than blanket-excluded by its `-primal` suffix.
+    test('groudon-primal shown when holding red-orb', () {
+      final result = filterFormChips(
+        varieties: ['groudon', 'groudon-primal'],
+        heldItem: 'red-orb',
+        abilityName: null,
+      );
+      expect(result, contains('groudon-primal'));
+    });
+
+    test('groudon-primal hidden without the orb', () {
+      final result = filterFormChips(
+        varieties: ['groudon', 'groudon-primal'],
+        heldItem: null,
+        abilityName: null,
+      );
+      expect(result, isNot(contains('groudon-primal')));
+    });
+
+    test('kyogre-primal shown when holding blue-orb', () {
+      final result = filterFormChips(
+        varieties: ['kyogre', 'kyogre-primal'],
+        heldItem: 'blue-orb',
+        abilityName: null,
+      );
+      expect(result, contains('kyogre-primal'));
+    });
+
+    test('kyogre-primal hidden without the orb', () {
+      final result = filterFormChips(
+        varieties: ['kyogre', 'kyogre-primal'],
+        heldItem: null,
+        abilityName: null,
+      );
+      expect(result, isNot(contains('kyogre-primal')));
+    });
+
+    test('kyogre-primal hidden when holding the wrong orb', () {
+      final result = filterFormChips(
+        varieties: ['kyogre', 'kyogre-primal'],
+        heldItem: 'red-orb',
+        abilityName: null,
+      );
+      expect(result, isNot(contains('kyogre-primal')));
     });
   });
 

@@ -695,15 +695,26 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final cosmeticFormEntries =
             cosmeticFormsAsync.asData?.value ?? const <PokemonFormEntry>[];
         final cosmeticForms = cosmeticFormEntries.map((f) => f.name).toList();
-        // Filter: exclude mega/primal/gmax/gender; gate ability/item forms
-        // on their prerequisite being selected. Variety-based and cosmetic
-        // candidates run through the same gating rules.
+        // Primal Reversion (Red/Blue Orb) only existed in Gen 6 (Omega
+        // Ruby/Alpha Sapphire) and Gen 7 (Sun/Moon era, via Pokémon Bank
+        // transfer) — the same generational window as Mega Evolution's
+        // Mega Stones. Hide the chip outside that window even if the orb
+        // is held, mirroring `alphaFormatOk` below for Alpha Pokémon.
+        final primalFormatOk = mechanics == null ||
+            mechanics.gen == 6 ||
+            mechanics.gen == 7;
+        const primalForms = {'groudon-primal', 'kyogre-primal'};
+        // Filter: exclude mega/gmax/gender; gate ability/item forms (incl.
+        // Primal Reversion via the Red/Blue Orb) on their prerequisite
+        // being selected, then drop Primal Reversion chips outside its
+        // Gen 6-7 window. Variety-based and cosmetic candidates run
+        // through the same gating rules.
         final availableForms = filterFormChips(
           varieties: allVarieties,
           cosmeticForms: cosmeticForms,
           heldItem: _heldItemName,
           abilityName: _abilityName,
-        );
+        ).where((f) => primalFormatOk || !primalForms.contains(f)).toList();
         final hasMultipleForms = availableForms.isNotEmpty;
         final isCosmeticFormSelected =
             _formName != null && cosmeticForms.contains(_formName);
