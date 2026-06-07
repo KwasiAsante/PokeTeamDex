@@ -808,7 +808,7 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
       };
       final eventRows = <_MoveRow>[];
       for (final id in formatService.eventMovesForGen(widget.pokemon.name, gen)) {
-        final name = psIdToName[id];
+        final name = _resolveEventMoveName(id, psIdToName, formatService);
         if (name == null || alreadyShown.contains(name)) continue;
         eventRows.add(_MoveRow(moveName: name, level: 0));
       }
@@ -845,6 +845,28 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     return map;
   }
 
+  /// Resolves a PS move id surfaced by [FormatService.eventMovesForGen] to a
+  /// displayable PokéAPI-style move name. Tries [psIdToName] first (the move
+  /// appears in PokéAPI's data for the species or an ancestor — just under a
+  /// different generation/method); falls back to PS's own move database for
+  /// moves PokéAPI has zero record of for the line at all — e.g. Eevee's
+  /// Gen-2 event-exclusive Growth (a Stadium-2/gift encounter, unlike
+  /// Dratini's Extreme Speed which PokéAPI at least lists via a later-gen
+  /// egg/tutor method). PS names preserve official punctuation/hyphenation
+  /// ("King's Shield", "U-turn"), so lower-casing, hyphenating whitespace and
+  /// dropping apostrophes reliably reproduces the PokéAPI slug.
+  static String? _resolveEventMoveName(
+    String psId,
+    Map<String, String> psIdToName,
+    FormatService? formatService,
+  ) {
+    final known = psIdToName[psId];
+    if (known != null) return known;
+    final entry = formatService?.moveDetail(psId);
+    if (entry == null) return null;
+    return entry.name.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
+  }
+
   /// For each ancestor, returns exclusive move rows learnable in [selectedVg]
   /// that the current Pokémon cannot learn in [selectedVg] — including
   /// genuine event/gift-exclusive moves from [FormatService.eventMovesForGen]
@@ -879,7 +901,7 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     }
     if (canQueryEvents) {
       for (final id in formatService.eventMovesForGen(widget.pokemon.name, gen)) {
-        final name = psIdToName[id];
+        final name = _resolveEventMoveName(id, psIdToName, formatService);
         if (name != null) currentInVg.add(name);
       }
     }
@@ -902,7 +924,7 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
       }
       if (canQueryEvents) {
         for (final id in formatService.eventMovesForGen(ancestor.speciesName, gen)) {
-          final name = psIdToName[id];
+          final name = _resolveEventMoveName(id, psIdToName, formatService);
           if (name == null || currentInVg.contains(name)) continue;
           if (!rows.any((r) => r.moveName == name)) {
             rows.add(_MoveRow(moveName: name, level: 0));

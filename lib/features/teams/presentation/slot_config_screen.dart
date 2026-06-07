@@ -745,13 +745,30 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         // for the picker's "Event" badge. Selectability/validation already
         // flow through buildLearnsetForFormat's PS event-move supplementary
         // pass (see slot_validator.dart), so this only affects display.
+        //
+        // Checked against `effectiveLearnableMoves` rather than
+        // `effectivePokemonMoves` — some genuinely event-exclusive moves
+        // (e.g. Eevee's Gen-2 event-exclusive Growth) never appear in
+        // PokéAPI's move list for the species at all, so they only exist in
+        // the learnable set via buildLearnsetForFormat's PS-name fallback.
+        final effectiveLearnableMoves = (format != null
+                ? buildLearnsetForFormat(
+                    effectivePokemonMoves, format,
+                    pokemonName: formPokemon?.name ?? pokemon.name,
+                    formatService: formatService,
+                  )
+                : effectivePokemonMoves
+                    .map((m) => m['move']['name'] as String)
+                    .toSet())
+            .toList()
+          ..sort();
+
         final effectiveEventMoves = <String>{};
         if (format != null && formatService.isInitialized) {
           final eventIds = formatService.eventMovesForGen(
               formPokemon?.name ?? pokemon.name, format.gen);
           if (eventIds.isNotEmpty) {
-            for (final m in effectivePokemonMoves) {
-              final name = (m['move'] as Map)['name'] as String;
+            for (final name in effectiveLearnableMoves) {
               if (eventIds.contains(name.replaceAll('-', '').toLowerCase())) {
                 effectiveEventMoves.add(name);
               }
@@ -772,18 +789,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     _moves[int.parse(entry.key.substring(4)) - 1]))
               entry.key: entry.value,
         };
-
-        final effectiveLearnableMoves = (format != null
-                ? buildLearnsetForFormat(
-                    effectivePokemonMoves, format,
-                    pokemonName: formPokemon?.name ?? pokemon.name,
-                    formatService: formatService,
-                  )
-                : effectivePokemonMoves
-                    .map((m) => m['move']['name'] as String)
-                    .toSet())
-            .toList()
-          ..sort();
 
         // Combined sorted move list: regular + prior-evo-exclusive.
         final allPickableMoves = {

@@ -174,22 +174,47 @@ Set<String> buildLearnsetForFormat(
   if (pokemonName != null &&
       formatService != null &&
       formatService.isInitialized) {
-    final psMoveIds = {
-      ...formatService.learnsetForGen(pokemonName.toLowerCase(), format.gen),
-      ...formatService.eventMovesForGen(pokemonName.toLowerCase(), format.gen),
-    };
-    if (psMoveIds.isNotEmpty) {
+    final name = pokemonName.toLowerCase();
+    final regularPsIds = formatService.learnsetForGen(name, format.gen);
+    final eventPsIds = formatService.eventMovesForGen(name, format.gen);
+
+    final matchedPsIds = <String>{};
+    if (regularPsIds.isNotEmpty || eventPsIds.isNotEmpty) {
       for (final moveData in pokemonMoves) {
         final moveName = (moveData['move'] as Map)['name'] as String;
         // Convert PokéAPI name to PS id (strip hyphens) for comparison.
         final psId = _toPsId(moveName);
-        if (psMoveIds.contains(psId)) result.add(moveName);
+        if (regularPsIds.contains(psId) || eventPsIds.contains(psId)) {
+          result.add(moveName);
+          matchedPsIds.add(psId);
+        }
       }
+    }
+
+    // Some genuinely event-exclusive moves never appear in PokéAPI's move
+    // list for this species at all — under ANY method or generation — e.g.
+    // Eevee's Gen-2 event-exclusive Growth (a Stadium 2 / gift encounter
+    // PokéAPI has zero record of, unlike Dratini's Extreme Speed which it at
+    // least lists under a later-gen egg/tutor method). The cross-check above
+    // can never recover these since there's no `pokemonMoves` entry to match
+    // against — fall back to PS's own move database for a displayable name.
+    for (final psId in eventPsIds.difference(matchedPsIds)) {
+      final entry = formatService.moveDetail(psId);
+      if (entry != null) result.add(_apiSlugForPsName(entry.name));
     }
   }
 
   return result;
 }
+
+/// Converts a PS move display name (e.g. "King's Shield", "U-turn") to its
+/// PokéAPI-style hyphenated slug ("kings-shield", "u-turn") — the inverse of
+/// [_toPsId] for names PS tracks but that never surface in `pokemonMoves`
+/// (so there's no existing PokéAPI name string to reuse verbatim). PokéAPI
+/// slugs drop apostrophes outright and hyphenate on whitespace; PS names
+/// already preserve official punctuation/hyphenation, so this is reliable.
+String _apiSlugForPsName(String name) =>
+    name.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
 
 Set<String> _buildLearnset(
   List<Map<String, dynamic>> pokemonMoves,
