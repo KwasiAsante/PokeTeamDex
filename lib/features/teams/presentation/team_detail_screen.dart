@@ -576,11 +576,15 @@ class _FilledSlotCard extends ConsumerWidget {
             : null;
 
         // ── Gigantamax sprite ───────────────────────────────────────────────
+        // Use the actively-selected form (e.g. Urshifu Rapid Strike, Toxtricity
+        // Low Key) rather than the base species — species with multiple forms
+        // can have different G-Max moves/artwork per form.
+        final gmaxSpeciesName = formChangePokemon?.name ?? pokemon.name;
         final isGMaxActive = slot.hasGigantamax && slot.gigantamaxEnabled &&
-            gmaxMoveForSpecies(pokemon.name) != null;
+            gmaxMoveForSpecies(gmaxSpeciesName) != null;
         final gmaxPokemon = isGMaxActive
             ? ref
-                .watch(pokemonByNameProvider('${pokemon.name}-gmax'))
+                .watch(pokemonByNameProvider('$gmaxSpeciesName-gmax'))
                 .asData
                 ?.value
             : null;
