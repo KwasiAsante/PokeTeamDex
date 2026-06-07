@@ -1017,6 +1017,33 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
                               rows: grouped[method]!,
                               showLevel: method == 'level-up',
                             )),
+                    // FormatService backs the "Event Moves" group — while it's
+                    // still initializing, `formatsReady` is false and the group
+                    // is simply absent from `grouped`, which looks identical to
+                    // "this Pokémon has no event moves". Show a spinner so it's
+                    // clear the table is still loading, not empty.
+                    if (!formatsReady)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: colorScheme.tertiary,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Loading event moves…',
+                              style: textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ),
                     if (priorEvoLoading)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
