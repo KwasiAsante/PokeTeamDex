@@ -664,8 +664,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               }
             : baseStats;
         // Prefer HOME artwork (higher quality); fall back to official artwork.
+        // Use shiny variants when the slot is shiny (mirrors form-change handling
+        // below) — otherwise a shiny mega/G-Max Pokémon renders in its regular
+        // colours since mega/gmax artwork takes priority over the gen sprite.
         final megaHomeUrl = megaPokemon != null
-            ? pokemonHomeUrl(megaPokemon.id)
+            ? (_isShiny
+                ? pokemonHomeShinyUrl(megaPokemon.id)
+                : pokemonHomeUrl(megaPokemon.id))
             : null;
         final megaArtworkUrl = megaHomeUrl; // primary; official is the fallback
 
@@ -830,16 +835,26 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             : null;
 
         // Sprite priority: G-Max > Mega > Form change > default.
-        final gmaxHomeUrl = gmaxPokemon != null ? pokemonHomeUrl(gmaxPokemon.id) : null;
+        final gmaxHomeUrl = gmaxPokemon != null
+            ? (_isShiny
+                ? pokemonHomeShinyUrl(gmaxPokemon.id)
+                : pokemonHomeUrl(gmaxPokemon.id))
+            : null;
         // Gender sprite selection is now handled inside _buildHeader using
         // spriteUrls.femaleUrl / femaleShinyUrl (set for Gen 4+ and HOME).
 
         final effectiveMegaArtworkUrl =
             gmaxHomeUrl ?? megaArtworkUrl ?? formHomeUrl;
         final effectiveMegaFallbackUrl = gmaxHomeUrl != null
-            ? gmaxPokemon?.officialArtworkUrl
+            ? (_isShiny
+                ? (gmaxPokemon?.officialArtworkShinyUrl ??
+                    gmaxPokemon?.officialArtworkUrl)
+                : gmaxPokemon?.officialArtworkUrl)
             : megaArtworkUrl != null
-                ? megaPokemon?.officialArtworkUrl
+                ? (_isShiny
+                    ? (megaPokemon?.officialArtworkShinyUrl ??
+                        megaPokemon?.officialArtworkUrl)
+                    : megaPokemon?.officialArtworkUrl)
                 : formFallbackUrl;
 
         // ── Alpha Pokémon ───────────────────────────────────────────────────
