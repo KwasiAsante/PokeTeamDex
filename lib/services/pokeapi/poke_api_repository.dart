@@ -194,11 +194,17 @@ class PokeApiRepository {
 
       // ── Strategy 2: base-species variety search ────────────────────────────
       // For hyphenated names (PS form names) where the direct /pokemon and
-      // /pokemon-species lookups both failed.  Strip the form suffix and look
-      // up the owning species, then search its variety list for:
+      // /pokemon-species lookups both failed.  Strip the form suffix, look up
+      // the owning species, and search its variety list for:
       //   1. An exact name match  (e.g. "gastrodon-east" in Gastrodon varieties)
       //   2. A prefix match       (e.g. "calyrex-shadow" → "calyrex-shadow-rider")
-      // Intentionally does NOT fall back to the default variety here — silently
+      //
+      // Once a variety is found, fetch by the numeric ID embedded in the
+      // variety URL.  Some alternate forms (like Gastrodon-East, ID 10015) are
+      // not reachable via /pokemon/{name} — only via /pokemon/{id} — so using
+      // the URL-embedded ID is more reliable than a second name-based lookup.
+      //
+      // Intentionally does NOT fall back to the default variety — silently
       // importing the wrong form would be more confusing than a clear error.
       if (name.contains('-')) {
         final baseName = name.split('-').first;
@@ -206,16 +212,21 @@ class PokeApiRepository {
             await _pokeApiClient.client.get('/pokemon-species/$baseName');
         if (r2.statusCode == 200) {
           final varieties = r2.data['varieties'] as List? ?? [];
-          // 1. Exact variety name
-          for (final v in varieties) {
-            if ((v['pokemon'] as Map)['name'] == name) {
-              return await fetchPokemonByName(name);
-            }
-          }
-          // 2. PS name is a prefix of the PokéAPI variety name
           for (final v in varieties) {
             final vName = (v['pokemon'] as Map)['name'] as String;
-            if (vName.startsWith('$name-')) {
+            // Match: exact name OR PS name is a prefix of the PokéAPI name
+            // (e.g. "calyrex-shadow" → "calyrex-shadow-rider")
+            if (vName == name || vName.startsWith('$name-')) {
+              // Prefer ID-based fetch: alternate forms may only be accessible
+              // via /pokemon/{id}, not /pokemon/{name}.
+              final vUrl = (v['pokemon'] as Map)['url'] as String?;
+              if (vUrl != null) {
+                final seg = Uri.parse(vUrl).pathSegments
+                    .where((s) => s.isNotEmpty)
+                    .toList();
+                final id = int.tryParse(seg.isNotEmpty ? seg.last : '');
+                if (id != null) return await fetchPokemon(id);
+              }
               return await fetchPokemonByName(vName);
             }
           }
