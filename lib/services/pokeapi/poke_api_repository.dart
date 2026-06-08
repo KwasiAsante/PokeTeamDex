@@ -16,6 +16,19 @@ class PokeApiRepository {
   final PokeApiClient _pokeApiClient;
   final PokeApiCache _pokeApiCache;
 
+  /// In-memory cache of parsed [PokemonEntry] objects, layered on top of
+  /// [_pokeApiCache]'s raw-JSON Hive cache. `PokemonEntry.fromJson` walks
+  /// every nested list (a movepool can run 100-200 entries) — that's
+  /// synchronous CPU work on the calling isolate. Both the Pokédex list
+  /// (`pokemonDetailProvider` per visible tile) and team/slot screens
+  /// (`pokemonDetailProvider`/`pokemonByNameProvider` per slot card, for the
+  /// base species plus any active mega/form/G-Max) re-request the same
+  /// species repeatedly as `.autoDispose` providers are torn down and rebuilt
+  /// on scroll/navigation — re-parsing the cached JSON every time. Memoizing
+  /// the parsed object skips that re-parse on every repeat lookup.
+  final Map<int, PokemonEntry> _pokemonById = {};
+  final Map<String, PokemonEntry> _pokemonByName = {};
+
   Future<List<PokemonListEntry>> fetchPokemonList({bool include = false}) async {
     try {
       final cache = _pokeApiCache.getIfValid('pokemon_list');
@@ -65,16 +78,22 @@ class PokeApiRepository {
   }
 
   Future<PokemonEntry> fetchPokemon(int id) async {
+    final memoized = _pokemonById[id];
+    if (memoized != null) return memoized;
     try {
       final cache = _pokeApiCache.getIfValid('pokemon_detail_$id');
       if (cache is Map<String, dynamic>) {
-        return PokemonEntry.fromJson(cache);
+        final entry = PokemonEntry.fromJson(cache);
+        _pokemonById[id] = entry;
+        return entry;
       } else {
         final response = await _pokeApiClient.client.get('/pokemon/$id');
         if (response.statusCode == 200) {
           final pokemonResponse = Map<String, dynamic>.from(response.data);
           _pokeApiCache.putWithTTL('pokemon_detail_$id', pokemonResponse, const Duration(days: 7));
-          return PokemonEntry.fromJson(pokemonResponse);
+          final entry = PokemonEntry.fromJson(pokemonResponse);
+          _pokemonById[id] = entry;
+          return entry;
         } else {
           throw Exception('Failed to fetch pokemon: ${response.statusCode}');
         }
@@ -85,10 +104,15 @@ class PokeApiRepository {
   }
 
   Future<PokemonEntry> fetchPokemonByName(String name) async {
+    final memoized = _pokemonByName[name];
+    if (memoized != null) return memoized;
     final cacheKey = 'pokemon_name_$name';
     final cached = _pokeApiCache.getIfValid(cacheKey);
     if (cached is Map<String, dynamic>) {
-      return PokemonEntry.fromJson(cached);
+      final entry = PokemonEntry.fromJson(cached);
+      _pokemonByName[name] = entry;
+      _pokemonById.putIfAbsent(entry.id, () => entry);
+      return entry;
     }
     final response = await _pokeApiClient.client.get('/pokemon/$name');
     if (response.statusCode != 200) {
@@ -96,7 +120,10 @@ class PokeApiRepository {
     }
     final data = Map<String, dynamic>.from(response.data);
     _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
-    return PokemonEntry.fromJson(data);
+    final entry = PokemonEntry.fromJson(data);
+    _pokemonByName[name] = entry;
+    _pokemonById.putIfAbsent(entry.id, () => entry);
+    return entry;
   }
 
   /// Fetches a `pokemon-form` resource — used for cosmetic forms (e.g. Burmy's

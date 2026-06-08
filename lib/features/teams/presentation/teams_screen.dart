@@ -577,18 +577,15 @@ class _TeamTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    final pendingIds = ref.watch(pendingTeamIdsProvider).when(
-          data: (ids) => ids,
-          loading: () => <int>{},
-          error: (_, _) => <int>{},
-        );
-    final errorIds = ref.watch(errorTeamIdsProvider).when(
-          data: (ids) => ids,
-          loading: () => <int>{},
-          error: (_, _) => <int>{},
-        );
-    final hasError = errorIds.contains(team.id);
-    final hasPending = !hasError && pendingIds.contains(team.id);
+    // Select just this team's membership bool — watching the raw Set would
+    // rebuild every tile in the list on every sync-queue emission, even when
+    // this team's pending/error status didn't change.
+    final hasError = ref.watch(errorTeamIdsProvider.select(
+      (async) => async.asData?.value.contains(team.id) ?? false,
+    ));
+    final hasPending = !hasError && ref.watch(pendingTeamIdsProvider.select(
+      (async) => async.asData?.value.contains(team.id) ?? false,
+    ));
 
     return ListTile(
       contentPadding:
