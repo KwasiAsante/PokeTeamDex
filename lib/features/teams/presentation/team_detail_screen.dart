@@ -849,10 +849,11 @@ class _FilledSlotCard extends ConsumerWidget {
                                     : genderUrl != null
                                         ? genFallback
                                         : null,
-                                fallbackUrl2: megaArtworkUrl == null &&
-                                        genderUrl != null
-                                    ? homeFemaleUrl
-                                    : null,
+                                fallbackUrl2: megaArtworkUrl != null
+                                    ? spriteUrls.defaultUrl
+                                    : genderUrl != null
+                                        ? homeFemaleUrl
+                                        : null,
                                 shinyUrl: (megaArtworkUrl == null &&
                                         genderUrl == null)
                                     ? spriteUrls.shinyUrl

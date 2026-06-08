@@ -214,9 +214,15 @@ class PokeApiRepository {
           final varieties = r2.data['varieties'] as List? ?? [];
           for (final v in varieties) {
             final vName = (v['pokemon'] as Map)['name'] as String;
-            // Match: exact name OR PS name is a prefix of the PokéAPI name
-            // (e.g. "calyrex-shadow" → "calyrex-shadow-rider")
-            if (vName == name || vName.startsWith('$name-')) {
+            // Match:
+            //   1. Exact              — "gastrodon-east" == "gastrodon-east"
+            //   2. Forward prefix     — "calyrex-shadow" → "calyrex-shadow-rider"
+            //   3. Reverse prefix     — "necrozma-dawn-wings" → "necrozma-dawn"
+            //      (PS appends extra suffixes that PokéAPI omits; guard with
+            //      vName != baseName so base form "necrozma" is never matched)
+            if (vName == name ||
+                vName.startsWith('$name-') ||
+                (name.startsWith('$vName-') && vName != baseName)) {
               // Prefer ID-based fetch: alternate forms may only be accessible
               // via /pokemon/{id}, not /pokemon/{name}.
               final vUrl = (v['pokemon'] as Map)['url'] as String?;

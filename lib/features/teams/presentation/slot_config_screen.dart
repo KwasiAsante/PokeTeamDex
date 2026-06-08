@@ -1294,9 +1294,14 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   : genderUrl != null
                       ? genFallback
                       : null,
-              fallbackUrl2: megaArtworkUrl == null && genderUrl != null
-                  ? homeFemaleUrl
-                  : null,
+              fallbackUrl2: megaArtworkUrl != null
+                  // When a form/mega/gmax URL is active but both it and
+                  // fallbackUrl fail (e.g. Polteageist Antique has no HOME
+                  // artwork), fall back to the base Pokémon sprite.
+                  ? spriteUrls.defaultUrl
+                  : genderUrl != null
+                      ? homeFemaleUrl
+                      : null,
               shinyUrl: (megaArtworkUrl == null && genderUrl == null)
                   ? spriteUrls.shinyUrl
                   : null,
