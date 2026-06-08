@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/features/pokedex/models/pokedex_filter.dart';
+import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
@@ -328,16 +329,20 @@ class _GenFilterBar extends ConsumerWidget {
 
 // ── Picker tile ───────────────────────────────────────────────────────────────
 
-class _PickerTile extends StatelessWidget {
+class _PickerTile extends ConsumerWidget {
   final PokemonListEntry entry;
   final VoidCallback onTap;
 
   const _PickerTile({required this.entry, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
+    final detailAsync = ref.watch(pokemonDetailProvider(entry.id));
+    final displayName = detailAsync.asData?.value.displaySpeciesName ??
+        entry.name.toCapitalCase();
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -346,7 +351,7 @@ class _PickerTile extends StatelessWidget {
         backgroundImage: NetworkImage(entry.imageUrl),
       ),
       title: Text(
-        entry.name.toCapitalCase(),
+        displayName,
         style: textTheme.bodyLarge,
       ),
       trailing: Text(

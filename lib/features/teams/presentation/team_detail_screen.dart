@@ -479,7 +479,7 @@ class _FilledSlotCard extends ConsumerWidget {
       error: (e, _) =>
           Card(child: Center(child: Text('Error', style: textTheme.bodySmall))),
       data: (pokemon) {
-        final speciesName = pokemon.name.toCapitalCase();
+        final speciesName = pokemon.displaySpeciesName;
         final nickname = slot.nickname?.trim();
         final hasNickname =
             nickname != null && nickname.isNotEmpty && nickname != speciesName;

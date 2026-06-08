@@ -109,12 +109,13 @@ class PokemonGridCard extends ConsumerWidget {
                     ),
                   ),
                   Text(
-                    pokemon.name
-                        .split('-')
-                        .map((w) => w.isEmpty
-                            ? ''
-                            : '${w[0].toUpperCase()}${w.substring(1)}')
-                        .join(' '),
+                    detailAsync.asData?.value.displaySpeciesName ??
+                        pokemon.name
+                            .split('-')
+                            .map((w) => w.isEmpty
+                                ? ''
+                                : '${w[0].toUpperCase()}${w.substring(1)}')
+                            .join(' '),
                     style: textTheme.bodyMedium
                         ?.copyWith(fontWeight: FontWeight.bold),
                     maxLines: 1,

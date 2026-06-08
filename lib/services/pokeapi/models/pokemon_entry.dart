@@ -1,6 +1,10 @@
 class PokemonEntry {
   final int id;
   final String name;
+  /// The bare species name from the `species` field of the `/pokemon` response
+  /// (e.g. `"wormadam"` when `name` is `"wormadam-plant"`).  Null for entries
+  /// fetched from older cached responses that pre-date this field.
+  final String? speciesName;
   final int height;
   final int weight;
   final int? baseExperience;
@@ -16,6 +20,7 @@ class PokemonEntry {
   PokemonEntry({
     required this.id,
     required this.name,
+    this.speciesName,
     required this.height,
     required this.weight,
     this.baseExperience,
@@ -33,6 +38,7 @@ class PokemonEntry {
     return PokemonEntry(
       id: json['id'] as int,
       name: json['name'] as String,
+      speciesName: json['species']?['name'] as String?,
       height: json['height'] as int,
       weight: json['weight'] as int,
       baseExperience: json['base_experience'] as int?,
@@ -77,6 +83,41 @@ class PokemonEntry {
       };
 
   String displayId() => '#${id.toString().padLeft(3, '0')}';
+
+  /// Display-ready species name.
+  ///
+  /// For species whose default variety name has a form suffix baked in
+  /// (e.g. `name = "wormadam-plant"`, `speciesName = "wormadam"`), returns
+  /// the bare species name capitalised ("Wormadam").  For normal species where
+  /// the variety name equals the species name, returns the capitalised name as
+  /// usual ("Charizard", "Mr-Mime" → "Mr Mime").
+  String get displaySpeciesName {
+    final sn = speciesName;
+    if (sn != null && name.startsWith('$sn-')) {
+      return sn
+          .split('-')
+          .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+          .join(' ');
+    }
+    return name
+        .split('-')
+        .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+  }
+
+  /// The form-suffix portion of [name] for "no-plain-form" species.
+  ///
+  /// Returns `"plant"` when `name = "wormadam-plant"` and
+  /// `speciesName = "wormadam"`, so callers can label the default form chip
+  /// "Plant" instead of the generic "Default".  Returns `null` for normal
+  /// species (where the variety name equals the species name).
+  String? get defaultFormLabel {
+    final sn = speciesName;
+    if (sn != null && name.startsWith('$sn-')) {
+      return name.substring(sn.length + 1);
+    }
+    return null;
+  }
 
   String? get officialArtworkShinyUrl =>
       sprites?['other']?['official-artwork']?['front_shiny'] as String?;

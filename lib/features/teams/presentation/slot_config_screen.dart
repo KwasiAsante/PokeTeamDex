@@ -595,7 +595,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           ? Center(child: Text('$e'))
           : Scaffold(appBar: AppBar(), body: Center(child: Text('$e'))),
       data: (pokemon) {
-        final speciesName = pokemon.name.toCapitalCase();
+        final speciesName = pokemon.displaySpeciesName;
 
         final abilities = pokemon.abilities.map((a) => (
           name: a['ability']['name'] as String,
@@ -970,7 +970,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               // ── Form selector (when Pokémon has multiple forms) ──
               if (hasMultipleForms) ...[
                 const SizedBox(height: 16),
-                _buildFormSelector(availableForms),
+                _buildFormSelector(availableForms,
+                    defaultFormLabel: pokemon.defaultFormLabel),
               ],
               const SizedBox(height: 24),
               _buildBasics(mechanics, speciesAsync.asData?.value.genderRate),
@@ -2202,7 +2203,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // ── Form selector ─────────────────────────────────────────────────────────
 
-  Widget _buildFormSelector(List<String> forms) {
+  Widget _buildFormSelector(List<String> forms, {String? defaultFormLabel}) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -2212,6 +2213,10 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         .join(' ');
 
     final isDefault = _formName == null;
+    // For no-plain-form species (e.g. Wormadam), label the default chip with
+    // the actual form name ("Plant") rather than the generic "Default".
+    final defaultChipLabel =
+        defaultFormLabel != null ? fmtForm(defaultFormLabel) : 'Default';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2224,7 +2229,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           children: [
             // Default form chip
             ChoiceChip(
-              label: const Text('Default'),
+              label: Text(defaultChipLabel),
               selected: isDefault,
               onSelected: (_) => setState(() { _formName = null; _dirty = true; }),
               selectedColor: colorScheme.primaryContainer,
