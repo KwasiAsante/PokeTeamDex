@@ -135,11 +135,12 @@ class PokemonListTile extends ConsumerWidget {
       null                     => 50.0, // icon aspect ratio
     };
 
-    final displayName = pokemon.name
-        .split('-')
-        .map((w) =>
-            w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
-        .join(' ');
+    final displayName = detailAsync.asData?.value.displaySpeciesName ??
+        pokemon.name
+            .split('-')
+            .map((w) =>
+                w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+            .join(' ');
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

@@ -1,6 +1,5 @@
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:change_case/change_case.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -170,7 +169,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         foregroundColor: Colors.white,
         leading: BackButton(onPressed: () => context.pop()),
         title: Text(
-          '${pokemon.displayId()}  ${pokemon.name.toCapitalCase()}',
+          '${pokemon.displayId()}  ${pokemon.displaySpeciesName}',
           style: const TextStyle(color: Colors.white),
         ),
         actions: [
@@ -217,7 +216,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        pokemon.name.toCapitalCase(),
+                        pokemon.displaySpeciesName,
                         style: textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                         textAlign: TextAlign.center,
@@ -326,7 +325,7 @@ class _DetailSliverAppBar extends StatelessWidget {
       foregroundColor: Colors.white,
       leading: BackButton(onPressed: () => context.pop()),
       title: Text(
-        '${pokemon.displayId()}  ${pokemon.name.toCapitalCase()}',
+        '${pokemon.displayId()}  ${pokemon.displaySpeciesName}',
         style: const TextStyle(color: Colors.white),
       ),
       actions: [
@@ -2144,7 +2143,7 @@ class _AddToTeamSheetState extends State<_AddToTeamSheet> {
           title: const Text('Replace slot?'),
           content: Text(
             'Slot $slot already has a Pokémon. Replace it with '
-            '${widget.pokemon.name.toCapitalCase()}?',
+            '${widget.pokemon.displaySpeciesName}?',
           ),
           actions: [
             TextButton(
@@ -2181,7 +2180,7 @@ class _AddToTeamSheetState extends State<_AddToTeamSheet> {
 
         showAppSnackBar(
           context,
-          '${widget.pokemon.name.toCapitalCase()} added to $teamName · Slot $slot',
+          '${widget.pokemon.displaySpeciesName} added to $teamName · Slot $slot',
           action: SnackBarAction(
             label: 'View team',
             onPressed: () => router.push('/teams/$teamId'),
@@ -2503,7 +2502,7 @@ class _AddToTeamTabState extends State<_AddToTeamTab> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          pokemon.name.toCapitalCase(),
+                          pokemon.displaySpeciesName,
                           style: textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.bold),
                         ),
@@ -2602,7 +2601,7 @@ class _AddToTeamTabState extends State<_AddToTeamTab> {
                 : () {
                     showAppSnackBar(
                       context,
-                      'Team Builder coming soon — ${pokemon.name.toCapitalCase()} queued for slot $_selectedSlot!',
+                      'Team Builder coming soon — ${pokemon.displaySpeciesName} queued for slot $_selectedSlot!',
                     );
                   },
             icon: const Icon(Icons.add),
