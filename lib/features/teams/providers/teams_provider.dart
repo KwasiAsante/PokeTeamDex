@@ -302,6 +302,116 @@ Future<void> deleteTeam(WidgetRef ref, int id) async {
 /// Inserts or replaces a slot in [teamId] at position [slot] with [pokemonId].
 /// Uses Gen III+ stat defaults (level 50, IVs 31). Queues a sync op.
 /// Callers should handle replacement confirmation before calling this.
+/// Copies [source] to [targetTeamId] at [targetSlotPosition], optionally
+/// deleting the source slot afterwards (move semantics when [deleteSource] is true).
+/// If the target position is already occupied, it is overwritten.
+Future<void> copySlotToTeam(
+  WidgetRef ref, {
+  required TeamSlot source,
+  required int targetTeamId,
+  required int targetSlotPosition,
+  required bool deleteSource,
+}) async {
+  final slotRepo = ref.read(teamSlotRepositoryProvider);
+  final syncQueue = ref.read(syncQueueRepositoryProvider);
+  final now = DateTime.now();
+
+  // Overwrite any existing slot at the target position.
+  final existing = await slotRepo.getByTeamAndSlot(targetTeamId, targetSlotPosition);
+  if (existing != null) {
+    await slotRepo.deleteSlot(targetTeamId, targetSlotPosition);
+  }
+
+  final newSlotId = await slotRepo.insert(TeamSlotsCompanion(
+    teamId: Value(targetTeamId),
+    slot: Value(targetSlotPosition),
+    pokemonId: Value(source.pokemonId),
+    nickname: Value(source.nickname),
+    formName: Value(source.formName),
+    level: Value(source.level),
+    gender: Value(source.gender),
+    isShiny: Value(source.isShiny),
+    friendship: Value(source.friendship),
+    abilityName: Value(source.abilityName),
+    natureName: Value(source.natureName),
+    heldItemName: Value(source.heldItemName),
+    move1: Value(source.move1),
+    move2: Value(source.move2),
+    move3: Value(source.move3),
+    move4: Value(source.move4),
+    evHp: Value(source.evHp),
+    evAtk: Value(source.evAtk),
+    evDef: Value(source.evDef),
+    evSpa: Value(source.evSpa),
+    evSpd: Value(source.evSpd),
+    evSpe: Value(source.evSpe),
+    ivHp: Value(source.ivHp),
+    ivAtk: Value(source.ivAtk),
+    ivDef: Value(source.ivDef),
+    ivSpa: Value(source.ivSpa),
+    ivSpd: Value(source.ivSpd),
+    ivSpe: Value(source.ivSpe),
+    isMegaEvolved: Value(source.isMegaEvolved),
+    hasGigantamax: Value(source.hasGigantamax),
+    gigantamaxEnabled: Value(source.gigantamaxEnabled),
+    isAlpha: Value(source.isAlpha),
+    ribbons: Value(source.ribbons),
+    contestCool: Value(source.contestCool),
+    contestBeautiful: Value(source.contestBeautiful),
+    contestCute: Value(source.contestCute),
+    contestClever: Value(source.contestClever),
+    contestTough: Value(source.contestTough),
+    contestSheen: Value(source.contestSheen),
+    createdAt: Value(now),
+    updatedAt: Value(now),
+  ));
+
+  await syncQueue.enqueue(PendingSyncOpsCompanion(
+    operation: const Value('upsert'),
+    entityType: const Value('team_slot'),
+    entityId: Value(newSlotId),
+    payload: Value(jsonEncode({
+      'team_local_id': targetTeamId,
+      'slot': targetSlotPosition,
+      'pokemon_id': source.pokemonId,
+      if (source.nickname != null && source.nickname!.isNotEmpty)
+        'nickname': source.nickname,
+      if (source.formName != null) 'form_name': source.formName,
+      'level': source.level ?? 50,
+      if (source.gender != null) 'gender': source.gender,
+      'is_shiny': source.isShiny,
+      if (source.friendship != null) 'friendship': source.friendship,
+      if (source.abilityName != null) 'ability_name': source.abilityName,
+      if (source.natureName != null) 'nature_name': source.natureName,
+      if (source.heldItemName != null) 'held_item_name': source.heldItemName,
+      if (source.move1 != null) 'move1': source.move1,
+      if (source.move2 != null) 'move2': source.move2,
+      if (source.move3 != null) 'move3': source.move3,
+      if (source.move4 != null) 'move4': source.move4,
+      'ev_hp': source.evHp, 'ev_atk': source.evAtk, 'ev_def': source.evDef,
+      'ev_spa': source.evSpa, 'ev_spd': source.evSpd, 'ev_spe': source.evSpe,
+      'iv_hp': source.ivHp, 'iv_atk': source.ivAtk, 'iv_def': source.ivDef,
+      'iv_spa': source.ivSpa, 'iv_spd': source.ivSpd, 'iv_spe': source.ivSpe,
+      if (source.ribbons != null) 'ribbons': source.ribbons,
+      'is_mega_evolved': source.isMegaEvolved,
+      'has_gigantamax': source.hasGigantamax,
+      'gigantamax_enabled': source.gigantamaxEnabled,
+      'is_alpha': source.isAlpha,
+      'contest_cool': source.contestCool,
+      'contest_beautiful': source.contestBeautiful,
+      'contest_cute': source.contestCute,
+      'contest_clever': source.contestClever,
+      'contest_tough': source.contestTough,
+      'contest_sheen': source.contestSheen,
+    })),
+    createdAt: Value(now),
+  ));
+
+  if (deleteSource) {
+    await slotRepo.deleteSlot(source.teamId, source.slot);
+  }
+}
+
 Future<void> addPokemonToSlot(
   WidgetRef ref, {
   required int teamId,
