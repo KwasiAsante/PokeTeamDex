@@ -12,17 +12,20 @@ import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 /// Shows the move/copy slot bottom sheet.
 ///
 /// [deleteSource] = true → move semantics; false → copy semantics.
+/// Pass multiple [sourceSlots] for bulk operations — slots are placed at their
+/// original position numbers in the target team (no individual slot picker).
 Future<void> showMoveCopySlotSheet(
   BuildContext context,
   WidgetRef ref, {
-  required TeamSlot sourceSlot,
+  required List<TeamSlot> sourceSlots,
   required bool deleteSource,
 }) async {
+  assert(sourceSlots.isNotEmpty);
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     builder: (_) => _MoveCopySlotSheet(
-      sourceSlot: sourceSlot,
+      sourceSlots: sourceSlots,
       deleteSource: deleteSource,
     ),
   );
@@ -36,12 +39,14 @@ enum _Step { teamPicker, slotPicker, newTeamForm }
 
 class _MoveCopySlotSheet extends ConsumerStatefulWidget {
   const _MoveCopySlotSheet({
-    required this.sourceSlot,
+    required this.sourceSlots,
     required this.deleteSource,
   });
 
-  final TeamSlot sourceSlot;
+  final List<TeamSlot> sourceSlots;
   final bool deleteSource;
+
+  bool get _isSingle => sourceSlots.length == 1;
 
   @override
   ConsumerState<_MoveCopySlotSheet> createState() => _MoveCopySlotSheetState();
@@ -72,13 +77,19 @@ class _MoveCopySlotSheetState extends ConsumerState<_MoveCopySlotSheet> {
   // ── Step transitions ────────────────────────────────────────────────────────
 
   Future<void> _pickExistingTeam(Team team) async {
-    final slotRepo = ref.read(teamSlotRepositoryProvider);
-    final slots = await slotRepo.getByTeam(team.id);
-    setState(() {
-      _targetTeam = team;
-      _targetSlots = slots;
-      _step = _Step.slotPicker;
-    });
+    if (widget._isSingle) {
+      // Single-slot: show slot picker so the user can choose the position.
+      final slotRepo = ref.read(teamSlotRepositoryProvider);
+      final slots = await slotRepo.getByTeam(team.id);
+      setState(() {
+        _targetTeam = team;
+        _targetSlots = slots;
+        _step = _Step.slotPicker;
+      });
+    } else {
+      // Multi-slot: preserve original slot positions, no picker needed.
+      await _copyAllToTeam(team);
+    }
   }
 
   Future<void> _showNewTeamForm() async {
@@ -100,12 +111,13 @@ class _MoveCopySlotSheetState extends ConsumerState<_MoveCopySlotSheet> {
 
   // ── Commit actions ──────────────────────────────────────────────────────────
 
+  /// Single-slot path: copy/move to a user-chosen slot position.
   Future<void> _copyToSlot(int slotPosition) async {
     setState(() => _saving = true);
     try {
       await copySlotToTeam(
         ref,
-        source: widget.sourceSlot,
+        source: widget.sourceSlots.first,
         targetTeamId: _targetTeam!.id,
         targetSlotPosition: slotPosition,
         deleteSource: widget.deleteSource,
@@ -124,28 +136,59 @@ class _MoveCopySlotSheetState extends ConsumerState<_MoveCopySlotSheet> {
     }
   }
 
+  /// Multi-slot path: copy/move all source slots at their original positions.
+  Future<void> _copyAllToTeam(Team team) async {
+    setState(() => _saving = true);
+    try {
+      for (final source in widget.sourceSlots) {
+        await copySlotToTeam(
+          ref,
+          source: source,
+          targetTeamId: team.id,
+          targetSlotPosition: source.slot,
+          deleteSource: widget.deleteSource,
+        );
+      }
+      if (mounted) {
+        final n = widget.sourceSlots.length;
+        Navigator.pop(context);
+        showAppSnackBar(
+          context,
+          widget.deleteSource
+              ? 'Moved $n Pokémon to ${team.name}'
+              : 'Copied $n Pokémon to ${team.name}',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<void> _createNewTeamAndCopy() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
 
     setState(() => _saving = true);
     try {
-      final newTeamId =
-          await createTeam(ref, name, folderId: _newTeamFolderId);
-      await copySlotToTeam(
-        ref,
-        source: widget.sourceSlot,
-        targetTeamId: newTeamId,
-        targetSlotPosition: 1,
-        deleteSource: widget.deleteSource,
-      );
+      final newTeamId = await createTeam(ref, name, folderId: _newTeamFolderId);
+      for (final source in widget.sourceSlots) {
+        await copySlotToTeam(
+          ref,
+          source: source,
+          targetTeamId: newTeamId,
+          // Single slot: slot 1; multi-slot: preserve original positions.
+          targetSlotPosition: widget._isSingle ? 1 : source.slot,
+          deleteSource: widget.deleteSource,
+        );
+      }
       if (mounted) {
         Navigator.pop(context);
+        final n = widget.sourceSlots.length;
         showAppSnackBar(
           context,
           widget.deleteSource
-              ? 'Moved to new team "$name"'
-              : 'Copied to new team "$name"',
+              ? 'Moved $n Pokémon to new team "$name"'
+              : 'Copied $n Pokémon to new team "$name"',
         );
       }
     } finally {
@@ -233,7 +276,7 @@ class _MoveCopySlotSheetState extends ConsumerState<_MoveCopySlotSheet> {
     switch (_step) {
       case _Step.teamPicker:
         return _TeamPickerBody(
-          sourceTeamId: widget.sourceSlot.teamId,
+          sourceTeamId: widget.sourceSlots.first.teamId,
           scrollController: scrollController,
           onTeamSelected: _pickExistingTeam,
           onNewTeam: _showNewTeamForm,
