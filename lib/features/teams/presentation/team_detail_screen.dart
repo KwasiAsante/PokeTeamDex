@@ -86,6 +86,46 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
   int? _selectedSlot;
   final _canCloseNotifier = ValueNotifier<Future<bool> Function()?>(null);
 
+  // ── Multi-select state ────────────────────────────────────────────────────
+  final Set<int> _selectedSlotIds = {};
+  bool get _isMultiSelect => _selectedSlotIds.isNotEmpty;
+
+  void _enterMultiSelect(TeamSlot slot) =>
+      setState(() => _selectedSlotIds.add(slot.id));
+
+  void _toggleSlotSelection(TeamSlot slot) => setState(() {
+        if (!_selectedSlotIds.remove(slot.id)) _selectedSlotIds.add(slot.id);
+      });
+
+  void _clearSelection() => setState(() => _selectedSlotIds.clear());
+
+  Future<void> _deleteSelected(List<TeamSlot> allSlots) async {
+    final toDelete =
+        allSlots.where((s) => _selectedSlotIds.contains(s.id)).toList();
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+    for (final s in toDelete) {
+      await slotRepo.deleteSlot(s.teamId, s.slot);
+    }
+    _clearSelection();
+    if (mounted) {
+      showAppSnackBar(
+          context, 'Deleted ${toDelete.length} Pokémon from team.');
+    }
+  }
+
+  Future<void> _copyOrMoveSelected(
+      List<TeamSlot> allSlots, bool deleteSource) async {
+    final selected =
+        allSlots.where((s) => _selectedSlotIds.contains(s.id)).toList();
+    await showMoveCopySlotSheet(
+      context,
+      ref,
+      sourceSlots: selected,
+      deleteSource: deleteSource,
+    );
+    if (mounted) _clearSelection();
+  }
+
   @override
   void dispose() {
     _canCloseNotifier.dispose();
@@ -110,6 +150,11 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
+        // Multi-select takes priority: back exits selection mode, not the screen.
+        if (_isMultiSelect) {
+          _clearSelection();
+          return;
+        }
         final canClose = _canCloseNotifier.value;
         if (canClose == null) {
           // No embedded slot config open — allow back normally.
@@ -133,117 +178,137 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
           final slots = slotsAsync.asData?.value ?? [];
 
           return Scaffold(
-            appBar: AppBar(
-              title: _TeamAppBarTitle(team: team),
-              actions: isWide
-                  ? [
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        tooltip: 'Rename',
-                        onPressed: () => _renameTeam(context, team),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.tune_outlined),
-                        tooltip: 'Change format',
-                        onPressed: () => _editFormat(context, team),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.download_outlined),
-                        tooltip: 'Import from Showdown',
-                        onPressed: () => showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          builder: (_) =>
-                              PsImportSheet(targetTeamId: widget.teamId),
-                        ),
-                      ),
-                      if (slots.isNotEmpty) ...[
-                        IconButton(
-                          icon: const Icon(Icons.save_rounded),
-                          tooltip: 'Save all slots',
-                          onPressed: () => _saveAllSlots(context, slots),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.upload_outlined),
-                          tooltip: 'Export to Showdown',
-                          onPressed: () => _exportShowdown(context, slots, team),
-                        ),
-                      ],
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        tooltip: 'Delete team',
-                        onPressed: () => _deleteTeam(context, team),
-                      ),
-                      const ConnectivityStatusButton(),
-                      const SettingsButton(),
-                    ]
-                  : [
-                      const ConnectivityStatusButton(),
-                      const SettingsButton(),
-                      PopupMenuButton<_TeamAction>(
-                        onSelected: (action) =>
-                            _handleTeamAction(context, action, slots, team),
-                        itemBuilder: (_) => [
-                          const PopupMenuItem(
-                            value: _TeamAction.rename,
-                            child: ListTile(
-                              leading: Icon(Icons.edit_outlined),
-                              title: Text('Rename'),
-                              contentPadding: EdgeInsets.zero,
+            appBar: _isMultiSelect
+                ? AppBar(
+                    leading: IconButton(
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Clear selection',
+                      onPressed: _clearSelection,
+                    ),
+                    title: Text('${_selectedSlotIds.length} selected'),
+                  )
+                : AppBar(
+                    title: _TeamAppBarTitle(team: team),
+                    actions: isWide
+                        ? [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined),
+                              tooltip: 'Rename',
+                              onPressed: () => _renameTeam(context, team),
                             ),
-                          ),
-                          const PopupMenuItem(
-                            value: _TeamAction.changeFormat,
-                            child: ListTile(
-                              leading: Icon(Icons.tune_outlined),
-                              title: Text('Change format'),
-                              contentPadding: EdgeInsets.zero,
+                            IconButton(
+                              icon: const Icon(Icons.tune_outlined),
+                              tooltip: 'Change format',
+                              onPressed: () => _editFormat(context, team),
                             ),
-                          ),
-                          const PopupMenuItem(
-                            value: _TeamAction.importShowdown,
-                            child: ListTile(
-                              leading: Icon(Icons.download_outlined),
-                              title: Text('Import from Showdown'),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                          if (slots.isNotEmpty) ...[
-                            const PopupMenuItem(
-                              value: _TeamAction.saveAll,
-                              child: ListTile(
-                                leading: Icon(Icons.save_rounded),
-                                title: Text('Save all slots'),
-                                contentPadding: EdgeInsets.zero,
+                            IconButton(
+                              icon: const Icon(Icons.download_outlined),
+                              tooltip: 'Import from Showdown',
+                              onPressed: () => showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                builder: (_) =>
+                                    PsImportSheet(targetTeamId: widget.teamId),
                               ),
                             ),
-                            const PopupMenuItem(
-                              value: _TeamAction.exportShowdown,
-                              child: ListTile(
-                                leading: Icon(Icons.upload_outlined),
-                                title: Text('Export to Showdown'),
-                                contentPadding: EdgeInsets.zero,
+                            if (slots.isNotEmpty) ...[
+                              IconButton(
+                                icon: const Icon(Icons.save_rounded),
+                                tooltip: 'Save all slots',
+                                onPressed: () => _saveAllSlots(context, slots),
                               ),
+                              IconButton(
+                                icon: const Icon(Icons.upload_outlined),
+                                tooltip: 'Export to Showdown',
+                                onPressed: () =>
+                                    _exportShowdown(context, slots, team),
+                              ),
+                            ],
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              tooltip: 'Delete team',
+                              onPressed: () => _deleteTeam(context, team),
+                            ),
+                            const ConnectivityStatusButton(),
+                            const SettingsButton(),
+                          ]
+                        : [
+                            const ConnectivityStatusButton(),
+                            const SettingsButton(),
+                            PopupMenuButton<_TeamAction>(
+                              onSelected: (action) => _handleTeamAction(
+                                  context, action, slots, team),
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                  value: _TeamAction.rename,
+                                  child: ListTile(
+                                    leading: Icon(Icons.edit_outlined),
+                                    title: Text('Rename'),
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: _TeamAction.changeFormat,
+                                  child: ListTile(
+                                    leading: Icon(Icons.tune_outlined),
+                                    title: Text('Change format'),
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: _TeamAction.importShowdown,
+                                  child: ListTile(
+                                    leading: Icon(Icons.download_outlined),
+                                    title: Text('Import from Showdown'),
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                ),
+                                if (slots.isNotEmpty) ...[
+                                  const PopupMenuItem(
+                                    value: _TeamAction.saveAll,
+                                    child: ListTile(
+                                      leading: Icon(Icons.save_rounded),
+                                      title: Text('Save all slots'),
+                                      contentPadding: EdgeInsets.zero,
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: _TeamAction.exportShowdown,
+                                    child: ListTile(
+                                      leading: Icon(Icons.upload_outlined),
+                                      title: Text('Export to Showdown'),
+                                      contentPadding: EdgeInsets.zero,
+                                    ),
+                                  ),
+                                ],
+                                const PopupMenuDivider(),
+                                PopupMenuItem(
+                                  value: _TeamAction.delete,
+                                  child: ListTile(
+                                    leading: Icon(Icons.delete_outline,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .error),
+                                    title: Text('Delete team',
+                                        style: TextStyle(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .error)),
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
-                          const PopupMenuDivider(),
-                          PopupMenuItem(
-                            value: _TeamAction.delete,
-                            child: ListTile(
-                              leading: Icon(Icons.delete_outline,
-                                  color: Theme.of(context).colorScheme.error),
-                              title: Text('Delete team',
-                                  style: TextStyle(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .error)),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-            ),
+                  ),
+            bottomNavigationBar: _isMultiSelect
+                ? _MultiSelectBar(
+                    selectedCount: _selectedSlotIds.length,
+                    onDelete: () => _deleteSelected(slots),
+                    onCopy: () => _copyOrMoveSelected(slots, false),
+                    onMove: () => _copyOrMoveSelected(slots, true),
+                  )
+                : null,
             body: slotsAsync.when(
               loading: () => const LoadingState(),
               error: (e, _) => ErrorState(error: e),
@@ -256,6 +321,10 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
                         slots: slots,
                         formatId: team.formatLabel,
                         maxSlots: maxSlots,
+                        selectedSlotIds: _selectedSlotIds,
+                        isMultiSelect: _isMultiSelect,
+                        onEnterMultiSelect: _enterMultiSelect,
+                        onToggleSlot: _toggleSlotSelection,
                       );
               },
             ),
@@ -279,6 +348,10 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
               formatId: team.formatLabel,
               selectedSlot: _selectedSlot,
               maxSlots: maxSlots,
+              selectedSlotIds: _selectedSlotIds,
+              isMultiSelect: _isMultiSelect,
+              onEnterMultiSelect: _enterMultiSelect,
+              onToggleSlot: _toggleSlotSelection,
               onSlotTap: (slotNumber) {
                 _canCloseNotifier.value = null;
                 setState(() => _selectedSlot = slotNumber);
@@ -472,6 +545,10 @@ class _SlotList extends ConsumerWidget {
   final int? selectedSlot;
   final int maxSlots;
   final void Function(int slotNumber)? onSlotTap;
+  final Set<int> selectedSlotIds;
+  final bool isMultiSelect;
+  final void Function(TeamSlot)? onEnterMultiSelect;
+  final void Function(TeamSlot)? onToggleSlot;
 
   const _SlotList({
     required this.teamId,
@@ -480,6 +557,10 @@ class _SlotList extends ConsumerWidget {
     this.selectedSlot,
     this.maxSlots = 6,
     this.onSlotTap,
+    this.selectedSlotIds = const {},
+    this.isMultiSelect = false,
+    this.onEnterMultiSelect,
+    this.onToggleSlot,
   });
 
   // Build a maxSlots-element growable list keyed by position (0-based); null = empty slot.
@@ -530,6 +611,14 @@ class _SlotList extends ConsumerWidget {
                   onTap: onSlotTap != null
                       ? () => onSlotTap!(slot.slot)
                       : null,
+                  isMultiSelectMode: isMultiSelect,
+                  isChecked: selectedSlotIds.contains(slot.id),
+                  onEnterMultiSelect: onEnterMultiSelect != null
+                      ? () => onEnterMultiSelect!(slot)
+                      : null,
+                  onToggleSlot: onToggleSlot != null
+                      ? () => onToggleSlot!(slot)
+                      : null,
                 )
               : _EmptySlotCard(teamId: teamId, slotNumber: i + 1, dragIndex: i),
         );
@@ -547,6 +636,10 @@ class _FilledSlotCard extends ConsumerWidget {
   final String? formatId;
   final bool selected;
   final VoidCallback? onTap;
+  final bool isMultiSelectMode;
+  final bool isChecked;
+  final VoidCallback? onEnterMultiSelect;
+  final VoidCallback? onToggleSlot;
 
   const _FilledSlotCard({
     required this.slot,
@@ -555,6 +648,10 @@ class _FilledSlotCard extends ConsumerWidget {
     this.formatId,
     this.selected = false,
     this.onTap,
+    this.isMultiSelectMode = false,
+    this.isChecked = false,
+    this.onEnterMultiSelect,
+    this.onToggleSlot,
   });
 
   static const _statLabels = ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe'];
@@ -842,17 +939,24 @@ class _FilledSlotCard extends ConsumerWidget {
 
         return Card(
           clipBehavior: Clip.antiAlias,
-          shape: selected
+          shape: (selected || isChecked)
               ? RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                   side: BorderSide(
-                    color: colorScheme.primary,
+                    color: isChecked
+                        ? colorScheme.tertiary
+                        : colorScheme.primary,
                     width: 2,
                   ),
                 )
               : null,
           child: InkWell(
-            onTap: onTap ?? () => context.push('/teams/$teamId/config/${slot.slot}'),
+            onTap: isMultiSelectMode
+                ? () {
+                    HapticFeedback.selectionClick();
+                    onToggleSlot?.call();
+                  }
+                : onTap ?? () => context.push('/teams/$teamId/config/${slot.slot}'),
             onLongPress: () {
               HapticFeedback.mediumImpact();
               _showSlotMenu(context, ref);
@@ -1134,6 +1238,12 @@ class _FilledSlotCard extends ConsumerWidget {
               title: const Text('Move to team'),
               onTap: () => Navigator.pop(ctx, 'move'),
             ),
+            if (!isMultiSelectMode)
+              ListTile(
+                leading: const Icon(Icons.checklist_outlined),
+                title: const Text('Select'),
+                onTap: () => Navigator.pop(ctx, 'select'),
+              ),
             ListTile(
               leading: const Icon(Icons.remove_circle_outline),
               title: const Text('Remove from team'),
@@ -1158,16 +1268,18 @@ class _FilledSlotCard extends ConsumerWidget {
       await showMoveCopySlotSheet(
         context,
         ref,
-        sourceSlot: slot,
+        sourceSlots: [slot],
         deleteSource: false,
       );
     } else if (action == 'move') {
       await showMoveCopySlotSheet(
         context,
         ref,
-        sourceSlot: slot,
+        sourceSlots: [slot],
         deleteSource: true,
       );
+    } else if (action == 'select') {
+      onEnterMultiSelect?.call();
     } else if (action == 'remove') {
       await ref
           .read(teamSlotRepositoryProvider)
@@ -1296,6 +1408,101 @@ class _EmptySlotCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+
+// ── Multi-select bottom action bar ────────────────────────────────────────────
+
+class _MultiSelectBar extends StatelessWidget {
+  const _MultiSelectBar({
+    required this.selectedCount,
+    required this.onDelete,
+    required this.onCopy,
+    required this.onMove,
+  });
+
+  final int selectedCount;
+  final VoidCallback onDelete;
+  final VoidCallback onCopy;
+  final VoidCallback onMove;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return SafeArea(
+      child: Container(
+        height: 64,
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          border: Border(
+            top: BorderSide(color: cs.outlineVariant, width: 0.5),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _ActionButton(
+              icon: Icons.delete_outline,
+              label: 'Delete',
+              color: cs.error,
+              onTap: onDelete,
+            ),
+            _ActionButton(
+              icon: Icons.copy_outlined,
+              label: 'Copy',
+              onTap: onCopy,
+            ),
+            _ActionButton(
+              icon: Icons.drive_file_move_outlined,
+              label: 'Move',
+              onTap: onMove,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final effectiveColor = color ?? cs.onSurface;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: effectiveColor, size: 22),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: effectiveColor),
+            ),
+          ],
         ),
       ),
     );
