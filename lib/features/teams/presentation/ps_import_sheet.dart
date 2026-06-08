@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
+import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
+import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 
 // ── Parser models ─────────────────────────────────────────────────────────────
@@ -55,6 +57,14 @@ const _kStatMap = {
 
 String _norm(String s) =>
     s.toLowerCase().trim().replaceAll(' ', '-').replaceAll("'", '');
+
+/// Returns [override] if non-empty, otherwise [parsed].
+String _resolveTeamName(String override, String parsed) =>
+    override.trim().isNotEmpty ? override.trim() : parsed;
+
+/// Returns [override].id if an override is selected, otherwise [parsed].
+String? _resolveFormatId(GameFormat? override, String? parsed) =>
+    override != null ? override.id : parsed;
 
 _PsTeam _parseTeam(String text) {
   String teamName = 'Imported Team';
