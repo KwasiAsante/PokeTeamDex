@@ -359,11 +359,14 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
     final moved = reordered.removeAt(from);
     reordered.insert(to, moved);
     final repo = ref.read(teamRepositoryProvider);
-    for (int i = 0; i < reordered.length; i++) {
-      if (reordered[i].sortOrder != i) {
-        await repo.updateSortOrder(reordered[i].id, i);
+    final db = ref.read(appDatabaseProvider);
+    await db.transaction(() async {
+      for (int i = 0; i < reordered.length; i++) {
+        if (reordered[i].sortOrder != i) {
+          await repo.updateSortOrder(reordered[i].id, i);
+        }
       }
-    }
+    });
   }
 
   Future<void> _onReorderTeams(List<Team> teams, int oldIndex, int newIndex) async {
