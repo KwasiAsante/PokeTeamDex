@@ -353,19 +353,31 @@ class _FolderSection extends ConsumerStatefulWidget {
 
 class _FolderSectionState extends ConsumerState<_FolderSection> {
   bool _expanded = true;
+  bool _reordering = false;
+
+  Future<void> _moveTeamTo(List<Team> teams, int from, int to) async {
+    setState(() => _reordering = true);
+    try {
+      final reordered = [...teams];
+      final moved = reordered.removeAt(from);
+      reordered.insert(to, moved);
+      final repo = ref.read(teamRepositoryProvider);
+      final db = ref.read(appDatabaseProvider);
+      await db.transaction(() async {
+        for (int i = 0; i < reordered.length; i++) {
+          if (reordered[i].sortOrder != i) {
+            await repo.updateSortOrder(reordered[i].id, i);
+          }
+        }
+      });
+    } finally {
+      if (mounted) setState(() => _reordering = false);
+    }
+  }
 
   Future<void> _onReorderTeams(List<Team> teams, int oldIndex, int newIndex) async {
     if (newIndex > oldIndex) newIndex--;
-    final reordered = [...teams];
-    final moved = reordered.removeAt(oldIndex);
-    reordered.insert(newIndex, moved);
-
-    final repo = ref.read(teamRepositoryProvider);
-    for (int i = 0; i < reordered.length; i++) {
-      if (reordered[i].sortOrder != i) {
-        await repo.updateSortOrder(reordered[i].id, i);
-      }
-    }
+    await _moveTeamTo(teams, oldIndex, newIndex);
   }
 
   @override
@@ -435,6 +447,8 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
             );
           },
         ),
+        if (_reordering)
+          const LinearProgressIndicator(minHeight: 2),
         if (_expanded)
           teamsAsync.when(
             loading: () => const SizedBox(
@@ -462,6 +476,8 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
                       key: ValueKey(teams[i].id),
                       team: teams[i],
                       dragIndex: i,
+                      teamCount: teams.length,
+                      onMove: (from, to) => _moveTeamTo(teams, from, to),
                     ),
                   ),
           ),
@@ -571,8 +587,16 @@ class _TeamTile extends ConsumerWidget {
   final Team team;
   // Non-null when inside a reorderable folder section; used for the drag handle.
   final int? dragIndex;
+  final int? teamCount;
+  final Future<void> Function(int from, int to)? onMove;
 
-  const _TeamTile({super.key, required this.team, this.dragIndex});
+  const _TeamTile({
+    super.key,
+    required this.team,
+    this.dragIndex,
+    this.teamCount,
+    this.onMove,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -664,6 +688,40 @@ class _TeamTile extends ConsumerWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (dragIndex != null && onMove != null && teamCount != null) ...[
+            IconButton(
+              icon: const Icon(Icons.vertical_align_top),
+              iconSize: 16,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              tooltip: 'Move to top',
+              onPressed: dragIndex! > 0 ? () => onMove!(dragIndex!, 0) : null,
+            ),
+            IconButton(
+              icon: const Icon(Icons.arrow_upward),
+              iconSize: 16,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              tooltip: 'Move up',
+              onPressed: dragIndex! > 0 ? () => onMove!(dragIndex!, dragIndex! - 1) : null,
+            ),
+            IconButton(
+              icon: const Icon(Icons.arrow_downward),
+              iconSize: 16,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              tooltip: 'Move down',
+              onPressed: dragIndex! < teamCount! - 1 ? () => onMove!(dragIndex!, dragIndex! + 1) : null,
+            ),
+            IconButton(
+              icon: const Icon(Icons.vertical_align_bottom),
+              iconSize: 16,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              tooltip: 'Move to bottom',
+              onPressed: dragIndex! < teamCount! - 1 ? () => onMove!(dragIndex!, teamCount! - 1) : null,
+            ),
+          ],
           if (dragIndex != null)
             ReorderableDragStartListener(
               index: dragIndex!,
