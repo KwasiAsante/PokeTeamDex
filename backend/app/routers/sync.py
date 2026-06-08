@@ -242,6 +242,7 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
                     ribbons=op.ribbons,
                     is_mega_evolved=op.is_mega_evolved, has_gigantamax=op.has_gigantamax,
                     gigantamax_enabled=op.gigantamax_enabled, is_alpha=op.is_alpha,
+                    tera_type=op.tera_type,
                     contest_cool=op.contest_cool, contest_beautiful=op.contest_beautiful,
                     contest_cute=op.contest_cute, contest_clever=op.contest_clever,
                     contest_tough=op.contest_tough, contest_sheen=op.contest_sheen,
@@ -280,6 +281,7 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
                 slot.has_gigantamax = op.has_gigantamax
                 slot.gigantamax_enabled = op.gigantamax_enabled
                 slot.is_alpha = op.is_alpha
+                slot.tera_type = op.tera_type
                 slot.contest_cool = op.contest_cool
                 slot.contest_beautiful = op.contest_beautiful
                 slot.contest_cute = op.contest_cute

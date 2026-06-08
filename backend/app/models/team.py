@@ -131,6 +131,9 @@ class TeamSlot(Base):
     gigantamax_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     is_alpha:           Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
+    # Tera Type (Gen 9 / No Format)
+    tera_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
     # Contest conditions
     contest_cool:      Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     contest_beautiful: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)

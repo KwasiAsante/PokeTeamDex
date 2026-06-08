@@ -19,7 +19,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -110,6 +110,11 @@ class AppDatabase extends _$AppDatabase {
               await customStatement(
                 'ALTER TABLE teams ADD COLUMN is_box INTEGER NOT NULL DEFAULT 0',
               );
+            } catch (_) {}
+          }
+          if (from < 12) {
+            try {
+              await m.addColumn(teamSlots, teamSlots.teraType);
             } catch (_) {}
           }
         },
