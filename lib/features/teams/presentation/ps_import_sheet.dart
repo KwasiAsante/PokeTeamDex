@@ -222,14 +222,14 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
   }
 
   Future<void> _pickFormat() async {
-    final result = await showModalBottomSheet<dynamic>(
+    final result = await showModalBottomSheet<GameFormat?>(
       context: context,
       isScrollControlled: true,
       builder: (_) => FormatPickerSheet(current: _selectedFormat?.id),
     );
-    if (result == null) return;
+    if (result == null || !mounted) return;
     setState(() {
-      _selectedFormat = isFormatCleared(result) ? null : result as GameFormat;
+      _selectedFormat = isFormatCleared(result) ? null : result;
     });
   }
 
