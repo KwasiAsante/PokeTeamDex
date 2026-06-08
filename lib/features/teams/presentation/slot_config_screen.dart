@@ -1535,11 +1535,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                                   ?.copyWith(color: colorScheme.onSurfaceVariant)),
                         ] else if (detailAsync.isLoading) ...[
                           const SizedBox(height: 6),
-                          const SizedBox(
-                            height: 8,
-                            width: 80,
-                            child: LinearProgressIndicator(),
-                          ),
+                          const _DescriptionLoadingBar(),
                         ],
                       ],
                     ),
@@ -1619,9 +1615,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     String? description;
+    bool descriptionLoading = false;
     if (_heldItemName != null) {
       final detailAsync = ref.watch(_itemDetailProvider(_heldItemName!));
       description = detailAsync.whenOrNull(data: (e) => e.shortEffect);
+      descriptionLoading = description == null && detailAsync.isLoading;
     }
 
     return Column(
@@ -1681,6 +1679,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             child: Text(description,
                 style: textTheme.bodySmall
                     ?.copyWith(color: colorScheme.onSurfaceVariant)),
+          )
+        else if (descriptionLoading)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(4, 6, 4, 0),
+            child: _DescriptionLoadingBar(),
           ),
         _buildViolationBanner(violation),
       ],
@@ -1704,9 +1707,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     return Column(
       children: List.generate(4, (i) {
         MoveEntry? moveDetail;
+        bool moveDetailLoading = false;
         if (_moves[i] != null) {
           final detailAsync = ref.watch(_moveDetailProvider(_moves[i]!));
           moveDetail = detailAsync.whenOrNull(data: (e) => e);
+          moveDetailLoading = moveDetail == null && detailAsync.isLoading;
         }
 
         return Padding(
@@ -1819,6 +1824,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   child: Text(moveDetail!.shortEffect!,
                       style: textTheme.bodySmall
                           ?.copyWith(color: colorScheme.onSurfaceVariant)),
+                )
+              else if (moveDetailLoading)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(4, 4, 4, 0),
+                  child: _DescriptionLoadingBar(),
                 ),
               // Z-Move info — Gen 7 / no-format; shown when Z-crystal held and move qualifies
               if (_moves[i] != null && _heldItemName != null) ...[
@@ -3540,6 +3550,20 @@ class _EventMoveBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+// Thin progress placeholder shown in place of an ability/item/move
+// description while its detail fetch is still in flight — kept as a single
+// widget so all three description spots show an identical loading state.
+class _DescriptionLoadingBar extends StatelessWidget {
+  const _DescriptionLoadingBar();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(
+        height: 8,
+        width: 80,
+        child: LinearProgressIndicator(),
+      );
 }
 
 // ── Item picker sheet ─────────────────────────────────────────────────────────
