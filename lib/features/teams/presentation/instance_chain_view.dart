@@ -17,8 +17,11 @@ import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dar
 ///   [Current slot]   ← highlighted
 ///     ↓
 ///   [Child 1]
-///   [Child 2]  (if multiple direct children)
+///     [Grandchild 1]
+///   [Child 2]  (if the current instance branches into multiple children)
 ///
+/// The full descendant tree is shown below the current slot — not just
+/// direct children — mirroring the full ancestor chain shown above it.
 /// Each row shows: team name · slot number · nickname (if set).
 class InstanceChainView extends ConsumerWidget {
   final int instanceId;
@@ -44,9 +47,14 @@ class InstanceChainView extends ConsumerWidget {
       error: (e, _) => Text('Could not load chain: $e'),
       data: (chain) {
         if (chain.isEmpty) return const SizedBox.shrink();
-        return _ChainList(
-          chain: chain,
-          currentSlotId: currentSlotId,
+        return ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 360),
+          child: SingleChildScrollView(
+            child: _ChainList(
+              chain: chain,
+              currentSlotId: currentSlotId,
+            ),
+          ),
         );
       },
     );
@@ -70,8 +78,10 @@ class _ChainListState extends ConsumerState<_ChainList> {
   final _slotCache = <int, List<TeamSlot>>{};
   /// team id → team name
   final _teamCache = <int, String>{};
-  /// direct children of the current instance (the last in the chain)
-  final _children = <PokemonInstance>[];
+  /// Every descendant of the current instance (children, grandchildren, …),
+  /// depth-first pre-order, paired with depth relative to the current
+  /// instance (1 = direct child, 2 = grandchild, …).
+  final _descendants = <(PokemonInstance instance, int depth)>[];
   bool _loaded = false;
 
   // The last instance in the ancestor chain is the one whose id == instanceId
@@ -96,17 +106,19 @@ class _ChainListState extends ConsumerState<_ChainList> {
       teamIdsNeeded.addAll(slots.map((s) => s.teamId));
     }
 
-    // Resolve direct children of the current instance.
-    final children =
-        await instanceRepo.getDirectChildren(_currentInstance.id);
-    for (final child in children) {
+    // Resolve the full descendant tree of the current instance — not just
+    // direct children, but their children too (and so on), mirroring the
+    // full ancestor chain shown above.
+    final descendants =
+        await instanceRepo.getDescendantTree(_currentInstance.id);
+    for (final (child, _) in descendants) {
       final slots = await instanceRepo.getSlotsForInstance(child.id);
       _slotCache[child.id] = slots;
       teamIdsNeeded.addAll(slots.map((s) => s.teamId));
     }
-    _children
+    _descendants
       ..clear()
-      ..addAll(children);
+      ..addAll(descendants);
 
     // Batch-load team names.
     final allTeams = await teamRepo.getAll();
@@ -131,7 +143,7 @@ class _ChainListState extends ConsumerState<_ChainList> {
       );
     }
 
-    final totalRows = widget.chain.length + _children.length;
+    final totalRows = widget.chain.length + _descendants.length;
 
     // Accumulate aliases across the ancestor chain so each row shows the full
     // nickname history up to that point (oldest first).
@@ -189,16 +201,17 @@ class _ChainListState extends ConsumerState<_ChainList> {
             textTheme: textTheme,
           ),
 
-        // ── Direct children ──
-        for (int i = 0; i < _children.length; i++)
+        // ── Descendants (children, grandchildren, …) ──
+        for (int i = 0; i < _descendants.length; i++)
           _ChainRow(
-            instance: _children[i],
-            slots: _slotCache[_children[i].id] ?? [],
+            instance: _descendants[i].$1,
+            slots: _slotCache[_descendants[i].$1.id] ?? [],
             teamCache: _teamCache,
             isOrigin: false,
             isCurrent: false,
-            isLast: i == _children.length - 1,
+            isLast: i == _descendants.length - 1,
             isChild: true,
+            depth: _descendants[i].$2,
             accumulatedAliases: const [],
             colorScheme: colorScheme,
             textTheme: textTheme,
@@ -218,6 +231,9 @@ class _ChainRow extends StatelessWidget {
   final bool isCurrent;
   final bool isChild;
   final bool isLast;
+  /// Depth of a descendant row relative to the current instance
+  /// (1 = direct child, 2 = grandchild, …). Unused for non-descendant rows.
+  final int depth;
   /// All nicknames accumulated from the chain up to and including this row.
   final List<String> accumulatedAliases;
   final ColorScheme colorScheme;
@@ -231,6 +247,7 @@ class _ChainRow extends StatelessWidget {
     required this.isCurrent,
     required this.isChild,
     required this.isLast,
+    this.depth = 0,
     required this.accumulatedAliases,
     required this.colorScheme,
     required this.textTheme,
@@ -297,7 +314,11 @@ class _ChainRow extends StatelessWidget {
     } else if (isCurrent) {
       badge = 'This slot';
     } else if (isChild) {
-      badge = 'Child';
+      badge = switch (depth) {
+        1 => 'Child',
+        2 => 'Grandchild',
+        _ => 'Descendant',
+      };
     }
 
     final badgeBackground = isCurrent
