@@ -310,10 +310,25 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
       String? resolvedFormName;
       try {
         final entry = await pokeRepo.fetchPokemonByNameOrDefault(s.species);
-        pokemonId = entry.id;
+        // If the entry is a form variant (e.g. urshifu-rapid-strike has
+        // speciesName "urshifu"), normalise to base species so that
+        // pokemonSpeciesProvider can load the varieties and form chips appear.
+        if (entry.defaultFormLabel != null && entry.speciesName != null) {
+          try {
+            final base =
+                await pokeRepo.fetchPokemonByNameOrDefault(entry.speciesName!);
+            pokemonId = base.id;
+            resolvedFormName = entry.name;
+          } catch (_) {
+            pokemonId = entry.id; // fallback: keep form ID
+          }
+        } else {
+          pokemonId = entry.id;
+        }
       } catch (_) {
-        // For form-qualified PS names (e.g. "gastrodon-east"), fall back to
-        // the base species and pre-set the form so the slot opens correctly.
+        // For form-qualified PS names (e.g. "gastrodon-east") whose
+        // /pokemon endpoint doesn't exist, fall back to the base species
+        // and pre-set the form so the slot opens correctly.
         if (s.species.contains('-')) {
           try {
             final base = await pokeRepo
@@ -474,7 +489,18 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
       String? resolvedFormName;
       try {
         final entry = await repo.fetchPokemonByNameOrDefault(s.species);
-        pokemonId = entry.id;
+        if (entry.defaultFormLabel != null && entry.speciesName != null) {
+          try {
+            final base =
+                await repo.fetchPokemonByNameOrDefault(entry.speciesName!);
+            pokemonId = base.id;
+            resolvedFormName = entry.name;
+          } catch (_) {
+            pokemonId = entry.id;
+          }
+        } else {
+          pokemonId = entry.id;
+        }
       } catch (_) {
         if (s.species.contains('-')) {
           try {

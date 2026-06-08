@@ -911,6 +911,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     ? cosmeticFormSpriteUrls.shinyUrl
                     : cosmeticFormSpriteUrls.defaultUrl)
                 : null;
+        // Raw sprite used as last-resort fallback for cosmetic forms that have
+        // no HOME artwork and a null spriteUrl from the form resource (e.g.
+        // Polteageist-Antique whose HOME path 854-antique.png doesn't exist).
+        final cosmeticRawSprite = cosmeticFormSuffix != null
+            ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
+                'sprites/pokemon/${pokemon.id}-$cosmeticFormSuffix.png'
+            : null;
         final formFallbackUrl = formPokemon != null
             ? (_isShiny
                 ? (formPokemon.officialArtworkShinyUrl ??
@@ -918,8 +925,10 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 : formPokemon.officialArtworkUrl)
             : cosmeticForm != null
                 ? (_isShiny
-                    ? (cosmeticForm.spriteShinyUrl ?? cosmeticForm.spriteUrl)
-                    : cosmeticForm.spriteUrl)
+                    ? (cosmeticForm.spriteShinyUrl ??
+                        cosmeticForm.spriteUrl ??
+                        cosmeticRawSprite)
+                    : (cosmeticForm.spriteUrl ?? cosmeticRawSprite))
                 : null;
 
         // Sprite priority: G-Max > Mega > Form change > default.
@@ -971,7 +980,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               if (hasMultipleForms) ...[
                 const SizedBox(height: 16),
                 _buildFormSelector(availableForms,
-                    defaultFormLabel: pokemon.defaultFormLabel),
+                    defaultFormLabel: pokemon.defaultFormLabel,
+                    speciesName: pokemon.name),
               ],
               const SizedBox(height: 24),
               _buildBasics(mechanics, speciesAsync.asData?.value.genderRate),
@@ -2203,14 +2213,23 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // ── Form selector ─────────────────────────────────────────────────────────
 
-  Widget _buildFormSelector(List<String> forms, {String? defaultFormLabel}) {
+  Widget _buildFormSelector(List<String> forms,
+      {String? defaultFormLabel, String? speciesName}) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    String fmtForm(String name) => name
-        .split('-')
-        .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
-        .join(' ');
+    // Strip the species-name prefix from a variety name so chips show only
+    // the form-specific part: "necrozma-dawn-wings" → "Dawn Wings",
+    // "urshifu-rapid-strike" → "Rapid Strike", "gastrodon-east" → "East".
+    String fmtForm(String name) {
+      final prefix = speciesName != null ? '$speciesName-' : null;
+      final raw =
+          prefix != null && name.startsWith(prefix) ? name.substring(prefix.length) : name;
+      return raw
+          .split('-')
+          .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+          .join(' ');
+    }
 
     final isDefault = _formName == null;
     // For no-plain-form species (e.g. Wormadam), label the default chip with
