@@ -71,6 +71,8 @@ enum _TeamAction {
   importShowdown,
   saveAll,
   exportShowdown,
+  promoteToBox,
+  demoteToTeam,
   delete,
 }
 
@@ -225,6 +227,17 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
                               ),
                             ],
                             IconButton(
+                              icon: Icon(team.isBox
+                                  ? Icons.groups_outlined
+                                  : Icons.inventory_2_outlined),
+                              tooltip: team.isBox
+                                  ? 'Demote to Team'
+                                  : 'Promote to Box',
+                              onPressed: () => team.isBox
+                                  ? _demoteToTeam(context, team, slots)
+                                  : _promoteToBox(context, team),
+                            ),
+                            IconButton(
                               icon: const Icon(Icons.delete_outline),
                               tooltip: 'Delete team',
                               onPressed: () => _deleteTeam(context, team),
@@ -281,6 +294,20 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
                                     ),
                                   ),
                                 ],
+                                PopupMenuItem(
+                                  value: team.isBox
+                                      ? _TeamAction.demoteToTeam
+                                      : _TeamAction.promoteToBox,
+                                  child: ListTile(
+                                    leading: Icon(team.isBox
+                                        ? Icons.groups_outlined
+                                        : Icons.inventory_2_outlined),
+                                    title: Text(team.isBox
+                                        ? 'Demote to Team'
+                                        : 'Promote to Box'),
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                ),
                                 const PopupMenuDivider(),
                                 PopupMenuItem(
                                   value: _TeamAction.delete,
@@ -409,6 +436,10 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
         _saveAllSlots(context, slots);
       case _TeamAction.exportShowdown:
         _exportShowdown(context, slots, team);
+      case _TeamAction.promoteToBox:
+        _promoteToBox(context, team);
+      case _TeamAction.demoteToTeam:
+        _demoteToTeam(context, team, slots);
       case _TeamAction.delete:
         _deleteTeam(context, team);
     }
@@ -499,6 +530,77 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
       await deleteTeam(ref, team.id);
       if (context.mounted) context.pop();
     }
+  }
+
+  Future<void> _promoteToBox(BuildContext context, Team team) async {
+    final repo = ref.read(teamRepositoryProvider);
+    await repo.setIsBox(team.id, isBox: true);
+    if (context.mounted) showAppSnackBar(context, 'Team promoted to Box.');
+  }
+
+  Future<void> _demoteToTeam(
+      BuildContext context, Team team, List<TeamSlot> slots) async {
+    final assigned = [...slots]..sort((a, b) => a.slot.compareTo(b.slot));
+
+    List<TeamSlot> toKeep;
+
+    if (assigned.length > 6) {
+      final result = await showDialog<List<TeamSlot>>(
+        context: context,
+        builder: (_) => _DemoteSlotSelectionDialog(slots: assigned),
+      );
+      if (result == null || !context.mounted) return;
+      toKeep = result;
+    } else {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Demote to Team'),
+          content: const Text(
+            'Convert this box to a team? It will hold a maximum of 6 Pokémon.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Demote'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+      toKeep = assigned;
+    }
+
+    await _performDemotion(team.id, toKeep, assigned);
+    if (context.mounted) showAppSnackBar(context, 'Box demoted to Team.');
+  }
+
+  Future<void> _performDemotion(
+      int teamId, List<TeamSlot> toKeep, List<TeamSlot> all) async {
+    final repo = ref.read(teamRepositoryProvider);
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+
+    final keepIds = toKeep.map((s) => s.id).toSet();
+    for (final slot in all) {
+      if (!keepIds.contains(slot.id)) {
+        await slotRepo.deleteSlot(slot.teamId, slot.slot);
+      }
+    }
+
+    // Renumber kept slots to positions 1–6 in ascending order to avoid
+    // transient conflicts when two slots swap positions.
+    final sorted = [...toKeep]..sort((a, b) => a.slot.compareTo(b.slot));
+    for (int i = 0; i < sorted.length; i++) {
+      if (sorted[i].slot != i + 1) {
+        await slotRepo.updateSlotPosition(sorted[i].id, i + 1);
+      }
+    }
+
+    await repo.setIsBox(teamId, isBox: false);
   }
 }
 
@@ -1536,6 +1638,102 @@ class _ActionButton extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Slot selection dialog for Box → Team demotion ─────────────────────────────
+
+class _DemoteSlotSelectionDialog extends StatefulWidget {
+  final List<TeamSlot> slots;
+  const _DemoteSlotSelectionDialog({required this.slots});
+
+  @override
+  State<_DemoteSlotSelectionDialog> createState() =>
+      _DemoteSlotSelectionDialogState();
+}
+
+class _DemoteSlotSelectionDialogState
+    extends State<_DemoteSlotSelectionDialog> {
+  late final Set<int> _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-select the first 6 by slot position (slots are already sorted).
+    _selected = widget.slots.take(6).map((s) => s.id).toSet();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final count = _selected.length;
+
+    return AlertDialog(
+      title: const Text('Select Pokémon for Team'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Choose up to 6 Pokémon to keep ($count/6 selected).',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: widget.slots.length,
+                itemBuilder: (_, i) {
+                  final slot = widget.slots[i];
+                  final isSelected = _selected.contains(slot.id);
+                  final atLimit = count >= 6 && !isSelected;
+                  return CheckboxListTile(
+                    value: isSelected,
+                    onChanged: atLimit
+                        ? null
+                        : (v) => setState(() {
+                              if (v == true) {
+                                _selected.add(slot.id);
+                              } else {
+                                _selected.remove(slot.id);
+                              }
+                            }),
+                    secondary: CachedNetworkImage(
+                      imageUrl: pokemonHomeUrl(slot.pokemonId),
+                      width: 40,
+                      height: 40,
+                      errorWidget: (_, _, _) =>
+                          const Icon(Icons.catching_pokemon, size: 40),
+                    ),
+                    title: Text(
+                      slot.nickname?.trim().isNotEmpty == true
+                          ? slot.nickname!.trim()
+                          : 'Slot ${slot.slot}',
+                    ),
+                    subtitle: Text('Position ${slot.slot}'),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final selected =
+                widget.slots.where((s) => _selected.contains(s.id)).toList();
+            Navigator.pop(context, selected);
+          },
+          child: const Text('Demote'),
+        ),
+      ],
     );
   }
 }
