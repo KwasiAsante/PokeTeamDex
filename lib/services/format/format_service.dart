@@ -32,6 +32,14 @@ class FormatService {
   Map<String, List<PsEventEntry>> _eventData = {};
   bool _initialized = false;
 
+  /// Memoizes [itemsForGen]/[abilitiesForGen] — both filter and sort the full
+  /// `_items`/`_abilities` maps (hundreds of entries) with no caching of their
+  /// own, yet `validateSlotSync` calls them on every keystroke/rebuild while
+  /// editing a slot. Gen is 1–9, so each cache holds at most 9 lists; cleared
+  /// in [_parseAll] whenever `_items`/`_abilities` are (re)populated.
+  final Map<int, List<PsItemEntry>> _itemsForGenCache = {};
+  final Map<int, List<PsAbilityEntry>> _abilitiesForGenCache = {};
+
   bool get isInitialized => _initialized;
 
   // Hive box keys
@@ -167,10 +175,12 @@ class FormatService {
     final itMap = items as Map<String, dynamic>;
     _items = itMap.map((k, v) =>
         MapEntry(k, PsItemEntry.fromJson(k, v as Map<String, dynamic>)));
+    _itemsForGenCache.clear();
 
     final abMap = abilities as Map<String, dynamic>;
     _abilities = abMap.map((k, v) =>
         MapEntry(k, PsAbilityEntry.fromJson(k, v as Map<String, dynamic>)));
+    _abilitiesForGenCache.clear();
 
     final fmtList = (formats as Map<String, dynamic>)['formats'] as List;
     _formats = fmtList
@@ -356,22 +366,26 @@ class FormatService {
   /// Items available in [gen], optionally filtered by [mechanics].
   /// Layer 1 only — excludes items that didn't exist in the gen.
   List<PsItemEntry> itemsForGen(int gen) {
-    final m = GenerationMechanics.forGen(gen);
-    return _items.values.where((item) {
-      if (item.gen > gen) return false;
-      if (item.isMegaStone && !m.hasMegaStone) return false;
-      if (item.isZCrystal && !m.hasZCrystal) return false;
-      return true;
-    }).toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    return _itemsForGenCache.putIfAbsent(gen, () {
+      final m = GenerationMechanics.forGen(gen);
+      return _items.values.where((item) {
+        if (item.gen > gen) return false;
+        if (item.isMegaStone && !m.hasMegaStone) return false;
+        if (item.isZCrystal && !m.hasZCrystal) return false;
+        return true;
+      }).toList()
+        ..sort((a, b) => a.name.compareTo(b.name));
+    });
   }
 
   /// Abilities available in [gen].
   List<PsAbilityEntry> abilitiesForGen(int gen) {
-    final m = GenerationMechanics.forGen(gen);
-    if (!m.hasAbilities) return [];
-    return _abilities.values.where((a) => a.gen <= gen).toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    return _abilitiesForGenCache.putIfAbsent(gen, () {
+      final m = GenerationMechanics.forGen(gen);
+      if (!m.hasAbilities) return [];
+      return _abilities.values.where((a) => a.gen <= gen).toList()
+        ..sort((a, b) => a.name.compareTo(b.name));
+    });
   }
 
   /// Move detail by PS move id, or null if not in dataset.
