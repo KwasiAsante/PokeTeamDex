@@ -1,60 +1,52 @@
 import 'package:flutter_test/flutter_test.dart';
-
-// These tests document the name/format resolution rules.
-// The actual functions (_resolveTeamName, _resolveFormatId) are private;
-// correctness is verified via widget integration in ps_import_sheet_test.dart.
+import 'package:poke_team_dex/features/teams/logic/ps_import_resolvers.dart';
+import 'package:poke_team_dex/services/format/format_models.dart';
 
 void main() {
   group('resolveTeamName', () {
     test('returns override when non-empty', () {
-      const override = 'Sun Team';
-      const parsed = 'Imported Team';
-      final result = override.trim().isNotEmpty ? override.trim() : parsed;
-      expect(result, 'Sun Team');
+      expect(resolveTeamName('Sun Team', 'Imported Team'), 'Sun Team');
     });
 
     test('returns parsed when override is empty', () {
-      const override = '';
-      const parsed = 'Parsed Name';
-      final result = override.trim().isNotEmpty ? override.trim() : parsed;
-      expect(result, 'Parsed Name');
+      expect(resolveTeamName('', 'Parsed Name'), 'Parsed Name');
     });
 
     test('returns parsed when override is whitespace-only', () {
-      const override = '   ';
-      const parsed = 'Parsed Name';
-      final result = override.trim().isNotEmpty ? override.trim() : parsed;
-      expect(result, 'Parsed Name');
+      expect(resolveTeamName('   ', 'Parsed Name'), 'Parsed Name');
     });
 
     test('trims whitespace from override', () {
-      const override = '  Trimmed  ';
-      const parsed = 'Parsed Name';
-      final result = override.trim().isNotEmpty ? override.trim() : parsed;
-      expect(result, 'Trimmed');
+      expect(resolveTeamName('  Trimmed  ', 'Parsed Name'), 'Trimmed');
     });
   });
 
   group('resolveFormatId', () {
+    const gen9ou = GameFormat(
+      id: 'gen9ou',
+      name: 'Gen 9 OU',
+      short: 'Gen 9 OU',
+      type: FormatType.game,
+      gen: 9,
+    );
+    const vgc = GameFormat(
+      id: 'gen9vgc2025',
+      name: 'VGC 2025',
+      short: 'VGC 2025',
+      type: FormatType.game,
+      gen: 9,
+    );
+
     test('returns null when no override and no parsed', () {
-      const String? override = null;
-      const String? parsed = null;
-      final result = override ?? parsed;
-      expect(result, isNull);
+      expect(resolveFormatId(null, null), isNull);
     });
 
     test('returns parsed when no override', () {
-      const String? override = null;
-      const String? parsed = 'gen9ou';
-      final result = override ?? parsed;
-      expect(result, 'gen9ou');
+      expect(resolveFormatId(null, 'gen9ou'), 'gen9ou');
     });
 
     test('returns override id when override is selected', () {
-      const String override = 'gen9vgc2025';
-      const String? parsed = 'gen9ou';
-      final result = override;
-      expect(result, 'gen9vgc2025');
+      expect(resolveFormatId(vgc, gen9ou.id), 'gen9vgc2025');
     });
   });
 }
