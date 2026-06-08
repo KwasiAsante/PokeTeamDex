@@ -21,7 +21,14 @@ class MockSlotRepo extends Mock implements TeamSlotRepository {}
 class MockInstanceRepo extends Mock implements PokemonInstanceRepository {}
 class MockMetaRepo extends Mock implements MetaRepository {}
 class MockTeamSyncApi extends Mock implements TeamSyncApi {}
-class MockAppDatabase extends Mock implements AppDatabase {}
+class MockAppDatabase extends Mock implements AppDatabase {
+  // Mocktail can't match `transaction`'s generic type argument reliably via
+  // `when()`/`any()`, so run the action straight through — the merge/write
+  // calls inside still hit the other (stubbed) repository mocks as normal.
+  @override
+  Future<T> transaction<T>(Future<T> Function() action, {bool requireNew = false}) =>
+      action();
+}
 
 /// Simple spy that records which state-transition methods were called.
 class _FakeNotifier implements SyncNotifier {
