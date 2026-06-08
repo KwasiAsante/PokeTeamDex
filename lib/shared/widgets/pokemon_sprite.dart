@@ -36,11 +36,19 @@ class PokemonSprite extends StatelessWidget {
     if (url == null || url.isEmpty) {
       return _placeholder(size);
     }
+    // Constrain the in-memory decoded cache to the display size (scaled for
+    // device pixel ratio) instead of decoding at the source's native
+    // resolution — HOME artwork is ~215-475px while most tiles render this
+    // at 40-80px, so uncapped decoding wastes memory and CPU across the
+    // hundreds of sprites in scrolling lists/grids.
+    final cacheSize = (size * MediaQuery.devicePixelRatioOf(context)).round();
     return CachedNetworkImage(
       imageUrl: url,
       width: size,
       height: size,
       fit: fit,
+      memCacheWidth: cacheSize,
+      memCacheHeight: cacheSize,
       placeholder: (_, _) => _placeholder(size),
       errorWidget: fallbackUrl != null
           ? (_, _, _) => CachedNetworkImage(
@@ -48,6 +56,8 @@ class PokemonSprite extends StatelessWidget {
                 width: size,
                 height: size,
                 fit: fit,
+                memCacheWidth: cacheSize,
+                memCacheHeight: cacheSize,
                 placeholder: (_, _) => _placeholder(size),
                 errorWidget: fallbackUrl2 != null
                     ? (_, _, _) => CachedNetworkImage(
@@ -55,6 +65,8 @@ class PokemonSprite extends StatelessWidget {
                           width: size,
                           height: size,
                           fit: fit,
+                          memCacheWidth: cacheSize,
+                          memCacheHeight: cacheSize,
                           placeholder: (_, _) => _placeholder(size),
                           errorWidget: (_, _, _) => _broken(size),
                         )

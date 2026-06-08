@@ -69,23 +69,28 @@ class TeamSlotRepository {
   /// for each one. Returns the number of slots processed.
   Future<int> saveAll(List<TeamSlot> slots) async {
     int count = 0;
-    for (final slot in slots) {
-      await (_db.update(_db.teamSlots)..where((s) => s.id.equals(slot.id))).write(
-        TeamSlotsCompanion(
-          syncStatus: const Value('pending'),
-          updatedAt: Value(DateTime.now()),
-        ),
-      );
-      final payload = _buildPayload(slot, slot.instanceId);
-      await _syncQueue.enqueue(PendingSyncOpsCompanion(
-        operation: const Value('upsert'),
-        entityType: const Value('team_slot'),
-        entityId: Value(slot.id),
-        payload: Value(jsonEncode(payload)),
-        createdAt: Value(DateTime.now()),
-      ));
-      count++;
-    }
+    // Coalesce all writes into one transaction so Drift fires a single
+    // table-invalidation per watched table at commit time, instead of one
+    // per slot — same "stream storm" fix applied to sync_service.dart.
+    await _db.transaction(() async {
+      for (final slot in slots) {
+        await (_db.update(_db.teamSlots)..where((s) => s.id.equals(slot.id))).write(
+          TeamSlotsCompanion(
+            syncStatus: const Value('pending'),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+        final payload = _buildPayload(slot, slot.instanceId);
+        await _syncQueue.enqueue(PendingSyncOpsCompanion(
+          operation: const Value('upsert'),
+          entityType: const Value('team_slot'),
+          entityId: Value(slot.id),
+          payload: Value(jsonEncode(payload)),
+          createdAt: Value(DateTime.now()),
+        ));
+        count++;
+      }
+    });
     return count;
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -23,6 +24,27 @@ class AppLogger {
 
   late final Logger _logger;
   late final LogsServerOutput _serverOutput;
+
+  // Calls (`d`/`i`/`w`/`e`) only enqueue a closure — formatting (the printer
+  // builds padded/joined strings, e.g. full Dio request/response dumps) and
+  // sink dispatch (file I/O, HTTP buffering) happen later in [_drain], run
+  // from a microtask so the calling code's synchronous frame work (a build
+  // method, an event handler) is never extended by log processing.
+  final List<void Function()> _queue = [];
+
+  void _enqueue(void Function() dispatch) {
+    final wasEmpty = _queue.isEmpty;
+    _queue.add(dispatch);
+    if (wasEmpty) scheduleMicrotask(_drain);
+  }
+
+  void _drain() {
+    final batch = _queue.toList(growable: false);
+    _queue.clear();
+    for (final dispatch in batch) {
+      dispatch();
+    }
+  }
 
   AppLogger._internal() {
     _serverOutput = LogsServerOutput();
@@ -52,16 +74,16 @@ class AppLogger {
   }
 
   void d(String message, {Object? error, StackTrace? stackTrace}) =>
-      _logger.d(message, error: error, stackTrace: stackTrace);
+      _enqueue(() => _logger.d(message, error: error, stackTrace: stackTrace));
 
   void i(String message, {Object? error, StackTrace? stackTrace}) =>
-      _logger.i(message, error: error, stackTrace: stackTrace);
+      _enqueue(() => _logger.i(message, error: error, stackTrace: stackTrace));
 
   void w(String message, {Object? error, StackTrace? stackTrace}) =>
-      _logger.w(message, error: error, stackTrace: stackTrace);
+      _enqueue(() => _logger.w(message, error: error, stackTrace: stackTrace));
 
   void e(String message, {Object? error, StackTrace? stackTrace}) =>
-      _logger.e(message, error: error, stackTrace: stackTrace);
+      _enqueue(() => _logger.e(message, error: error, stackTrace: stackTrace));
 }
 
 // ── Printers / outputs ────────────────────────────────────────────────────────
@@ -107,8 +129,9 @@ class _FileLogOutput extends LogOutput {
       await dir.create(recursive: true);
       _file = File('${dir.path}/$day.log');
 
-      // Rotate when the file exceeds 5 MB.
-      if (_file!.existsSync() && _file!.lengthSync() > 5 * 1024 * 1024) {
+      // Rotate when the file exceeds 5 MB. Async stat calls — `existsSync`/
+      // `lengthSync` block the calling isolate on the filesystem syscall.
+      if (await _file!.exists() && await _file!.length() > 5 * 1024 * 1024) {
         _file = File('${dir.path}/${day}_1.log');
       }
     }

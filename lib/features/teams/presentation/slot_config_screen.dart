@@ -618,11 +618,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             ? GenerationMechanics.forGen(format.gen)
             : null;
         final pokemonMoves = pokemon.moves.cast<Map<String, dynamic>>();
-        // violations is recomputed as effectiveViolations after form data loads.
-        // ignore: unused_local_variable
-        final violations = format != null
-            ? _computeViolations(formatService, format, pokemon.name, pokemonMoves)
-            : <String, String>{};
 
         // Learnable moves filtered by format version groups.
         // No format → show everything the Pokémon can ever learn.
@@ -764,35 +759,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             ? formPokemon.moves.cast<Map<String, dynamic>>()
             : pokemonMoves;
 
-        // Prior-evolution-exclusive moves (computed first so violations can be
-        // suppressed for them below).
-        final priorEvoMoveSetsAsync =
-            ref.watch(priorEvoMoveSetsProvider(slot.pokemonId));
-        final effectivePriorEvoMoves =
-            priorEvoMoveSetsAsync.whenOrNull(data: (sets) {
-          if (sets.isEmpty) return const <String>{};
-          if (format == null) {
-            final currentAll = effectivePokemonMoves
-                .map((m) => (m['move'] as Map)['name'] as String)
-                .toSet();
-            final ancestorAll = <String>{};
-            for (final ancestor in sets) {
-              for (final m in ancestor.moves) {
-                ancestorAll.add((m['move'] as Map)['name'] as String);
-              }
-            }
-            return ancestorAll.difference(currentAll);
-          }
-          return buildPriorEvoExclusiveMoveNames(
-            currentMoves: effectivePokemonMoves,
-            ancestorMoveSets: sets,
-            format: format,
-            pokemonName: formPokemon?.name ?? pokemon.name,
-            formatService: formatService,
-          );
-        }) ??
-            const <String>{};
-
         // Genuine event/gift-Pokémon-exclusive moves (e.g. Pokémon Crystal's
         // gift Dratini knowing Extreme Speed from the start) — surfaced purely
         // for the picker's "Event" badge. Selectability/validation already
@@ -804,17 +770,50 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         // (e.g. Eevee's Gen-2 event-exclusive Growth) never appear in
         // PokéAPI's move list for the species at all, so they only exist in
         // the learnable set via buildLearnsetForFormat's PS-name fallback.
-        final effectiveLearnableMoves = (format != null
-                ? buildLearnsetForFormat(
-                    effectivePokemonMoves, format,
-                    pokemonName: formPokemon?.name ?? pokemon.name,
-                    formatService: formatService,
-                  )
-                : effectivePokemonMoves
-                    .map((m) => m['move']['name'] as String)
-                    .toSet())
-            .toList()
+        //
+        // Computed once as a set and shared with the prior-evo-exclusive
+        // lookup below — both want the exact same learnable-move set for
+        // `effectivePokemonMoves`/`format`/`formPokemon?.name ?? pokemon.name`,
+        // and `buildLearnsetForFormat` walks the full movepool plus a PS
+        // supplementary pass, so rebuilding it twice per render is wasted work.
+        final effectiveLearnableMoveSet = format != null
+            ? buildLearnsetForFormat(
+                effectivePokemonMoves, format,
+                pokemonName: formPokemon?.name ?? pokemon.name,
+                formatService: formatService,
+              )
+            : effectivePokemonMoves
+                .map((m) => m['move']['name'] as String)
+                .toSet();
+        final effectiveLearnableMoves = effectiveLearnableMoveSet.toList()
           ..sort();
+
+        // Prior-evolution-exclusive moves (computed first so violations can be
+        // suppressed for them below).
+        final priorEvoMoveSetsAsync =
+            ref.watch(priorEvoMoveSetsProvider(slot.pokemonId));
+        final effectivePriorEvoMoves =
+            priorEvoMoveSetsAsync.whenOrNull(data: (sets) {
+          if (sets.isEmpty) return const <String>{};
+          if (format == null) {
+            final ancestorAll = <String>{};
+            for (final ancestor in sets) {
+              for (final m in ancestor.moves) {
+                ancestorAll.add((m['move'] as Map)['name'] as String);
+              }
+            }
+            return ancestorAll.difference(effectiveLearnableMoveSet);
+          }
+          return buildPriorEvoExclusiveMoveNames(
+            currentMoves: effectivePokemonMoves,
+            ancestorMoveSets: sets,
+            format: format,
+            pokemonName: formPokemon?.name ?? pokemon.name,
+            formatService: formatService,
+            currentLearnset: effectiveLearnableMoveSet,
+          );
+        }) ??
+            const <String>{};
 
         final effectiveEventMoves = <String>{};
         if (format != null && formatService.isInitialized) {
@@ -1535,11 +1534,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                                   ?.copyWith(color: colorScheme.onSurfaceVariant)),
                         ] else if (detailAsync.isLoading) ...[
                           const SizedBox(height: 6),
-                          const SizedBox(
-                            height: 8,
-                            width: 80,
-                            child: LinearProgressIndicator(),
-                          ),
+                          const _DescriptionLoadingBar(),
                         ],
                       ],
                     ),
@@ -1619,9 +1614,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     String? description;
+    bool descriptionLoading = false;
     if (_heldItemName != null) {
       final detailAsync = ref.watch(_itemDetailProvider(_heldItemName!));
       description = detailAsync.whenOrNull(data: (e) => e.shortEffect);
+      descriptionLoading = description == null && detailAsync.isLoading;
     }
 
     return Column(
@@ -1681,6 +1678,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             child: Text(description,
                 style: textTheme.bodySmall
                     ?.copyWith(color: colorScheme.onSurfaceVariant)),
+          )
+        else if (descriptionLoading)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(4, 6, 4, 0),
+            child: _DescriptionLoadingBar(),
           ),
         _buildViolationBanner(violation),
       ],
@@ -1704,9 +1706,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     return Column(
       children: List.generate(4, (i) {
         MoveEntry? moveDetail;
+        bool moveDetailLoading = false;
         if (_moves[i] != null) {
           final detailAsync = ref.watch(_moveDetailProvider(_moves[i]!));
           moveDetail = detailAsync.whenOrNull(data: (e) => e);
+          moveDetailLoading = moveDetail == null && detailAsync.isLoading;
         }
 
         return Padding(
@@ -1819,6 +1823,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   child: Text(moveDetail!.shortEffect!,
                       style: textTheme.bodySmall
                           ?.copyWith(color: colorScheme.onSurfaceVariant)),
+                )
+              else if (moveDetailLoading)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(4, 4, 4, 0),
+                  child: _DescriptionLoadingBar(),
                 ),
               // Z-Move info — Gen 7 / no-format; shown when Z-crystal held and move qualifies
               if (_moves[i] != null && _heldItemName != null) ...[
@@ -3540,6 +3549,20 @@ class _EventMoveBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+// Thin progress placeholder shown in place of an ability/item/move
+// description while its detail fetch is still in flight — kept as a single
+// widget so all three description spots show an identical loading state.
+class _DescriptionLoadingBar extends StatelessWidget {
+  const _DescriptionLoadingBar();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(
+        height: 8,
+        width: 80,
+        child: LinearProgressIndicator(),
+      );
 }
 
 // ── Item picker sheet ─────────────────────────────────────────────────────────

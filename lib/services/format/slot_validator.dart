@@ -262,17 +262,25 @@ Set<String> _buildLearnset(
 /// e.g. gift Dratini's event-exclusive Extreme Speed must be looked up under
 /// "dratini", not "dragonite", or it would never be recognized as learnable
 /// by any prior evolution.
+///
+/// [currentLearnset] lets a caller that already built the current Pokémon's
+/// learnable-move set (with the same [currentMoves]/[format]/[pokemonName]/
+/// [formatService]) pass it straight through — `buildLearnsetForFormat` walks
+/// the full movepool plus a PS supplementary pass, so callers that also need
+/// that exact set elsewhere (e.g. the move picker) shouldn't pay for it twice.
 Set<String> buildPriorEvoExclusiveMoveNames({
   required List<Map<String, dynamic>> currentMoves,
   required List<({String speciesName, List<Map<String, dynamic>> moves})> ancestorMoveSets,
   required GameFormat format,
   String? pokemonName,
   FormatService? formatService,
+  Set<String>? currentLearnset,
 }) {
-  final current = buildLearnsetForFormat(
-    currentMoves, format,
-    pokemonName: pokemonName, formatService: formatService,
-  );
+  final current = currentLearnset ??
+      buildLearnsetForFormat(
+        currentMoves, format,
+        pokemonName: pokemonName, formatService: formatService,
+      );
   final ancestorAll = <String>{};
   for (final ancestor in ancestorMoveSets) {
     ancestorAll.addAll(buildLearnsetForFormat(

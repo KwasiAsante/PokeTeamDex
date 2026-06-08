@@ -136,26 +136,40 @@ class SyncService {
       final created = (result['created'] as List).cast<Map<String, dynamic>>();
       AppLogger().i('Push: ${batchOps.length} op(s) sent, ${created.length} entity(ies) created');
 
-      for (final c in created) {
-        final localId = c['client_local_id'] as int;
-        final remoteId = (c['remote_id'] as int).toString();
-        switch (c['entity_type'] as String) {
-          case 'folder':
-            await (db.update(db.teamFolders)
-                  ..where((f) => f.id.equals(localId)))
-                .write(TeamFoldersCompanion(remoteId: Value(remoteId)));
-          case 'team':
-            await (db.update(db.teams)..where((t) => t.id.equals(localId)))
-                .write(TeamsCompanion(remoteId: Value(remoteId)));
-          case 'instance':
-            await (db.update(db.pokemonInstances)
-                  ..where((i) => i.id.equals(localId)))
-                .write(PokemonInstancesCompanion(remoteId: Value(remoteId)));
-        }
+      // Same coalescing as the pull-side merges below — stamp every newly
+      // created entity's server-assigned remoteId in one transaction so each
+      // table fires a single invalidation rather than one per row.
+      if (created.isNotEmpty) {
+        await db.transaction(() async {
+          for (final c in created) {
+            final localId = c['client_local_id'] as int;
+            final remoteId = (c['remote_id'] as int).toString();
+            switch (c['entity_type'] as String) {
+              case 'folder':
+                await (db.update(db.teamFolders)
+                      ..where((f) => f.id.equals(localId)))
+                    .write(TeamFoldersCompanion(remoteId: Value(remoteId)));
+              case 'team':
+                await (db.update(db.teams)..where((t) => t.id.equals(localId)))
+                    .write(TeamsCompanion(remoteId: Value(remoteId)));
+              case 'instance':
+                await (db.update(db.pokemonInstances)
+                      ..where((i) => i.id.equals(localId)))
+                    .write(PokemonInstancesCompanion(remoteId: Value(remoteId)));
+            }
+          }
+        });
       }
 
-      for (final op in includedOps) {
-        await syncQueue.delete(op.id);
+      // Same coalescing — clearing the queue one row at a time fires
+      // `watchPendingCount`/`watchPending` (the sync monitor screen) once
+      // per deleted op instead of once for the whole drained batch.
+      if (includedOps.isNotEmpty) {
+        await db.transaction(() async {
+          for (final op in includedOps) {
+            await syncQueue.delete(op.id);
+          }
+        });
       }
       return true;
     } on DioException catch (e) {
@@ -166,8 +180,12 @@ class SyncService {
       return false;
     } on StateError catch (e) {
       AppLogger().w('Push: bad op data discarded', error: e);
-      for (final op in includedOps) {
-        await syncQueue.delete(op.id);
+      if (includedOps.isNotEmpty) {
+        await db.transaction(() async {
+          for (final op in includedOps) {
+            await syncQueue.delete(op.id);
+          }
+        });
       }
       return true; // bad data discarded — not a transient push failure
     }
@@ -454,10 +472,17 @@ class SyncService {
       '${instances.length} instance(s), ${slots.length} slot(s)',
     );
 
-    await _mergeFolders(folders);
-    await _mergeTeams(teams);
-    await _mergeInstances(instances);
-    await _mergeSlots(slots);
+    // Coalesce all merge writes into a single transaction so Drift emits one
+    // table-invalidation notification per watched table at commit time, instead
+    // of one per row. With 30+ teams and ~6 slots each, merging row-by-row
+    // outside a transaction re-runs every active `.watch()` query (and rebuilds
+    // every dependent widget) once per write — a "stream storm" during pull.
+    await db.transaction(() async {
+      await _mergeFolders(folders);
+      await _mergeTeams(teams);
+      await _mergeInstances(instances);
+      await _mergeSlots(slots);
+    });
 
     await metaRepo.set(_metaKeyLastPullAt, pullStart.toIso8601String());
   }
