@@ -353,20 +353,26 @@ class _FolderSection extends ConsumerStatefulWidget {
 
 class _FolderSectionState extends ConsumerState<_FolderSection> {
   bool _expanded = true;
+  bool _reordering = false;
 
   Future<void> _moveTeamTo(List<Team> teams, int from, int to) async {
-    final reordered = [...teams];
-    final moved = reordered.removeAt(from);
-    reordered.insert(to, moved);
-    final repo = ref.read(teamRepositoryProvider);
-    final db = ref.read(appDatabaseProvider);
-    await db.transaction(() async {
-      for (int i = 0; i < reordered.length; i++) {
-        if (reordered[i].sortOrder != i) {
-          await repo.updateSortOrder(reordered[i].id, i);
+    setState(() => _reordering = true);
+    try {
+      final reordered = [...teams];
+      final moved = reordered.removeAt(from);
+      reordered.insert(to, moved);
+      final repo = ref.read(teamRepositoryProvider);
+      final db = ref.read(appDatabaseProvider);
+      await db.transaction(() async {
+        for (int i = 0; i < reordered.length; i++) {
+          if (reordered[i].sortOrder != i) {
+            await repo.updateSortOrder(reordered[i].id, i);
+          }
         }
-      }
-    });
+      });
+    } finally {
+      if (mounted) setState(() => _reordering = false);
+    }
   }
 
   Future<void> _onReorderTeams(List<Team> teams, int oldIndex, int newIndex) async {
@@ -441,6 +447,8 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
             );
           },
         ),
+        if (_reordering)
+          const LinearProgressIndicator(minHeight: 2),
         if (_expanded)
           teamsAsync.when(
             loading: () => const SizedBox(
