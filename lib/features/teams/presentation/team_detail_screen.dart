@@ -16,6 +16,7 @@ import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dar
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/services/format/sprite_resolver.dart';
+import 'package:poke_team_dex/features/teams/presentation/move_copy_slot_sheet.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
 import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
@@ -1124,6 +1125,16 @@ class _FilledSlotCard extends ConsumerWidget {
               onTap: () => Navigator.pop(ctx, 'replace'),
             ),
             ListTile(
+              leading: const Icon(Icons.copy_outlined),
+              title: const Text('Copy to team'),
+              onTap: () => Navigator.pop(ctx, 'copy'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.drive_file_move_outlined),
+              title: const Text('Move to team'),
+              onTap: () => Navigator.pop(ctx, 'move'),
+            ),
+            ListTile(
               leading: const Icon(Icons.remove_circle_outline),
               title: const Text('Remove from team'),
               onTap: () => Navigator.pop(ctx, 'remove'),
@@ -1143,6 +1154,20 @@ class _FilledSlotCard extends ConsumerWidget {
       }
     } else if (action == 'replace') {
       context.push('/teams/$teamId/pick/${slot.slot}');
+    } else if (action == 'copy') {
+      await showMoveCopySlotSheet(
+        context,
+        ref,
+        sourceSlot: slot,
+        deleteSource: false,
+      );
+    } else if (action == 'move') {
+      await showMoveCopySlotSheet(
+        context,
+        ref,
+        sourceSlot: slot,
+        deleteSource: true,
+      );
     } else if (action == 'remove') {
       await ref
           .read(teamSlotRepositoryProvider)
