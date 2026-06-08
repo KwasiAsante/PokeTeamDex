@@ -332,7 +332,7 @@ class _ChainRow extends StatelessWidget {
             ? colorScheme.onSecondaryContainer
             : colorScheme.onSurfaceVariant;
 
-    final content = Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (badge != null) ...[
@@ -383,15 +383,6 @@ class _ChainRow extends StatelessWidget {
           ),
         ],
       ],
-    );
-
-    // Indent deeper descendants (grandchildren, …) so the branching of the
-    // evolution tree below the current instance reads as a hierarchy rather
-    // than a flat list — direct children (depth 1) stay flush with ancestors.
-    if (depth <= 1) return content;
-    return Padding(
-      padding: EdgeInsets.only(left: (depth - 1) * 16.0),
-      child: content,
     );
   }
 }
