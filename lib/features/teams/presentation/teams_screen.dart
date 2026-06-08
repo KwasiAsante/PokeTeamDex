@@ -201,18 +201,24 @@ class _TeamsList extends ConsumerWidget {
   final List<TeamFolder> folders;
   const _TeamsList({required this.folders});
 
-  Future<void> _onReorderFolders(WidgetRef ref, int oldIndex, int newIndex) async {
-    if (newIndex > oldIndex) newIndex--;
+  Future<void> _moveFolderTo(WidgetRef ref, List<TeamFolder> folders, int from, int to) async {
     final reordered = [...folders];
-    final moved = reordered.removeAt(oldIndex);
-    reordered.insert(newIndex, moved);
-
+    final moved = reordered.removeAt(from);
+    reordered.insert(to, moved);
     final repo = ref.read(teamFolderRepositoryProvider);
-    for (int i = 0; i < reordered.length; i++) {
-      if (reordered[i].sortOrder != i) {
-        await repo.updateSortOrder(reordered[i].id, i);
+    final db = ref.read(appDatabaseProvider);
+    await db.transaction(() async {
+      for (int i = 0; i < reordered.length; i++) {
+        if (reordered[i].sortOrder != i) {
+          await repo.updateSortOrder(reordered[i].id, i);
+        }
       }
-    }
+    });
+  }
+
+  Future<void> _onReorderFolders(WidgetRef ref, List<TeamFolder> folders, int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex--;
+    await _moveFolderTo(ref, folders, oldIndex, newIndex);
   }
 
   @override
@@ -254,11 +260,13 @@ class _TeamsList extends ConsumerWidget {
             if (folders.isNotEmpty)
               SliverReorderableList(
                 itemCount: folders.length,
-                onReorder: (o, n) => _onReorderFolders(ref, o, n),
+                onReorder: (o, n) => _onReorderFolders(ref, folders, o, n),
                 itemBuilder: (_, i) => _FolderSection(
                   key: ValueKey(folders[i].id),
                   folder: folders[i],
                   index: i,
+                  folderCount: folders.length,
+                  onMove: (f, t) => _moveFolderTo(ref, folders, f, t),
                 ),
               ),
             // Ungrouped teams
@@ -340,11 +348,15 @@ class _TeamsList extends ConsumerWidget {
 class _FolderSection extends ConsumerStatefulWidget {
   final TeamFolder folder;
   final int index; // position in the reorderable folder list
+  final int folderCount;
+  final Future<void> Function(int from, int to) onMove;
 
   const _FolderSection({
     required super.key,
     required this.folder,
     required this.index,
+    required this.folderCount,
+    required this.onMove,
   });
 
   @override
@@ -419,6 +431,38 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              IconButton(
+                icon: const Icon(Icons.vertical_align_top),
+                iconSize: 16,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: 'Move to top',
+                onPressed: widget.index > 0 ? () => widget.onMove(widget.index, 0) : null,
+              ),
+              IconButton(
+                icon: const Icon(Icons.arrow_upward),
+                iconSize: 16,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: 'Move up',
+                onPressed: widget.index > 0 ? () => widget.onMove(widget.index, widget.index - 1) : null,
+              ),
+              IconButton(
+                icon: const Icon(Icons.arrow_downward),
+                iconSize: 16,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: 'Move down',
+                onPressed: widget.index < widget.folderCount - 1 ? () => widget.onMove(widget.index, widget.index + 1) : null,
+              ),
+              IconButton(
+                icon: const Icon(Icons.vertical_align_bottom),
+                iconSize: 16,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: 'Move to bottom',
+                onPressed: widget.index < widget.folderCount - 1 ? () => widget.onMove(widget.index, widget.folderCount - 1) : null,
+              ),
               IconButton(
                 icon: const Icon(Icons.add, size: 20),
                 tooltip: 'Add team to folder',
