@@ -453,10 +453,13 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
     // >6 Pokémon → import as a Box; ≤6 → regular team.
     final isBox = parsed.slots.length > 6;
 
+    final teamName = resolveTeamName(_nameCtrl.text, parsed.name);
+    final formatId = resolveFormatId(_selectedFormat, parsed.formatId);
+
     final teamId = await teamRepo.insert(TeamsCompanion(
-      name: Value(parsed.name),
+      name: Value(teamName),
       folderId: Value(widget.folderId),
-      formatLabel: Value(parsed.formatId),
+      formatLabel: Value(formatId),
       isBox: Value(isBox),
       createdAt: Value(now),
       updatedAt: Value(now),
@@ -466,9 +469,9 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
       entityType: const Value('team'),
       entityId: Value(teamId),
       payload: Value(jsonEncode({
-        'name': parsed.name,
+        'name': teamName,
         'folder_local_id': widget.folderId,
-        'format_label': parsed.formatId,
+        'format_label': formatId,
       })),
       createdAt: Value(now),
     ));
@@ -619,6 +622,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
               ),
             ),
             const SizedBox(height: 8),
+            if (widget.targetTeamId == null) _buildOverrideFields(context),
             Flexible(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
