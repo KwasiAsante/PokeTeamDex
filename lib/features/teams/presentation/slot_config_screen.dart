@@ -642,10 +642,16 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         );
 
         // ── Mega Evolution ─────────────────────────────────────────────────
+        // Rayquaza is the sole exception to the "needs a Mega Stone" rule —
+        // it Mega Evolves simply by knowing Dragon Ascent, no held item
+        // required (and regardless of what it IS holding). This was potent
+        // enough on its own to get Mega Rayquaza banned to Ubers outright.
+        final rayquazaDragonAscent =
+            pokemon.name == 'rayquaza' && _moves.contains('dragon-ascent');
         // Determine if a mega toggle should be shown for the current slot.
-        final megaEntry = _heldItemName != null
-            ? kMegaStoneMap[_heldItemName]
-            : null;
+        final megaEntry = rayquazaDragonAscent
+            ? (baseSpecies: 'rayquaza', megaForm: 'rayquaza-mega')
+            : (_heldItemName != null ? kMegaStoneMap[_heldItemName] : null);
         // No format = no restrictions; hasMegaStone applies only for specific gens.
         final canMegaEvolve = megaEntry != null &&
             pokemon.name == megaEntry.baseSpecies &&
