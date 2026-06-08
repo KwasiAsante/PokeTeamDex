@@ -1094,6 +1094,10 @@ class _FilledSlotCard extends ConsumerWidget {
                                   .map((t) => TypeBadge(type: t))
                                   .toList(),
                             ),
+                            if (slot.teraType != null) ...[
+                              const SizedBox(height: 4),
+                              _TeraTypeBadge(teraType: slot.teraType!),
+                            ],
                             const SizedBox(height: 4),
                             // Level · gender · shiny
                             Row(
@@ -1354,6 +1358,33 @@ class _CompactStatBar extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Tera Type badge ───────────────────────────────────────────────────────────
+
+class _TeraTypeBadge extends StatelessWidget {
+  final String teraType;
+  const _TeraTypeBadge({required this.teraType});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = PokemonTypeColors.colors[teraType] ?? Colors.grey;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Text(
+        'Tera · ${teraType[0].toUpperCase()}${teraType.substring(1)}',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
       ),
     );
   }
