@@ -53,8 +53,13 @@ const _kStatMap = {
   'SpA': 'special-attack', 'SpD': 'special-defense', 'Spe': 'speed',
 };
 
-String _norm(String s) =>
-    s.toLowerCase().trim().replaceAll(' ', '-').replaceAll("'", '');
+String _norm(String s) => s
+    .toLowerCase()
+    .trim()
+    .replaceAll(' ', '-')
+    .replaceAll("'", '')      // U+0027 ASCII apostrophe
+    .replaceAll('\u2019', '') // U+2019 RIGHT SINGLE QUOTATION MARK (used by some PS clients)
+    .replaceAll('\u02BC', ''); // U+02BC MODIFIER LETTER APOSTROPHE
 
 _PsTeam _parseTeam(String text) {
   String teamName = 'Imported Team';

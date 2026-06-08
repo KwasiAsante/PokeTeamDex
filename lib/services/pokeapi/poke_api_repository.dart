@@ -165,11 +165,19 @@ class PokeApiRepository {
   /// Like [fetchPokemonByName] but falls back to the species endpoint when the
   /// direct name lookup fails (e.g. `aegislash` → 404; use species to find the
   /// default variety `aegislash-shield`).
+  ///
+  /// For Pokémon Showdown imports where the PS form name differs from the
+  /// PokéAPI variety name, a second fallback looks up the base species and
+  /// searches its variety list:
+  ///   • Exact match  — `gastrodon-east` found in Gastrodon's variety list.
+  ///   • Prefix match — `calyrex-shadow` matches `calyrex-shadow-rider`.
   Future<PokemonEntry> fetchPokemonByNameOrDefault(String name) async {
     try {
       return await fetchPokemonByName(name);
     } catch (_) {
-      // Try pokemon-species/{name} to find the default variety.
+      // ── Strategy 1: species/{name} → default variety ──────────────────────
+      // Handles bare species names like "aegislash" that 404 on /pokemon but
+      // have a valid /pokemon-species entry with a default variety.
       final r = await _pokeApiClient.client.get('/pokemon-species/$name');
       if (r.statusCode == 200) {
         final varieties = r.data['varieties'] as List? ?? [];
@@ -183,6 +191,37 @@ class PokeApiRepository {
           return await fetchPokemonByName(defaultName);
         }
       }
+
+      // ── Strategy 2: base-species variety search ────────────────────────────
+      // For hyphenated names (PS form names) where the direct /pokemon and
+      // /pokemon-species lookups both failed.  Strip the form suffix and look
+      // up the owning species, then search its variety list for:
+      //   1. An exact name match  (e.g. "gastrodon-east" in Gastrodon varieties)
+      //   2. A prefix match       (e.g. "calyrex-shadow" → "calyrex-shadow-rider")
+      // Intentionally does NOT fall back to the default variety here — silently
+      // importing the wrong form would be more confusing than a clear error.
+      if (name.contains('-')) {
+        final baseName = name.split('-').first;
+        final r2 =
+            await _pokeApiClient.client.get('/pokemon-species/$baseName');
+        if (r2.statusCode == 200) {
+          final varieties = r2.data['varieties'] as List? ?? [];
+          // 1. Exact variety name
+          for (final v in varieties) {
+            if ((v['pokemon'] as Map)['name'] == name) {
+              return await fetchPokemonByName(name);
+            }
+          }
+          // 2. PS name is a prefix of the PokéAPI variety name
+          for (final v in varieties) {
+            final vName = (v['pokemon'] as Map)['name'] as String;
+            if (vName.startsWith('$name-')) {
+              return await fetchPokemonByName(vName);
+            }
+          }
+        }
+      }
+
       rethrow;
     }
   }
