@@ -29,6 +29,18 @@ class PokeApiRepository {
   final Map<int, PokemonEntry> _pokemonById = {};
   final Map<String, PokemonEntry> _pokemonByName = {};
 
+  /// Same memoization as [_pokemonById] for the other detail-screen fetches —
+  /// `fetchPokemonSpecies`/`fetchAbility`/`fetchEvolutionChain`/
+  /// `fetchPokemonForm` had no in-memory layer, so every `.autoDispose`
+  /// provider rebuild (and every internal helper that calls them, e.g.
+  /// `fetchForwardEvolutionInfo` + `fetchBackwardEvolutionInfo` both fetching
+  /// the same species/chain back to back) re-ran `fromJson` on the cached
+  /// Hive payload from scratch.
+  final Map<int, PokemonSpeciesEntry> _speciesById = {};
+  final Map<String, AbilityEntry> _abilityByName = {};
+  final Map<int, EvolutionNode> _evolutionChainById = {};
+  final Map<String, PokemonFormEntry> _formByName = {};
+
   Future<List<PokemonListEntry>> fetchPokemonList({bool include = false}) async {
     try {
       final cache = _pokeApiCache.getIfValid('pokemon_list');
@@ -130,10 +142,14 @@ class PokeApiRepository {
   /// cloaks, Shellos' seas, Unown's letters) that exist only as form resources
   /// and have no separate `/pokemon/{name}` entry of their own.
   Future<PokemonFormEntry> fetchPokemonForm(String name) async {
+    final memoized = _formByName[name];
+    if (memoized != null) return memoized;
     final cacheKey = 'pokemon_form_$name';
     final cached = _pokeApiCache.getIfValid(cacheKey);
     if (cached is Map<String, dynamic>) {
-      return PokemonFormEntry.fromJson(cached);
+      final entry = PokemonFormEntry.fromJson(cached);
+      _formByName[name] = entry;
+      return entry;
     }
     final response = await _pokeApiClient.client.get('/pokemon-form/$name');
     if (response.statusCode != 200) {
@@ -141,7 +157,9 @@ class PokeApiRepository {
     }
     final data = Map<String, dynamic>.from(response.data);
     _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
-    return PokemonFormEntry.fromJson(data);
+    final entry = PokemonFormEntry.fromJson(data);
+    _formByName[name] = entry;
+    return entry;
   }
 
   /// Like [fetchPokemonByName] but falls back to the species endpoint when the
@@ -170,10 +188,14 @@ class PokeApiRepository {
   }
 
   Future<PokemonSpeciesEntry> fetchPokemonSpecies(int id) async {
+    final memoized = _speciesById[id];
+    if (memoized != null) return memoized;
     final cacheKey = 'pokemon_species_$id';
     final cached = _pokeApiCache.getIfValid(cacheKey);
     if (cached is Map<String, dynamic>) {
-      return PokemonSpeciesEntry.fromJson(cached);
+      final entry = PokemonSpeciesEntry.fromJson(cached);
+      _speciesById[id] = entry;
+      return entry;
     }
     final response = await _pokeApiClient.client.get('/pokemon-species/$id');
     if (response.statusCode != 200) {
@@ -181,14 +203,20 @@ class PokeApiRepository {
     }
     final data = Map<String, dynamic>.from(response.data);
     _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
-    return PokemonSpeciesEntry.fromJson(data);
+    final entry = PokemonSpeciesEntry.fromJson(data);
+    _speciesById[id] = entry;
+    return entry;
   }
 
   Future<AbilityEntry> fetchAbility(String name) async {
+    final memoized = _abilityByName[name];
+    if (memoized != null) return memoized;
     final cacheKey = 'ability_$name';
     final cached = _pokeApiCache.getIfValid(cacheKey);
     if (cached is Map<String, dynamic>) {
-      return AbilityEntry.fromJson(cached);
+      final entry = AbilityEntry.fromJson(cached);
+      _abilityByName[name] = entry;
+      return entry;
     }
     final response = await _pokeApiClient.client.get('/ability/$name');
     if (response.statusCode != 200) {
@@ -196,14 +224,20 @@ class PokeApiRepository {
     }
     final data = Map<String, dynamic>.from(response.data);
     _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
-    return AbilityEntry.fromJson(data);
+    final entry = AbilityEntry.fromJson(data);
+    _abilityByName[name] = entry;
+    return entry;
   }
 
   Future<EvolutionNode> fetchEvolutionChain(int chainId) async {
+    final memoized = _evolutionChainById[chainId];
+    if (memoized != null) return memoized;
     final cacheKey = 'evolution_chain_$chainId';
     final cached = _pokeApiCache.getIfValid(cacheKey);
     if (cached is Map<String, dynamic>) {
-      return EvolutionNode.fromJson(cached['chain'] as Map<String, dynamic>);
+      final node = EvolutionNode.fromJson(cached['chain'] as Map<String, dynamic>);
+      _evolutionChainById[chainId] = node;
+      return node;
     }
     final response = await _pokeApiClient.client.get('/evolution-chain/$chainId');
     if (response.statusCode != 200) {
@@ -211,7 +245,9 @@ class PokeApiRepository {
     }
     final data = Map<String, dynamic>.from(response.data);
     _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
-    return EvolutionNode.fromJson(data['chain'] as Map<String, dynamic>);
+    final node = EvolutionNode.fromJson(data['chain'] as Map<String, dynamic>);
+    _evolutionChainById[chainId] = node;
+    return node;
   }
 
   /// Returns the set of species IDs reachable FORWARD in the evolution chain
