@@ -1023,6 +1023,12 @@ class _TeamSpriteRow extends ConsumerWidget {
           final fallback  = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$id.png';
           final width = 60.0;
           final height = 50.0;
+          // Cap the decoded cache to display size — these are tiny party
+          // icons, but up to 6 render per team across 30+ teams, and
+          // CachedNetworkImage otherwise decodes at native resolution.
+          final dpr = MediaQuery.devicePixelRatioOf(context);
+          final cacheWidth = (width * dpr).round();
+          final cacheHeight = (height * dpr).round();
 
           return Padding(
             padding: const EdgeInsets.only(right: 2),
@@ -1031,16 +1037,22 @@ class _TeamSpriteRow extends ConsumerWidget {
               width: width,
               height: height,
               fit: BoxFit.contain,
+              memCacheWidth: cacheWidth,
+              memCacheHeight: cacheHeight,
               errorWidget: (_, _, _) => CachedNetworkImage(
                 imageUrl: iconGen8,
                 width: width,
                 height: height,
                 fit: BoxFit.contain,
+                memCacheWidth: cacheWidth,
+                memCacheHeight: cacheHeight,
                 errorWidget: (_, _, _) => CachedNetworkImage(
                   imageUrl: fallback,
                   width: width,
                   height: height,
                   fit: BoxFit.contain,
+                  memCacheWidth: cacheWidth,
+                  memCacheHeight: cacheHeight,
                   errorWidget: (_, _, _) => Icon(
                     Icons.catching_pokemon,
                     size: 60,
