@@ -100,6 +100,7 @@ class SlotUpsert(BaseModel):
     has_gigantamax: bool = False
     gigantamax_enabled: bool = False
     is_alpha: bool = False
+    tera_type: str | None = None
     contest_cool: int | None = None
     contest_beautiful: int | None = None
     contest_cute: int | None = None
@@ -144,6 +145,7 @@ class SlotResponse(BaseModel):
     has_gigantamax: bool
     gigantamax_enabled: bool
     is_alpha: bool
+    tera_type: str | None
     contest_cool: int | None
     contest_beautiful: int | None
     contest_cute: int | None
@@ -279,6 +281,7 @@ class SlotUpsertOp(BaseModel):
     has_gigantamax: bool = False
     gigantamax_enabled: bool = False
     is_alpha: bool = False
+    tera_type: str | None = None
     contest_cool: int | None = None
     contest_beautiful: int | None = None
     contest_cute: int | None = None

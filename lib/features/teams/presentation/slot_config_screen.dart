@@ -20,6 +20,7 @@ import 'package:poke_team_dex/services/format/sprite_resolver.dart';
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/type_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'dart:math' as math;
@@ -176,6 +177,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   // Alpha Pokémon (Legends: Arceus)
   bool _isAlpha = false;
 
+  // Tera Type (Gen 9 / No Format)
+  String? _teraType;
+
   bool _initialized = false;
   bool _saving = false;
   bool _dirty = false;
@@ -251,6 +255,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _hasGigantamax = slot.hasGigantamax;
     _gigantamaxEnabled = slot.gigantamaxEnabled;
     _isAlpha = slot.isAlpha;
+    _teraType = slot.teraType;
 
     // Ribbons
     _ribbons.clear();
@@ -417,6 +422,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           hasGigantamax: Value(_hasGigantamax),
           gigantamaxEnabled: Value(_gigantamaxEnabled),
           isAlpha: Value(_isAlpha),
+          teraType: Value(_teraType),
           instanceId: Value(_instanceId),
           ribbons: Value(_ribbons.isEmpty
               ? null
@@ -464,6 +470,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             'has_gigantamax':     _hasGigantamax,
             'gigantamax_enabled': _gigantamaxEnabled,
             'is_alpha':           _isAlpha,
+            if (_teraType != null) 'tera_type': _teraType,
             'contest_cool':       contest[0], 'contest_beautiful': contest[1],
             'contest_cute':       contest[2], 'contest_clever':    contest[3],
             'contest_tough':      contest[4], 'contest_sheen':     contest[5],
@@ -1022,6 +1029,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               if (canAlpha) ...[
                 const SizedBox(height: 12),
                 _buildAlphaToggle(),
+              ],
+              // ── Tera Type (Gen 9 / No Format) ──
+              if (mechanics == null || mechanics.hasTeraType) ...[
+                const SizedBox(height: 24),
+                _SectionTitle('Tera Type'),
+                const SizedBox(height: 8),
+                _buildTeraType(),
               ],
               const SizedBox(height: 24),
               _SectionTitle('Moves'),
@@ -2527,6 +2541,44 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // ── Tera Type ─────────────────────────────────────────────────────────────
+
+  Widget _buildTeraType() {
+    final textTheme = Theme.of(context).textTheme;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: kAllTypes.map((type) {
+        final isSelected = _teraType == type;
+        final typeColor = PokemonTypeColors.colors[type] ?? Colors.grey;
+        return GestureDetector(
+          onTap: () => setState(() => _teraType = isSelected ? null : type),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? typeColor
+                  : typeColor.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isSelected ? typeColor : typeColor.withValues(alpha: 0.5),
+                width: isSelected ? 2 : 1,
+              ),
+            ),
+            child: Text(
+              type[0].toUpperCase() + type.substring(1),
+              style: textTheme.labelMedium?.copyWith(
+                color: isSelected ? Colors.white : typeColor,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 

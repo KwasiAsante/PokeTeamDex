@@ -64,6 +64,9 @@ class TeamSlots extends Table {
   BoolColumn get isAlpha =>
       boolean().withDefault(const Constant(false))();
 
+  // Tera Type (Gen 9 / No Format): one of the 18 types
+  TextColumn get teraType => text().nullable()();
+
   // Contest conditions (Gen III+): 0–255 each
   IntColumn get contestCool      => integer().nullable()();
   IntColumn get contestBeautiful => integer().nullable()();
