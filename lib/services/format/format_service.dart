@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:poke_team_dex/services/api/api_client.dart';
@@ -61,12 +62,26 @@ class FormatService {
     final eventLearnsets  = await _loadJson(box, _keyEventLearnsets, 'assets/data/ps/event_learnsets.json');
     final formatsRaw      = await _loadAsset('assets/data/ps/formats.json');
 
-    _parseAll(learnsets, moves, items, abilities, formatsRaw);
-    _parseG6Allowlist(g6Allowlist);
-    _parseEventLearnsets(eventLearnsets);
+    // 2. Decode the raw JSON off the UI isolate. learnsets.json and
+    //    event_learnsets.json alone are multi-megabyte strings — `jsonDecode`
+    //    on them is CPU-heavy enough to drop frames if run inline here.
+    final decoded = await _decodePsJson({
+      'learnsets': learnsets,
+      'g6Allowlist': g6Allowlist,
+      'moves': moves,
+      'items': items,
+      'abilities': abilities,
+      'eventLearnsets': eventLearnsets,
+      'formats': formatsRaw,
+    });
+
+    _parseAll(decoded['learnsets'], decoded['moves'], decoded['items'],
+        decoded['abilities'], decoded['formats']);
+    _parseG6Allowlist(decoded['g6Allowlist']);
+    _parseEventLearnsets(decoded['eventLearnsets']);
     _initialized = true;
 
-    // 2. Check for updates in the background (non-blocking).
+    // 3. Check for updates in the background (non-blocking).
     _checkForUpdates(box);
   }
 
@@ -80,9 +95,9 @@ class FormatService {
     return rootBundle.loadString(path);
   }
 
-  void _parseG6Allowlist(String raw) {
+  void _parseG6Allowlist(dynamic decoded) {
     try {
-      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final map = decoded as Map<String, dynamic>;
       _g6Allowlist = map.map((k, v) =>
           MapEntry(k, (v as List).cast<String>().toSet()));
     } catch (_) {
@@ -93,9 +108,9 @@ class FormatService {
   /// Parses `event_learnsets.json` — built from PS's raw learnset sources.
   /// Format: { "dratini": { "learnset": {"extremespeed": ["2S1","4E",...]},
   ///                        "eventData": [{"generation": 2, "level": 15, ...}] } }
-  void _parseEventLearnsets(String raw) {
+  void _parseEventLearnsets(dynamic decoded) {
     try {
-      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final map = decoded as Map<String, dynamic>;
       final learnsets = <String, Map<String, List<String>>>{};
       final events = <String, List<PsEventEntry>>{};
       for (final entry in map.entries) {
@@ -132,36 +147,45 @@ class FormatService {
   }
 
   void _parseAll(
-    String learnsets,
-    String moves,
-    String items,
-    String abilities,
-    String formats,
+    dynamic learnsets,
+    dynamic moves,
+    dynamic items,
+    dynamic abilities,
+    dynamic formats,
   ) {
-    final lsMap = jsonDecode(learnsets) as Map<String, dynamic>;
+    final lsMap = learnsets as Map<String, dynamic>;
     _learnsets = lsMap.map((k, v) {
       final byGen = v as Map<String, dynamic>;
       return MapEntry(k, byGen.map((g, ml) =>
           MapEntry(g, (ml as List).cast<String>())));
     });
 
-    final mvMap = jsonDecode(moves) as Map<String, dynamic>;
+    final mvMap = moves as Map<String, dynamic>;
     _moves = mvMap.map((k, v) =>
         MapEntry(k, PsMoveEntry.fromJson(k, v as Map<String, dynamic>)));
 
-    final itMap = jsonDecode(items) as Map<String, dynamic>;
+    final itMap = items as Map<String, dynamic>;
     _items = itMap.map((k, v) =>
         MapEntry(k, PsItemEntry.fromJson(k, v as Map<String, dynamic>)));
 
-    final abMap = jsonDecode(abilities) as Map<String, dynamic>;
+    final abMap = abilities as Map<String, dynamic>;
     _abilities = abMap.map((k, v) =>
         MapEntry(k, PsAbilityEntry.fromJson(k, v as Map<String, dynamic>)));
 
-    final fmtList = (jsonDecode(formats) as Map<String, dynamic>)['formats'] as List;
+    final fmtList = (formats as Map<String, dynamic>)['formats'] as List;
     _formats = fmtList
         .map((f) => GameFormat.fromJson(f as Map<String, dynamic>))
         .toList();
   }
+
+  /// Decodes raw PS JSON payload strings on a background isolate.
+  /// `learnsets.json` and `event_learnsets.json` alone are multi-megabyte
+  /// strings — `jsonDecode` on them is CPU-heavy enough to drop frames if run
+  /// on the UI isolate, which is exactly where [initialize] (and the
+  /// background update check) would otherwise run it.
+  static Future<Map<String, dynamic>> _decodePsJson(
+          Map<String, String> raw) =>
+      compute(_decodeJsonStrings, raw);
 
   // ---------------------------------------------------------------------------
   // Background version check + update
@@ -209,8 +233,17 @@ class FormatService {
         final abilities      = box.get(_keyAbilities)      ?? await _loadAsset('assets/data/ps/abilities.json');
         final eventLearnsets = box.get(_keyEventLearnsets) ?? await _loadAsset('assets/data/ps/event_learnsets.json');
         final formats        = await _loadAsset('assets/data/ps/formats.json');
-        _parseAll(learnsets, moves, items, abilities, formats);
-        _parseEventLearnsets(eventLearnsets);
+        final decoded = await _decodePsJson({
+          'learnsets': learnsets,
+          'moves': moves,
+          'items': items,
+          'abilities': abilities,
+          'eventLearnsets': eventLearnsets,
+          'formats': formats,
+        });
+        _parseAll(decoded['learnsets'], decoded['moves'], decoded['items'],
+            decoded['abilities'], decoded['formats']);
+        _parseEventLearnsets(decoded['eventLearnsets']);
       }
     } catch (_) {
       // Version check is best-effort; silently ignore network errors.
@@ -347,3 +380,11 @@ class FormatService {
   /// Item detail by PS item id, or null if not in dataset.
   PsItemEntry? itemDetail(String itemId) => _items[itemId];
 }
+
+/// Top-level so it can be handed to [compute] — decodes each raw JSON string
+/// in [raw] and returns the decoded structures keyed the same way. Runs on a
+/// background isolate; only JSON-primitive structures (maps/lists/strings/
+/// numbers) cross the isolate boundary, so the heavier step of building
+/// [PsMoveEntry]/[PsItemEntry]/etc. model objects stays on the UI isolate.
+Map<String, dynamic> _decodeJsonStrings(Map<String, String> raw) =>
+    raw.map((key, value) => MapEntry(key, jsonDecode(value)));
