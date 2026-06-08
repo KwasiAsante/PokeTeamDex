@@ -307,12 +307,27 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
       }
 
       int? pokemonId;
+      String? resolvedFormName;
       try {
         final entry = await pokeRepo.fetchPokemonByNameOrDefault(s.species);
         pokemonId = entry.id;
       } catch (_) {
-        resolveErrors.add(s.species);
-        continue;
+        // For form-qualified PS names (e.g. "gastrodon-east"), fall back to
+        // the base species and pre-set the form so the slot opens correctly.
+        if (s.species.contains('-')) {
+          try {
+            final base = await pokeRepo
+                .fetchPokemonByNameOrDefault(s.species.split('-').first);
+            pokemonId = base.id;
+            resolvedFormName = s.species;
+          } catch (_) {
+            resolveErrors.add(s.species);
+            continue;
+          }
+        } else {
+          resolveErrors.add(s.species);
+          continue;
+        }
       }
 
       const ivDefault = 31;
@@ -327,6 +342,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         level: Value(s.level.clamp(1, 100)),
         isShiny: Value(s.isShiny),
         gender: Value(s.gender),
+        formName: Value(resolvedFormName),
         evHp:  Value(s.evs['hp']  ?? 0),
         evAtk: Value(s.evs['attack'] ?? 0),
         evDef: Value(s.evs['defense'] ?? 0),
@@ -455,12 +471,25 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
       final slotNumber = i + 1;
 
       int? pokemonId;
+      String? resolvedFormName;
       try {
         final entry = await repo.fetchPokemonByNameOrDefault(s.species);
         pokemonId = entry.id;
       } catch (_) {
-        errors.add('Could not find Pokémon "${s.species}"');
-        continue;
+        if (s.species.contains('-')) {
+          try {
+            final base = await repo
+                .fetchPokemonByNameOrDefault(s.species.split('-').first);
+            pokemonId = base.id;
+            resolvedFormName = s.species;
+          } catch (_) {
+            errors.add('Could not find Pokémon "${s.species}"');
+            continue;
+          }
+        } else {
+          errors.add('Could not find Pokémon "${s.species}"');
+          continue;
+        }
       }
 
       await slotRepo.insert(TeamSlotsCompanion(
@@ -474,6 +503,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         level: Value(s.level.clamp(1, 100)),
         isShiny: Value(s.isShiny),
         gender: Value(s.gender),
+        formName: Value(resolvedFormName),
         evHp:  Value(s.evs['hp']  ?? 0),
         evAtk: Value(s.evs['attack'] ?? 0),
         evDef: Value(s.evs['defense'] ?? 0),
