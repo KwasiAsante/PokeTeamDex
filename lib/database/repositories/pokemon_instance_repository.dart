@@ -103,6 +103,25 @@ class PokemonInstanceRepository {
             ..where((t) => t.parentInstanceId.equals(instanceId)))
           .get();
 
+  /// Returns every descendant of [instanceId] — children, grandchildren, …,
+  /// as a depth-first, pre-order flat list paired with their depth relative
+  /// to [instanceId] (1 = direct child, 2 = grandchild, …).
+  Future<List<(PokemonInstance instance, int depth)>> getDescendantTree(
+    int instanceId,
+  ) async {
+    final result = <(PokemonInstance, int)>[];
+
+    Future<void> visit(int parentId, int depth) async {
+      for (final child in await getDirectChildren(parentId)) {
+        result.add((child, depth));
+        await visit(child.id, depth + 1);
+      }
+    }
+
+    await visit(instanceId, 1);
+    return result;
+  }
+
   /// Returns all slots currently linked to [instanceId].
   Future<List<TeamSlot>> getSlotsForInstance(int instanceId) =>
       (_db.select(_db.teamSlots)
