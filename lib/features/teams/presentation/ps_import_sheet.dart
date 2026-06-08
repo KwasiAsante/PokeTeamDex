@@ -209,13 +209,76 @@ class PsImportSheet extends ConsumerStatefulWidget {
 
 class _PsImportSheetState extends ConsumerState<PsImportSheet> {
   final _ctrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  GameFormat? _selectedFormat;
   bool _loading = false;
   String? _error;
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _nameCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickFormat() async {
+    final result = await showModalBottomSheet<dynamic>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FormatPickerSheet(current: _selectedFormat?.id),
+    );
+    if (result == null) return;
+    setState(() {
+      _selectedFormat = isFormatCleared(result) ? null : result as GameFormat;
+    });
+  }
+
+  Widget _buildOverrideFields(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _nameCtrl,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Team Name',
+              hintText: 'e.g. Sun Team · optional',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 10),
+          InkWell(
+            onTap: _pickFormat,
+            borderRadius: BorderRadius.circular(4),
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Format',
+                border: OutlineInputBorder(),
+                isDense: true,
+                suffixIcon: Icon(Icons.arrow_drop_down),
+              ),
+              child: Text(
+                _selectedFormat != null
+                    ? _selectedFormat!.name
+                    : 'No format · optional',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: _selectedFormat != null
+                      ? colorScheme.onSurface
+                      : colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
   }
 
   Future<void> _import() async {
