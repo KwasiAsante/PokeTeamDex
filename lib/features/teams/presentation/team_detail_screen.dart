@@ -495,9 +495,17 @@ class _FilledSlotCard extends ConsumerWidget {
         };
 
         // ── Mega Evolution support (must come before calcStats) ────────────
-        final megaEntry = slot.heldItemName != null
-            ? kMegaStoneMap[slot.heldItemName]
-            : null;
+        // Rayquaza is the sole exception to the "needs a Mega Stone" rule —
+        // it Mega Evolves simply by knowing Dragon Ascent, no held item
+        // required. Mirrors the same special case in slot_config_screen.dart.
+        final rayquazaDragonAscent = pokemon.name == 'rayquaza' &&
+            [slot.move1, slot.move2, slot.move3, slot.move4]
+                .contains('dragon-ascent');
+        final megaEntry = rayquazaDragonAscent
+            ? (baseSpecies: 'rayquaza', megaForm: 'rayquaza-mega')
+            : (slot.heldItemName != null
+                ? kMegaStoneMap[slot.heldItemName]
+                : null);
         final isMegaApplicable = slot.isMegaEvolved &&
             megaEntry != null &&
             pokemon.name == megaEntry.baseSpecies;
