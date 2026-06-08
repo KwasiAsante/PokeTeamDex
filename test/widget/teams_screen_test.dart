@@ -136,5 +136,78 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(milliseconds: 1));
     });
+
+    testWidgets('single folder has all four reorder buttons disabled', (tester) async {
+      final db = openTestDatabase();
+      final now = DateTime.now();
+      await db.into(db.teamFolders).insert(
+        TeamFoldersCompanion(
+          name: const Value('Only Folder'),
+          sortOrder: const Value(0),
+          createdAt: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
+
+      await pumpTestApp(tester, const TeamsScreen(), db: db);
+      await tester.pumpAndSettle();
+
+      IconButton? btn(String tooltip) => tester
+          .widgetList<IconButton>(find.byType(IconButton))
+          .where((b) => b.tooltip == tooltip)
+          .firstOrNull;
+
+      expect(btn('Move to top')?.onPressed, isNull);
+      expect(btn('Move up')?.onPressed, isNull);
+      expect(btn('Move down')?.onPressed, isNull);
+      expect(btn('Move to bottom')?.onPressed, isNull);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 1));
+    });
+
+    testWidgets('folder reorder buttons respect boundary constraints with two folders', (tester) async {
+      final db = openTestDatabase();
+      final now = DateTime.now();
+      await db.into(db.teamFolders).insert(
+        TeamFoldersCompanion(
+          name: const Value('First Folder'),
+          sortOrder: const Value(0),
+          createdAt: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
+      await db.into(db.teamFolders).insert(
+        TeamFoldersCompanion(
+          name: const Value('Second Folder'),
+          sortOrder: const Value(1),
+          createdAt: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
+
+      await pumpTestApp(tester, const TeamsScreen(), db: db);
+      await tester.pumpAndSettle();
+
+      List<IconButton> btns(String tooltip) => tester
+          .widgetList<IconButton>(find.byType(IconButton))
+          .where((b) => b.tooltip == tooltip)
+          .toList();
+
+      // First folder (index 0): top/up disabled, down/bottom enabled
+      expect(btns('Move to top')[0].onPressed, isNull);
+      expect(btns('Move up')[0].onPressed, isNull);
+      expect(btns('Move down')[0].onPressed, isNotNull);
+      expect(btns('Move to bottom')[0].onPressed, isNotNull);
+
+      // Last folder (index 1): top/up enabled, down/bottom disabled
+      expect(btns('Move to top')[1].onPressed, isNotNull);
+      expect(btns('Move up')[1].onPressed, isNotNull);
+      expect(btns('Move down')[1].onPressed, isNull);
+      expect(btns('Move to bottom')[1].onPressed, isNull);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 1));
+    });
   });
 }
