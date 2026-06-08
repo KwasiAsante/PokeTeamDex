@@ -64,6 +64,15 @@ double _natureMod(String? nature, String key) {
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
+enum _TeamAction {
+  rename,
+  changeFormat,
+  importShowdown,
+  saveAll,
+  exportShowdown,
+  delete,
+}
+
 class TeamDetailScreen extends ConsumerStatefulWidget {
   final int teamId;
   const TeamDetailScreen({super.key, required this.teamId});
@@ -125,47 +134,114 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
           return Scaffold(
             appBar: AppBar(
               title: _TeamAppBarTitle(team: team),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined),
-                  tooltip: 'Rename',
-                  onPressed: () => _renameTeam(context, team),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.tune_outlined),
-                  tooltip: 'Change format',
-                  onPressed: () => _editFormat(context, team),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.download_outlined),
-                  tooltip: 'Import from Showdown',
-                  onPressed: () => showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (_) =>
-                        PsImportSheet(targetTeamId: widget.teamId),
-                  ),
-                ),
-                if (slots.isNotEmpty) ...[
-                  IconButton(
-                    icon: const Icon(Icons.save_rounded),
-                    tooltip: 'Save all slots',
-                    onPressed: () => _saveAllSlots(context, slots),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.upload_outlined),
-                    tooltip: 'Export to Showdown',
-                    onPressed: () => _exportShowdown(context, slots, team),
-                  ),
-                ],
-                IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Delete team',
-                  onPressed: () => _deleteTeam(context, team),
-                ),
-                const ConnectivityStatusButton(),
-                const SettingsButton(),
-              ],
+              actions: isWide
+                  ? [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        tooltip: 'Rename',
+                        onPressed: () => _renameTeam(context, team),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.tune_outlined),
+                        tooltip: 'Change format',
+                        onPressed: () => _editFormat(context, team),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.download_outlined),
+                        tooltip: 'Import from Showdown',
+                        onPressed: () => showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          builder: (_) =>
+                              PsImportSheet(targetTeamId: widget.teamId),
+                        ),
+                      ),
+                      if (slots.isNotEmpty) ...[
+                        IconButton(
+                          icon: const Icon(Icons.save_rounded),
+                          tooltip: 'Save all slots',
+                          onPressed: () => _saveAllSlots(context, slots),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.upload_outlined),
+                          tooltip: 'Export to Showdown',
+                          onPressed: () => _exportShowdown(context, slots, team),
+                        ),
+                      ],
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: 'Delete team',
+                        onPressed: () => _deleteTeam(context, team),
+                      ),
+                      const ConnectivityStatusButton(),
+                      const SettingsButton(),
+                    ]
+                  : [
+                      const ConnectivityStatusButton(),
+                      const SettingsButton(),
+                      PopupMenuButton<_TeamAction>(
+                        onSelected: (action) =>
+                            _handleTeamAction(context, action, slots, team),
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(
+                            value: _TeamAction.rename,
+                            child: ListTile(
+                              leading: Icon(Icons.edit_outlined),
+                              title: Text('Rename'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: _TeamAction.changeFormat,
+                            child: ListTile(
+                              leading: Icon(Icons.tune_outlined),
+                              title: Text('Change format'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: _TeamAction.importShowdown,
+                            child: ListTile(
+                              leading: Icon(Icons.download_outlined),
+                              title: Text('Import from Showdown'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                          if (slots.isNotEmpty) ...[
+                            const PopupMenuItem(
+                              value: _TeamAction.saveAll,
+                              child: ListTile(
+                                leading: Icon(Icons.save_rounded),
+                                title: Text('Save all slots'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: _TeamAction.exportShowdown,
+                              child: ListTile(
+                                leading: Icon(Icons.upload_outlined),
+                                title: Text('Export to Showdown'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
+                          const PopupMenuDivider(),
+                          PopupMenuItem(
+                            value: _TeamAction.delete,
+                            child: ListTile(
+                              leading: Icon(Icons.delete_outline,
+                                  color: Theme.of(context).colorScheme.error),
+                              title: Text('Delete team',
+                                  style: TextStyle(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .error)),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
             ),
             body: slotsAsync.when(
               loading: () => const LoadingState(),
@@ -236,6 +312,32 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
         ),
       ],
     );
+  }
+
+  void _handleTeamAction(
+    BuildContext context,
+    _TeamAction action,
+    List<TeamSlot> slots,
+    Team team,
+  ) {
+    switch (action) {
+      case _TeamAction.rename:
+        _renameTeam(context, team);
+      case _TeamAction.changeFormat:
+        _editFormat(context, team);
+      case _TeamAction.importShowdown:
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          builder: (_) => PsImportSheet(targetTeamId: widget.teamId),
+        );
+      case _TeamAction.saveAll:
+        _saveAllSlots(context, slots);
+      case _TeamAction.exportShowdown:
+        _exportShowdown(context, slots, team);
+      case _TeamAction.delete:
+        _deleteTeam(context, team);
+    }
   }
 
   Future<void> _saveAllSlots(
