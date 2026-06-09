@@ -387,6 +387,7 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isWide = MediaQuery.of(context).size.width >= 600;
     final teamsAsync = ref.watch(teamsByFolderProvider(widget.folder.id));
 
     return Column(
@@ -415,6 +416,7 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
                 ),
                 title: Text(
                   widget.folder.name,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context)
                       .textTheme
                       .titleSmall
@@ -423,53 +425,90 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              IconButton(
-                icon: const Icon(Icons.vertical_align_top),
-                iconSize: 16,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                tooltip: 'Move to top',
-                onPressed: widget.index > 0 ? () => widget.onMove(widget.index, 0) : null,
-              ),
-              IconButton(
-                icon: const Icon(Icons.arrow_upward),
-                iconSize: 16,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                tooltip: 'Move up',
-                onPressed: widget.index > 0 ? () => widget.onMove(widget.index, widget.index - 1) : null,
-              ),
-              IconButton(
-                icon: const Icon(Icons.arrow_downward),
-                iconSize: 16,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                tooltip: 'Move down',
-                onPressed: widget.index < widget.folderCount - 1 ? () => widget.onMove(widget.index, widget.index + 1) : null,
-              ),
-              IconButton(
-                icon: const Icon(Icons.vertical_align_bottom),
-                iconSize: 16,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                tooltip: 'Move to bottom',
-                onPressed: widget.index < widget.folderCount - 1 ? () => widget.onMove(widget.index, widget.folderCount - 1) : null,
-              ),
+              if (isWide) ...[
+                IconButton(
+                  icon: const Icon(Icons.vertical_align_top),
+                  iconSize: 16,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  tooltip: 'Move to top',
+                  onPressed: widget.index > 0 ? () => widget.onMove(widget.index, 0) : null,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_upward),
+                  iconSize: 16,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  tooltip: 'Move up',
+                  onPressed: widget.index > 0 ? () => widget.onMove(widget.index, widget.index - 1) : null,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_downward),
+                  iconSize: 16,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  tooltip: 'Move down',
+                  onPressed: widget.index < widget.folderCount - 1 ? () => widget.onMove(widget.index, widget.index + 1) : null,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.vertical_align_bottom),
+                  iconSize: 16,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  tooltip: 'Move to bottom',
+                  onPressed: widget.index < widget.folderCount - 1 ? () => widget.onMove(widget.index, widget.folderCount - 1) : null,
+                ),
+              ],
               IconButton(
                 icon: const Icon(Icons.add, size: 20),
                 tooltip: 'Add team to folder',
                 onPressed: () => _addTeamToFolder(context),
               ),
               PopupMenuButton<String>(
-                onSelected: (v) => _onFolderAction(context, v),
-                itemBuilder: (_) => const [
-                  PopupMenuItem(
+                onSelected: (v) {
+                  if (v == 'move_top') {
+                    widget.onMove(widget.index, 0);
+                  } else if (v == 'move_up') {
+                    widget.onMove(widget.index, widget.index - 1);
+                  } else if (v == 'move_down') {
+                    widget.onMove(widget.index, widget.index + 1);
+                  } else if (v == 'move_bottom') {
+                    widget.onMove(widget.index, widget.folderCount - 1);
+                  } else {
+                    _onFolderAction(context, v);
+                  }
+                },
+                itemBuilder: (_) => [
+                  if (!isWide) ...[
+                    PopupMenuItem(
+                      value: 'move_top',
+                      enabled: widget.index > 0,
+                      child: const Text('Move to top'),
+                    ),
+                    PopupMenuItem(
+                      value: 'move_up',
+                      enabled: widget.index > 0,
+                      child: const Text('Move up'),
+                    ),
+                    PopupMenuItem(
+                      value: 'move_down',
+                      enabled: widget.index < widget.folderCount - 1,
+                      child: const Text('Move down'),
+                    ),
+                    PopupMenuItem(
+                      value: 'move_bottom',
+                      enabled: widget.index < widget.folderCount - 1,
+                      child: const Text('Move to bottom'),
+                    ),
+                    const PopupMenuDivider(),
+                  ],
+                  const PopupMenuItem(
                     value: 'import',
                     child: Text('Import from Showdown'),
                   ),
-                  PopupMenuDivider(),
-                  PopupMenuItem(value: 'rename', child: Text('Rename')),
-                  PopupMenuItem(value: 'delete', child: Text('Delete')),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(value: 'rename', child: Text('Rename')),
+                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
                 ],
               ),
               IconButton(
@@ -637,6 +676,7 @@ class _TeamTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isWide = MediaQuery.of(context).size.width >= 600;
     // Select just this team's membership bool — watching the raw Set would
     // rebuild every tile in the list on every sync-queue emission, even when
     // this team's pending/error status didn't change.
@@ -723,7 +763,7 @@ class _TeamTile extends ConsumerWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (dragIndex != null && onMove != null && teamCount != null) ...[
+          if (isWide && dragIndex != null && onMove != null && teamCount != null) ...[
             IconButton(
               icon: const Icon(Icons.vertical_align_top),
               iconSize: 16,
@@ -799,13 +839,44 @@ class _TeamTile extends ConsumerWidget {
             ),
           ),
           PopupMenuButton<String>(
-            onSelected: (v) => _onTeamAction(context, ref, v),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'rename', child: Text('Rename')),
-              PopupMenuItem(value: 'move', child: Text('Move to folder')),
-              PopupMenuItem(value: 'duplicate', child: Text('Duplicate')),
-              PopupMenuDivider(),
-              PopupMenuItem(value: 'delete', child: Text('Delete')),
+            onSelected: (v) {
+              if (!isWide && dragIndex != null && onMove != null && teamCount != null) {
+                if (v == 'move_top') { onMove!(dragIndex!, 0); return; }
+                if (v == 'move_up') { onMove!(dragIndex!, dragIndex! - 1); return; }
+                if (v == 'move_down') { onMove!(dragIndex!, dragIndex! + 1); return; }
+                if (v == 'move_bottom') { onMove!(dragIndex!, teamCount! - 1); return; }
+              }
+              _onTeamAction(context, ref, v);
+            },
+            itemBuilder: (_) => [
+              if (!isWide && dragIndex != null && onMove != null && teamCount != null) ...[
+                PopupMenuItem(
+                  value: 'move_top',
+                  enabled: dragIndex! > 0,
+                  child: const Text('Move to top'),
+                ),
+                PopupMenuItem(
+                  value: 'move_up',
+                  enabled: dragIndex! > 0,
+                  child: const Text('Move up'),
+                ),
+                PopupMenuItem(
+                  value: 'move_down',
+                  enabled: dragIndex! < teamCount! - 1,
+                  child: const Text('Move down'),
+                ),
+                PopupMenuItem(
+                  value: 'move_bottom',
+                  enabled: dragIndex! < teamCount! - 1,
+                  child: const Text('Move to bottom'),
+                ),
+                const PopupMenuDivider(),
+              ],
+              const PopupMenuItem(value: 'rename', child: Text('Rename')),
+              const PopupMenuItem(value: 'move', child: Text('Move to folder')),
+              const PopupMenuItem(value: 'duplicate', child: Text('Duplicate')),
+              const PopupMenuDivider(),
+              const PopupMenuItem(value: 'delete', child: Text('Delete')),
             ],
           ),
         ],
