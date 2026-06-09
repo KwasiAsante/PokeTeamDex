@@ -124,9 +124,7 @@ String _versionedShinyUrl(
 ) {
   if (gen < 4) return (null, null);
   final femaleUrl = '$_versionsBase/$versionPath/${animSeg}female/$stem$ext';
-  final femaleShinyUrl = gen == 1
-      ? femaleUrl
-      : '$_versionsBase/$versionPath/${animSeg}shiny/female/$stem$ext';
+  final femaleShinyUrl = '$_versionsBase/$versionPath/${animSeg}shiny/female/$stem$ext';
   return (femaleUrl, femaleShinyUrl);
 }
 
