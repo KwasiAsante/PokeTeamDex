@@ -225,6 +225,11 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
                 team_id = team_map.get(op.team_client_local_id)
             if team_id is None:
                 continue
+            tr = await db.execute(
+                select(Team).where(Team.id == team_id, Team.user_id == current_user.id)
+            )
+            if tr.scalar_one_or_none() is None:
+                continue
             # Resolve instance reference.
             instance_id = op.instance_remote_id
             if instance_id is None and op.instance_client_local_id is not None:
@@ -304,6 +309,11 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
             if team_id is None and op.team_client_local_id is not None:
                 team_id = team_map.get(op.team_client_local_id)
             if team_id is None:
+                continue
+            tr = await db.execute(
+                select(Team).where(Team.id == team_id, Team.user_id == current_user.id)
+            )
+            if tr.scalar_one_or_none() is None:
                 continue
             r = await db.execute(
                 select(TeamSlot).where(TeamSlot.team_id == team_id, TeamSlot.slot == op.slot)
