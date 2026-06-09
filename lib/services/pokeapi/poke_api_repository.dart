@@ -165,11 +165,19 @@ class PokeApiRepository {
   /// Like [fetchPokemonByName] but falls back to the species endpoint when the
   /// direct name lookup fails (e.g. `aegislash` → 404; use species to find the
   /// default variety `aegislash-shield`).
+  ///
+  /// For Pokémon Showdown imports where the PS form name differs from the
+  /// PokéAPI variety name, a second fallback looks up the base species and
+  /// searches its variety list:
+  ///   • Exact match  — `gastrodon-east` found in Gastrodon's variety list.
+  ///   • Prefix match — `calyrex-shadow` matches `calyrex-shadow-rider`.
   Future<PokemonEntry> fetchPokemonByNameOrDefault(String name) async {
     try {
       return await fetchPokemonByName(name);
     } catch (_) {
-      // Try pokemon-species/{name} to find the default variety.
+      // ── Strategy 1: species/{name} → default variety ──────────────────────
+      // Handles bare species names like "aegislash" that 404 on /pokemon but
+      // have a valid /pokemon-species entry with a default variety.
       final r = await _pokeApiClient.client.get('/pokemon-species/$name');
       if (r.statusCode == 200) {
         final varieties = r.data['varieties'] as List? ?? [];
@@ -183,6 +191,54 @@ class PokeApiRepository {
           return await fetchPokemonByName(defaultName);
         }
       }
+
+      // ── Strategy 2: base-species variety search ────────────────────────────
+      // For hyphenated names (PS form names) where the direct /pokemon and
+      // /pokemon-species lookups both failed.  Strip the form suffix, look up
+      // the owning species, and search its variety list for:
+      //   1. An exact name match  (e.g. "gastrodon-east" in Gastrodon varieties)
+      //   2. A prefix match       (e.g. "calyrex-shadow" → "calyrex-shadow-rider")
+      //
+      // Once a variety is found, fetch by the numeric ID embedded in the
+      // variety URL.  Some alternate forms (like Gastrodon-East, ID 10015) are
+      // not reachable via /pokemon/{name} — only via /pokemon/{id} — so using
+      // the URL-embedded ID is more reliable than a second name-based lookup.
+      //
+      // Intentionally does NOT fall back to the default variety — silently
+      // importing the wrong form would be more confusing than a clear error.
+      if (name.contains('-')) {
+        final baseName = name.split('-').first;
+        final r2 =
+            await _pokeApiClient.client.get('/pokemon-species/$baseName');
+        if (r2.statusCode == 200) {
+          final varieties = r2.data['varieties'] as List? ?? [];
+          for (final v in varieties) {
+            final vName = (v['pokemon'] as Map)['name'] as String;
+            // Match:
+            //   1. Exact              — "gastrodon-east" == "gastrodon-east"
+            //   2. Forward prefix     — "calyrex-shadow" → "calyrex-shadow-rider"
+            //   3. Reverse prefix     — "necrozma-dawn-wings" → "necrozma-dawn"
+            //      (PS appends extra suffixes that PokéAPI omits; guard with
+            //      vName != baseName so base form "necrozma" is never matched)
+            if (vName == name ||
+                vName.startsWith('$name-') ||
+                (name.startsWith('$vName-') && vName != baseName)) {
+              // Prefer ID-based fetch: alternate forms may only be accessible
+              // via /pokemon/{id}, not /pokemon/{name}.
+              final vUrl = (v['pokemon'] as Map)['url'] as String?;
+              if (vUrl != null) {
+                final seg = Uri.parse(vUrl).pathSegments
+                    .where((s) => s.isNotEmpty)
+                    .toList();
+                final id = int.tryParse(seg.isNotEmpty ? seg.last : '');
+                if (id != null) return await fetchPokemon(id);
+              }
+              return await fetchPokemonByName(vName);
+            }
+          }
+        }
+      }
+
       rethrow;
     }
   }

@@ -946,6 +946,10 @@ class _FilledSlotCard extends ConsumerWidget {
                     ? cosmeticFormChangeSpriteUrls.shinyUrl
                     : cosmeticFormChangeSpriteUrls.defaultUrl)
                 : null;
+        final cosmeticRawSprite = cosmeticFormChangeSuffix != null
+            ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
+                'sprites/pokemon/${pokemon.id}-$cosmeticFormChangeSuffix.png'
+            : null;
         final formOfficialUrl = formChangePokemon != null
             ? (slot.isShiny
                 ? (formChangePokemon.officialArtworkShinyUrl ??
@@ -954,8 +958,9 @@ class _FilledSlotCard extends ConsumerWidget {
             : cosmeticFormChange != null
                 ? (slot.isShiny
                     ? (cosmeticFormChange.spriteShinyUrl ??
-                        cosmeticFormChange.spriteUrl)
-                    : cosmeticFormChange.spriteUrl)
+                        cosmeticFormChange.spriteUrl ??
+                        cosmeticRawSprite)
+                    : (cosmeticFormChange.spriteUrl ?? cosmeticRawSprite))
                 : null;
 
         // ── Gigantamax sprite ───────────────────────────────────────────────
@@ -1153,10 +1158,11 @@ class _FilledSlotCard extends ConsumerWidget {
                                     : genderUrl != null
                                         ? genFallback
                                         : null,
-                                fallbackUrl2: megaArtworkUrl == null &&
-                                        genderUrl != null
-                                    ? homeFemaleUrl
-                                    : null,
+                                fallbackUrl2: megaArtworkUrl != null
+                                    ? spriteUrls.defaultUrl
+                                    : genderUrl != null
+                                        ? homeFemaleUrl
+                                        : null,
                                 shinyUrl: (megaArtworkUrl == null &&
                                         genderUrl == null)
                                     ? spriteUrls.shinyUrl

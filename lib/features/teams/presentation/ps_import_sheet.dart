@@ -53,8 +53,46 @@ const _kStatMap = {
   'SpA': 'special-attack', 'SpD': 'special-defense', 'Spe': 'speed',
 };
 
-String _norm(String s) =>
-    s.toLowerCase().trim().replaceAll(' ', '-').replaceAll("'", '');
+String _norm(String s) => s
+    .toLowerCase()
+    .trim()
+    .replaceAll(' ', '-')
+    .replaceAll("'", '')      // U+0027 ASCII apostrophe
+    .replaceAll('\u2019', '') // U+2019 RIGHT SINGLE QUOTATION MARK (used by some PS clients)
+    .replaceAll('\u02BC', ''); // U+02BC MODIFIER LETTER APOSTROPHE
+
+/// Maps a normalised PS species name (e.g. `"ogerpon-wellspring"` or
+/// `"necrozma-dawn-wings"`) to the actual PokéAPI variety name by comparing
+/// it against the species' variety list.  Returns null when no variety is a
+/// reasonable match (caller should not pre-select a form).
+Future<String?> _resolveFormName(
+    dynamic repo, int basePokemonId, String psName) async {
+  try {
+    final species = await repo.fetchPokemonSpecies(basePokemonId);
+    final names = species.varieties.map((v) => v.name).toList();
+    // 1. Exact match
+    if (names.contains(psName)) return psName;
+    // 2. Forward prefix: PokéAPI name starts with PS name + "-"
+    //    ("ogerpon-wellspring" → "ogerpon-wellspring-mask")
+    for (final n in names.skip(1)) {
+      if (n.startsWith('$psName-')) return n;
+    }
+    // 3. Reverse prefix: PS name starts with PokéAPI name + "-"
+    //    ("necrozma-dawn-wings" → "necrozma-dawn")
+    for (final n in names.skip(1)) {
+      if (psName.startsWith('$n-')) return n;
+    }
+    // 4. Last-segment match for non-default varieties
+    //    ("maushold-four" last seg "four" → "maushold-family-of-four")
+    final lastSeg = psName.split('-').last;
+    for (final n in names.skip(1)) {
+      if (n.split('-').last == lastSeg) return n;
+    }
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
 
 _PsTeam _parseTeam(String text) {
   String teamName = 'Imported Team';
@@ -302,12 +340,61 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
       }
 
       int? pokemonId;
+      String? resolvedFormName;
       try {
         final entry = await pokeRepo.fetchPokemonByNameOrDefault(s.species);
-        pokemonId = entry.id;
+        // If the entry is a form variant (e.g. urshifu-rapid-strike whose
+        // defaultFormLabel = "rapid-strike"), normalise to the base species
+        // so pokemonSpeciesProvider can load varieties and form chips appear.
+        if (entry.defaultFormLabel != null) {
+          // Derive base name: prefer speciesName field, fall back to first
+          // hyphen segment (covers entries where speciesName is null).
+          final baseSN = entry.speciesName ?? entry.name.split('-').first;
+          try {
+            final base = await pokeRepo.fetchPokemonByNameOrDefault(baseSN);
+            pokemonId = base.id;
+            // If the resolved form entry IS the default variety (entry.id ==
+            // base.id), leave formName null — the base pokemon already IS that
+            // form, so no explicit chip selection is needed.
+            resolvedFormName = (entry.id != base.id) ? entry.name : null;
+          } catch (_) {
+            pokemonId = entry.id; // fallback: keep form ID
+            resolvedFormName = entry.name; // still record form even if base fetch failed
+          }
+        } else {
+          pokemonId = entry.id;
+        }
       } catch (_) {
-        resolveErrors.add(s.species);
-        continue;
+        // For form-qualified PS names (e.g. "gastrodon-east", "ogerpon-wellspring")
+        // whose /pokemon endpoint doesn't exist, look up the base species and
+        // map the PS name to the closest PokéAPI variety name.
+        if (s.species.contains('-')) {
+          try {
+            final base = await pokeRepo
+                .fetchPokemonByNameOrDefault(s.species.split('-').first);
+            pokemonId = base.id;
+            final matched = await _resolveFormName(pokeRepo, base.id, s.species);
+            if (matched != null) {
+              resolvedFormName = matched;
+            } else {
+              // No variety match — check if the base pokemon's default form
+              // IS the requested form (last-segment match against defaultFormLabel),
+              // e.g. base = "maushold-family-of-four", PS = "maushold-four".
+              // If so, formName = null (default chip selected). Otherwise fall
+              // back to the PS name to cover cosmetic forms ("polteageist-antique").
+              final baseLastSeg = base.defaultFormLabel?.split('-').last;
+              final psLastSeg = s.species.split('-').last;
+              resolvedFormName =
+                  (baseLastSeg != null && baseLastSeg == psLastSeg) ? null : s.species;
+            }
+          } catch (_) {
+            resolveErrors.add(s.species);
+            continue;
+          }
+        } else {
+          resolveErrors.add(s.species);
+          continue;
+        }
       }
 
       const ivDefault = 31;
@@ -322,6 +409,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         level: Value(s.level.clamp(1, 100)),
         isShiny: Value(s.isShiny),
         gender: Value(s.gender),
+        formName: Value(resolvedFormName),
         evHp:  Value(s.evs['hp']  ?? 0),
         evAtk: Value(s.evs['attack'] ?? 0),
         evDef: Value(s.evs['defense'] ?? 0),
@@ -450,12 +538,45 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
       final slotNumber = i + 1;
 
       int? pokemonId;
+      String? resolvedFormName;
       try {
         final entry = await repo.fetchPokemonByNameOrDefault(s.species);
-        pokemonId = entry.id;
+        if (entry.defaultFormLabel != null) {
+          final baseSN = entry.speciesName ?? entry.name.split('-').first;
+          try {
+            final base = await repo.fetchPokemonByNameOrDefault(baseSN);
+            pokemonId = base.id;
+            resolvedFormName = (entry.id != base.id) ? entry.name : null;
+          } catch (_) {
+            pokemonId = entry.id;
+            resolvedFormName = entry.name;
+          }
+        } else {
+          pokemonId = entry.id;
+        }
       } catch (_) {
-        errors.add('Could not find Pokémon "${s.species}"');
-        continue;
+        if (s.species.contains('-')) {
+          try {
+            final base = await repo
+                .fetchPokemonByNameOrDefault(s.species.split('-').first);
+            pokemonId = base.id;
+            final matched = await _resolveFormName(repo, base.id, s.species);
+            if (matched != null) {
+              resolvedFormName = matched;
+            } else {
+              final baseLastSeg = base.defaultFormLabel?.split('-').last;
+              final psLastSeg = s.species.split('-').last;
+              resolvedFormName =
+                  (baseLastSeg != null && baseLastSeg == psLastSeg) ? null : s.species;
+            }
+          } catch (_) {
+            errors.add('Could not find Pokémon "${s.species}"');
+            continue;
+          }
+        } else {
+          errors.add('Could not find Pokémon "${s.species}"');
+          continue;
+        }
       }
 
       await slotRepo.insert(TeamSlotsCompanion(
@@ -469,6 +590,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         level: Value(s.level.clamp(1, 100)),
         isShiny: Value(s.isShiny),
         gender: Value(s.gender),
+        formName: Value(resolvedFormName),
         evHp:  Value(s.evs['hp']  ?? 0),
         evAtk: Value(s.evs['attack'] ?? 0),
         evDef: Value(s.evs['defense'] ?? 0),

@@ -29,7 +29,7 @@ final abilityProvider =
 final pokemonByNameProvider =
     FutureProvider.autoDispose.family<PokemonEntry, String>((ref, name) async {
   final repo = ref.read(pokeApiRepositoryProvider);
-  return repo.fetchPokemonByName(name);
+  return repo.fetchPokemonByNameOrDefault(name);
 });
 
 /// Resolves the non-default `pokemon-form` resources for a cosmetic-form
