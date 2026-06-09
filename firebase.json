@@ -5,6 +5,13 @@
     "rewrites": [{ "source": "**", "destination": "/index.html" }],
     "headers": [
       {
+        "source": "**",
+        "headers": [
+          { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+          { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" }
+        ]
+      },
+      {
         "source": "/flutter_bootstrap.js",
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       },
@@ -15,6 +22,14 @@
       {
         "source": "**/*.@(js|css|wasm)",
         "headers": [{ "key": "Cache-Control", "value": "max-age=31536000, immutable" }]
+      },
+      {
+        "source": "/drift_worker.dart.js",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "/sqlite3.wasm",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       }
     ]
   },
