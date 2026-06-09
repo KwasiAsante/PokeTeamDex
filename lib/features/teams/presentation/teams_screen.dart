@@ -205,15 +205,11 @@ class _TeamsList extends ConsumerWidget {
     final reordered = [...folders];
     final moved = reordered.removeAt(from);
     reordered.insert(to, moved);
-    final repo = ref.read(teamFolderRepositoryProvider);
-    final db = ref.read(appDatabaseProvider);
-    await db.transaction(() async {
-      for (int i = 0; i < reordered.length; i++) {
-        if (reordered[i].sortOrder != i) {
-          await repo.updateSortOrder(reordered[i].id, i);
-        }
+    for (int i = 0; i < reordered.length; i++) {
+      if (reordered[i].sortOrder != i) {
+        await updateFolderSortOrder(ref, reordered[i].id, i);
       }
-    });
+    }
   }
 
   Future<void> _onReorderFolders(WidgetRef ref, List<TeamFolder> folders, int oldIndex, int newIndex) async {
@@ -373,15 +369,11 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
       final reordered = [...teams];
       final moved = reordered.removeAt(from);
       reordered.insert(to, moved);
-      final repo = ref.read(teamRepositoryProvider);
-      final db = ref.read(appDatabaseProvider);
-      await db.transaction(() async {
-        for (int i = 0; i < reordered.length; i++) {
-          if (reordered[i].sortOrder != i) {
-            await repo.updateSortOrder(reordered[i].id, i);
-          }
+      for (int i = 0; i < reordered.length; i++) {
+        if (reordered[i].sortOrder != i) {
+          await updateTeamSortOrder(ref, reordered[i].id, i);
         }
-      });
+      }
     } finally {
       if (mounted) setState(() => _reordering = false);
     }

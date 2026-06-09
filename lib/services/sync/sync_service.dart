@@ -255,17 +255,23 @@ class SyncService {
           'type': 'folder_create',
           'client_local_id': op.entityId,
           'name': payload['name'] as String,
+          'sort_order': payload['sort_order'] as int? ?? 0,
         };
 
       case 'team_folder:update':
         final folder = await folderRepo.getByIdOrNull(op.entityId);
         if (folder == null) return _kDiscard; // deleted locally, nothing to update
         if (folder.remoteId == null) return null; // wait for create
-        return {
+        final folderEntry = <String, dynamic>{
           'type': 'folder_update',
           'remote_id': int.parse(folder.remoteId!),
-          'name': payload['name'] as String,
+          'name': payload['name'] as String? ?? folder.name,
         };
+        if (payload.containsKey('sort_order')) {
+          folderEntry['update_sort_order'] = true;
+          folderEntry['sort_order'] = payload['sort_order'] as int;
+        }
+        return folderEntry;
 
       case 'team_folder:delete':
         final remoteId = payload['remote_id'] as String?;
@@ -280,6 +286,8 @@ class SyncService {
           'name': payload['name'] as String,
           if (payload['format_label'] != null)
             'format_label': payload['format_label'] as String,
+          'sort_order': payload['sort_order'] as int? ?? 0,
+          'is_box': payload['is_box'] as bool? ?? false,
         };
         final folderLocalId = payload['folder_local_id'] as int?;
         if (folderLocalId != null) {
@@ -305,6 +313,14 @@ class SyncService {
         if (payload.containsKey('format_label')) {
           entry['update_format_label'] = true;
           entry['format_label'] = payload['format_label'] as String?;
+        }
+        if (payload.containsKey('sort_order')) {
+          entry['update_sort_order'] = true;
+          entry['sort_order'] = payload['sort_order'] as int;
+        }
+        if (payload.containsKey('is_box')) {
+          entry['update_is_box'] = true;
+          entry['is_box'] = payload['is_box'] as bool;
         }
         if (payload.containsKey('folder_local_id')) {
           entry['update_folder'] = true;
@@ -508,9 +524,11 @@ class SyncService {
       }
 
       final remoteName = rf['name'] as String;
+      final remoteSortOrder = rf['sort_order'] as int? ?? 0;
       if (existing == null) {
         await folderRepo.insert(TeamFoldersCompanion(
           name: Value(remoteName),
+          sortOrder: Value(remoteSortOrder),
           remoteId: Value(remoteId),
           updatedAt: Value(remoteUpdatedAt),
         ));
@@ -519,6 +537,7 @@ class SyncService {
               ..where((f) => f.id.equals(existing.id)))
             .write(TeamFoldersCompanion(
           name: Value(remoteName),
+          sortOrder: Value(remoteSortOrder),
           updatedAt: Value(remoteUpdatedAt),
         ));
       }
@@ -544,6 +563,8 @@ class SyncService {
 
       final remoteName = rt['name'] as String;
       final remoteFormatLabel = rt['format_label'] as String?;
+      final remoteSortOrder = rt['sort_order'] as int? ?? 0;
+      final remoteIsBox = rt['is_box'] as bool? ?? false;
       final remoteFolderId = rt['folder_id'];
 
       int? localFolderId;
@@ -558,6 +579,8 @@ class SyncService {
           name: Value(remoteName),
           remoteId: Value(remoteId),
           formatLabel: Value(remoteFormatLabel),
+          sortOrder: Value(remoteSortOrder),
+          isBox: Value(remoteIsBox),
           folderId: Value(localFolderId),
           updatedAt: Value(remoteUpdatedAt),
         ));
@@ -566,6 +589,8 @@ class SyncService {
             .write(TeamsCompanion(
           name: Value(remoteName),
           formatLabel: Value(remoteFormatLabel),
+          sortOrder: Value(remoteSortOrder),
+          isBox: Value(remoteIsBox),
           folderId: Value(localFolderId),
           updatedAt: Value(remoteUpdatedAt),
         ));
