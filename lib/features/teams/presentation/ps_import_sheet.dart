@@ -82,6 +82,12 @@ Future<String?> _resolveFormName(
     for (final n in names.skip(1)) {
       if (psName.startsWith('$n-')) return n;
     }
+    // 4. Last-segment match for non-default varieties
+    //    ("maushold-four" last seg "four" → "maushold-family-of-four")
+    final lastSeg = psName.split('-').last;
+    for (final n in names.skip(1)) {
+      if (n.split('-').last == lastSeg) return n;
+    }
     return null;
   } catch (_) {
     return null;
@@ -347,9 +353,10 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
           try {
             final base = await pokeRepo.fetchPokemonByNameOrDefault(baseSN);
             pokemonId = base.id;
-            // Use the actual PokéAPI variety name (entry.name), not the PS
-            // name (s.species), so the form chip key matches exactly.
-            resolvedFormName = entry.name;
+            // If the resolved form entry IS the default variety (entry.id ==
+            // base.id), leave formName null — the base pokemon already IS that
+            // form, so no explicit chip selection is needed.
+            resolvedFormName = (entry.id != base.id) ? entry.name : null;
           } catch (_) {
             pokemonId = entry.id; // fallback: keep form ID
             resolvedFormName = entry.name; // still record form even if base fetch failed
@@ -361,17 +368,25 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         // For form-qualified PS names (e.g. "gastrodon-east", "ogerpon-wellspring")
         // whose /pokemon endpoint doesn't exist, look up the base species and
         // map the PS name to the closest PokéAPI variety name.
-        // Fall back to the raw PS name when no variety matches — this covers
-        // cosmetic forms like "polteageist-antique" that exist as form
-        // resources rather than species varieties.
         if (s.species.contains('-')) {
           try {
             final base = await pokeRepo
                 .fetchPokemonByNameOrDefault(s.species.split('-').first);
             pokemonId = base.id;
-            resolvedFormName =
-                await _resolveFormName(pokeRepo, base.id, s.species) ??
-                    s.species;
+            final matched = await _resolveFormName(pokeRepo, base.id, s.species);
+            if (matched != null) {
+              resolvedFormName = matched;
+            } else {
+              // No variety match — check if the base pokemon's default form
+              // IS the requested form (last-segment match against defaultFormLabel),
+              // e.g. base = "maushold-family-of-four", PS = "maushold-four".
+              // If so, formName = null (default chip selected). Otherwise fall
+              // back to the PS name to cover cosmetic forms ("polteageist-antique").
+              final baseLastSeg = base.defaultFormLabel?.split('-').last;
+              final psLastSeg = s.species.split('-').last;
+              resolvedFormName =
+                  (baseLastSeg != null && baseLastSeg == psLastSeg) ? null : s.species;
+            }
           } catch (_) {
             resolveErrors.add(s.species);
             continue;
@@ -531,7 +546,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
           try {
             final base = await repo.fetchPokemonByNameOrDefault(baseSN);
             pokemonId = base.id;
-            resolvedFormName = entry.name;
+            resolvedFormName = (entry.id != base.id) ? entry.name : null;
           } catch (_) {
             pokemonId = entry.id;
             resolvedFormName = entry.name;
@@ -545,8 +560,15 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
             final base = await repo
                 .fetchPokemonByNameOrDefault(s.species.split('-').first);
             pokemonId = base.id;
-            resolvedFormName =
-                await _resolveFormName(repo, base.id, s.species) ?? s.species;
+            final matched = await _resolveFormName(repo, base.id, s.species);
+            if (matched != null) {
+              resolvedFormName = matched;
+            } else {
+              final baseLastSeg = base.defaultFormLabel?.split('-').last;
+              final psLastSeg = s.species.split('-').last;
+              resolvedFormName =
+                  (baseLastSeg != null && baseLastSeg == psLastSeg) ? null : s.species;
+            }
           } catch (_) {
             errors.add('Could not find Pokémon "${s.species}"');
             continue;

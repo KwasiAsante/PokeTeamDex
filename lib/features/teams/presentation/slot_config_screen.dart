@@ -981,7 +981,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 const SizedBox(height: 16),
                 _buildFormSelector(availableForms,
                     defaultFormLabel: pokemon.defaultFormLabel,
-                    speciesName: pokemon.name),
+                    speciesName: pokemon.speciesName ?? pokemon.name),
               ],
               const SizedBox(height: 24),
               _buildBasics(mechanics, speciesAsync.asData?.value.genderRate),
