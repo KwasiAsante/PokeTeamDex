@@ -8,6 +8,7 @@ import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/teams/logic/ps_import_resolvers.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
+import 'package:poke_team_dex/features/teams/providers/teams_provider.dart' show setTeamIsBox;
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/utils/snack_bar.dart';
@@ -393,7 +394,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
 
       // Auto-promote to box if we've exhausted the 6-slot team limit.
       if (slot > capacity && !isBox) {
-        await teamRepo.setIsBox(teamId, isBox: true);
+        await setTeamIsBox(ref, teamId, isBox: true);
         isBox = true;
         capacity = maxBoxSize;
         promoted = true;

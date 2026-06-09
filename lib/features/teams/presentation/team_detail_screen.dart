@@ -533,8 +533,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
   }
 
   Future<void> _promoteToBox(BuildContext context, Team team) async {
-    final repo = ref.read(teamRepositoryProvider);
-    await repo.setIsBox(team.id, isBox: true);
+    await setTeamIsBox(ref, team.id, isBox: true);
     if (context.mounted) showAppSnackBar(context, 'Team promoted to Box.');
   }
 
@@ -581,7 +580,6 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
 
   Future<void> _performDemotion(
       int teamId, List<TeamSlot> toKeep, List<TeamSlot> all) async {
-    final repo = ref.read(teamRepositoryProvider);
     final slotRepo = ref.read(teamSlotRepositoryProvider);
 
     final keepIds = toKeep.map((s) => s.id).toSet();
@@ -600,7 +598,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
       }
     }
 
-    await repo.setIsBox(teamId, isBox: false);
+    await setTeamIsBox(ref, teamId, isBox: false);
   }
 }
 

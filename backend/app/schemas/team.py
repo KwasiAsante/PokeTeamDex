@@ -17,6 +17,7 @@ class FolderUpdate(BaseModel):
 class FolderResponse(BaseModel):
     id: int
     name: str
+    sort_order: int
     is_deleted: bool
     created_at: datetime
     updated_at: datetime
@@ -41,6 +42,8 @@ class TeamResponse(BaseModel):
     folder_id: int | None
     name: str
     format_label: str | None
+    sort_order: int
+    is_box: bool
     is_deleted: bool
     created_at: datetime
     updated_at: datetime
@@ -174,12 +177,15 @@ class FolderCreateOp(BaseModel):
     type: Literal["folder_create"]
     client_local_id: int
     name: str
+    sort_order: int = 0
 
 
 class FolderUpdateOp(BaseModel):
     type: Literal["folder_update"]
     remote_id: int
     name: str
+    sort_order: int | None = None
+    update_sort_order: bool = False
 
 
 class FolderDeleteOp(BaseModel):
@@ -192,6 +198,8 @@ class TeamCreateOp(BaseModel):
     client_local_id: int
     name: str
     format_label: str | None = None
+    sort_order: int = 0
+    is_box: bool = False
     # Exactly one of these two should be set when a folder is involved.
     # folder_remote_id: folder already synced — server ID known.
     # folder_client_local_id: folder being created in the same batch.
@@ -205,6 +213,10 @@ class TeamUpdateOp(BaseModel):
     name: str
     format_label: str | None = None
     update_format_label: bool = False
+    sort_order: int | None = None
+    update_sort_order: bool = False
+    is_box: bool | None = None
+    update_is_box: bool = False
     # Folder change — only applied when update_folder is True so that a
     # plain rename (which has no folder info) doesn't accidentally clear it.
     update_folder: bool = False

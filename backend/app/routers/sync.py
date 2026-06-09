@@ -68,7 +68,7 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
 
     for op in body.ops:
         if isinstance(op, FolderCreateOp):
-            folder = TeamFolder(user_id=current_user.id, name=op.name)
+            folder = TeamFolder(user_id=current_user.id, name=op.name, sort_order=op.sort_order)
             db.add(folder)
             await db.flush()
             folder_map[op.client_local_id] = folder.id
@@ -88,6 +88,8 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
             folder = r.scalar_one_or_none()
             if folder:
                 folder.name = op.name
+                if op.update_sort_order and op.sort_order is not None:
+                    folder.sort_order = op.sort_order
                 folder.updated_at = datetime.now(timezone.utc)
 
         elif isinstance(op, FolderDeleteOp):
@@ -123,6 +125,8 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
                 user_id=current_user.id,
                 name=op.name,
                 format_label=op.format_label,
+                sort_order=op.sort_order,
+                is_box=op.is_box,
                 folder_id=folder_id,
             )
             db.add(team)
@@ -142,6 +146,10 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
             if team:
                 team.name = op.name
                 team.updated_at = datetime.now(timezone.utc)
+                if op.update_sort_order and op.sort_order is not None:
+                    team.sort_order = op.sort_order
+                if op.update_is_box and op.is_box is not None:
+                    team.is_box = op.is_box
                 if op.update_format_label:
                     team.format_label = op.format_label
                 if op.update_folder:

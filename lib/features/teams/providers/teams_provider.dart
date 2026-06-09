@@ -135,6 +135,7 @@ Future<int> createTeam(
       'name': name,
       'folder_local_id': folderId,
       'format_label': formatLabel,
+      'is_box': isBox,
     })),
     createdAt: Value(DateTime.now()),
   ));
@@ -278,6 +279,51 @@ Future<void> duplicateTeam(WidgetRef ref, int teamId) async {
       createdAt: Value(now),
     ));
   }
+}
+
+Future<void> updateFolderSortOrder(WidgetRef ref, int id, int sortOrder) async {
+  final repo = ref.read(teamFolderRepositoryProvider);
+  final syncQueue = ref.read(syncQueueRepositoryProvider);
+
+  await repo.updateSortOrder(id, sortOrder);
+
+  await syncQueue.enqueue(PendingSyncOpsCompanion(
+    operation: const Value('update'),
+    entityType: const Value('team_folder'),
+    entityId: Value(id),
+    payload: Value(jsonEncode({'sort_order': sortOrder})),
+    createdAt: Value(DateTime.now()),
+  ));
+}
+
+Future<void> updateTeamSortOrder(WidgetRef ref, int id, int sortOrder) async {
+  final repo = ref.read(teamRepositoryProvider);
+  final syncQueue = ref.read(syncQueueRepositoryProvider);
+
+  await repo.updateSortOrder(id, sortOrder);
+
+  await syncQueue.enqueue(PendingSyncOpsCompanion(
+    operation: const Value('update'),
+    entityType: const Value('team'),
+    entityId: Value(id),
+    payload: Value(jsonEncode({'sort_order': sortOrder})),
+    createdAt: Value(DateTime.now()),
+  ));
+}
+
+Future<void> setTeamIsBox(WidgetRef ref, int id, {required bool isBox}) async {
+  final repo = ref.read(teamRepositoryProvider);
+  final syncQueue = ref.read(syncQueueRepositoryProvider);
+
+  await repo.setIsBox(id, isBox: isBox);
+
+  await syncQueue.enqueue(PendingSyncOpsCompanion(
+    operation: const Value('update'),
+    entityType: const Value('team'),
+    entityId: Value(id),
+    payload: Value(jsonEncode({'is_box': isBox})),
+    createdAt: Value(DateTime.now()),
+  ));
 }
 
 Future<void> deleteTeam(WidgetRef ref, int id) async {
