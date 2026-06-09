@@ -8,6 +8,7 @@ import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/teams/data/dynamax_data.dart';
+import 'package:poke_team_dex/features/teams/data/form_descriptor.dart';
 import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/presentation/ps_import_sheet.dart';
@@ -785,6 +786,17 @@ class _FilledSlotCard extends ConsumerWidget {
             nickname != null && nickname.isNotEmpty && nickname != speciesName;
         final displayName = hasNickname ? nickname : speciesName;
 
+        // Wrap all form-state columns into a single value object for clean reads.
+        final descriptor = FormDescriptor.from(
+          formName: slot.formName,
+          isShiny: slot.isShiny,
+          isMegaEvolved: slot.isMegaEvolved,
+          hasGigantamax: slot.hasGigantamax,
+          gigantamaxEnabled: slot.gigantamaxEnabled,
+          isAlpha: slot.isAlpha,
+          gender: slot.gender,
+        );
+
         // effectiveTypes/effectiveTypeColor are computed after formChangePokemon
         // is resolved below and drive all type display in the slot card.
 
@@ -806,7 +818,7 @@ class _FilledSlotCard extends ConsumerWidget {
             : (slot.heldItemName != null
                 ? kMegaStoneMap[slot.heldItemName]
                 : null);
-        final isMegaApplicable = slot.isMegaEvolved &&
+        final isMegaApplicable = descriptor.isMegaEvolved &&
             megaEntry != null &&
             pokemon.name == megaEntry.baseSpecies;
 
@@ -832,44 +844,44 @@ class _FilledSlotCard extends ConsumerWidget {
         // below) — otherwise a shiny mega/G-Max Pokémon renders in its regular
         // colours since mega/gmax artwork takes priority over the gen sprite.
         final megaHomeUrl = megaPokemon != null
-            ? (slot.isShiny
+            ? (descriptor.isShiny
                 ? pokemonHomeShinyUrl(megaPokemon.id)
                 : pokemonHomeUrl(megaPokemon.id))
             : null;
         final megaOfficialUrl = megaPokemon != null
-            ? (slot.isShiny
+            ? (descriptor.isShiny
                 ? (megaPokemon.officialArtworkShinyUrl ??
                     megaPokemon.officialArtworkUrl)
                 : megaPokemon.officialArtworkUrl)
             : null;
 
         // ── Form change sprite ──────────────────────────────────────────────
-        final isFormActive = slot.formName != null &&
-            slot.formName!.isNotEmpty;
+        final isFormActive = descriptor.formName != null &&
+            descriptor.formName!.isNotEmpty;
         // Cosmetic forms (e.g. Burmy's cloaks, Shellos' seas, Cherrim's
         // Sunshine Form) have no separate `/pokemon` resource of their own —
         // `pokemonByNameProvider` 404s for them. They only exist as
         // `pokemon-form` entries and differ from the base species solely by
         // sprite, so resolve the full set via `cosmeticFormsProvider` (which
         // returns `[]` for species without them — see its doc comment for why
-        // a name-based check like `slot.formName != pokemon.name` doesn't
+        // a name-based check like `descriptor.formName != pokemon.name` doesn't
         // reliably identify them) and look up the active one by name, keeping
         // `formChangePokemon` null so stats/types fall through to `pokemon`.
         final cosmeticFormEntries =
             ref.watch(cosmeticFormsProvider(pokemon.name)).asData?.value ??
                 const <PokemonFormEntry>[];
         final isCosmeticFormActive = isFormActive &&
-            cosmeticFormEntries.any((f) => f.name == slot.formName);
+            cosmeticFormEntries.any((f) => f.name == descriptor.formName);
         final formChangePokemon = (isFormActive && !isCosmeticFormActive)
             ? ref
-                .watch(pokemonByNameProvider(slot.formName!))
+                .watch(pokemonByNameProvider(descriptor.formName!))
                 .asData
                 ?.value
             : null;
         PokemonFormEntry? cosmeticFormChange;
         if (isCosmeticFormActive) {
           for (final entry in cosmeticFormEntries) {
-            if (entry.name == slot.formName) {
+            if (entry.name == descriptor.formName) {
               cosmeticFormChange = entry;
               break;
             }
@@ -936,11 +948,11 @@ class _FilledSlotCard extends ConsumerWidget {
               )
             : null;
         final formHomeUrl = formChangePokemon != null
-            ? (slot.isShiny
+            ? (descriptor.isShiny
                 ? pokemonHomeShinyUrl(formChangePokemon.id)
                 : pokemonHomeUrl(formChangePokemon.id))
             : cosmeticFormChangeSpriteUrls != null
-                ? (slot.isShiny
+                ? (descriptor.isShiny
                     ? cosmeticFormChangeSpriteUrls.shinyUrl
                     : cosmeticFormChangeSpriteUrls.defaultUrl)
                 : null;
@@ -949,12 +961,12 @@ class _FilledSlotCard extends ConsumerWidget {
                 'sprites/pokemon/${pokemon.id}-$cosmeticFormChangeSuffix.png'
             : null;
         final formOfficialUrl = formChangePokemon != null
-            ? (slot.isShiny
+            ? (descriptor.isShiny
                 ? (formChangePokemon.officialArtworkShinyUrl ??
                     formChangePokemon.officialArtworkUrl)
                 : formChangePokemon.officialArtworkUrl)
             : cosmeticFormChange != null
-                ? (slot.isShiny
+                ? (descriptor.isShiny
                     ? (cosmeticFormChange.spriteShinyUrl ??
                         cosmeticFormChange.spriteUrl ??
                         cosmeticRawSprite)
@@ -966,7 +978,7 @@ class _FilledSlotCard extends ConsumerWidget {
         // Low Key) rather than the base species — species with multiple forms
         // can have different G-Max moves/artwork per form.
         final gmaxSpeciesName = formChangePokemon?.name ?? pokemon.name;
-        final isGMaxActive = slot.hasGigantamax && slot.gigantamaxEnabled &&
+        final isGMaxActive = descriptor.hasGigantamax && descriptor.gigantamaxEnabled &&
             gmaxMoveForSpecies(gmaxSpeciesName) != null;
         final gmaxPokemon = isGMaxActive
             ? ref
@@ -975,7 +987,7 @@ class _FilledSlotCard extends ConsumerWidget {
                 ?.value
             : null;
         final gmaxHomeUrl = gmaxPokemon != null
-            ? (slot.isShiny
+            ? (descriptor.isShiny
                 ? pokemonHomeShinyUrl(gmaxPokemon.id)
                 : pokemonHomeUrl(gmaxPokemon.id))
             : null;
@@ -983,7 +995,7 @@ class _FilledSlotCard extends ConsumerWidget {
         // Sprite priority: G-Max > Mega > Form change > default.
         final megaArtworkUrl = gmaxHomeUrl ?? megaHomeUrl ?? formHomeUrl;
         final megaArtworkFallback = gmaxHomeUrl != null
-            ? (slot.isShiny
+            ? (descriptor.isShiny
                 ? (gmaxPokemon?.officialArtworkShinyUrl ??
                     gmaxPokemon?.officialArtworkUrl)
                 : gmaxPokemon?.officialArtworkUrl)
@@ -1129,21 +1141,21 @@ class _FilledSlotCard extends ConsumerWidget {
                         child: Column(
                           children: [
                             Builder(builder: (ctx) {
-                              final isFemale = slot.gender == 'female';
+                              final isFemale = descriptor.gender == 'female';
                               // femaleUrl is non-null only for Gen 4+ and HOME
                               // sprites that have gender variants.
                               final genderUrl = isFemale
-                                  ? (slot.isShiny
+                                  ? (descriptor.isShiny
                                       ? spriteUrls.femaleShinyUrl
                                       : spriteUrls.femaleUrl)
                                   : null;
                               // When gender sprite is used, chain:
                               //   gen female → gen default/shiny → HOME female
-                              final genFallback = slot.isShiny
+                              final genFallback = descriptor.isShiny
                                   ? spriteUrls.shinyUrl
                                   : spriteUrls.defaultUrl;
                               final homeFemaleUrl = isFemale
-                                  ? (slot.isShiny
+                                  ? (descriptor.isShiny
                                       ? pokemonHomeShinyFemaleUrl(pokemon.id)
                                       : pokemonHomeFemaleUrl(pokemon.id))
                                   : null;
@@ -1167,7 +1179,7 @@ class _FilledSlotCard extends ConsumerWidget {
                                     : null,
                                 shiny: megaArtworkUrl == null &&
                                     genderUrl == null &&
-                                    slot.isShiny,
+                                    descriptor.isShiny,
                                 size: 96,
                               );
                             }),
@@ -1211,19 +1223,19 @@ class _FilledSlotCard extends ConsumerWidget {
                                 Text('Lv $level',
                                     style: textTheme.bodySmall?.copyWith(
                                         fontWeight: FontWeight.w600)),
-                                if (slot.gender != null) ...[
+                                if (descriptor.gender != null) ...[
                                   Text(
-                                    ' · ${_genderSymbol(slot.gender!)}',
+                                    ' · ${_genderSymbol(descriptor.gender!)}',
                                     style: textTheme.bodySmall?.copyWith(
-                                      color: slot.gender == 'male'
+                                      color: descriptor.gender == 'male'
                                           ? Colors.blue
-                                          : slot.gender == 'female'
+                                          : descriptor.gender == 'female'
                                               ? Colors.pink
                                               : colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ],
-                                if (slot.isShiny) ...[
+                                if (descriptor.isShiny) ...[
                                   const SizedBox(width: 4),
                                   Icon(Icons.auto_awesome,
                                       size: 12, color: Colors.amber),
