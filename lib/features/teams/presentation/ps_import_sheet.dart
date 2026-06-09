@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
+import 'package:poke_team_dex/features/teams/logic/ps_import_resolvers.dart';
+import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
+import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 
@@ -244,13 +247,76 @@ class PsImportSheet extends ConsumerStatefulWidget {
 
 class _PsImportSheetState extends ConsumerState<PsImportSheet> {
   final _ctrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  GameFormat? _selectedFormat;
   bool _loading = false;
   String? _error;
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _nameCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickFormat() async {
+    final result = await showModalBottomSheet<GameFormat?>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FormatPickerSheet(current: _selectedFormat?.id),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _selectedFormat = isFormatCleared(result) ? null : result;
+    });
+  }
+
+  Widget _buildOverrideFields(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _nameCtrl,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Team Name',
+              hintText: 'e.g. Sun Team · optional',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 10),
+          InkWell(
+            onTap: _pickFormat,
+            borderRadius: BorderRadius.circular(4),
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Format',
+                border: OutlineInputBorder(),
+                isDense: true,
+                suffixIcon: Icon(Icons.arrow_drop_down),
+              ),
+              child: Text(
+                _selectedFormat != null
+                    ? _selectedFormat!.name
+                    : 'No format · optional',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: _selectedFormat != null
+                      ? colorScheme.onSurface
+                      : colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
   }
 
   Future<void> _import() async {
@@ -475,10 +541,13 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
     // >6 Pokémon → import as a Box; ≤6 → regular team.
     final isBox = parsed.slots.length > 6;
 
+    final teamName = resolveTeamName(_nameCtrl.text, parsed.name);
+    final formatId = resolveFormatId(_selectedFormat, parsed.formatId);
+
     final teamId = await teamRepo.insert(TeamsCompanion(
-      name: Value(parsed.name),
+      name: Value(teamName),
       folderId: Value(widget.folderId),
-      formatLabel: Value(parsed.formatId),
+      formatLabel: Value(formatId),
       isBox: Value(isBox),
       createdAt: Value(now),
       updatedAt: Value(now),
@@ -488,9 +557,9 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
       entityType: const Value('team'),
       entityId: Value(teamId),
       payload: Value(jsonEncode({
-        'name': parsed.name,
+        'name': teamName,
         'folder_local_id': widget.folderId,
-        'format_label': parsed.formatId,
+        'format_label': formatId,
       })),
       createdAt: Value(now),
     ));
@@ -675,6 +744,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
               ),
             ),
             const SizedBox(height: 8),
+            if (widget.targetTeamId == null) _buildOverrideFields(context),
             Flexible(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
