@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
-import 'package:drift_flutter/drift_flutter.dart';
+import 'package:poke_team_dex/database/connection_native.dart'
+    if (dart.library.html) 'package:poke_team_dex/database/connection_web.dart';
 import 'package:poke_team_dex/database/tables/app_config_table.dart';
 import 'package:poke_team_dex/database/tables/favorites_table.dart';
 import 'package:poke_team_dex/database/tables/pokemon_instances_table.dart';
@@ -122,22 +123,5 @@ class AppDatabase extends _$AppDatabase {
 }
 
 LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    return driftDatabase(
-      name: 'poketeamdex',
-      web: DriftWebOptions(
-        sqlite3Wasm: Uri.parse('sqlite3.wasm'),
-        driftWorker: Uri.parse('drift_worker.dart.js'),
-        onResult: (result) {
-          if (result.missingFeatures.isNotEmpty) {
-            // ignore: avoid_print
-            print(
-              'Drift web: using ${result.chosenImplementation} '
-              '(missing: ${result.missingFeatures})',
-            );
-          }
-        },
-      ),
-    );
-  });
+  return LazyDatabase(openDatabaseConnection);
 }
