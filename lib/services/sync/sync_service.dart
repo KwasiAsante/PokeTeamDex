@@ -251,11 +251,15 @@ class SyncService {
     switch ('${op.entityType}:${op.operation}') {
       // ── Folders ───────────────────────────────────────────────────────────
       case 'team_folder:create':
+        final folder = await folderRepo.getByIdOrNull(op.entityId);
+        if (folder == null) return _kDiscard; // deleted before first sync
         return {
           'type': 'folder_create',
           'client_local_id': op.entityId,
           'name': payload['name'] as String,
-          'sort_order': payload['sort_order'] as int? ?? 0,
+          // Use current DB sort_order so folders reordered before first sync
+          // land at the right position on the server immediately.
+          'sort_order': folder.sortOrder,
         };
 
       case 'team_folder:update':
@@ -280,13 +284,17 @@ class SyncService {
 
       // ── Teams ─────────────────────────────────────────────────────────────
       case 'team:create':
+        final team = await teamRepo.getByIdOrNull(op.entityId);
+        if (team == null) return _kDiscard; // deleted before first sync
         final entry = <String, dynamic>{
           'type': 'team_create',
           'client_local_id': op.entityId,
           'name': payload['name'] as String,
           if (payload['format_label'] != null)
             'format_label': payload['format_label'] as String,
-          'sort_order': payload['sort_order'] as int? ?? 0,
+          // Use the current DB sort_order so teams reordered before first sync
+          // land at the right position on the server immediately.
+          'sort_order': team.sortOrder,
           'is_box': payload['is_box'] as bool? ?? false,
         };
         final folderLocalId = payload['folder_local_id'] as int?;

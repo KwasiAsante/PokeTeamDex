@@ -36,5 +36,8 @@ class TeamFolderRepository {
 
   Future<int> updateSortOrder(int id, int sortOrder) =>
       (_db.update(_db.teamFolders)..where((f) => f.id.equals(id)))
-          .write(TeamFoldersCompanion(sortOrder: Value(sortOrder)));
+          .write(TeamFoldersCompanion(
+            sortOrder: Value(sortOrder),
+            updatedAt: Value(DateTime.now()),
+          ));
 }
