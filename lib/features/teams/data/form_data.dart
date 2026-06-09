@@ -15,6 +15,8 @@ const Map<String, String> kPsFormExceptions = {
 /// Structure: baseSpecies → { formName → spriteFileStem }
 /// The stem is used in sprite path building: "{stem}.png" / "{stem}-shiny.png".
 /// e.g. Burmy Sandy Cloak is filed under "412-sandy" in every sprite tier.
+/// Default/base forms (Plant Cloak, West Sea, Spring) are intentionally absent —
+/// they use the normal sprite pipeline via pokemonId and need no stem override.
 const Map<String, Map<String, String>> kCosmeticSpriteStems = {
   'burmy': {
     'burmy-sandy': '412-sandy',
