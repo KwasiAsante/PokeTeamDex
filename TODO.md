@@ -1,6 +1,6 @@
 # PokeTeamDex — Progress Tracker
 
-> Updated 2026-06-03 after widget + integration tests (PR #87).
+> Updated 2026-06-08 after v1.0.4 release.
 
 ---
 
@@ -90,6 +90,7 @@
 - [x] **gen-mechanics** — slot config UI gates sections by generation: abilities/nature hidden Gen 1–2, held item hidden Gen 1, shiny toggle hidden Gen 1, friendship hidden Gen 1, EVs labelled "Stat Experience" Gen 1–2, IVs renamed "DVs" with max 15, Gen 1 shows 5 stats (HP/Atk/Def/Spc/Spe)
 - [x] **gen-sprites** — PS transparent sprites for Gen 1–5 (gen5ani animated GIFs for BW), HOME/official artwork for Gen 6+; "Use generation sprites" toggle in Settings
 - [x] **gen-learnsets** — move picker filtered by format version groups; game formats check exact version-group, gen formats union all groups in that gen; validation flags illegal moves/abilities/items
+- [x] **event/gift movesets** — event and gift Pokémon movesets sourced from PS learnset data; surfaced in slot config move picker and used during move legality validation
 - [ ] **banlist** — Layer 2 competitive ban checking (Ubers, clause violations, format-specific bans) *(deferred — post-release)*
 - [ ] **custom-formats** — custom format builder UI *(deferred — post-release)*
 
@@ -234,6 +235,11 @@
 - [x] **Team: Move to folder** — "Move to folder" in team context menu; bottom sheet lists all folders + Ungrouped; one DB write + sync op
 - [x] **Team: Drag to folder** — folder section headers as `DragTarget`; team tiles as `Draggable`; cross-section drag replaces folder assignment
 - [x] **Team: Duplicate** — "Duplicate team" in context menu; deep-copies team row + all slots with "(Copy)" suffix; queues create ops
+- [x] **Promote/demote Team ↔ Box** — context menu option on any team or box to flip the `isBox` flag; synced to backend
+- [x] **Slot: Multi-select** — long-press enters selection mode; bulk delete, copy, or move selected slots to another team
+- [x] **Slot: Move/copy to another team** — single-slot context menu action; destination picker sheet shows all teams with available slots
+- [x] **PS Import: name & format override** — dialog lets user enter a custom team name and pick a format before the paste is committed to DB
+- [x] **Sync sort order and isBox** — team and folder `sort_order` + team `is_box` synced end-to-end to backend (push + pull)
 
 ### Pokédex
 - [x] **Favorites** — star `IconButton` on Pokédex list tile, detail header, team slot card, and slot config AppBar; favorites `FilterChip` in Pokédex filter bar; `favorites` Drift table (`pokemon_id` PK)
@@ -246,6 +252,8 @@
 ### Slot Config
 - [x] **Contest stats + radar chart** — 6 contest stat sliders (Coolness/Beautifulness/Cuteness/Cleverness/Toughness/Sheen, 0–255) in slot config, visible only for gen 3/4/no-format; rendered as a radar/spider chart via `fl_chart RadarChart`; DB migration adds 6 columns to `team_slots`
 - [x] **Ribbons** — hardcoded ribbon catalog by category (League, Contest, Tower, Memorial, Gift, Special) sourced from Bulbapedia; `ribbons` JSON column on `team_slots`; chip-grid picker in slot config
+- [x] **Tera Type** — 18-type chip selector in slot config; shown only for Gen 9 / SV formats; `tera_type` column on `team_slots`; displayed on team card
+- [x] **Cosmetic form support** — Unown letters, Vivillon patterns, Alcremie decorations, and other cosmetic-only variants tracked per slot; cosmetic forms do not change stats/typing/moves
 
 ### Pokémon Showdown Sync
 - [x] **PS import** — parse PS team `.txt` format (Nickname (Species) @ Item, Ability, EVs, moves) → create teams + slots locally; folder mapping from PS subfolder structure
