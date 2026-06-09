@@ -229,11 +229,26 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       });
     }
 
-    // Foreground FCM handler — app is open when message arrives.
-    // Directly invalidates the update provider so the banner shows immediately.
     if (FcmService.isSupported) {
+      // Foreground: app is open when message arrives.
       FirebaseMessaging.onMessage.listen((message) {
         if (message.data['type'] == 'app_update') {
+          ref.invalidate(updateCheckProvider);
+        }
+      });
+
+      // Backgrounded app: user taps the notification.
+      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        if (message.data['type'] == 'app_update') {
+          ref.invalidate(updateCheckProvider);
+        }
+      });
+
+      // Killed app: user taps the notification that launched the app.
+      // didChangeAppLifecycleState does not fire on initial launch, so the
+      // SharedPreferences flag check in that callback is never reached here.
+      FirebaseMessaging.instance.getInitialMessage().then((message) {
+        if (message?.data['type'] == 'app_update') {
           ref.invalidate(updateCheckProvider);
         }
       });

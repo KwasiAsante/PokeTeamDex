@@ -44,7 +44,9 @@ class UpdateService {
     final response = await http
         .get(Uri.parse(_apiUrl), headers: {'Accept': 'application/vnd.github+json'})
         .timeout(const Duration(seconds: 10));
-    if (response.statusCode != 200) return null;
+    if (response.statusCode != 200) {
+      throw Exception('Update check failed (HTTP ${response.statusCode})');
+    }
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 

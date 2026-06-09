@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poke_team_dex/services/update/update_info.dart';
 import 'package:poke_team_dex/services/update/update_provider.dart';
 import 'package:poke_team_dex/services/update/update_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,7 +31,7 @@ class UpdateBanner extends ConsumerWidget {
 class _DismissableUpdateBanner extends StatefulWidget {
   const _DismissableUpdateBanner({required this.info, required this.child});
 
-  final dynamic info;
+  final UpdateInfo info;
   final Widget child;
 
   @override
