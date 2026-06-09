@@ -983,7 +983,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             children: [
               _buildHeader(slot, spriteUrls, mechanics,
                   megaArtworkUrl: effectiveMegaArtworkUrl,
-                  megaFallbackUrl: effectiveMegaFallbackUrl,
+                  megaFallbackUrl: cosmeticFormSpriteUrls?.fallbackUrl ?? effectiveMegaFallbackUrl,
+                  megaFallbackUrl2: cosmeticFormSpriteUrls?.fallbackUrl2,
                   isFormLoading: (formPokemonAsync?.isLoading ?? false) ||
                       (isCosmeticFormSelected && cosmeticFormsAsync.isLoading)),
               // ── Form selector (when Pokémon has multiple forms) ──
@@ -1279,6 +1280,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     GenerationMechanics? mechanics, {
     String? megaArtworkUrl,
     String? megaFallbackUrl,
+    String? megaFallbackUrl2,
     bool isFormLoading = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -1312,10 +1314,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                       ? genFallback
                       : null,
               fallbackUrl2: megaArtworkUrl != null
-                  // When a form/mega/gmax URL is active but both it and
-                  // fallbackUrl fail (e.g. Polteageist Antique has no HOME
-                  // artwork), fall back to the base Pokémon sprite.
-                  ? spriteUrls.defaultUrl
+                  ? (megaFallbackUrl2 ?? spriteUrls.defaultUrl)
                   : genderUrl != null
                       ? homeFemaleUrl
                       : null,

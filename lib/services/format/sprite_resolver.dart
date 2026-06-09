@@ -50,7 +50,13 @@ bool _needsTransparentSubfolder(int gen) => gen <= 2;
 ///
 /// [femaleUrl] and [femaleShinyUrl] are non-null for Gen 4+ formats (and HOME)
 /// where female-specific sprites exist in the PokeAPI sprites repository.
-({String? defaultUrl, String? shinyUrl, String? femaleUrl, String? femaleShinyUrl})
+///
+/// [fallbackUrl] and [fallbackUrl2] are non-null for Gen 2 crystal format: they
+/// hold the gold and silver paths respectively. Crystal's transparent/ subfolder
+/// lacks some form-variant sprites (e.g. Unown letter forms) that exist in gold
+/// and silver, so callers should pass these through to PokemonSprite's fallback
+/// chain.
+({String? defaultUrl, String? shinyUrl, String? femaleUrl, String? femaleShinyUrl, String? fallbackUrl, String? fallbackUrl2})
     resolveSprite({
   required Map<String, dynamic>? sprites,
   required int pokemonId,
@@ -92,12 +98,21 @@ bool _needsTransparentSubfolder(int gen) => gen <= 2;
       final shinyUrl   = _versionedShinyUrl(versionPath, gen, animSeg, transparent, stem, ext, pokemonName);
       final (femaleUrl, femaleShinyUrl) = _versionedFemaleUrls(versionPath, gen, animSeg, stem, ext);
 
+      // Gen 2 crystal lacks transparent form-variant sprites (e.g. Unown letter
+      // forms). Gold and silver have full coverage, so provide them as fallbacks.
+      String? fallbackUrl;
+      String? fallbackUrl2;
+      if (gameId == 'crystal') {
+        fallbackUrl  = _versionedDefaultUrl('generation-ii/gold',   animSeg, transparent, stem, ext);
+        fallbackUrl2 = _versionedDefaultUrl('generation-ii/silver', animSeg, transparent, stem, ext);
+      }
+
       AppLogger().d('resolveSprite: → versioned | default=$defaultUrl | shiny=$shinyUrl');
-      return (defaultUrl: defaultUrl, shinyUrl: shinyUrl, femaleUrl: femaleUrl, femaleShinyUrl: femaleShinyUrl);
+      return (defaultUrl: defaultUrl, shinyUrl: shinyUrl, femaleUrl: femaleUrl, femaleShinyUrl: femaleShinyUrl, fallbackUrl: fallbackUrl, fallbackUrl2: fallbackUrl2);
     }
   }
 
-  // Gen 6+ — PokéAPI HOME / official artwork
+  // Gen 6+ or unrecognised game — PokéAPI HOME / official artwork
   return _homeOrArtwork(sprites, rawDefault, rawShiny, hint: hint);
 }
 
@@ -133,7 +148,7 @@ String _versionedShinyUrl(
   return (femaleUrl, femaleShinyUrl);
 }
 
-({String? defaultUrl, String? shinyUrl, String? femaleUrl, String? femaleShinyUrl})
+({String? defaultUrl, String? shinyUrl, String? femaleUrl, String? femaleShinyUrl, String? fallbackUrl, String? fallbackUrl2})
     _homeOrArtwork(
   Map<String, dynamic>? sprites,
   String rawDefault,
@@ -153,6 +168,8 @@ String _versionedShinyUrl(
         rawShiny,
     femaleUrl: home?['front_female'] as String?,
     femaleShinyUrl: home?['front_shiny_female'] as String?,
+    fallbackUrl: null,
+    fallbackUrl2: null,
   );
 }
 
