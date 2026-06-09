@@ -12,6 +12,7 @@ import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
     show teamByIdProvider, teamSlotsProvider;
+import 'package:poke_team_dex/features/teams/data/form_descriptor.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/services/format/format_service.dart';
@@ -641,6 +642,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           pokemonName: pokemon.name,
           format: format,
           useFormatSprites: useFormatSprites,
+          hint: const SpriteHint(),
         );
 
         // ── Mega Evolution ─────────────────────────────────────────────────
@@ -903,10 +905,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 pokemonName: cosmeticForm!.name,
                 format: format,
                 useFormatSprites: useFormatSprites,
-                spriteFileStem: '${pokemon.id}-$cosmeticFormSuffix',
-                homeUrl: cosmeticFormHomeUrl(pokemon.id, cosmeticFormSuffix),
-                homeShinyUrl:
-                    cosmeticFormHomeShinyUrl(pokemon.id, cosmeticFormSuffix),
+                hint: SpriteHint(
+                  stem: '${pokemon.id}-$cosmeticFormSuffix',
+                  homeUrl: cosmeticFormHomeUrl(pokemon.id, cosmeticFormSuffix),
+                  homeShinyUrl: cosmeticFormHomeShinyUrl(pokemon.id, cosmeticFormSuffix),
+                ),
               )
             : null;
         final formHomeUrl = formPokemon != null

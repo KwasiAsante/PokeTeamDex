@@ -940,11 +940,7 @@ class _FilledSlotCard extends ConsumerWidget {
                 pokemonName: cosmeticFormChange!.name,
                 format: format,
                 useFormatSprites: useFormatSprites,
-                spriteFileStem: '${pokemon.id}-$cosmeticFormChangeSuffix',
-                homeUrl:
-                    cosmeticFormHomeUrl(pokemon.id, cosmeticFormChangeSuffix),
-                homeShinyUrl: cosmeticFormHomeShinyUrl(
-                    pokemon.id, cosmeticFormChangeSuffix),
+                hint: descriptor.spriteHint(pokemon.name, pokemon.id),
               )
             : null;
         final formHomeUrl = formChangePokemon != null
@@ -1035,6 +1031,7 @@ class _FilledSlotCard extends ConsumerWidget {
           pokemonName: pokemon.name,
           format: format,
           useFormatSprites: useFormatSprites,
+          hint: descriptor.spriteHint(pokemon.name, pokemon.id),
         );
 
         // Slot validation against format (Layer 1)
