@@ -710,8 +710,7 @@ class _TeamTile extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Mini sprite row — 6 slots (first 6 shown for boxes)
-          _TeamSpriteRow(teamId: team.id),
+          _TeamSpriteRow(teamId: team.id, isBox: team.isBox),
           if (hasError)
             Text(
               'Sync issue — check sync monitor',
@@ -1085,87 +1084,98 @@ class _DesktopRefreshBar extends ConsumerWidget {
   }
 }
 
-// ── Team sprite row (6 mini sprites) ─────────────────────────────────────────
+// ── Team sprite row (6 mini sprites, or all filled slots for boxes) ───────────
 
 class _TeamSpriteRow extends ConsumerWidget {
   final int teamId;
-  const _TeamSpriteRow({required this.teamId});
+  final bool isBox;
+  const _TeamSpriteRow({required this.teamId, this.isBox = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final slotsAsync = ref.watch(teamSlotsProvider(teamId));
     final slots = slotsAsync.asData?.value ?? [];
-    final slotMap = {for (final s in slots) s.slot: s};
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 2),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-        children: List.generate(6, (i) {
-          final slot = slotMap[i + 1];
-          if (slot == null) {
-            return Padding(
-              padding: const EdgeInsets.only(right: 2),
-              child: Icon(
-                Icons.catching_pokemon,
-                size: 36,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-              ),
-            );
-          }
-          // Use PokéAPI icon sprites — small, pixel-art icons designed for
-          // party/box views. Gen VIII icons cover the widest Pokémon range;
-          // fall back to Gen VII then the regular front sprite.
-          final id = slot.pokemonId;
-          const base = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions';
-          final iconGen8  = '$base/generation-viii/icons/$id.png';
-          final iconGen7  = '$base/generation-vii/icons/$id.png';
-          final fallback  = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$id.png';
-          final width = 60.0;
-          final height = 50.0;
-          // Cap the decoded cache to display size — these are tiny party
-          // icons, but up to 6 render per team across 30+ teams, and
-          // CachedNetworkImage otherwise decodes at native resolution.
-          final dpr = MediaQuery.devicePixelRatioOf(context);
-          final cacheWidth = (width * dpr).round();
-          final cacheHeight = (height * dpr).round();
+    const double width = 60.0;
+    const double height = 50.0;
+    // Cap the decoded cache to display size — these are tiny party icons, but
+    // many render simultaneously across a long list.
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final cacheWidth = (width * dpr).round();
+    final cacheHeight = (height * dpr).round();
+    // Use PokéAPI icon sprites — Gen VIII covers the widest Pokémon range;
+    // fall back to Gen VII then the regular front sprite.
+    const base = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions';
 
-          return Padding(
-            padding: const EdgeInsets.only(right: 2),
-            child: CachedNetworkImage(
-              imageUrl: iconGen7,
+    Widget buildSprite(int id) {
+      final iconGen7 = '$base/generation-vii/icons/$id.png';
+      final iconGen8 = '$base/generation-viii/icons/$id.png';
+      final fallback = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$id.png';
+      return Padding(
+        padding: const EdgeInsets.only(right: 2),
+        child: CachedNetworkImage(
+          imageUrl: iconGen7,
+          width: width,
+          height: height,
+          fit: BoxFit.contain,
+          memCacheWidth: cacheWidth,
+          memCacheHeight: cacheHeight,
+          errorWidget: (_, _, _) => CachedNetworkImage(
+            imageUrl: iconGen8,
+            width: width,
+            height: height,
+            fit: BoxFit.contain,
+            memCacheWidth: cacheWidth,
+            memCacheHeight: cacheHeight,
+            errorWidget: (_, _, _) => CachedNetworkImage(
+              imageUrl: fallback,
               width: width,
               height: height,
               fit: BoxFit.contain,
               memCacheWidth: cacheWidth,
               memCacheHeight: cacheHeight,
-              errorWidget: (_, _, _) => CachedNetworkImage(
-                imageUrl: iconGen8,
-                width: width,
-                height: height,
-                fit: BoxFit.contain,
-                memCacheWidth: cacheWidth,
-                memCacheHeight: cacheHeight,
-                errorWidget: (_, _, _) => CachedNetworkImage(
-                  imageUrl: fallback,
-                  width: width,
-                  height: height,
-                  fit: BoxFit.contain,
-                  memCacheWidth: cacheWidth,
-                  memCacheHeight: cacheHeight,
-                  errorWidget: (_, _, _) => Icon(
-                    Icons.catching_pokemon,
-                    size: 60,
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                  ),
-                ),
+              errorWidget: (_, _, _) => Icon(
+                Icons.catching_pokemon,
+                size: 60,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
               ),
             ),
-          );
-        }),
+          ),
         ),
+      );
+    }
+
+    Widget buildEmpty() => Padding(
+      padding: const EdgeInsets.only(right: 2),
+      child: Icon(
+        Icons.catching_pokemon,
+        size: 36,
+        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+      ),
+    );
+
+    final List<Widget> children;
+    if (isBox) {
+      // Show all filled slots sorted by position; fall back to 6 empty icons
+      // when the box is empty so the card height stays consistent.
+      final filled = slots.toList()..sort((a, b) => a.slot.compareTo(b.slot));
+      children = filled.isEmpty
+          ? List.generate(6, (_) => buildEmpty())
+          : filled.map((s) => buildSprite(s.pokemonId)).toList();
+    } else {
+      final slotMap = {for (final s in slots) s.slot: s};
+      children = List.generate(6, (i) {
+        final slot = slotMap[i + 1];
+        return slot == null ? buildEmpty() : buildSprite(slot.pokemonId);
+      });
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 2),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(children: children),
       ),
     );
   }
