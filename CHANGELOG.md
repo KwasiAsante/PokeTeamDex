@@ -4,6 +4,15 @@ All notable changes to PokeTeamDex are documented here.
 
 ---
 
+## [1.0.6] — 2026-06-09
+
+### Fixed
+- Update check errors now surfaced to the user instead of silently failing; FCM notification tap handler correctly opens the app on cold start
+- Web: skip `opfsShared` strategy for cross-browser SQLite compatibility (fixes Firefox `NoModificationAllowedError`)
+- Web: cross-origin isolation headers (COOP/COEP) added to Firebase Hosting config for stable SharedArrayBuffer support
+
+---
+
 ## [1.0.5] — 2026-06-09
 
 ### Fixed

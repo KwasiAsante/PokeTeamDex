@@ -1,6 +1,6 @@
 # PokeTeamDex — Progress Tracker
 
-> Updated 2026-06-08 after v1.0.4 release.
+> Updated 2026-06-09 after v1.0.6 release.
 
 ---
 
