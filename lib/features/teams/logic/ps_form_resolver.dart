@@ -5,7 +5,8 @@ import 'package:poke_team_dex/features/teams/data/form_data.dart';
 /// Returns the mapped PokeAPI name or null if the PS name is not a known exception.
 String? applyPsFormExceptions(String psName) => kPsFormExceptions[psName];
 
-/// Runs the heuristic pipeline against [varieties] (non-default entries only).
+/// Runs the heuristic pipeline against [varieties] (the full varieties list,
+/// including the default form). Non-default filtering is applied internally.
 /// Returns the first match or null if none of the heuristics succeed.
 String? resolveFormFromVarieties(String psName, List<String> varieties) {
   final nonDefault = varieties.skip(1).toList();
