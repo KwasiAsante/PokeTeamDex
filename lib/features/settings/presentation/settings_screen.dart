@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:poke_team_dex/services/update/update_info.dart';
 import 'package:poke_team_dex/services/update/update_provider.dart';
 import 'package:poke_team_dex/services/update/update_service.dart';
 import 'package:poke_team_dex/shared/utils/snack_bar.dart';
@@ -770,7 +771,7 @@ class _AppVersionTile extends ConsumerWidget {
 
 class _UpdateDownloadRow extends StatelessWidget {
   const _UpdateDownloadRow({required this.info});
-  final dynamic info;
+  final UpdateInfo info;
 
   @override
   Widget build(BuildContext context) {
