@@ -4,6 +4,16 @@ All notable changes to PokeTeamDex are documented here.
 
 ---
 
+## [1.0.5] — 2026-06-09
+
+### Fixed
+- Sort order no longer reverts after sync — `updateSortOrder` now bumps `updatedAt` so the local timestamp always beats the server's stale value on pull
+- Teams/folders reordered before their first sync now land at the correct server position — create op reads current DB `sortOrder` instead of the always-zero payload value
+- Folder name on mobile no longer renders vertically — `TextOverflow.ellipsis` prevents character-per-line wrapping when the trailing action row is wide
+- Reorder arrows (↑ ↓ top/bottom) on folder headers and team tiles are hidden on narrow screens (< 600 dp) and moved into the `⋮` overflow menu instead; wide screens (tablet/desktop/web) keep the inline buttons
+
+---
+
 ## [1.0.4] — 2026-06-08
 
 ### Added

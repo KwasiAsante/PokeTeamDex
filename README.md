@@ -37,7 +37,7 @@ A full-featured Pokémon team builder and Pokédex browser built with Flutter. S
 | Area | Features |
 |------|----------|
 | **Pokédex** | Browse all 1000+ Pokémon, search/filter by gen/type/game, base stats, evolutions, forms, moves, abilities, locations, type effectiveness matrix |
-| **Team Builder** | Create/edit teams in folder hierarchy, 6-slot configuration with full stat preview, EV/IV grids, drag-reorder, format picker |
+| **Team Builder** | Create/edit teams in folder hierarchy, 6-slot configuration with full stat preview, EV/IV grids, drag-reorder, format picker; responsive overflow menu for reorder actions on mobile |
 | **Slot Config** | Ability, nature, held item, 4 moves (generation-aware), EV/IV, level, shiny, gender, friendship, ribbons, Mega/Dynamax/Gigantamax, contest stats, Pokémon identity chains |
 | **Reference** | Moves, Items, Abilities, Types, Natures, Locations browsers |
 | **Sync** | Offline-first — all data local; bidirectional push/pull sync to PostgreSQL backend |
@@ -166,7 +166,7 @@ Key provider patterns used:
 
 ### Local Database (Drift)
 
-Drift provides a type-safe SQLite ORM with code generation. The database uses **schema v10** with 9 tables.
+Drift provides a type-safe SQLite ORM with code generation. The database uses **schema v12** with 9 tables.
 
 ```mermaid
 erDiagram
@@ -297,6 +297,8 @@ erDiagram
 | v8 | Ribbons JSON column; Mega/Dynamax/Alpha booleans |
 | v9 | PokemonInstances table; `instance_id` FK on TeamSlots |
 | v10 | `gigantamax_enabled` on TeamSlots |
+| v11 | `is_box` on Teams |
+| v12 | `tera_type` on TeamSlots |
 
 ### Feature Modules
 
@@ -856,6 +858,8 @@ uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
 | `0004_pokemon_instances` | PokemonInstances table |
 | `0005_full_slot_config` | All slot config columns (ribbons, contest stats, gimmicks) |
 | `0006_add_format_label_to_teams` | `format_label` column on teams |
+| `0007_add_tera_type_to_slots` | `tera_type` column on TeamSlots |
+| `0008_add_sort_order_and_is_box` | `sort_order` on Teams/TeamFolders; `is_box` on Teams |
 
 ```bash
 cd backend
