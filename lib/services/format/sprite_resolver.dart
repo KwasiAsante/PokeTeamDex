@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:poke_team_dex/features/teams/data/form_descriptor.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
+import 'package:poke_team_dex/utils/app_logger.dart';
 
 const _versionsBase = 'https://raw.githubusercontent.com/PokeAPI/sprites/'
     'master/sprites/pokemon/versions';
@@ -59,13 +60,16 @@ bool _needsTransparentSubfolder(int gen) => gen <= 2;
   required SpriteHint hint,
 }) {
   final stem = hint.stem ?? '$pokemonId';
+  AppLogger().d('resolveSprite: $pokemonName | id=$pokemonId | format=${format?.id} | stem=$stem | hint.stem=${hint.stem}');
   final rawDefault = 'https://raw.githubusercontent.com/PokeAPI/sprites/'
       'master/sprites/pokemon/$stem.png';
   final rawShiny = 'https://raw.githubusercontent.com/PokeAPI/sprites/'
       'master/sprites/pokemon/shiny/$stem.png';
 
   if (!useFormatSprites || format == null) {
-    return _homeOrArtwork(sprites, rawDefault, rawShiny, hint: hint);
+    final result = _homeOrArtwork(sprites, rawDefault, rawShiny, hint: hint);
+    AppLogger().d('resolveSprite: → HOME | default=${result.defaultUrl}');
+    return result;
   }
 
   final gameId = format.type == FormatType.game
@@ -88,6 +92,7 @@ bool _needsTransparentSubfolder(int gen) => gen <= 2;
       final shinyUrl   = _versionedShinyUrl(versionPath, gen, animSeg, transparent, stem, ext, pokemonName);
       final (femaleUrl, femaleShinyUrl) = _versionedFemaleUrls(versionPath, gen, animSeg, stem, ext);
 
+      AppLogger().d('resolveSprite: → versioned | default=$defaultUrl | shiny=$shinyUrl');
       return (defaultUrl: defaultUrl, shinyUrl: shinyUrl, femaleUrl: femaleUrl, femaleShinyUrl: femaleShinyUrl);
     }
   }
