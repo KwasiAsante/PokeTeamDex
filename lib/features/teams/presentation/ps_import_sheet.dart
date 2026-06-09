@@ -352,6 +352,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
             resolvedFormName = entry.name;
           } catch (_) {
             pokemonId = entry.id; // fallback: keep form ID
+            resolvedFormName = entry.name; // still record form even if base fetch failed
           }
         } else {
           pokemonId = entry.id;
@@ -360,13 +361,17 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         // For form-qualified PS names (e.g. "gastrodon-east", "ogerpon-wellspring")
         // whose /pokemon endpoint doesn't exist, look up the base species and
         // map the PS name to the closest PokéAPI variety name.
+        // Fall back to the raw PS name when no variety matches — this covers
+        // cosmetic forms like "polteageist-antique" that exist as form
+        // resources rather than species varieties.
         if (s.species.contains('-')) {
           try {
             final base = await pokeRepo
                 .fetchPokemonByNameOrDefault(s.species.split('-').first);
             pokemonId = base.id;
             resolvedFormName =
-                await _resolveFormName(pokeRepo, base.id, s.species);
+                await _resolveFormName(pokeRepo, base.id, s.species) ??
+                    s.species;
           } catch (_) {
             resolveErrors.add(s.species);
             continue;
@@ -529,6 +534,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
             resolvedFormName = entry.name;
           } catch (_) {
             pokemonId = entry.id;
+            resolvedFormName = entry.name;
           }
         } else {
           pokemonId = entry.id;
@@ -540,7 +546,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
                 .fetchPokemonByNameOrDefault(s.species.split('-').first);
             pokemonId = base.id;
             resolvedFormName =
-                await _resolveFormName(repo, base.id, s.species);
+                await _resolveFormName(repo, base.id, s.species) ?? s.species;
           } catch (_) {
             errors.add('Could not find Pokémon "${s.species}"');
             continue;
