@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
+import 'package:poke_team_dex/features/teams/logic/ps_form_resolver.dart';
 import 'package:poke_team_dex/features/teams/logic/ps_import_resolvers.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart' show setTeamIsBox;
@@ -65,34 +66,16 @@ String _norm(String s) => s
     .replaceAll('\u2019', '') // U+2019 RIGHT SINGLE QUOTATION MARK (used by some PS clients)
     .replaceAll('\u02BC', ''); // U+02BC MODIFIER LETTER APOSTROPHE
 
-/// Maps a normalised PS species name (e.g. `"ogerpon-wellspring"` or
-/// `"necrozma-dawn-wings"`) to the actual PokéAPI variety name by comparing
-/// it against the species' variety list.  Returns null when no variety is a
-/// reasonable match (caller should not pre-select a form).
 Future<String?> _resolveFormName(
     dynamic repo, int basePokemonId, String psName) async {
+  // Exceptions table — checked before the API call.
+  final exception = applyPsFormExceptions(psName);
+  if (exception != null) return exception;
+
   try {
     final species = await repo.fetchPokemonSpecies(basePokemonId);
-    final names = species.varieties.map((v) => v.name).toList();
-    // 1. Exact match
-    if (names.contains(psName)) return psName;
-    // 2. Forward prefix: PokéAPI name starts with PS name + "-"
-    //    ("ogerpon-wellspring" → "ogerpon-wellspring-mask")
-    for (final n in names.skip(1)) {
-      if (n.startsWith('$psName-')) return n;
-    }
-    // 3. Reverse prefix: PS name starts with PokéAPI name + "-"
-    //    ("necrozma-dawn-wings" → "necrozma-dawn")
-    for (final n in names.skip(1)) {
-      if (psName.startsWith('$n-')) return n;
-    }
-    // 4. Last-segment match for non-default varieties
-    //    ("maushold-four" last seg "four" → "maushold-family-of-four")
-    final lastSeg = psName.split('-').last;
-    for (final n in names.skip(1)) {
-      if (n.split('-').last == lastSeg) return n;
-    }
-    return null;
+    final varieties = species.varieties.map((v) => v.name).toList();
+    return resolveFormFromVarieties(psName, varieties);
   } catch (_) {
     return null;
   }
