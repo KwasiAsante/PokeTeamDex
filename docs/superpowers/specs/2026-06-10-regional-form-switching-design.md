@@ -54,12 +54,10 @@ Shows one card per form (base + each battle-meaningful form), each displaying th
 ### Header update on form switch
 
 When `_selectedFormName` is non-null and `pokemonByNameProvider` has loaded:
-- Sprite: official artwork for `effectivePokemon.id`, shiny variant when `_shiny` is true — same `resolveSprite` / HOME artwork logic already used for base forms, driven by `effectivePokemon.id` instead of `widget.pokemonId`
+- Sprite: official artwork for `effectivePokemon.id`
 - Type badges: `effectivePokemon.types`
 - Background gradient: derived from `effectivePokemon.types[0]` (same existing logic)
 - Pokémon name: still shows base species name ("Raichu") — form is indicated by the app bar badge
-
-The shiny toggle (`_shiny`) applies to the selected form at all times — switching form while shiny is active shows the shiny artwork for the new form, and toggling shiny while a form is selected shows the shiny/normal artwork for that form. The bottom sheet form picker also reflects the current shiny state in the sprite shown for each form card.
 
 While the form provider is loading, the header shows a loading shimmer/spinner without clearing existing content.
 
