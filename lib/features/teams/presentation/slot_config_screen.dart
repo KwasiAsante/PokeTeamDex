@@ -1276,7 +1276,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   Widget _buildHeader(
     TeamSlot slot,
-    ({String? defaultUrl, String? shinyUrl, String? femaleUrl, String? femaleShinyUrl}) spriteUrls,
+    ({String? defaultUrl, String? shinyUrl, String? femaleUrl, String? femaleShinyUrl, String? fallbackUrl, String? fallbackUrl2}) spriteUrls,
     GenerationMechanics? mechanics, {
     String? megaArtworkUrl,
     String? megaFallbackUrl,
