@@ -125,6 +125,17 @@ const Map<String, ItemGatingRule> kItemGatingRules = {
   'silvally-fairy':    ItemGatingRule({'fairy-memory'}),
 };
 
+// ── Generation-gated forms ────────────────────────────────────────────────
+
+/// Forms that were introduced mid-series and should not appear in formats
+/// for earlier generations. Maps form name → minimum generation (inclusive).
+const Map<String, int> kFormMinGen = {
+  // Unown ! and ? were added in FireRed/LeafGreen (Gen 3).
+  // Gen 1–2 formats only have the 26 letter forms.
+  'unown-exclamation': 3,
+  'unown-question':    3,
+};
+
 // ── Public API ────────────────────────────────────────────────────────────
 
 /// Returns the non-default form names that should be shown as chips.
@@ -133,11 +144,13 @@ const Map<String, ItemGatingRule> kItemGatingRules = {
 /// [cosmeticForms] — sprite-only form names (e.g. Burmy's cloaks).
 /// [heldItem] — current held item (PokéAPI hyphenated name, or null).
 /// [abilityName] — current ability (PokéAPI hyphenated name, or null).
+/// [gen] — current format generation (null = no format, no restriction).
 List<String> filterFormChips({
   required List<String> varieties,
   List<String> cosmeticForms = const [],
   required String? heldItem,
   required String? abilityName,
+  int? gen,
 }) {
   final candidates = [
     if (varieties.length > 1) ...varieties.skip(1),
@@ -155,15 +168,19 @@ List<String> filterFormChips({
     }
     if (kAlwaysExcludeForms.contains(form)) return false;
 
-    // 2. Ability-gated
+    // 2. Generation-gated: hide forms introduced after the current format's gen
+    final minGen = kFormMinGen[form];
+    if (minGen != null && gen != null && gen < minGen) return false;
+
+    // 3. Ability-gated
     final abilityRule = kAbilityGatingRules[form];
     if (abilityRule != null) return ability == abilityRule.requiredAbility;
 
-    // 3. Item-gated (covers legendary, primal, Arceus plates, Silvally memories)
+    // 4. Item-gated (covers legendary, primal, Arceus plates, Silvally memories)
     final itemRule = kItemGatingRules[form];
     if (itemRule != null) return itemRule.requiredItems.contains(item);
 
-    // 4. Free chip
+    // 5. Free chip
     return true;
   }).toList();
 }

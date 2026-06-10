@@ -724,6 +724,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           cosmeticForms: cosmeticForms,
           heldItem: _heldItemName,
           abilityName: _abilityName,
+          gen: format?.gen,
         ).where((f) => primalFormatOk || !primalForms.contains(f)).toList();
         final hasMultipleForms = availableForms.isNotEmpty;
         final isCosmeticFormSelected =

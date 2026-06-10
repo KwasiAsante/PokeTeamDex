@@ -372,4 +372,43 @@ void main() {
       expect(result, containsAll(['aegislash-blade', 'burmy-sandy']));
     });
   });
+
+  group('filterFormChips — generation-gated forms', () {
+    const unownVarieties = [
+      'unown', 'unown-b', 'unown-exclamation', 'unown-question',
+    ];
+
+    test('unown-exclamation and unown-question hidden in Gen 2', () {
+      final result = filterFormChips(
+        varieties: unownVarieties,
+        heldItem: null,
+        abilityName: null,
+        gen: 2,
+      );
+      expect(result, isNot(contains('unown-exclamation')));
+      expect(result, isNot(contains('unown-question')));
+      expect(result, contains('unown-b'));
+    });
+
+    test('unown-exclamation and unown-question shown in Gen 3', () {
+      final result = filterFormChips(
+        varieties: unownVarieties,
+        heldItem: null,
+        abilityName: null,
+        gen: 3,
+      );
+      expect(result, contains('unown-exclamation'));
+      expect(result, contains('unown-question'));
+    });
+
+    test('unown-exclamation and unown-question shown when no gen (no format)', () {
+      final result = filterFormChips(
+        varieties: unownVarieties,
+        heldItem: null,
+        abilityName: null,
+      );
+      expect(result, contains('unown-exclamation'));
+      expect(result, contains('unown-question'));
+    });
+  });
 }
