@@ -129,11 +129,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         final battleForms = species != null
             ? battleMeaningfulForms(species.varieties)
             : <PokemonVariety>[];
-        final baseFormLabel = formLabel(
-          isDefault: true,
-          varietyName: species?.name ?? basePokemon.name,
-          generationName: species?.generationName,
-        );
+        final baseFormLabel = shortBaseFormLabel(species?.generationName);
 
         return isWide
             ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel)

@@ -159,6 +159,19 @@ String formLabel({
   return (generationName != null ? _kGenLabel[generationName] : null) ?? 'Original Form';
 }
 
+const _kGenLabelShort = {
+  'generation-i':    'Kantonian', 'generation-ii':   'Johtonian',
+  'generation-iii':  'Hoennian',  'generation-iv':   'Sinnohian',
+  'generation-v':    'Unovan',    'generation-vi':   'Kalosian',
+  'generation-vii':  'Alolan',    'generation-viii': 'Galarian',
+  'generation-ix':   'Paldean',
+};
+
+/// Short label for the base form in the form picker (e.g. "Kantonian", "Hoennian").
+/// Matches the style of [shortFormLabel] — no "Form" suffix.
+String shortBaseFormLabel(String? generationName) =>
+    (generationName != null ? _kGenLabelShort[generationName] : null) ?? 'Original';
+
 /// Short label for the app bar badge (e.g. "Galarian", "Alolan").
 String shortFormLabel(String varietyName) {
   const suffixShort = {
