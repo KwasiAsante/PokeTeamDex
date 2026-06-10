@@ -92,7 +92,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     _StatsTab(pokemon: effectivePokemon),
     _AbilitiesTab(pokemon: effectivePokemon),
     _MovesTab(pokemon: effectivePokemon),
-    _EvolutionsTab(speciesAsync: speciesAsync),
+    _EvolutionsTab(speciesAsync: speciesAsync, selectedFormName: _selectedFormName),
     _FormsTab(speciesAsync: speciesAsync),
     _LocationsTab(pokemonId: effectivePokemon.id),
     _TeamsTab(pokemonId: widget.pokemonId, pokemon: basePokemon),
@@ -1417,7 +1417,8 @@ class _AbilityCard extends ConsumerWidget {
 
 class _EvolutionsTab extends ConsumerWidget {
   final AsyncValue<PokemonSpeciesEntry> speciesAsync;
-  const _EvolutionsTab({required this.speciesAsync});
+  final String? selectedFormName;
+  const _EvolutionsTab({required this.speciesAsync, this.selectedFormName});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1427,19 +1428,48 @@ class _EvolutionsTab extends ConsumerWidget {
       data: (species) {
         final chainId = species.evolutionChainId;
         if (chainId == null) {
-          return const EmptyState(
-            icon: Icons.device_unknown,
-            title: 'No evolution data',
-          );
+          return const EmptyState(icon: Icons.device_unknown, title: 'No evolution data');
         }
         final chainAsync = ref.watch(evolutionChainProvider(chainId));
         return chainAsync.when(
           loading: () => const LoadingState(),
           error: (e, _) => ErrorState(error: e),
-          data: (root) => SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: _EvolutionTree(node: root),
-          ),
+          data: (root) {
+            // Step 1: suffix from the form switcher.
+            String? suffix = selectedFormName != null
+                ? regionalSuffixOf(selectedFormName!)
+                : null;
+            // Step 2: auto-detect for Pokémon like Obstagoon and Mr. Rime that
+            // have no regional varieties of their own but are form-exclusive evolutions.
+            suffix ??= chainHasFormDetails(root)
+                ? formSuffixForSpecies(root, species.id)
+                : null;
+
+            // Pre-resolve form IDs for terminal nodes and region branches.
+            final allNames = collectSpeciesNames(root);
+            const regionalSuffixes = ['galar', 'alola', 'hisui', 'paldea'];
+            final formIds = <String, int>{};
+            for (final name in allNames) {
+              for (final s in regionalSuffixes) {
+                final async = ref.watch(pokemonByNameProvider('$name-$s'));
+                final id = async.asData?.value.id;
+                if (id != null) formIds['$name-$s'] = id;
+              }
+            }
+
+            // Root display ID: regional form of the chain root when applicable.
+            final rootDisplayId = suffix != null
+                ? (formIds['${root.speciesName}-$suffix'] ?? root.speciesId)
+                : root.speciesId;
+
+            final displayRoot =
+                buildFormChain(root, suffix, rootDisplayId, formIds: formIds);
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: _EvolutionTree(displayNode: displayRoot),
+            );
+          },
         );
       },
     );
@@ -1450,62 +1480,49 @@ class _EvolutionsTab extends ConsumerWidget {
 /// Linear chains stay vertical; branching chains (e.g. Eevee) spread
 /// horizontally in a Wrap so they don't all stack into a single tall column.
 class _EvolutionTree extends StatelessWidget {
-  final EvolutionNode node;
-  const _EvolutionTree({required this.node});
+  final DisplayNode displayNode;
+  const _EvolutionTree({required this.displayNode});
 
   @override
   Widget build(BuildContext context) {
-    if (node.evolvesTo.isEmpty) {
-      return _EvolutionNodeCard(node: node);
-    }
+    final node = displayNode;
+    if (node.evolvesTo.isEmpty) return _EvolutionNodeCard(displayNode: node);
 
     if (node.evolvesTo.length == 1) {
-      // Linear chain — vertical layout
       final child = node.evolvesTo.first;
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _EvolutionNodeCard(node: node),
+          _EvolutionNodeCard(displayNode: node),
           const SizedBox(height: 6),
-          _EvolutionArrow(details: child.details),
+          _EvolutionArrow(details: child.matchedDetails ?? child.source.details),
           const SizedBox(height: 6),
-          _EvolutionTree(node: child),
+          _EvolutionTree(displayNode: child),
         ],
       );
     }
 
-    // Branching — show branches side-by-side in a Wrap
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _EvolutionNodeCard(node: node),
+        _EvolutionNodeCard(displayNode: node),
         const SizedBox(height: 6),
-        const Icon(
-          Icons.call_split_rounded,
-          size: 22,
-          color: Colors.grey,
-        ),
+        const Icon(Icons.call_split_rounded, size: 22, color: Colors.grey),
         const SizedBox(height: 8),
         Wrap(
           alignment: WrapAlignment.center,
           spacing: 12,
           runSpacing: 16,
-          children: node.evolvesTo.map((child) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ConditionChip(details: child.details),
-                const SizedBox(height: 4),
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 20,
-                  color: Colors.grey.shade400,
-                ),
-                const SizedBox(height: 4),
-                _EvolutionTree(node: child),
-              ],
-            );
-          }).toList(),
+          children: node.evolvesTo.map((child) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ConditionChip(details: child.matchedDetails ?? child.source.details),
+              const SizedBox(height: 4),
+              Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: Colors.grey.shade400),
+              const SizedBox(height: 4),
+              _EvolutionTree(displayNode: child),
+            ],
+          )).toList(),
         ),
       ],
     );
@@ -1535,53 +1552,41 @@ class _EvolutionArrow extends StatelessWidget {
 }
 
 class _EvolutionNodeCard extends StatelessWidget {
-  final EvolutionNode node;
-  const _EvolutionNodeCard({required this.node});
+  final DisplayNode displayNode;
+  const _EvolutionNodeCard({required this.displayNode});
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
+    final spriteUrl =
+        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${displayNode.displayId}.png';
     return GestureDetector(
-      onTap: () => context.push('/pokedex/${node.speciesId}'),
+      onTap: () => context.push('/pokedex/${displayNode.source.speciesId}'),
       child: Container(
         width: 96,
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-          ),
+          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             CachedNetworkImage(
-              imageUrl: node.spriteUrl,
-              width: 72,
-              height: 72,
-              placeholder: (_, _) => const SizedBox(
-                width: 72,
-                height: 72,
-                child: Icon(Icons.catching_pokemon, color: Colors.grey),
-              ),
-              errorWidget: (_, _, _) =>
-                  const Icon(Icons.broken_image_outlined),
+              imageUrl: spriteUrl,
+              width: 72, height: 72,
+              placeholder: (_, _) => const SizedBox(width: 72, height: 72,
+                  child: Icon(Icons.catching_pokemon, color: Colors.grey)),
+              errorWidget: (_, _, _) => const Icon(Icons.broken_image_outlined),
             ),
             const SizedBox(height: 4),
-            Text(
-              node.displayName,
-              textAlign: TextAlign.center,
-              style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            Text(
-              '#${node.speciesId.toString().padLeft(3, '0')}',
-              style: textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
+            Text(displayNode.source.displayName,
+                textAlign: TextAlign.center,
+                style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+            Text('#${displayNode.source.speciesId.toString().padLeft(3, '0')}',
+                style: textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant)),
           ],
         ),
       ),
