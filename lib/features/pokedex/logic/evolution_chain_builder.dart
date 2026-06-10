@@ -125,22 +125,16 @@ DisplayNode _buildNode(
         children.add(defaultChild);
       }
 
-      // Region-specific branches (e.g. Alolan Raichu from Pikachu).
-      // For each unique region in the details, add a branch using the
-      // regional form's Pokémon ID from the pre-resolved formIds map.
+      // Region-specific branches (e.g. Alolan Raichu from Pikachu, Galarian Mr. Mime from Mime Jr).
+      // Recursively built so descendants like Mr. Rime are included.
       final regionDetails = child.details.where((d) => d.region != null).toList();
       for (final regionDetail in regionDetails) {
         final regionName = regionDetail.region!.name;
         final formName = '${child.speciesName}-$regionName';
         final regionDisplayId = formIds[formName];
         if (regionDisplayId == null) continue;
-        // Build the regional branch — terminal for now (Alolan Raichu doesn't evolve).
-        final regionChild = DisplayNode(
-          source: child,
-          displayId: regionDisplayId,
-          evolvesTo: const [],
-          matchedDetails: [regionDetail],
-        );
+        final regionChild = _buildNode(child, regionName, regionDisplayId, formIds);
+        regionChild.matchedDetails = [regionDetail];
         children.add(regionChild);
       }
     }
@@ -153,9 +147,12 @@ EvolutionDetail? _matchingDetail(List<EvolutionDetail> details, String? formSuff
   if (formSuffix == null) {
     return details.where((d) => d.baseForm == null && d.region == null).firstOrNull;
   }
-  return details
-      .where((d) => d.baseForm?.name.endsWith('-$formSuffix') == true)
-      .firstOrNull;
+  // Match either a base_form edge (e.g. zigzagoon-galar) or a region edge
+  // (e.g. region: {name: "galar"} used for Mime Jr → Galarian Mr. Mime).
+  return details.where((d) =>
+    d.baseForm?.name.endsWith('-$formSuffix') == true ||
+    d.region?.name == formSuffix
+  ).firstOrNull;
 }
 
 int _resolveChildDisplayId(

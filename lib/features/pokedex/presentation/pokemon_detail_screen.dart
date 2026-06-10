@@ -1461,8 +1461,12 @@ class _EvolutionsTab extends ConsumerWidget {
             for (final variety in regionalVarieties) {
               final suffix = regionalSuffixOf(variety.name);
               if (suffix == null) continue;
-              final rootDisplayId = formIds[variety.name];
-              if (rootDisplayId == null) continue; // provider still loading
+              // Use the Galarian form of the chain ROOT (not the variety's species).
+              // E.g. for mr-mime-galar, the chain root is mime-jr — there is no
+              // mime-jr-galar, so rootDisplayId falls back to mime-jr's speciesId.
+              // For zigzagoon-galar, the chain root IS zigzagoon, so 10174 is used.
+              final rootDisplayId =
+                  formIds['${root.speciesName}-$suffix'] ?? root.speciesId;
               sections.add((
                 formLabel(
                   isDefault: false,
