@@ -146,7 +146,11 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
       body: NestedScrollView(
         headerSliverBuilder: (context, _) => [
           _DetailSliverAppBar(
-            pokemon: basePokemon,
+            basePokemon: basePokemon,
+            effectivePokemon: effectivePokemon,
+            speciesAsync: speciesAsync,
+            selectedFormName: _selectedFormName,
+            onFormSelect: (name) => setState(() => _selectedFormName = name),
             headerColor: headerColor,
             shiny: _shiny,
             onShinyToggle: () => setState(() => _shiny = !_shiny),
@@ -185,6 +189,19 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         ),
         actions: [
           FavoriteButton(pokemonId: basePokemon.id),
+          Builder(builder: (context) {
+            final species = speciesAsync.asData?.value;
+            if (species == null) return const SizedBox.shrink();
+            final forms = battleMeaningfulForms(species.varieties);
+            if (forms.isEmpty) return const SizedBox.shrink();
+            return _FormBadge(
+              battleForms: forms,
+              selectedFormName: _selectedFormName,
+              effectivePokemon: effectivePokemon,
+              shiny: _shiny,
+              onSelect: (name) => setState(() => _selectedFormName = name),
+            );
+          }),
           IconButton(
             tooltip: _shiny ? 'Show default' : 'Show shiny',
             icon: Icon(
@@ -310,7 +327,11 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
 // ── Sliver AppBar ─────────────────────────────────────────────────────────────
 
 class _DetailSliverAppBar extends StatelessWidget {
-  final PokemonEntry pokemon;
+  final PokemonEntry basePokemon;
+  final PokemonEntry effectivePokemon;
+  final AsyncValue<PokemonSpeciesEntry> speciesAsync;
+  final String? selectedFormName;
+  final void Function(String?) onFormSelect;
   final Color headerColor;
   final bool shiny;
   final VoidCallback onShinyToggle;
@@ -318,7 +339,11 @@ class _DetailSliverAppBar extends StatelessWidget {
   final List<Tab> tabs;
 
   const _DetailSliverAppBar({
-    required this.pokemon,
+    required this.basePokemon,
+    required this.effectivePokemon,
+    required this.speciesAsync,
+    required this.selectedFormName,
+    required this.onFormSelect,
     required this.headerColor,
     required this.shiny,
     required this.onShinyToggle,
@@ -335,11 +360,24 @@ class _DetailSliverAppBar extends StatelessWidget {
       foregroundColor: Colors.white,
       leading: BackButton(onPressed: () => context.pop()),
       title: Text(
-        '${pokemon.displayId()}  ${pokemon.displaySpeciesName}',
+        '${basePokemon.displayId()}  ${basePokemon.displaySpeciesName}',
         style: const TextStyle(color: Colors.white),
       ),
       actions: [
-        FavoriteButton(pokemonId: pokemon.id),
+        FavoriteButton(pokemonId: basePokemon.id),
+        Builder(builder: (context) {
+          final species = speciesAsync.asData?.value;
+          if (species == null) return const SizedBox.shrink();
+          final forms = battleMeaningfulForms(species.varieties);
+          if (forms.isEmpty) return const SizedBox.shrink();
+          return _FormBadge(
+            battleForms: forms,
+            selectedFormName: selectedFormName,
+            effectivePokemon: effectivePokemon,
+            shiny: shiny,
+            onSelect: onFormSelect,
+          );
+        }),
         IconButton(
           tooltip: shiny ? 'Show default' : 'Show shiny',
           icon: Icon(
@@ -356,10 +394,10 @@ class _DetailSliverAppBar extends StatelessWidget {
           color: headerColor.withValues(alpha: 0.85),
           child: Center(
             child: Hero(
-              tag: 'pokemon-sprite-${pokemon.id}',
+              tag: 'pokemon-sprite-${basePokemon.id}',
               child: PokemonSprite(
-                defaultUrl: pokemon.officialArtworkUrl,
-                shinyUrl: pokemon.sprites?['other']?['official-artwork']?['front_shiny'] as String?,
+                defaultUrl: effectivePokemon.officialArtworkUrl,
+                shinyUrl: effectivePokemon.officialArtworkShinyUrl,
                 shiny: shiny,
                 size: 200,
               ),
@@ -2636,3 +2674,173 @@ class _AddToTeamTabState extends State<_AddToTeamTab> {
   }
 }
 
+// ── Form Badge ────────────────────────────────────────────────────────────────
+
+class _FormBadge extends StatelessWidget {
+  final List<PokemonVariety> battleForms;
+  final String? selectedFormName;
+  final PokemonEntry effectivePokemon;
+  final bool shiny;
+  final void Function(String?) onSelect;
+
+  const _FormBadge({
+    required this.battleForms,
+    required this.selectedFormName,
+    required this.effectivePokemon,
+    required this.shiny,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = selectedFormName != null
+        ? shortFormLabel(selectedFormName!)
+        : 'Base';
+    return GestureDetector(
+      onTap: () => showModalBottomSheet(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (ctx) => _FormPickerSheet(
+          battleForms: battleForms,
+          selectedFormName: selectedFormName,
+          shiny: shiny,
+          onSelect: (name) {
+            onSelect(name);
+            Navigator.pop(ctx);
+          },
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white38),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Form Picker Sheet ─────────────────────────────────────────────────────────
+
+class _FormPickerSheet extends ConsumerWidget {
+  final List<PokemonVariety> battleForms;
+  final String? selectedFormName;
+  final bool shiny;
+  final void Function(String?) onSelect;
+
+  const _FormPickerSheet({
+    required this.battleForms,
+    required this.selectedFormName,
+    required this.shiny,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final allOptions = <(String? name, String label)>[
+      (null, 'Base Form'),
+      ...battleForms.map((v) => (v.name, shortFormLabel(v.name))),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Select Form',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: allOptions.map((opt) {
+              final (name, label) = opt;
+              final isSelected = name == selectedFormName;
+              final pokemonAsync =
+                  name != null ? ref.watch(pokemonByNameProvider(name)) : null;
+              final formPokemon = pokemonAsync?.asData?.value;
+              final spriteUrl = shiny
+                  ? (formPokemon?.officialArtworkShinyUrl ??
+                      formPokemon?.officialArtworkUrl)
+                  : formPokemon?.officialArtworkUrl;
+
+              return GestureDetector(
+                onTap: () => onSelect(name),
+                child: Container(
+                  width: 88,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? colorScheme.primaryContainer
+                        : colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected
+                          ? colorScheme.primary
+                          : colorScheme.outlineVariant,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (spriteUrl != null)
+                        CachedNetworkImage(
+                          imageUrl: spriteUrl,
+                          height: 56,
+                          width: 56,
+                        )
+                      else
+                        const SizedBox(
+                          height: 56,
+                          width: 56,
+                          child: Icon(Icons.catching_pokemon, color: Colors.grey),
+                        ),
+                      const SizedBox(height: 4),
+                      Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: isSelected ? colorScheme.primary : null,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
