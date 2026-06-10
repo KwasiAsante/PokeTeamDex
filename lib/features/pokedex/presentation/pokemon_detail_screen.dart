@@ -1574,7 +1574,7 @@ class _EvolutionNodeCard extends StatelessWidget {
         'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${displayNode.displayId}.png';
 
     return GestureDetector(
-      onTap: () => context.push('/pokedex/${displayNode.displayId}'),
+      onTap: () => context.push('/pokedex/${displayNode.source.speciesId}'),
       child: Container(
         width: 96,
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),

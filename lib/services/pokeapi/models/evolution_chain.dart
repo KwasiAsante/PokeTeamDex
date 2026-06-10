@@ -29,9 +29,6 @@ class EvolutionNode {
     );
   }
 
-  String get spriteUrl =>
-      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$speciesId.png';
-
   String get displayName {
     return speciesName
         .split('-')
