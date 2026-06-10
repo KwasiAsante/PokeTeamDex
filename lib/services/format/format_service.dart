@@ -291,7 +291,9 @@ class FormatService {
   /// Cumulative learnset for [pokemonName] in [gen].
   /// Includes all moves the Pokémon could learn in gens 1–[gen].
   List<String> learnsetForGen(String pokemonName, int gen) {
-    final byGen = _learnsets[pokemonName.toLowerCase()];
+    // PS ids use no hyphens (e.g. "zigzagoongalar"); strip them so PokéAPI
+    // hyphenated names like "zigzagoon-galar" resolve correctly.
+    final byGen = _learnsets[pokemonName.toLowerCase().replaceAll('-', '')];
     if (byGen == null) return [];
     final moves = <String>{};
     for (int g = 1; g <= gen; g++) {
@@ -309,7 +311,7 @@ class FormatService {
   /// endpoints — and therefore the bundled `learnsets.json` — don't carry,
   /// most notably genuine event/gift sources ("S").
   Set<String> detailedLearnsetForGen(String pokemonName, int gen) {
-    final learnset = _detailedLearnsets[pokemonName.toLowerCase()];
+    final learnset = _detailedLearnsets[pokemonName.toLowerCase().replaceAll('-', '')];
     if (learnset == null) return const {};
     final moves = <String>{};
     for (final entry in learnset.entries) {
@@ -324,7 +326,7 @@ class FormatService {
   /// generation (Pokémon Crystal's gift Dratini knowing Extreme Speed is
   /// exactly this case). PokéAPI has no equivalent category at all.
   Set<String> eventMovesForGen(String pokemonName, int gen) {
-    final key = pokemonName.toLowerCase();
+    final key = pokemonName.toLowerCase().replaceAll('-', '');
     final moves = <String>{};
 
     final learnset = _detailedLearnsets[key];
@@ -353,7 +355,7 @@ class FormatService {
   /// generation) — for any future richer display of event details
   /// (level, shininess, full gift moveset, etc).
   List<PsEventEntry> eventsForSpecies(String pokemonName) =>
-      List.unmodifiable(_eventData[pokemonName.toLowerCase()] ?? const []);
+      List.unmodifiable(_eventData[pokemonName.toLowerCase().replaceAll('-', '')] ?? const []);
 
   /// Leading generation digit of a PS source-code string (e.g. "2S1" → 2).
   /// Malformed/empty codes sort last (gen 99) so they never spuriously match.
