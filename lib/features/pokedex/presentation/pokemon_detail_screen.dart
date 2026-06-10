@@ -93,11 +93,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     _AbilitiesTab(pokemon: effectivePokemon),
     _MovesTab(pokemon: effectivePokemon),
     _EvolutionsTab(speciesAsync: speciesAsync, selectedFormName: _selectedFormName),
-    _FormsTab(
-      speciesAsync: speciesAsync,
-      selectedFormName: _selectedFormName,
-      onFormSelect: (name) => setState(() => _selectedFormName = name),
-    ),
+    _FormsTab(speciesAsync: speciesAsync),
     _LocationsTab(pokemonId: effectivePokemon.id),
     _TeamsTab(pokemonId: widget.pokemonId, pokemon: basePokemon, selectedFormName: _selectedFormName),
   ];
@@ -203,7 +199,6 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
             _FormBadge(
               battleForms: battleForms,
               selectedFormName: _selectedFormName,
-              effectivePokemon: effectivePokemon,
               shiny: _shiny,
               onSelect: (name) => setState(() => _selectedFormName = name),
             ),
@@ -374,7 +369,6 @@ class _DetailSliverAppBar extends StatelessWidget {
           _FormBadge(
             battleForms: battleForms,
             selectedFormName: selectedFormName,
-            effectivePokemon: effectivePokemon,
             shiny: shiny,
             onSelect: onFormSelect,
           ),
@@ -1627,13 +1621,7 @@ class _ConditionChip extends StatelessWidget {
 
 class _FormsTab extends ConsumerWidget {
   final AsyncValue<PokemonSpeciesEntry> speciesAsync;
-  final String? selectedFormName;
-  final void Function(String?) onFormSelect;
-  const _FormsTab({
-    required this.speciesAsync,
-    required this.selectedFormName,
-    required this.onFormSelect,
-  });
+  const _FormsTab({required this.speciesAsync});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2704,14 +2692,12 @@ class _AddToTeamTabState extends State<_AddToTeamTab> {
 class _FormBadge extends StatelessWidget {
   final List<PokemonVariety> battleForms;
   final String? selectedFormName;
-  final PokemonEntry effectivePokemon;
   final bool shiny;
   final void Function(String?) onSelect;
 
   const _FormBadge({
     required this.battleForms,
     required this.selectedFormName,
-    required this.effectivePokemon,
     required this.shiny,
     required this.onSelect,
   });
