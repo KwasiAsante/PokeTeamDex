@@ -544,6 +544,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         'name': teamName,
         'folder_local_id': widget.folderId,
         'format_label': formatId,
+        'is_box': isBox,
       })),
       createdAt: Value(now),
     ));
