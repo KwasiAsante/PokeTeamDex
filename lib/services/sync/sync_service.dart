@@ -232,6 +232,7 @@ class SyncService {
             'name': team.name,
             'folder_local_id': team.folderId,
             'format_label': team.formatLabel,
+            'is_box': team.isBox,
           })),
           createdAt: Value(now),
         ));

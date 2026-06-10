@@ -40,8 +40,9 @@ class TeamRepository {
   Future<int> insert(TeamsCompanion entry) =>
       _db.into(_db.teams).insert(entry);
 
-  Future<bool> update(TeamsCompanion entry) =>
-      _db.update(_db.teams).replace(entry);
+  Future<int> update(TeamsCompanion entry) =>
+      (_db.update(_db.teams)..where((t) => t.id.equals(entry.id.value)))
+          .write(entry);
 
   Future<int> delete(int id) =>
       (_db.delete(_db.teams)..where((t) => t.id.equals(id))).go();
