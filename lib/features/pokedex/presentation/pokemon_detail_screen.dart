@@ -93,9 +93,13 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     _AbilitiesTab(pokemon: effectivePokemon),
     _MovesTab(pokemon: effectivePokemon),
     _EvolutionsTab(speciesAsync: speciesAsync, selectedFormName: _selectedFormName),
-    _FormsTab(speciesAsync: speciesAsync),
+    _FormsTab(
+      speciesAsync: speciesAsync,
+      selectedFormName: _selectedFormName,
+      onFormSelect: (name) => setState(() => _selectedFormName = name),
+    ),
     _LocationsTab(pokemonId: effectivePokemon.id),
-    _TeamsTab(pokemonId: widget.pokemonId, pokemon: basePokemon),
+    _TeamsTab(pokemonId: widget.pokemonId, pokemon: basePokemon, selectedFormName: _selectedFormName),
   ];
 
   @override
@@ -1623,7 +1627,13 @@ class _ConditionChip extends StatelessWidget {
 
 class _FormsTab extends ConsumerWidget {
   final AsyncValue<PokemonSpeciesEntry> speciesAsync;
-  const _FormsTab({required this.speciesAsync});
+  final String? selectedFormName;
+  final void Function(String?) onFormSelect;
+  const _FormsTab({
+    required this.speciesAsync,
+    required this.selectedFormName,
+    required this.onFormSelect,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1631,12 +1641,18 @@ class _FormsTab extends ConsumerWidget {
       loading: () => const LoadingState(),
       error: (e, _) => ErrorState(error: e),
       data: (species) {
-        final nonDefault = species.varieties.where((v) => !v.isDefault).toList();
+        // Battle-meaningful forms live in the app bar switcher — exclude them here.
+        final switcherFormNames = battleMeaningfulForms(species.varieties)
+            .map((v) => v.name)
+            .toSet();
+        final nonDefault = species.varieties
+            .where((v) => !v.isDefault && !switcherFormNames.contains(v.name))
+            .toList();
         if (nonDefault.isEmpty) {
           return const EmptyState(
             icon: Icons.style_outlined,
             title: 'No alternate forms',
-            subtitle: 'This Pokémon has no regional forms, Mega Evolutions, or other variants.',
+            subtitle: 'Regional and battle forms are accessible via the form switcher above.',
           );
         }
         return ListView.separated(
@@ -1931,7 +1947,8 @@ class _LocationTile extends StatelessWidget {
 class _TeamsTab extends ConsumerWidget {
   final int pokemonId;
   final PokemonEntry pokemon;
-  const _TeamsTab({required this.pokemonId, required this.pokemon});
+  final String? selectedFormName;
+  const _TeamsTab({required this.pokemonId, required this.pokemon, this.selectedFormName});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1942,7 +1959,13 @@ class _TeamsTab extends ConsumerWidget {
     return pairsAsync.when(
       loading: () => const LoadingState(),
       error: (e, _) => ErrorState(error: e),
-      data: (pairs) => CustomScrollView(
+      data: (allPairs) {
+        // Show only slots matching the selected form.
+        // null selectedFormName = base form = slots where formName is null.
+        final pairs = allPairs
+            .where((pair) => pair.$2.formName == selectedFormName)
+            .toList();
+        return CustomScrollView(
         slivers: [
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
@@ -2035,7 +2058,8 @@ class _TeamsTab extends ConsumerWidget {
             ),
           ),
         ],
-      ),
+      );
+    },
     );
   }
 
