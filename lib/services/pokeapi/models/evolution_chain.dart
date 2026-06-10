@@ -53,6 +53,7 @@ class EvolutionDetail {
   final String? location;
   final bool? needsOverworldRain;
   final String? turnUpsideDown; // for Inkay
+  final ({String name, int id})? baseForm;
 
   const EvolutionDetail({
     required this.trigger,
@@ -67,6 +68,7 @@ class EvolutionDetail {
     this.location,
     this.needsOverworldRain,
     this.turnUpsideDown,
+    this.baseForm,
   });
 
   factory EvolutionDetail.fromJson(Map<String, dynamic> json) {
@@ -91,6 +93,7 @@ class EvolutionDetail {
           : null,
       needsOverworldRain: json['needs_overworld_rain'] as bool?,
       turnUpsideDown: json['turn_upside_down'] == true ? 'Turn upside down' : null,
+      baseForm: EvolutionDetail._parseBaseForm(json['base_form']),
     );
   }
 
@@ -133,5 +136,16 @@ class EvolutionDetail {
   static String _fmt(String? s) {
     if (s == null) return '';
     return s.split('-').map((p) => p.isEmpty ? '' : '${p[0].toUpperCase()}${p.substring(1)}').join(' ');
+  }
+
+  static ({String name, int id})? _parseBaseForm(dynamic raw) {
+    if (raw == null || raw is! Map) return null;
+    final url = (raw as Map<String, dynamic>)['url'] as String?;
+    if (url == null) return null;
+    final segments = Uri.parse(url).pathSegments;
+    final idStr = segments.lastWhere((s) => s.isNotEmpty, orElse: () => '');
+    final id = int.tryParse(idStr);
+    if (id == null) return null;
+    return (name: raw['name'] as String, id: id);
   }
 }
