@@ -120,6 +120,14 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         ),
       ),
       data: (basePokemon) {
+        // When navigated directly to a form-variant Pokémon ID (e.g. /pokedex/10174
+        // for Galarian Zigzagoon), auto-select that form in the switcher.
+        if (_selectedFormName == null && widget.pokemonId > 10000) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _selectedFormName = basePokemon.name);
+          });
+        }
+
         final effectivePokemon = formAsync?.asData?.value ?? basePokemon;
         final primaryType =
             effectivePokemon.types[1] ?? effectivePokemon.types.values.first;
@@ -1583,7 +1591,7 @@ class _EvolutionNodeCard extends StatelessWidget {
     final spriteUrl =
         'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${displayNode.displayId}.png';
     return GestureDetector(
-      onTap: () => context.push('/pokedex/${displayNode.source.speciesId}'),
+      onTap: () => context.push('/pokedex/${displayNode.displayId}'),
       child: Container(
         width: 96,
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
