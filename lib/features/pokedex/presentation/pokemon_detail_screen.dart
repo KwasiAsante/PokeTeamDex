@@ -26,6 +26,8 @@ import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/stat_bar.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
+import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
+import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
 
 class PokemonDetailScreen extends ConsumerStatefulWidget {
   final int pokemonId;
@@ -39,6 +41,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _shiny = false;
+  String? _selectedFormName; // null = base form
 
   // Narrow layout — horizontal TabBar
   static const _tabs = [
@@ -81,23 +84,27 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
   }
 
   List<Widget> _tabChildren(
-    PokemonEntry pokemon,
+    PokemonEntry basePokemon,
+    PokemonEntry effectivePokemon,
     AsyncValue<PokemonSpeciesEntry> speciesAsync,
   ) => [
-    _OverviewTab(pokemon: pokemon, speciesAsync: speciesAsync),
-    _StatsTab(pokemon: pokemon),
-    _AbilitiesTab(pokemon: pokemon),
-    _MovesTab(pokemon: pokemon),
+    _OverviewTab(pokemon: effectivePokemon, speciesAsync: speciesAsync),
+    _StatsTab(pokemon: effectivePokemon),
+    _AbilitiesTab(pokemon: effectivePokemon),
+    _MovesTab(pokemon: effectivePokemon),
     _EvolutionsTab(speciesAsync: speciesAsync),
     _FormsTab(speciesAsync: speciesAsync),
-    _LocationsTab(pokemonId: widget.pokemonId),
-    _TeamsTab(pokemonId: widget.pokemonId, pokemon: pokemon),
+    _LocationsTab(pokemonId: effectivePokemon.id),
+    _TeamsTab(pokemonId: widget.pokemonId, pokemon: basePokemon),
   ];
 
   @override
   Widget build(BuildContext context) {
     final pokemonAsync = ref.watch(pokemonDetailProvider(widget.pokemonId));
     final speciesAsync = ref.watch(pokemonSpeciesProvider(widget.pokemonId));
+    final formAsync = _selectedFormName != null
+        ? ref.watch(pokemonByNameProvider(_selectedFormName!))
+        : null;
     final isWide = MediaQuery.sizeOf(context).width > 840;
 
     return pokemonAsync.when(
@@ -112,14 +119,16 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
           onRetry: () => ref.invalidate(pokemonDetailProvider(widget.pokemonId)),
         ),
       ),
-      data: (pokemon) {
-        final primaryType = pokemon.types[1] ?? pokemon.types.values.first;
+      data: (basePokemon) {
+        final effectivePokemon = formAsync?.asData?.value ?? basePokemon;
+        final primaryType =
+            effectivePokemon.types[1] ?? effectivePokemon.types.values.first;
         final headerColor =
             PokemonTypeColors.colors[primaryType] ?? Theme.of(context).colorScheme.primary;
 
         return isWide
-            ? _buildWideLayout(context, pokemon, speciesAsync, headerColor)
-            : _buildNarrowLayout(context, pokemon, speciesAsync, headerColor);
+            ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor)
+            : _buildNarrowLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor);
       },
     );
   }
@@ -128,7 +137,8 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
 
   Widget _buildNarrowLayout(
     BuildContext context,
-    PokemonEntry pokemon,
+    PokemonEntry basePokemon,
+    PokemonEntry effectivePokemon,
     AsyncValue<PokemonSpeciesEntry> speciesAsync,
     Color headerColor,
   ) {
@@ -136,7 +146,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
       body: NestedScrollView(
         headerSliverBuilder: (context, _) => [
           _DetailSliverAppBar(
-            pokemon: pokemon,
+            pokemon: basePokemon,
             headerColor: headerColor,
             shiny: _shiny,
             onShinyToggle: () => setState(() => _shiny = !_shiny),
@@ -146,7 +156,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         ],
         body: TabBarView(
           controller: _tabController,
-          children: _tabChildren(pokemon, speciesAsync),
+          children: _tabChildren(basePokemon, effectivePokemon, speciesAsync),
         ),
       ),
     );
@@ -156,7 +166,8 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
 
   Widget _buildWideLayout(
     BuildContext context,
-    PokemonEntry pokemon,
+    PokemonEntry basePokemon,
+    PokemonEntry effectivePokemon,
     AsyncValue<PokemonSpeciesEntry> speciesAsync,
     Color headerColor,
   ) {
@@ -169,11 +180,11 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         foregroundColor: Colors.white,
         leading: BackButton(onPressed: () => context.pop()),
         title: Text(
-          '${pokemon.displayId()}  ${pokemon.displaySpeciesName}',
+          '${basePokemon.displayId()}  ${basePokemon.displaySpeciesName}',
           style: const TextStyle(color: Colors.white),
         ),
         actions: [
-          FavoriteButton(pokemonId: pokemon.id),
+          FavoriteButton(pokemonId: basePokemon.id),
           IconButton(
             tooltip: _shiny ? 'Show default' : 'Show shiny',
             icon: Icon(
@@ -205,18 +216,17 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                   child: Column(
                     children: [
                       Hero(
-                        tag: 'pokemon-sprite-${pokemon.id}',
+                        tag: 'pokemon-sprite-${basePokemon.id}',
                         child: PokemonSprite(
-                          defaultUrl: pokemon.officialArtworkUrl,
-                          shinyUrl: pokemon.sprites?['other']
-                              ?['official-artwork']?['front_shiny'] as String?,
+                          defaultUrl: effectivePokemon.officialArtworkUrl,
+                          shinyUrl: effectivePokemon.officialArtworkShinyUrl,
                           shiny: _shiny,
                           size: 140,
                         ),
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        pokemon.displaySpeciesName,
+                        basePokemon.displaySpeciesName,
                         style: textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                         textAlign: TextAlign.center,
@@ -225,7 +235,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                       Wrap(
                         spacing: 6,
                         alignment: WrapAlignment.center,
-                        children: pokemon.types.values
+                        children: effectivePokemon.types.values
                             .map((t) => TypeBadge(type: t))
                             .toList(),
                       ),
@@ -287,7 +297,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
               child: TabBarView(
                 controller: _tabController,
                 physics: const NeverScrollableScrollPhysics(),
-                children: _tabChildren(pokemon, speciesAsync),
+                children: _tabChildren(basePokemon, effectivePokemon, speciesAsync),
               ),
             ),
           ),
