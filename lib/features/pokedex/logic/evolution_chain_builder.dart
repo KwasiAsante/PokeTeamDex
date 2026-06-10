@@ -69,43 +69,60 @@ List<String> collectSpeciesNames(EvolutionNode node) =>
 /// Builds one [DisplayNode] chain for [formSuffix] or the default chain when null.
 /// [formIds] maps "{name}-{suffix}" → Pokémon ID for resolving terminal-node IDs
 /// and region-keyed branches.
+/// Builds one [DisplayNode] chain for [formSuffix] or the default chain when null.
+///
+/// [excludeRegionSuffixes]: in the default chain, region-keyed branches whose
+/// suffix appears here are omitted. Pass the set of suffixes already in the
+/// form switcher so the base chain doesn't duplicate branches the user can
+/// reach by switching forms (e.g. Raichu's base chain omits "alola" because
+/// the switcher already offers Alolan Raichu).
 DisplayNode buildFormChain(
   EvolutionNode root,
   String? formSuffix,
   int rootDisplayId, {
   Map<String, int> formIds = const {},
+  Set<String> excludeRegionSuffixes = const {},
 }) =>
-    _buildNode(root, formSuffix, rootDisplayId, formIds);
+    _buildNode(root, formSuffix, rootDisplayId, formIds, excludeRegionSuffixes);
 
 DisplayNode _buildNode(
   EvolutionNode node,
   String? formSuffix,
   int displayId,
   Map<String, int> formIds,
+  Set<String> excludeRegionSuffixes,
 ) {
   final children = <DisplayNode>[];
   for (final child in node.evolvesTo) {
     if (formSuffix != null) {
+      // Regional chain: prefer a region/base_form-specific detail; fall back to
+      // a default (no-restriction) detail for intermediate edges that have no
+      // region gate (e.g. Pichu→Pikachu has no "alola" restriction, but we
+      // still need to traverse it to reach Alolan Raichu).
       final detail = _matchingDetail(child.details, formSuffix);
       if (detail == null) continue;
       final childId = _resolveChildId(child, formSuffix, formIds);
-      final n = _buildNode(child, formSuffix, childId, formIds);
+      final n = _buildNode(child, formSuffix, childId, formIds, excludeRegionSuffixes);
       n.matchedDetails = [detail];
       children.add(n);
     } else {
       final defaultDetail =
           child.details.where((d) => d.baseForm == null && d.region == null).firstOrNull;
       if (defaultDetail != null) {
-        final n = _buildNode(child, null, child.speciesId, formIds);
+        final n = _buildNode(child, null, child.speciesId, formIds, excludeRegionSuffixes);
         n.matchedDetails = [defaultDetail];
         children.add(n);
       }
-      // Region-keyed branches in the default chain (e.g. Alolan Raichu, Galarian Mr. Mime).
+      // Region-keyed branches in the default chain (e.g. Galarian Mr. Mime from
+      // Mime Jr, Alolan Raichu from Pikachu). Skipped when the region suffix is
+      // already covered by the form switcher — the user selects that form via
+      // the badge instead of seeing it as a branch in the default chain.
       for (final rd in child.details.where((d) => d.region != null)) {
         final rName = rd.region!.name;
+        if (excludeRegionSuffixes.contains(rName)) continue;
         final rId = formIds['${child.speciesName}-$rName'];
         if (rId == null) continue;
-        final n = _buildNode(child, rName, rId, formIds);
+        final n = _buildNode(child, rName, rId, formIds, excludeRegionSuffixes);
         n.matchedDetails = [rd];
         children.add(n);
       }
@@ -118,10 +135,14 @@ EvolutionDetail? _matchingDetail(List<EvolutionDetail> details, String? suffix) 
   if (suffix == null) {
     return details.where((d) => d.baseForm == null && d.region == null).firstOrNull;
   }
+  // Prefer a region/base_form-specific match; fall back to a default
+  // (no-restriction) detail so intermediate edges without a region gate
+  // (e.g. Pichu→Pikachu) are still traversed in a regional chain.
   return details.where((d) =>
     d.baseForm?.name.endsWith('-$suffix') == true ||
     d.region?.name == suffix
-  ).firstOrNull;
+  ).firstOrNull ??
+  details.where((d) => d.baseForm == null && d.region == null).firstOrNull;
 }
 
 int _resolveChildId(EvolutionNode child, String? suffix, Map<String, int> formIds) {

@@ -93,7 +93,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     _AbilitiesTab(pokemon: effectivePokemon),
     _MovesTab(pokemon: effectivePokemon),
     _EvolutionsTab(speciesAsync: speciesAsync, selectedFormName: _selectedFormName),
-    _FormsTab(speciesAsync: speciesAsync),
+    _FormsTab(speciesAsync: speciesAsync, selectedFormName: _selectedFormName),
     _LocationsTab(pokemonId: effectivePokemon.id),
     _TeamsTab(pokemonId: widget.pokemonId, pokemon: basePokemon, selectedFormName: _selectedFormName),
   ];
@@ -1472,8 +1472,19 @@ class _EvolutionsTab extends ConsumerWidget {
                 ? (formIds['${root.speciesName}-$suffix'] ?? root.speciesId)
                 : root.speciesId;
 
-            final displayRoot =
-                buildFormChain(root, suffix, rootDisplayId, formIds: formIds);
+            // Suffixes already in the form switcher — omit their region-keyed
+            // branches from the default chain (e.g. Raichu's base chain should
+            // not show the Alolan branch; the user switches via the badge).
+            final switcherSuffixes = battleMeaningfulForms(species.varieties)
+                .map((v) => regionalSuffixOf(v.name))
+                .whereType<String>()
+                .toSet();
+
+            final displayRoot = buildFormChain(
+              root, suffix, rootDisplayId,
+              formIds: formIds,
+              excludeRegionSuffixes: suffix == null ? switcherSuffixes : const {},
+            );
 
             return SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -1633,7 +1644,8 @@ class _ConditionChip extends StatelessWidget {
 
 class _FormsTab extends ConsumerWidget {
   final AsyncValue<PokemonSpeciesEntry> speciesAsync;
-  const _FormsTab({required this.speciesAsync});
+  final String? selectedFormName;
+  const _FormsTab({required this.speciesAsync, this.selectedFormName});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1645,9 +1657,15 @@ class _FormsTab extends ConsumerWidget {
         final switcherFormNames = battleMeaningfulForms(species.varieties)
             .map((v) => v.name)
             .toSet();
-        final nonDefault = species.varieties
-            .where((v) => !v.isDefault && !switcherFormNames.contains(v.name))
-            .toList();
+        // When a regional form is selected, also hide mega/gmax forms: they
+        // belong to the base form and aren't accessible from a regional variant.
+        const megaSuffixes = {'-mega', '-mega-x', '-mega-y', '-mega-z', '-gmax', '-eternamax'};
+        final nonDefault = species.varieties.where((v) {
+          if (v.isDefault) return false;
+          if (switcherFormNames.contains(v.name)) return false;
+          if (selectedFormName != null && megaSuffixes.any((s) => v.name.endsWith(s))) return false;
+          return true;
+        }).toList();
         if (nonDefault.isEmpty) {
           return const EmptyState(
             icon: Icons.style_outlined,
