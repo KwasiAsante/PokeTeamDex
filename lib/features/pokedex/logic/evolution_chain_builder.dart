@@ -6,12 +6,17 @@ class DisplayNode {
   final int displayId;
   final List<DisplayNode> evolvesTo;
   List<EvolutionDetail>? matchedDetails;
+  /// PokéAPI name for the specific form (e.g. "zigzagoon-galar"), used for
+  /// navigation: tapping the card goes to /pokedex/{source.speciesId}?form={formName}.
+  /// Null when this node represents the default (base) form.
+  String? formName;
 
   DisplayNode({
     required this.source,
     required this.displayId,
     required this.evolvesTo,
     this.matchedDetails,
+    this.formName,
   });
 }
 
@@ -102,8 +107,10 @@ DisplayNode _buildNode(
       final detail = _matchingDetail(child.details, formSuffix);
       if (detail == null) continue;
       final childId = _resolveChildId(child, formSuffix, formIds);
+      final childFormName = _resolveChildFormName(child, formSuffix, formIds);
       final n = _buildNode(child, formSuffix, childId, formIds, excludeRegionSuffixes);
       n.matchedDetails = [detail];
+      n.formName = childFormName;
       children.add(n);
     } else {
       final defaultDetail =
@@ -122,8 +129,10 @@ DisplayNode _buildNode(
         if (excludeRegionSuffixes.contains(rName)) continue;
         final rId = formIds['${child.speciesName}-$rName'];
         if (rId == null) continue;
+        final regionFormName = '${child.speciesName}-$rName';
         final n = _buildNode(child, rName, rId, formIds, excludeRegionSuffixes);
         n.matchedDetails = [rd];
+        n.formName = regionFormName;
         children.add(n);
       }
     }
@@ -153,6 +162,20 @@ int _resolveChildId(EvolutionNode child, String? suffix, Map<String, int> formId
     }
   }
   return formIds['${child.speciesName}-$suffix'] ?? child.speciesId;
+}
+
+/// Returns the PokéAPI form name for [child] in the given [suffix] chain,
+/// or null if the child has no regional variant (navigate to base species).
+String? _resolveChildFormName(EvolutionNode child, String? suffix, Map<String, int> formIds) {
+  if (suffix == null) return null;
+  for (final gc in child.evolvesTo) {
+    for (final d in gc.details) {
+      if (d.baseForm?.name.endsWith('-$suffix') == true) return d.baseForm!.name;
+    }
+  }
+  final formName = '${child.speciesName}-$suffix';
+  if (formIds.containsKey(formName)) return formName;
+  return null;
 }
 
 const _kSuffixLabel = {

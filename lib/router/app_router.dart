@@ -64,6 +64,7 @@ GoRouter buildAppRouter(
                     path: ':id',
                     builder: (context, state) => PokemonDetailScreen(
                       pokemonId: int.parse(state.pathParameters['id']!),
+                      initialFormName: state.uri.queryParameters['form'],
                     ),
                   ),
                 ],
