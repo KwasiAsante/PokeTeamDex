@@ -1393,12 +1393,91 @@ class _EvolutionsTab extends ConsumerWidget {
         return chainAsync.when(
           loading: () => const LoadingState(),
           error: (e, _) => ErrorState(error: e),
-          data: (root) => SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: _EvolutionTree(node: root),
-          ),
+          data: (root) {
+            final regionalVarieties =
+                species.varieties.where(isRegionalVariety).toList();
+            final showMultiple =
+                regionalVarieties.isNotEmpty && chainHasFormDetails(root);
+
+            if (!showMultiple) {
+              final displayRoot = buildFormChain(root, null, root.speciesId);
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: _EvolutionTree(displayNode: displayRoot),
+              );
+            }
+
+            final sections = <(String label, DisplayNode chain)>[];
+
+            final defaultRoot = buildFormChain(root, null, root.speciesId);
+            sections.add((
+              formLabel(
+                isDefault: true,
+                varietyName: species.name,
+                generationName: species.generationName,
+              ),
+              defaultRoot,
+            ));
+
+            for (final variety in regionalVarieties) {
+              final suffix = regionalSuffixOf(variety.name);
+              if (suffix == null) continue;
+              final formAsync = ref.watch(pokemonByNameProvider(variety.name));
+              final formId = formAsync.asData?.value.id;
+              if (formId == null) continue;
+              final regionalRoot = buildFormChain(root, suffix, formId);
+              sections.add((
+                formLabel(
+                  isDefault: false,
+                  varietyName: variety.name,
+                  generationName: null,
+                ),
+                regionalRoot,
+              ));
+            }
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (int i = 0; i < sections.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 24),
+                    _FormChainSection(
+                      label: sections[i].$1,
+                      chain: sections[i].$2,
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
         );
       },
+    );
+  }
+}
+
+class _FormChainSection extends StatelessWidget {
+  final String label;
+  final DisplayNode chain;
+  const _FormChainSection({required this.label, required this.chain});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Center(child: _EvolutionTree(displayNode: chain)),
+      ],
     );
   }
 }
