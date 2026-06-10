@@ -129,10 +129,15 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         final battleForms = species != null
             ? battleMeaningfulForms(species.varieties)
             : <PokemonVariety>[];
+        final baseFormLabel = formLabel(
+          isDefault: true,
+          varietyName: species?.name ?? basePokemon.name,
+          generationName: species?.generationName,
+        );
 
         return isWide
-            ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms)
-            : _buildNarrowLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms);
+            ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel)
+            : _buildNarrowLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel);
       },
     );
   }
@@ -146,6 +151,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     AsyncValue<PokemonSpeciesEntry> speciesAsync,
     Color headerColor,
     List<PokemonVariety> battleForms,
+    String baseFormLabel,
   ) {
     return Scaffold(
       body: NestedScrollView(
@@ -154,6 +160,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
             basePokemon: basePokemon,
             effectivePokemon: effectivePokemon,
             battleForms: battleForms,
+            baseFormLabel: baseFormLabel,
             selectedFormName: _selectedFormName,
             onFormSelect: (name) => setState(() => _selectedFormName = name),
             headerColor: headerColor,
@@ -180,6 +187,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     AsyncValue<PokemonSpeciesEntry> speciesAsync,
     Color headerColor,
     List<PokemonVariety> battleForms,
+    String baseFormLabel,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -198,6 +206,9 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
           if (battleForms.isNotEmpty)
             _FormBadge(
               battleForms: battleForms,
+              baseFormLabel: baseFormLabel,
+              baseSpriteUrl: basePokemon.officialArtworkUrl,
+              baseShinyUrl: basePokemon.officialArtworkShinyUrl,
               selectedFormName: _selectedFormName,
               shiny: _shiny,
               onSelect: (name) => setState(() => _selectedFormName = name),
@@ -330,6 +341,7 @@ class _DetailSliverAppBar extends StatelessWidget {
   final PokemonEntry basePokemon;
   final PokemonEntry effectivePokemon;
   final List<PokemonVariety> battleForms;
+  final String baseFormLabel;
   final String? selectedFormName;
   final void Function(String?) onFormSelect;
   final Color headerColor;
@@ -342,6 +354,7 @@ class _DetailSliverAppBar extends StatelessWidget {
     required this.basePokemon,
     required this.effectivePokemon,
     required this.battleForms,
+    required this.baseFormLabel,
     required this.selectedFormName,
     required this.onFormSelect,
     required this.headerColor,
@@ -368,6 +381,9 @@ class _DetailSliverAppBar extends StatelessWidget {
         if (battleForms.isNotEmpty)
           _FormBadge(
             battleForms: battleForms,
+            baseFormLabel: baseFormLabel,
+            baseSpriteUrl: basePokemon.officialArtworkUrl,
+            baseShinyUrl: basePokemon.officialArtworkShinyUrl,
             selectedFormName: selectedFormName,
             shiny: shiny,
             onSelect: onFormSelect,
@@ -2691,12 +2707,18 @@ class _AddToTeamTabState extends State<_AddToTeamTab> {
 
 class _FormBadge extends StatelessWidget {
   final List<PokemonVariety> battleForms;
+  final String baseFormLabel;
+  final String? baseSpriteUrl;
+  final String? baseShinyUrl;
   final String? selectedFormName;
   final bool shiny;
   final void Function(String?) onSelect;
 
   const _FormBadge({
     required this.battleForms,
+    required this.baseFormLabel,
+    this.baseSpriteUrl,
+    this.baseShinyUrl,
     required this.selectedFormName,
     required this.shiny,
     required this.onSelect,
@@ -2715,6 +2737,9 @@ class _FormBadge extends StatelessWidget {
         ),
         builder: (ctx) => _FormPickerSheet(
           battleForms: battleForms,
+          baseFormLabel: baseFormLabel,
+          baseSpriteUrl: baseSpriteUrl,
+          baseShinyUrl: baseShinyUrl,
           selectedFormName: selectedFormName,
           shiny: shiny,
           onSelect: (name) {
@@ -2754,12 +2779,18 @@ class _FormBadge extends StatelessWidget {
 
 class _FormPickerSheet extends StatelessWidget {
   final List<PokemonVariety> battleForms;
+  final String baseFormLabel;
+  final String? baseSpriteUrl;
+  final String? baseShinyUrl;
   final String? selectedFormName;
   final bool shiny;
   final void Function(String?) onSelect;
 
   const _FormPickerSheet({
     required this.battleForms,
+    required this.baseFormLabel,
+    this.baseSpriteUrl,
+    this.baseShinyUrl,
     required this.selectedFormName,
     required this.shiny,
     required this.onSelect,
@@ -2768,7 +2799,7 @@ class _FormPickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final allOptions = <(String? name, String label)>[
-      (null, 'Base Form'),
+      (null, baseFormLabel),
       ...battleForms.map((v) => (v.name, shortFormLabel(v.name))),
     ];
 
@@ -2796,6 +2827,7 @@ class _FormPickerSheet extends StatelessWidget {
                 label: label,
                 isSelected: name == selectedFormName,
                 shiny: shiny,
+                overrideSpriteUrl: name == null ? (shiny ? (baseShinyUrl ?? baseSpriteUrl) : baseSpriteUrl) : null,
                 onTap: () => onSelect(name),
               );
             }).toList(),
@@ -2813,6 +2845,9 @@ class _FormOptionTile extends ConsumerWidget {
   final String label;
   final bool isSelected;
   final bool shiny;
+  /// Pre-resolved sprite URL for the base form tile (avoids a provider watch
+  /// on null formName and fixes the pokéball placeholder).
+  final String? overrideSpriteUrl;
   final void Function() onTap;
 
   const _FormOptionTile({
@@ -2820,6 +2855,7 @@ class _FormOptionTile extends ConsumerWidget {
     required this.label,
     required this.isSelected,
     required this.shiny,
+    this.overrideSpriteUrl,
     required this.onTap,
   });
 
@@ -2830,9 +2866,10 @@ class _FormOptionTile extends ConsumerWidget {
         ? ref.watch(pokemonByNameProvider(formName!))
         : null;
     final formPokemon = pokemonAsync?.asData?.value;
-    final spriteUrl = shiny
-        ? (formPokemon?.officialArtworkShinyUrl ?? formPokemon?.officialArtworkUrl)
-        : formPokemon?.officialArtworkUrl;
+    final spriteUrl = overrideSpriteUrl ??
+        (shiny
+            ? (formPokemon?.officialArtworkShinyUrl ?? formPokemon?.officialArtworkUrl)
+            : formPokemon?.officialArtworkUrl);
 
     return GestureDetector(
       onTap: onTap,
