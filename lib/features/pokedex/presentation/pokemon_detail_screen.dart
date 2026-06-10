@@ -1394,45 +1394,82 @@ class _EvolutionsTab extends ConsumerWidget {
           loading: () => const LoadingState(),
           error: (e, _) => ErrorState(error: e),
           data: (root) {
+            // Pre-resolve all potential form IDs for species in this chain.
+            // This covers terminal-node IDs (Arcanine-Hisui) and region-based
+            // branches (Alolan Raichu). Providers are cached after first load.
+            final allNames = collectSpeciesNames(root);
+            const regionalSuffixes = ['galar', 'alola', 'hisui', 'paldea'];
+            final formIds = <String, int>{};
+            for (final name in allNames) {
+              for (final suffix in regionalSuffixes) {
+                final formName = '$name-$suffix';
+                final async = ref.watch(pokemonByNameProvider(formName));
+                final id = async.asData?.value.id;
+                if (id != null) formIds[formName] = id;
+              }
+            }
+
             final regionalVarieties =
                 species.varieties.where(isRegionalVariety).toList();
             final showMultiple =
                 regionalVarieties.isNotEmpty && chainHasFormDetails(root);
 
             if (!showMultiple) {
-              final displayRoot = buildFormChain(root, null, root.speciesId);
+              // Check if the current species is only reachable via a form-specific
+              // branch (e.g. Obstagoon via Galarian Linoone). If so, show that
+              // form's chain rather than the default (which would stop before it).
+              final suffix = chainHasFormDetails(root)
+                  ? formSuffixForSpecies(root, species.id)
+                  : null;
+
+              if (suffix != null) {
+                final rootFormName = '${root.speciesName}-$suffix';
+                final rootDisplayId = formIds[rootFormName] ?? root.speciesId;
+                final displayRoot = buildFormChain(
+                  root, suffix, rootDisplayId,
+                  formIds: formIds,
+                );
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: _EvolutionTree(displayNode: displayRoot),
+                );
+              }
+
+              // Default single chain (with possible region branches, e.g. Pikachu).
+              final displayRoot = buildFormChain(
+                root, null, root.speciesId,
+                formIds: formIds,
+              );
               return SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: _EvolutionTree(displayNode: displayRoot),
               );
             }
 
+            // Multiple form sections (e.g. Zigzagoon, Growlithe).
             final sections = <(String label, DisplayNode chain)>[];
 
-            final defaultRoot = buildFormChain(root, null, root.speciesId);
             sections.add((
               formLabel(
                 isDefault: true,
                 varietyName: species.name,
                 generationName: species.generationName,
               ),
-              defaultRoot,
+              buildFormChain(root, null, root.speciesId, formIds: formIds),
             ));
 
             for (final variety in regionalVarieties) {
               final suffix = regionalSuffixOf(variety.name);
               if (suffix == null) continue;
-              final formAsync = ref.watch(pokemonByNameProvider(variety.name));
-              final formId = formAsync.asData?.value.id;
-              if (formId == null) continue;
-              final regionalRoot = buildFormChain(root, suffix, formId);
+              final rootDisplayId = formIds[variety.name];
+              if (rootDisplayId == null) continue; // provider still loading
               sections.add((
                 formLabel(
                   isDefault: false,
                   varietyName: variety.name,
                   generationName: null,
                 ),
-                regionalRoot,
+                buildFormChain(root, suffix, rootDisplayId, formIds: formIds),
               ));
             }
 
@@ -1503,7 +1540,7 @@ class _EvolutionTree extends StatelessWidget {
         children: [
           _EvolutionNodeCard(displayNode: node),
           const SizedBox(height: 6),
-          _EvolutionArrow(details: child.source.details),
+          _EvolutionArrow(details: child.matchedDetails ?? child.source.details),
           const SizedBox(height: 6),
           _EvolutionTree(displayNode: child),
         ],
@@ -1525,7 +1562,7 @@ class _EvolutionTree extends StatelessWidget {
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _ConditionChip(details: child.source.details),
+                _ConditionChip(details: child.matchedDetails ?? child.source.details),
                 const SizedBox(height: 4),
                 Icon(Icons.keyboard_arrow_down_rounded,
                     size: 20, color: Colors.grey.shade400),

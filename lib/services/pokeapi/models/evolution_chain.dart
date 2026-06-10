@@ -51,6 +51,7 @@ class EvolutionDetail {
   final bool? needsOverworldRain;
   final String? turnUpsideDown; // for Inkay
   final ({String name, int id})? baseForm;
+  final ({String name})? region;
 
   const EvolutionDetail({
     required this.trigger,
@@ -66,6 +67,7 @@ class EvolutionDetail {
     this.needsOverworldRain,
     this.turnUpsideDown,
     this.baseForm,
+    this.region,
   });
 
   factory EvolutionDetail.fromJson(Map<String, dynamic> json) {
@@ -91,6 +93,7 @@ class EvolutionDetail {
       needsOverworldRain: json['needs_overworld_rain'] as bool?,
       turnUpsideDown: json['turn_upside_down'] == true ? 'Turn upside down' : null,
       baseForm: EvolutionDetail._parseBaseForm(json['base_form']),
+      region: EvolutionDetail._parseRegion(json['region']),
     );
   }
 
@@ -127,12 +130,24 @@ class EvolutionDetail {
       parts.add('Hold ${_fmt(heldItem)}');
     }
 
+    if (region != null) {
+      final r = region!.name;
+      parts.add('(${r[0].toUpperCase()}${r.substring(1)})');
+    }
+
     return parts.join(', ');
   }
 
   static String _fmt(String? s) {
     if (s == null) return '';
     return s.split('-').map((p) => p.isEmpty ? '' : '${p[0].toUpperCase()}${p.substring(1)}').join(' ');
+  }
+
+  static ({String name})? _parseRegion(dynamic raw) {
+    if (raw == null || raw is! Map) return null;
+    final name = (raw as Map<String, dynamic>)['name'] as String?;
+    if (name == null) return null;
+    return (name: name);
   }
 
   static ({String name, int id})? _parseBaseForm(dynamic raw) {
