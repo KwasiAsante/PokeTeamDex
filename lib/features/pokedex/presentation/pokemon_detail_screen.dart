@@ -26,6 +26,7 @@ import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/stat_bar.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
+import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
 
 class PokemonDetailScreen extends ConsumerStatefulWidget {
   final int pokemonId;
@@ -1406,41 +1407,36 @@ class _EvolutionsTab extends ConsumerWidget {
 /// Linear chains stay vertical; branching chains (e.g. Eevee) spread
 /// horizontally in a Wrap so they don't all stack into a single tall column.
 class _EvolutionTree extends StatelessWidget {
-  final EvolutionNode node;
-  const _EvolutionTree({required this.node});
+  final DisplayNode displayNode;
+  const _EvolutionTree({required this.displayNode});
 
   @override
   Widget build(BuildContext context) {
+    final node = displayNode;
     if (node.evolvesTo.isEmpty) {
-      return _EvolutionNodeCard(node: node);
+      return _EvolutionNodeCard(displayNode: node);
     }
 
     if (node.evolvesTo.length == 1) {
-      // Linear chain — vertical layout
       final child = node.evolvesTo.first;
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _EvolutionNodeCard(node: node),
+          _EvolutionNodeCard(displayNode: node),
           const SizedBox(height: 6),
-          _EvolutionArrow(details: child.details),
+          _EvolutionArrow(details: child.source.details),
           const SizedBox(height: 6),
-          _EvolutionTree(node: child),
+          _EvolutionTree(displayNode: child),
         ],
       );
     }
 
-    // Branching — show branches side-by-side in a Wrap
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _EvolutionNodeCard(node: node),
+        _EvolutionNodeCard(displayNode: node),
         const SizedBox(height: 6),
-        const Icon(
-          Icons.call_split_rounded,
-          size: 22,
-          color: Colors.grey,
-        ),
+        const Icon(Icons.call_split_rounded, size: 22, color: Colors.grey),
         const SizedBox(height: 8),
         Wrap(
           alignment: WrapAlignment.center,
@@ -1450,15 +1446,12 @@ class _EvolutionTree extends StatelessWidget {
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _ConditionChip(details: child.details),
+                _ConditionChip(details: child.source.details),
                 const SizedBox(height: 4),
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 20,
-                  color: Colors.grey.shade400,
-                ),
+                Icon(Icons.keyboard_arrow_down_rounded,
+                    size: 20, color: Colors.grey.shade400),
                 const SizedBox(height: 4),
-                _EvolutionTree(node: child),
+                _EvolutionTree(displayNode: child),
               ],
             );
           }).toList(),
@@ -1491,16 +1484,18 @@ class _EvolutionArrow extends StatelessWidget {
 }
 
 class _EvolutionNodeCard extends StatelessWidget {
-  final EvolutionNode node;
-  const _EvolutionNodeCard({required this.node});
+  final DisplayNode displayNode;
+  const _EvolutionNodeCard({required this.displayNode});
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final spriteUrl =
+        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${displayNode.displayId}.png';
 
     return GestureDetector(
-      onTap: () => context.push('/pokedex/${node.speciesId}'),
+      onTap: () => context.push('/pokedex/${displayNode.displayId}'),
       child: Container(
         width: 96,
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -1515,7 +1510,7 @@ class _EvolutionNodeCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             CachedNetworkImage(
-              imageUrl: node.spriteUrl,
+              imageUrl: spriteUrl,
               width: 72,
               height: 72,
               placeholder: (_, _) => const SizedBox(
@@ -1528,12 +1523,12 @@ class _EvolutionNodeCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              node.displayName,
+              displayNode.source.displayName,
               textAlign: TextAlign.center,
               style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             Text(
-              '#${node.speciesId.toString().padLeft(3, '0')}',
+              '#${displayNode.source.speciesId.toString().padLeft(3, '0')}',
               style: textTheme.labelSmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
