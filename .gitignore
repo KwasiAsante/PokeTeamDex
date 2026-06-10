@@ -1,3 +1,6 @@
+# Brainstorming session files
+/.superpowers/
+
 # Miscellaneous
 # Stray local images (e.g. downloaded sprites for debugging)
 /*.png
