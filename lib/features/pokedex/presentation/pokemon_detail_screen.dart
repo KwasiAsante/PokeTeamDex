@@ -32,6 +32,16 @@ import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
 
 /// Derives a display label from a PokéAPI cosmetic form name.
 /// e.g. "red-flower" → "Red Flower", "sandy" → "Sandy", "a" → "A".
+/// Variety names that are purely cosmetic (same stats as base) and should
+/// appear as header cosmetic chips rather than in the Forms tab.
+const kCosmeticVarietyNames = <String>{
+  'wormadam-sandy', 'wormadam-trash',
+  'squawkabilly-blue-plumage', 'squawkabilly-yellow-plumage', 'squawkabilly-white-plumage',
+  'tatsugiri-droopy', 'tatsugiri-stretchy',
+  'dudunsparce-three-segment',
+  'basculin-blue-striped',
+};
+
 String cosmeticFormLabel(String formName) {
   if (formName.isEmpty) return 'Default';
   return formName.split('-')
@@ -175,20 +185,11 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                       : shortBaseFormLabel(species?.generationName));
         final cosmeticFormsBase = cosmeticFormsAsync?.asData?.value ?? const <PokemonFormEntry>[];
 
-        // Variety-based cosmetic forms: species whose alternate appearances are
-        // variety resources (not form-name resources) but are purely cosmetic.
-        // cosmeticFormsProvider returns [] for these since each has its own
-        // /pokemon resource. We fetch them via pokemonByNameProvider instead.
-        const kCosmeticVarietyNames = {
-          'wormadam-sandy', 'wormadam-trash',
-          'squawkabilly-blue-plumage', 'squawkabilly-yellow-plumage', 'squawkabilly-white-plumage',
-          'tatsugiri-droopy', 'tatsugiri-stretchy',
-          'dudunsparce-three-segment',
-          'basculin-blue-striped',
-        };
-
+        // Variety-based cosmetic chips are only shown for the BASE form.
+        // When a regional battle form is selected (e.g. Hisuian Basculin),
+        // Unovan cosmetic variants (Blue-Striped) are not relevant.
         final varietyCosmeticForms = <PokemonFormEntry>[];
-        if (species != null) {
+        if (species != null && _selectedFormName == null) {
           for (final variety in species.varieties) {
             if (variety.isDefault) continue;
             if (!kCosmeticVarietyNames.contains(variety.name)) continue;
@@ -203,8 +204,11 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
               name: variety.name,
               formName: formName,
               isDefault: false,
+              // Chip thumbnail uses the small sprite; header uses official artwork.
               spriteUrl: vData.sprites?['front_default'] as String?,
               spriteShinyUrl: vData.sprites?['front_shiny'] as String?,
+              officialArtworkUrl: vData.officialArtworkUrl,
+              officialArtworkShinyUrl: vData.officialArtworkShinyUrl,
             ));
           }
         }
@@ -281,6 +285,9 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     // prefix from the form name to get the suffix.
     String? cosmeticHomeUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
+      if (form.officialArtworkUrl != null) return form.officialArtworkUrl;
+      final override = kCosmeticFormHomeUrlOverrides[form.name];
+      if (override != null) return override;
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteUrl;
       final suffix = form.name.substring(baseName.length + 1);
@@ -288,6 +295,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     }
     String? cosmeticHomeShinyUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
+      if (form.officialArtworkShinyUrl != null) return form.officialArtworkShinyUrl;
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteShinyUrl;
       final suffix = form.name.substring(baseName.length + 1);
@@ -504,9 +512,16 @@ class _DetailSliverAppBar extends StatelessWidget {
         ? cosmeticForms.where((f) => f.name == selectedCosmeticFormName).firstOrNull
         : null;
 
-    // Cosmetic form HOME artwork: "{baseId}-{suffix}.png" (e.g. 201-b.png for Unown B).
+    // Resolve header display URL for a cosmetic form.
+    // Priority: official artwork (variety-based) → HOME override → HOME → sprite.
     String? cosmeticUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
+      // Variety-based forms have their own official artwork URL.
+      if (form.officialArtworkUrl != null) return form.officialArtworkUrl;
+      // Specific URL overrides (e.g. xerneas-active → show neutral form).
+      final override = kCosmeticFormHomeUrlOverrides[form.name];
+      if (override != null) return override;
+      // Form-name-based: try "{baseId}-{suffix}.png" HOME URL.
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteUrl;
       final suffix = form.name.substring(baseName.length + 1);
@@ -514,6 +529,8 @@ class _DetailSliverAppBar extends StatelessWidget {
     }
     String? cosmeticShinyUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
+      if (form.officialArtworkShinyUrl != null) return form.officialArtworkShinyUrl;
+      // No shiny override for now; fall back to non-shiny HOME or sprite.
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteShinyUrl;
       final suffix = form.name.substring(baseName.length + 1);
@@ -1888,6 +1905,8 @@ class _FormsTab extends ConsumerWidget {
         final nonDefault = species.varieties.where((v) {
           if (v.isDefault) return false;
           if (switcherFormNames.contains(v.name)) return false;
+          // Also exclude variety-based cosmetic forms — they appear as header chips.
+          if (kCosmeticVarietyNames.contains(v.name)) return false;
           if (selectedFormName != null && megaSuffixes.any((s) => v.name.endsWith(s))) return false;
           return true;
         }).toList();

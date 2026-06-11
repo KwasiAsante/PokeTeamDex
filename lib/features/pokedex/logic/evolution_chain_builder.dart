@@ -257,6 +257,16 @@ const kCosmeticFormLabels = <String, String>{
   'xerneas-active': 'Neutral',
 };
 
+/// Override HOME artwork URLs for cosmetic form chips where the default URL
+/// derivation would show the wrong visual.
+/// Key: PokéAPI form/variety name. Value: full HOME artwork URL.
+const kCosmeticFormHomeUrlOverrides = <String, String>{
+  // xerneas-active is relabeled "Neutral" — show the neutral (resting) form
+  // HOME artwork so the chip actually displays the neutral appearance.
+  'xerneas-active':
+      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/716-neutral.png',
+};
+
 /// Maps specific base_form names (as they appear in PokéAPI evolution_details)
 /// to their effective regional suffix. Used for forms that are regionally
 /// exclusive but don't follow the simple "{name}-{suffix}" naming convention.
