@@ -28,8 +28,22 @@ bool isRegionalVariety(PokemonVariety variety) {
 }
 
 String? regionalSuffixOf(String varietyName) {
+  // Exact suffix (e.g. "zigzagoon-galar" → "galar").
   for (final s in _kRegionalSuffixes) {
     if (varietyName.endsWith(s)) return s.substring(1);
+  }
+  // Regional infix for compound forms (e.g. "darmanitan-galar-standard" → "galar").
+  // Skips cosmetic variants where the word after the regional infix is a cosmetic
+  // indicator (e.g. "pikachu-alola-cap" has "cap" after "alola" → not a regional form).
+  const cosmeticNextParts = {'cap'};
+  final parts = varietyName.split('-');
+  for (final s in _kRegionalSuffixes) {
+    final suffix = s.substring(1);
+    final idx = parts.indexOf(suffix);
+    if (idx != -1 && idx < parts.length - 1) {
+      if (cosmeticNextParts.contains(parts[idx + 1])) continue;
+      return suffix;
+    }
   }
   return null;
 }
@@ -244,12 +258,23 @@ const _kGenLabelShort = {
 String shortBaseFormLabel(String? generationName) =>
     (generationName != null ? _kGenLabelShort[generationName] : null) ?? 'Original';
 
+/// Hardcoded overrides for form names where the generic algorithm produces
+/// an ambiguous or incorrect label.
+const _kSpecificFormLabels = <String, String>{
+  'darmanitan-zen':            'Unovan Zen',
+  'darmanitan-galar-standard': 'Galarian',
+};
+
 /// Short label for the app bar badge (e.g. "Galarian", "Alolan", "Combat Breed").
 ///
 /// For plain regional forms (e.g. "zigzagoon-galar") returns the region adjective.
 /// For forms with a regional infix followed by a sub-form descriptor
 /// (e.g. "tauros-paldea-combat-breed") returns the sub-form label ("Combat Breed").
 String shortFormLabel(String varietyName) {
+  // Hardcoded overrides first.
+  final specific = _kSpecificFormLabels[varietyName];
+  if (specific != null) return specific;
+
   const suffixShort = {
     'galar': 'Galarian', 'alola': 'Alolan',
     'hisui': 'Hisuian',  'paldea': 'Paldean',

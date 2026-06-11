@@ -189,5 +189,29 @@ void main() {
     test('mr-mime-galar → Galarian (not just last segment)', () {
       expect(shortFormLabel('mr-mime-galar'), 'Galarian');
     });
+    test('darmanitan-galar-standard → Galarian (override)', () {
+      expect(shortFormLabel('darmanitan-galar-standard'), 'Galarian');
+    });
+    test('darmanitan-galar-zen → Galarian Zen', () {
+      expect(shortFormLabel('darmanitan-galar-zen'), 'Galarian Zen');
+    });
+    test('darmanitan-zen → Unovan Zen (override)', () {
+      expect(shortFormLabel('darmanitan-zen'), 'Unovan Zen');
+    });
+  });
+
+  group('regionalSuffixOf — compound forms', () {
+    test('darmanitan-galar-standard → galar', () {
+      expect(regionalSuffixOf('darmanitan-galar-standard'), 'galar');
+    });
+    test('darmanitan-galar-zen → galar', () {
+      expect(regionalSuffixOf('darmanitan-galar-zen'), 'galar');
+    });
+    test('tauros-paldea-combat-breed → paldea', () {
+      expect(regionalSuffixOf('tauros-paldea-combat-breed'), 'paldea');
+    });
+    test('darmanitan-zen → null (no regional infix)', () {
+      expect(regionalSuffixOf('darmanitan-zen'), isNull);
+    });
   });
 }
