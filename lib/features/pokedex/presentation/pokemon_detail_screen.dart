@@ -147,9 +147,10 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
             ? 'Male'
             : hasRegionalForm
                 ? shortBaseFormLabel(species?.generationName)
-                : battleForms.isNotEmpty
-                    ? 'Base'
-                    : shortBaseFormLabel(species?.generationName);
+                : kBaseFormNameOverrides[basePokemon.name] ??
+                  (battleForms.isNotEmpty
+                      ? 'Base'
+                      : shortBaseFormLabel(species?.generationName));
 
         return isWide
             ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel)

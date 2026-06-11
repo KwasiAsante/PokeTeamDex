@@ -220,6 +220,14 @@ String? _resolveChildFormName(EvolutionNode child, String? suffix, Map<String, i
   return null;
 }
 
+/// Override labels for the base/default form of specific species where the
+/// default form has its own name rather than just "Base".
+/// Key: PokéAPI species name. Value: display label for the default form.
+const kBaseFormNameOverrides = <String, String>{
+  'lycanroc': 'Midday',
+  'urshifu':  'Single Strike',
+};
+
 const _kSuffixLabel = {
   'galar': 'Galarian Form', 'alola': 'Alolan Form',
   'hisui': 'Hisuian Form',  'paldea': 'Paldean Form',
