@@ -30,6 +30,15 @@ import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
 import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
 
+/// Derives a display label from a PokéAPI cosmetic form name.
+/// e.g. "red-flower" → "Red Flower", "sandy" → "Sandy", "a" → "A".
+String cosmeticFormLabel(String formName) {
+  if (formName.isEmpty) return 'Default';
+  return formName.split('-')
+      .map((p) => p.isEmpty ? '' : '${p[0].toUpperCase()}${p.substring(1)}')
+      .join(' ');
+}
+
 class PokemonDetailScreen extends ConsumerStatefulWidget {
   final int pokemonId;
   /// When navigating from an evolution chain node, pre-select this form
