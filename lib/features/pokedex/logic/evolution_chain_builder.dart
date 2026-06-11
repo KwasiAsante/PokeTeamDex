@@ -252,7 +252,7 @@ const kBaseFormNameOverrides = <String, String>{
   'enamorus-incarnate':        'Incarnate',
   'aegislash-shield':          'Shield',
   'gimmighoul-chest':          'Chest',
-  'ogerpon-teal-mask':         'Teal Mask',
+  'ogerpon':                   'Teal Mask',
   // Battle-form species where the default variety has no suffix but a specific
   // form name is clearer than the generic "Base" fallback.
   'shaymin':                   'Land',
