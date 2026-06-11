@@ -135,7 +135,12 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         final battleForms = species != null
             ? battleMeaningfulForms(species.varieties)
             : <PokemonVariety>[];
-        final baseFormLabel = shortBaseFormLabel(species?.generationName);
+        // Gender-split species (Meowstic, Indeedee, Basculegion): all battle-meaningful
+        // forms are female variants — the default is the male form.
+        final baseFormLabel = (battleForms.isNotEmpty &&
+                battleForms.every((v) => v.name.endsWith('-female')))
+            ? 'Male'
+            : shortBaseFormLabel(species?.generationName);
 
         return isWide
             ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel)
