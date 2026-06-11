@@ -51,7 +51,10 @@ backend/
 │       ├── 0002_nullable_folder_user_on_team.py
 │       ├── 0003_add_is_deleted.py
 │       ├── 0004_pokemon_instances.py
-│       └── 0005_full_slot_config.py
+│       ├── 0005_full_slot_config.py
+│       ├── 0006_add_format_label_to_teams.py
+│       ├── 0007_add_tera_type_to_slots.py
+│       └── 0008_add_sort_order_and_is_box.py
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt

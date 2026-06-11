@@ -50,7 +50,7 @@ The core team builder feature — the most complex module.
 | `SlotConfigScreen` | Full slot configuration — all per-Pokémon fields |
 
 **SlotConfigScreen** sections:
-- Form picker (regional variants, Mega, Gigantamax)
+- Form picker (regional variants, Mega, Gigantamax, cosmetic variants — Unown, Vivillon, Alcremie, etc.)
 - Level slider (1–100)
 - Gender chips + shiny toggle + friendship slider
 - Ability cards (labelled Hidden if applicable)
@@ -59,9 +59,10 @@ The core team builder feature — the most complex module.
 - 4 Move slots — learnable moves filtered by generation/format
 - EV grid (0–252/stat, 510 total cap with overflow block)
 - IV grid (0–31/stat, renamed DVs with max 15 in Gen 1–2)
+- Tera Type selector (18-type chips, Gen 9 / SV formats only)
 - Ribbon catalog (chip-grid picker)
 - Mega/Dynamax/Gigantamax/Alpha toggles (gated by generation)
-- Contest stat sliders (Gen 3–4 / no-format only)
+- Contest stat sliders + radar chart (Gen 3–4 / no-format only)
 - Pokémon Identity section (instance chain browser)
 
 **`services/showdown_export.dart`** — `buildShowdownExport(team, slots)` produces standard Showdown `.txt` format.

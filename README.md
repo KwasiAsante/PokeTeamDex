@@ -352,8 +352,14 @@ lib/services/
 │   ├── sync_service.dart        # Push + pull orchestration
 │   ├── sync_providers.dart      # Riverpod wrappers + sync trigger helper
 │   └── sync_status.dart         # SyncResult, SyncPhase enums
-└── tray/
-    └── tray_service.dart        # System tray icon + menu (desktop only)
+├── tray/
+│   └── tray_service.dart        # System tray icon + menu (desktop only)
+├── update/
+│   ├── update_service.dart      # GitHub releases API check + semver compare
+│   ├── update_info.dart         # UpdateInfo data class (version + per-platform URLs)
+│   └── update_provider.dart     # updateCheckProvider FutureProvider<UpdateInfo?>
+└── logs/
+    └── logs_server_output.dart  # Buffered log forwarder → backend /logs/device
 ```
 
 ### Format Engine
@@ -884,40 +890,48 @@ git commit -m "chore: update PS data"
 
 ## Deploying the Frontend
 
-> **Frontend release strategy is TBD.** The app compiles to all major platforms but the distribution channel (App Store, Play Store, web hosting, sideload) is being decided. This section will be completed once that decision is made.
+Web, Android, and Windows release builds are fully automated via GitHub Actions — no manual steps needed after pushing a version tag.
 
-### Supported platforms
+### Web — Firebase Hosting
 
-| Platform | Build target | Status |
-|----------|-------------|--------|
-| Android | APK / App Bundle | Ready |
-| iOS | `.ipa` | Ready (requires macOS + Xcode) |
-| Web | Static files | Ready |
-| macOS | `.app` | Ready |
-| Windows | `.exe` installer | Ready |
-| Linux | Binary | Ready |
+Deployed automatically to **https://poketeamdex.web.app** on every push to `main` and on every `v*.*.*` tag (`deploy-web.yml`).
 
-### Build commands (reference)
+### Android — APK
+
+Built and uploaded to the GitHub Release automatically on every version tag. Signed with the keystore stored in GitHub Secrets.
 
 ```bash
-# Android APK (direct install)
+# Manual build (if needed)
 flutter build apk --release
-
-# Android App Bundle (Play Store)
-flutter build appbundle --release
-
-# iOS — requires macOS + Xcode + provisioning profile
-flutter build ios --release
-
-# Web — outputs to build/web/
-flutter build web --release
-
-# macOS
-flutter build macos --release
-
-# Windows
-flutter build windows --release
+# Output: build/app/outputs/flutter-apk/app-release.apk
 ```
+
+### Windows — MSI + EXE
+
+Both installers built on every version tag and uploaded to the GitHub Release automatically (`release.yml`).
+
+> **Known issue #96**: the MSI "Launch after Finish" checkbox does not start the app. Use the EXE installer as the primary Windows download.
+
+### macOS / iOS / Linux
+
+Not automated — build and distribute manually:
+
+```bash
+flutter build macos --release
+flutter build ios --release     # requires macOS + Xcode + provisioning profile
+flutter build linux --release
+```
+
+### Platform summary
+
+| Platform | Distribution | CI automated |
+|----------|-------------|:---:|
+| Web | Firebase Hosting (`poketeamdex.web.app`) | ✓ push to main + tags |
+| Android | APK on GitHub Releases | ✓ tags only |
+| Windows | MSI + EXE on GitHub Releases | ✓ tags only |
+| macOS | Manual | — |
+| iOS | Manual | — |
+| Linux | Manual | — |
 
 ---
 
@@ -973,7 +987,7 @@ poke_team_dex/
 │   ├── router/
 │   │   └── app_router.dart          # GoRouter config + adaptive shell
 │   ├── database/
-│   │   ├── app_database.dart        # Drift DB class + v1–v10 migrations
+│   │   ├── app_database.dart        # Drift DB class + v1–v12 migrations
 │   │   ├── database_providers.dart  # Riverpod providers for DB + repositories
 │   │   ├── tables/                  # One file per Drift table definition
 │   │   └── repositories/            # Data access objects (query + mutation methods)
@@ -995,7 +1009,10 @@ poke_team_dex/
 │   │   ├── format/                  # PS format engine
 │   │   ├── pokeapi/                 # PokéAPI client + Hive cache
 │   │   ├── sync/                    # Bidirectional sync engine
-│   │   └── tray/                    # Desktop system tray
+│   │   ├── tray/                    # Desktop system tray
+│   │   ├── update/                  # GitHub release update checker
+│   │   └── logs/                    # Remote log forwarding
+│   ├── utils/                       # App-level utilities (AppLogger)
 │   └── shared/
 │       ├── theme/                   # Material 3 theme + accent colour swatches
 │       ├── widgets/                 # Reusable UI components
@@ -1011,7 +1028,7 @@ poke_team_dex/
 │   │   ├── schemas/                 # Pydantic request/response models
 │   │   └── core/                    # config.py, security.py, deps.py
 │   ├── alembic/
-│   │   └── versions/                # 0001–0005 SQL migrations
+│   │   └── versions/                # 0001–0008 SQL migrations
 │   ├── Dockerfile
 │   ├── docker-compose.yml
 │   ├── requirements.txt

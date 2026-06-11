@@ -55,11 +55,14 @@ See [`services/README.md`](services/README.md).
 
 ## shared/
 
-Cross-feature UI components and utilities.
+See [`shared/README.md`](shared/README.md).
 
-| Folder | Contents |
-|--------|----------|
-| `theme/` | `AppTheme.buildTheme()`, type colour palette (18 types), accent colour swatches |
-| `widgets/` | `AsyncValueStates` (loading/error/empty), `TypeBadge`, `PokemonSprite`, `FavoriteButton`, `ConnectivityStatusButton`, `SettingsButton`, `SkeletonBox` |
-| `providers/` | `appStateProvider`, `themeProvider`, `accentColourProvider` |
-| `utils/` | `StatCalculator` (Gen III+ formula), `showAppSnackBar()`, `snackBarError()` |
+---
+
+## utils/
+
+Top-level app utilities, separate from `shared/utils/`.
+
+| File | Purpose |
+|------|---------|
+| `app_logger.dart` | Singleton `AppLogger` — three sinks: console (debug only), daily rotating file (non-web), HTTP push to backend `/logs/device`; call `AppLogger.configure(url)` and `AppLogger.configureToken(token)` after the DB loads |

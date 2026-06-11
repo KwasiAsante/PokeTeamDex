@@ -117,3 +117,29 @@ Desktop-only system tray integration via `tray_manager`.
 | `tray_service.dart` | `TrayService.init()` — sets tray icon + menu (Sync Now, Quit); routes tray events to `SyncService` |
 
 Active only on macOS, Windows, and Linux. No-op on iOS/Android/Web.
+
+---
+
+## `update/`
+
+In-app update checker. Queries the GitHub Releases API and compares against the running app version.
+
+| File | Class / Provider | Purpose |
+|------|-----------------|---------|
+| `update_service.dart` | `UpdateService` | `checkForUpdate()` — fetches latest GitHub release, semver-compares against current version, returns `UpdateInfo?` if newer |
+| `update_info.dart` | `UpdateInfo` | Data class: version string + per-platform download URLs (APK, MSI, EXE, web) |
+| `update_provider.dart` | `updateCheckProvider` | `FutureProvider<UpdateInfo?>` — consumed by `UpdateBanner` in `shared/widgets/` |
+
+`platformDownloadUrl(info)` selects the correct URL for the running platform (APK on Android, EXE/MSI on Windows, web URL on web, release page otherwise).
+
+---
+
+## `logs/`
+
+Remote log forwarding to the backend `/logs/device` endpoint.
+
+| File | Class | Purpose |
+|------|-------|---------|
+| `logs_server_output.dart` | `LogsServerOutput` | `LogOutput` subclass (from the `logger` package); buffers lines by level and flushes every 3 s or when 20 lines accumulate; drops silently on network failure |
+
+Used by `AppLogger` in `lib/utils/app_logger.dart`. Requires a valid auth token — lines are dropped when unauthenticated. Call `updateToken(token)` after login/logout.

@@ -8,7 +8,7 @@ Local persistence layer built on [Drift](https://drift.simonbinder.eu/) — a ty
 
 | File | Purpose |
 |------|---------|
-| `app_database.dart` | `AppDatabase` class — registers all tables, defines v1–v10 migrations |
+| `app_database.dart` | `AppDatabase` class — registers all tables, defines v1–v12 migrations |
 | `database_providers.dart` | Riverpod providers: `appDatabaseProvider`, repository providers |
 | `tables/` | One Dart file per Drift table definition |
 | `repositories/` | Data access objects — typed query + mutation methods |
@@ -57,6 +57,8 @@ v7  6 contest stat columns on TeamSlots
 v8  ribbons JSON + isMegaEvolved + hasGigantamax + isAlpha on TeamSlots
 v9  PokemonInstances table + instance_id FK on TeamSlots
 v10 gigantamax_enabled column on TeamSlots
+v11 is_box boolean on Teams
+v12 tera_type on TeamSlots
 ```
 
 ---

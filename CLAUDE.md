@@ -1,5 +1,17 @@
 # PokeTeamDex — Claude Instructions
 
+## README Maintenance
+
+When making significant code changes, keep READMEs accurate:
+
+- **New file or service added** → update the README for that directory (or create one if it doesn't exist and other sibling directories have READMEs).
+- **Existing behaviour changed** (new endpoint, schema migration, new widget, config option, etc.) → update the relevant README to reflect the change.
+- **Directory has no README but should** → create one when you first touch that directory significantly. Use the existing READMEs as style reference (tables for file lists, brief purpose descriptions, no multi-paragraph prose).
+
+Directories that always have READMEs in this project: `lib/`, `lib/features/`, `lib/services/`, `lib/database/`, `lib/shared/`, `backend/`, `test/`, `scripts/`, `assets/`, `.github/workflows/`.
+
+---
+
 ## TODO.md ↔ GitHub Issues Sync
 
 `TODO.md` and GitHub issues are the single source of truth for planned and deferred work. Keep them in sync at all times.
