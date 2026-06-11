@@ -251,14 +251,15 @@ String shortFormLabel(String varietyName) {
     if (varietyName.endsWith('-${entry.key}')) return entry.value;
   }
   // Regional infix with sub-form content after it (e.g. tauros-paldea-combat-breed).
-  const infixes = ['paldea', 'galar', 'alola', 'hisui'];
+  // Returns "{RegionalAdjective} {SubForm}" — e.g. "Paldean Combat Breed".
   final parts = varietyName.split('-');
-  for (final infix in infixes) {
-    final idx = parts.indexOf(infix);
+  for (final entry in suffixShort.entries) {
+    final idx = parts.indexOf(entry.key);
     if (idx != -1 && idx < parts.length - 1) {
-      return parts.sublist(idx + 1)
+      final subLabel = parts.sublist(idx + 1)
           .map((p) => '${p[0].toUpperCase()}${p.substring(1)}')
           .join(' ');
+      return '${entry.value} $subLabel';
     }
   }
   // Fallback: capitalize last segment.

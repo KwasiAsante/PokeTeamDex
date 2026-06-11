@@ -181,10 +181,10 @@ void main() {
     test('plain alola suffix → Alolan', () {
       expect(shortFormLabel('vulpix-alola'), 'Alolan');
     });
-    test('paldea sub-form → sub-form label', () {
-      expect(shortFormLabel('tauros-paldea-combat-breed'), 'Combat Breed');
-      expect(shortFormLabel('tauros-paldea-blaze-breed'), 'Blaze Breed');
-      expect(shortFormLabel('tauros-paldea-aqua-breed'), 'Aqua Breed');
+    test('paldea sub-form → regional adjective + sub-form label', () {
+      expect(shortFormLabel('tauros-paldea-combat-breed'), 'Paldean Combat Breed');
+      expect(shortFormLabel('tauros-paldea-blaze-breed'), 'Paldean Blaze Breed');
+      expect(shortFormLabel('tauros-paldea-aqua-breed'), 'Paldean Aqua Breed');
     });
     test('mr-mime-galar → Galarian (not just last segment)', () {
       expect(shortFormLabel('mr-mime-galar'), 'Galarian');
