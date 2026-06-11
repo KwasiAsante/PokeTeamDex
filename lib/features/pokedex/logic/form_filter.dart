@@ -59,7 +59,7 @@ const _kBattleMeaningfulNames = {
   // Wishiwashi — School forme has massively boosted stats (ability-triggered)
   'wishiwashi-school',
   // Necrozma — fusion and Ultra formes have different types and stats
-  'necrozma-dusk-mane', 'necrozma-dawn-wings', 'necrozma-ultra',
+  'necrozma-dusk', 'necrozma-dawn', 'necrozma-ultra',
   // Ursaluna — Bloodmoon forme has different typing and a signature move
   'ursaluna-bloodmoon',
   // Gimmighoul — Roaming forme has different stats

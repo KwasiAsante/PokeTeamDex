@@ -371,8 +371,8 @@ const _kSpecificFormLabels = <String, String>{
   'urshifu-rapid-strike':      'Rapid Strike',
   // Fallback capitalises only the last hyphen-segment, which gives wrong labels
   // for multi-word form names.
-  'necrozma-dusk-mane':        'Dusk Mane',
-  'necrozma-dawn-wings':       'Dawn Wings',
+  'necrozma-dusk':             'Dusk Mane',
+  'necrozma-dawn':             'Dawn Wings',
   'zygarde-10':                '10%',
   'ogerpon-wellspring-mask':   'Wellspring Mask',
   'ogerpon-hearthflame-mask':  'Hearthflame Mask',
