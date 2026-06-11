@@ -24,6 +24,11 @@ const _kBattleMeaningfulNames = {
   'tauros-paldea-combat-breed',
   'tauros-paldea-blaze-breed',
   'tauros-paldea-aqua-breed',
+  // Darmanitan forms — zen modes have different types/stats; Galarian forms are
+  // the same species but distinct in stats and type.
+  'darmanitan-zen',
+  'darmanitan-galar-standard',
+  'darmanitan-galar-zen',
 };
 
 /// Returns non-default [varieties] that are battle-meaningful — regional forms

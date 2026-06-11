@@ -1467,9 +1467,21 @@ class _EvolutionsTab extends ConsumerWidget {
             final formIds = <String, int>{};
             for (final name in allNames) {
               for (final s in regionalSuffixes) {
-                final async = ref.watch(pokemonByNameProvider('$name-$s'));
-                final id = async.asData?.value.id;
-                if (id != null) formIds['$name-$s'] = id;
+                final exactAsync = ref.watch(pokemonByNameProvider('$name-$s'));
+                final exactId = exactAsync.asData?.value.id;
+                if (exactId != null) {
+                  formIds['$name-$s'] = exactId;
+                } else {
+                  // Try "{name}-{suffix}-standard" for species whose Galarian/regional
+                  // form uses a compound name (e.g. darmanitan-galar-standard rather
+                  // than darmanitan-galar which doesn't exist in PokéAPI).
+                  final stdAsync = ref.watch(pokemonByNameProvider('$name-$s-standard'));
+                  final stdId = stdAsync.asData?.value.id;
+                  if (stdId != null) {
+                    formIds['$name-$s'] = stdId;          // simplified key for ID lookup
+                    formIds['$name-$s-standard'] = stdId; // actual key for formName resolution
+                  }
+                }
               }
             }
 

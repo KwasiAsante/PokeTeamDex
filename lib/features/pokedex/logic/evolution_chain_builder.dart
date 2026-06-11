@@ -93,7 +93,9 @@ DisplayNode buildFormChain(
   // tapping it navigates to /pokedex/{speciesId}?form={formName} correctly.
   // e.g. Alolan Vulpix root: displayId=10103, speciesId=37 → formName="vulpix-alola"
   if (formSuffix != null && rootDisplayId != root.speciesId) {
-    node.formName = '${root.speciesName}-$formSuffix';
+    final simpleName = '${root.speciesName}-$formSuffix';
+    final compoundName = '$simpleName-standard';
+    node.formName = formIds.containsKey(compoundName) ? compoundName : simpleName;
   }
   return node;
 }
@@ -193,8 +195,14 @@ String? _resolveChildFormName(EvolutionNode child, String? suffix, Map<String, i
       if (d.baseForm?.name.endsWith('-$suffix') == true) return d.baseForm!.name;
     }
   }
-  final formName = '${child.speciesName}-$suffix';
-  if (formIds.containsKey(formName)) return formName;
+  final simpleName = '${child.speciesName}-$suffix';
+  if (formIds.containsKey(simpleName)) {
+    // Prefer the compound form name when it exists — e.g. "darmanitan-galar-standard"
+    // over "darmanitan-galar" (the latter doesn't exist as a PokéAPI endpoint).
+    final compoundName = '$simpleName-standard';
+    if (formIds.containsKey(compoundName)) return compoundName;
+    return simpleName;
+  }
   return null;
 }
 
