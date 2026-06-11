@@ -417,8 +417,24 @@ class _DetailSliverAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Resolve the cosmetic form to display (if one is selected).
+    final selectedCosmetic = selectedCosmeticFormName != null
+        ? cosmeticForms.where((f) => f.name == selectedCosmeticFormName).firstOrNull
+        : null;
+
+    // HOME artwork for the selected cosmetic form; falls back to sprite via CachedNetworkImage error handler.
+    final displayDefaultUrl = selectedCosmetic != null
+        ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${selectedCosmetic.id}.png'
+        : effectivePokemon.officialArtworkUrl;
+    final displayShinyUrl = selectedCosmetic != null
+        ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/${selectedCosmetic.id}.png'
+        : effectivePokemon.officialArtworkShinyUrl;
+
+    // Expand header height when cosmetic chips are present.
+    final expandedHeight = cosmeticForms.isNotEmpty ? 324.0 : 280.0;
+
     return SliverAppBar(
-      expandedHeight: 280,
+      expandedHeight: expandedHeight,
       pinned: true,
       backgroundColor: headerColor,
       foregroundColor: Colors.white,
@@ -453,16 +469,29 @@ class _DetailSliverAppBar extends StatelessWidget {
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           color: headerColor.withValues(alpha: 0.85),
-          child: Center(
-            child: Hero(
-              tag: 'pokemon-sprite-${basePokemon.id}',
-              child: PokemonSprite(
-                defaultUrl: effectivePokemon.officialArtworkUrl,
-                shinyUrl: effectivePokemon.officialArtworkShinyUrl,
-                shiny: shiny,
-                size: 200,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(height: 56), // clear the collapsed app bar height
+              Hero(
+                tag: 'pokemon-sprite-${basePokemon.id}',
+                child: PokemonSprite(
+                  defaultUrl: displayDefaultUrl,
+                  shinyUrl: displayShinyUrl,
+                  shiny: shiny,
+                  size: 200,
+                ),
               ),
-            ),
+              if (cosmeticForms.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _CosmeticFormRow(
+                  forms: cosmeticForms,
+                  selectedFormName: selectedCosmeticFormName,
+                  shiny: shiny,
+                  onSelect: onCosmeticFormSelect,
+                ),
+              ],
+            ],
           ),
         ),
       ),
