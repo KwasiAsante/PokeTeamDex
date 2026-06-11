@@ -233,7 +233,7 @@ String? _resolveChildFormName(EvolutionNode child, String? suffix, Map<String, i
 /// Key: PokéAPI species name. Value: display label for the default form.
 const kBaseFormNameOverrides = <String, String>{
   'lycanroc-midday':      'Midday',
-  'urshifu':              'Single Strike',
+  'urshifu-single-strike': 'Single Strike',
   'basculin-red-striped': 'Red-Striped',
   'oricorio-baile':       'Baile',
   'toxtricity-amped':     'Amped',
@@ -303,6 +303,7 @@ const _kSpecificFormLabels = <String, String>{
   'oricorio-pom-pom':          'Pom-Pom',
   "oricorio-pau":              "Pa'u",
   'toxtricity-low-key':        'Low Key',
+  'urshifu-rapid-strike':      'Rapid Strike',
 };
 
 /// Short label for the app bar badge (e.g. "Galarian", "Alolan", "Combat Breed").
