@@ -177,4 +177,69 @@ void main() {
       expect(battleMeaningfulForms([]), isEmpty);
     });
   });
+
+  group('kCosmeticVarietyNames', () {
+    test('contains Wormadam cosmetic cloaks', () {
+      expect(kCosmeticVarietyNames, containsAll(['wormadam-sandy', 'wormadam-trash']));
+    });
+
+    test('contains Squawkabilly plumage variants', () {
+      expect(kCosmeticVarietyNames, containsAll([
+        'squawkabilly-blue-plumage',
+        'squawkabilly-yellow-plumage',
+        'squawkabilly-white-plumage',
+      ]));
+    });
+
+    test('contains Minior core colour variants', () {
+      expect(kCosmeticVarietyNames, containsAll([
+        'minior-red', 'minior-orange', 'minior-yellow', 'minior-green',
+        'minior-blue', 'minior-indigo', 'minior-violet',
+      ]));
+    });
+
+    test('contains Morpeko Hangry mode', () {
+      expect(kCosmeticVarietyNames, contains('morpeko-hangry'));
+    });
+
+    test('contains Mimikyu Busted form', () {
+      expect(kCosmeticVarietyNames, contains('mimikyu-busted'));
+    });
+
+    test('does not contain battle-meaningful forms', () {
+      expect(kCosmeticVarietyNames, isNot(contains('giratina-origin')));
+      expect(kCosmeticVarietyNames, isNot(contains('rotom-heat')));
+      expect(kCosmeticVarietyNames, isNot(contains('meowstic-female')));
+      expect(kCosmeticVarietyNames, isNot(contains('urshifu-rapid-strike')));
+    });
+
+    test('does not contain mega, gmax, or totem forms', () {
+      expect(kCosmeticVarietyNames, isNot(contains('charizard-mega-x')));
+      expect(kCosmeticVarietyNames, isNot(contains('charizard-gmax')));
+      expect(kCosmeticVarietyNames, isNot(contains('marowak-totem')));
+    });
+
+    test('battle-meaningful forms and cosmetic forms are disjoint', () {
+      // No variety should appear in both sets — that would make its chip
+      // appear in the Forms tab AND as a cosmetic chip simultaneously.
+      final allBattle = battleMeaningfulForms([
+        _v('wormadam-plant', isDefault: true),
+        _v('wormadam-sandy'),
+        _v('wormadam-trash'),
+        _v('squawkabilly-green-plumage', isDefault: true),
+        _v('squawkabilly-blue-plumage'),
+        _v('morpeko-full-belly', isDefault: true),
+        _v('morpeko-hangry'),
+        _v('mimikyu-disguised', isDefault: true),
+        _v('mimikyu-busted'),
+      ]);
+      for (final v in allBattle) {
+        expect(
+          kCosmeticVarietyNames,
+          isNot(contains(v.name)),
+          reason: '${v.name} should not be in both sets',
+        );
+      }
+    });
+  });
 }
