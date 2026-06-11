@@ -239,6 +239,7 @@ const kBaseFormNameOverrides = <String, String>{
   'toxtricity-amped':     'Amped',
   'zacian':               'Hero',
   'zamazenta':            'Hero',
+  'palafin':              'Zero',
 };
 
 /// Maps specific base_form names (as they appear in PokéAPI evolution_details)
