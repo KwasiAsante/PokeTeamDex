@@ -240,11 +240,13 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     final wideSelectedCosmetic = _selectedCosmeticFormName != null
         ? cosmeticForms.where((f) => f.name == _selectedCosmeticFormName).firstOrNull
         : null;
+    // Cosmetic forms share the same Pokémon resource — no separate HOME artwork
+    // exists per form. Use the form's pixel sprite directly.
     final wideDisplayUrl = wideSelectedCosmetic != null
-        ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${wideSelectedCosmetic.id}.png'
+        ? (wideSelectedCosmetic.spriteUrl ?? effectivePokemon.officialArtworkUrl)
         : effectivePokemon.officialArtworkUrl;
     final wideShinyUrl = wideSelectedCosmetic != null
-        ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/${wideSelectedCosmetic.id}.png'
+        ? (wideSelectedCosmetic.spriteShinyUrl ?? wideSelectedCosmetic.spriteUrl)
         : effectivePokemon.officialArtworkShinyUrl;
 
     return Scaffold(
@@ -441,12 +443,13 @@ class _DetailSliverAppBar extends StatelessWidget {
         ? cosmeticForms.where((f) => f.name == selectedCosmeticFormName).firstOrNull
         : null;
 
-    // HOME artwork for the selected cosmetic form; falls back to sprite via CachedNetworkImage error handler.
+    // Cosmetic forms share the same Pokémon resource — no separate HOME artwork
+    // exists per form. Use the form's pixel sprite directly.
     final displayDefaultUrl = selectedCosmetic != null
-        ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${selectedCosmetic.id}.png'
+        ? (selectedCosmetic.spriteUrl ?? effectivePokemon.officialArtworkUrl)
         : effectivePokemon.officialArtworkUrl;
     final displayShinyUrl = selectedCosmetic != null
-        ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/${selectedCosmetic.id}.png'
+        ? (selectedCosmetic.spriteShinyUrl ?? selectedCosmetic.spriteUrl)
         : effectivePokemon.officialArtworkShinyUrl;
 
     // Expand header height when cosmetic chips are present.
