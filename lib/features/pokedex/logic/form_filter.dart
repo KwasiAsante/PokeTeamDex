@@ -33,6 +33,39 @@ const _kBattleMeaningfulNames = {
   // Basculin White-Striped is Hisui-exclusive and the only form that evolves
   // into Basculegion; treated as a regional form.
   'basculin-white-striped',
+  // Deoxys — each forme has a distinct stat distribution
+  'deoxys-attack', 'deoxys-defense', 'deoxys-speed',
+  // Shaymin — Sky forme has different type, stats, and ability
+  'shaymin-sky',
+  // Giratina — Origin forme has different ability and stats
+  'giratina-origin',
+  // Dialga & Palkia — Origin formes have different typing and stats
+  'dialga-origin',
+  'palkia-origin',
+  // Forces of Nature — Therian formes have different abilities and stats
+  'tornadus-therian', 'thundurus-therian', 'landorus-therian', 'enamorus-therian',
+  // Kyurem — fusion formes have different typing and stats
+  'kyurem-black', 'kyurem-white',
+  // Meloetta — Pirouette forme has different type (Fighting) and stats
+  'meloetta-pirouette',
+  // Greninja — Ash-Greninja has boosted SpA/Spe via Battle Bond
+  'greninja-ash',
+  // Aegislash — Blade forme has inverted bulk/offense stat spread
+  'aegislash-blade',
+  // Zygarde — 10% and Complete formes have very different stats
+  'zygarde-10', 'zygarde-complete',
+  // Hoopa — Unbound forme has different type and stats
+  'hoopa-unbound',
+  // Wishiwashi — School forme has massively boosted stats (ability-triggered)
+  'wishiwashi-school',
+  // Necrozma — fusion and Ultra formes have different types and stats
+  'necrozma-dusk', 'necrozma-dawn', 'necrozma-ultra',
+  // Ursaluna — Bloodmoon forme has different typing and a signature move
+  'ursaluna-bloodmoon',
+  // Gimmighoul — Roaming forme has different stats
+  'gimmighoul-roaming',
+  // Ogerpon — each mask changes typing and gives a unique signature move
+  'ogerpon-wellspring-mask', 'ogerpon-hearthflame-mask', 'ogerpon-cornerstone-mask',
 };
 
 /// Returns non-default [varieties] that are battle-meaningful — regional forms

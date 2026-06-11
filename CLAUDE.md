@@ -160,6 +160,38 @@ Apply this whenever:
 
 ---
 
+## PokéAPI Data Patterns
+
+### Variety names — always verify before coding
+
+PokéAPI variety names are often **shorter than the colloquial form name** and must be verified before adding them to `_kBattleMeaningfulNames`, `kBaseFormNameOverrides`, or `kCosmeticVarietyNames`. Never guess based on the form's display name.
+
+```bash
+curl -s "https://pokeapi.co/api/v2/pokemon-species/{id}" | python3 -c \
+  "import sys,json; [print(v['pokemon']['name'], '| default:', v['is_default']) for v in json.load(sys.stdin)['varieties']]"
+```
+
+Known traps:
+- `necrozma-dusk` (not `necrozma-dusk-mane`), `necrozma-dawn` (not `necrozma-dawn-wings`)
+- `ogerpon` (not `ogerpon-teal-mask`) — default variety has no mask suffix even though all forms are mask-based
+
+The key used in `kBaseFormNameOverrides` must be the exact default variety name returned by this endpoint.
+
+### Battle-meaningful vs cosmetic — classification rules
+
+**Battle-meaningful** (`_kBattleMeaningfulNames` in `form_filter.dart`) — the form switcher badge; switches Stats, Abilities, Moves, and Locations tabs:
+- Different base stats
+- Different type(s)
+- Different ability (not just ability slot order)
+
+**Cosmetic** (`kCosmeticVarietyNames` / `cosmeticFormsProvider`) — header sprite chip only; tabs do not change:
+- Identical stats, type, and ability
+- Visual/sprite difference only, or a move requirement that doesn't change the Pokémon's data
+
+When in doubt: look up both forms on Bulbapedia and compare the stat totals and type lines. If they match, it's cosmetic.
+
+---
+
 ## Windows Installer
 
 - **Known issue #96**: MSI "Launch after Finish" checkbox does not start the app — do not re-attempt without new information; use the EXE installer as the primary download for now
