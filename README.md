@@ -7,28 +7,29 @@ A full-featured Pokémon team builder and Pokédex browser built with Flutter. S
 ## Table of Contents
 
 1. [Feature Overview](#feature-overview)
-2. [Architecture Overview](#architecture-overview)
-3. [Frontend — Flutter App](#frontend--flutter-app)
+2. [Data Sources](#data-sources)
+3. [Architecture Overview](#architecture-overview)
+4. [Frontend — Flutter App](#frontend--flutter-app)
    - [Navigation & Routing](#navigation--routing)
    - [State Management](#state-management)
    - [Local Database (Drift)](#local-database-drift)
    - [Feature Modules](#feature-modules)
    - [Services Layer](#services-layer)
    - [Format Engine](#format-engine)
-4. [Backend — FastAPI](#backend--fastapi)
+5. [Backend — FastAPI](#backend--fastapi)
    - [API Endpoints](#api-endpoints)
    - [Database Models](#database-models)
    - [Authentication](#authentication)
-5. [Sync System](#sync-system)
+6. [Sync System](#sync-system)
    - [Push Phase](#push-phase)
    - [Pull Phase](#pull-phase)
    - [Conflict Resolution](#conflict-resolution)
-6. [Data Flow Diagrams](#data-flow-diagrams)
-7. [Local Development Setup](#local-development-setup)
-8. [Deploying the Backend](#deploying-the-backend)
-9. [Deploying the Frontend](#deploying-the-frontend)
-10. [Testing](#testing)
-11. [Project Structure](#project-structure)
+7. [Data Flow Diagrams](#data-flow-diagrams)
+8. [Local Development Setup](#local-development-setup)
+9. [Deploying the Backend](#deploying-the-backend)
+10. [Deploying the Frontend](#deploying-the-frontend)
+11. [Testing](#testing)
+12. [Project Structure](#project-structure)
 
 ---
 
@@ -45,6 +46,20 @@ A full-featured Pokémon team builder and Pokédex browser built with Flutter. S
 | **PS Integration** | Import teams from `.txt`, export Showdown-format text, write to local PS teams directory |
 | **Desktop** | System tray, native window management, persistent nav drawer |
 | **Platforms** | iOS, Android, macOS, Windows, Linux, Web |
+
+---
+
+## Data Sources
+
+| Source | What we use it for |
+|--------|-------------------|
+| [PokéAPI](https://pokeapi.co/docs/v2) | Pokémon species, base stats, types, abilities, moves, evolutions, locations, and all other Pokédex data |
+| [PokéAPI Sprites](https://github.com/PokeAPI/sprites) | Front/back sprites and official artwork for every Pokémon and form |
+| [Pokémon Showdown data](https://play.pokemonshowdown.com/data/) | Learnsets, move stats, item data, ability data, and competitive format definitions |
+| [Smogon/pokemon-showdown](https://github.com/smogon/pokemon-showdown) | Source repository for the PS data files pulled by `scripts/sync_ps_data.py` |
+| [Smogon Sprites](https://github.com/smogon/sprites) | Animated and generation-specific sprites used in the team builder and slot config |
+
+PS data is downloaded and trimmed by `scripts/sync_ps_data.py` and bundled into `assets/data/ps/`. The app checks a SHA hash on startup and auto-downloads updates from the backend when the data changes upstream.
 
 ---
 
