@@ -322,23 +322,23 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
       if (form.officialArtworkUrl != null) return form.officialArtworkUrl;
       final override = kCosmeticFormHomeUrlOverrides[form.name];
       if (override != null) return override;
+      if (form.formName == 'female') {
+        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${basePokemon.id}.png';
+      }
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteUrl;
       final suffix = form.name.substring(baseName.length + 1);
-      if (suffix == 'female') {
-        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${basePokemon.id}.png';
-      }
       return cosmeticFormHomeUrl(basePokemon.id, suffix);
     }
     String? cosmeticHomeShinyUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
       if (form.officialArtworkShinyUrl != null) return form.officialArtworkShinyUrl;
+      if (form.formName == 'female') {
+        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/female/${basePokemon.id}.png';
+      }
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteShinyUrl;
       final suffix = form.name.substring(baseName.length + 1);
-      if (suffix == 'female') {
-        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/female/${basePokemon.id}.png';
-      }
       return cosmeticFormHomeShinyUrl(basePokemon.id, suffix);
     }
 
@@ -572,14 +572,15 @@ class _DetailSliverAppBar extends StatelessWidget {
       // Specific URL overrides (e.g. xerneas-active → show neutral form).
       final override = kCosmeticFormHomeUrlOverrides[form.name];
       if (override != null) return override;
+      // Gender forms: check formName directly so it works even when basePokemon.name
+      // includes a suffix (e.g. "frillish-male" → "frillish-female" prefix check fails).
+      if (form.formName == 'female') {
+        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${basePokemon.id}.png';
+      }
       // Form-name-based: try "{baseId}-{suffix}.png" HOME URL.
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteUrl;
       final suffix = form.name.substring(baseName.length + 1);
-      // Gender forms use /home/female/{id}.png (not /home/{id}-female.png).
-      if (suffix == 'female') {
-        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${basePokemon.id}.png';
-      }
       return cosmeticFormHomeUrl(basePokemon.id, suffix);
     }
     String? cosmeticShinyUrlFor(PokemonFormEntry? form) {
@@ -587,12 +588,12 @@ class _DetailSliverAppBar extends StatelessWidget {
       if (form.officialArtworkShinyUrl != null) return form.officialArtworkShinyUrl;
       final shinyOverride = kCosmeticFormHomeShinyUrlOverrides[form.name];
       if (shinyOverride != null) return shinyOverride;
+      if (form.formName == 'female') {
+        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/female/${basePokemon.id}.png';
+      }
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteShinyUrl;
       final suffix = form.name.substring(baseName.length + 1);
-      if (suffix == 'female') {
-        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/female/${basePokemon.id}.png';
-      }
       return cosmeticFormHomeShinyUrl(basePokemon.id, suffix);
     }
 

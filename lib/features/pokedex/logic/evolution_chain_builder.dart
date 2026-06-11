@@ -237,6 +237,9 @@ const kBaseFormNameOverrides = <String, String>{
   'basculin-red-striped':      'Red-Striped',
   'oricorio-baile':            'Baile',
   'toxtricity-amped':          'Amped',
+  // Gender-differentiated Pokémon where the base default is the male form.
+  'frillish-male':             'Male',
+  'jellicent-male':            'Male',
   'zacian':                    'Hero',
   'zamazenta':                 'Hero',
   'palafin-zero':              'Zero',
