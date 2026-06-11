@@ -3066,7 +3066,6 @@ class _FormOptionTile extends ConsumerWidget {
 
 /// Horizontal strip of cosmetic form chips (≤ 6 forms) or a single count
 /// chip that opens a picker sheet (> 6 forms).
-// ignore: unused_element
 class _CosmeticFormRow extends StatelessWidget {
   final List<PokemonFormEntry> forms;
   final String? selectedFormName;
