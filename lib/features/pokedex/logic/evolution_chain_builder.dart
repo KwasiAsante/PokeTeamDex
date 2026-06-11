@@ -235,6 +235,7 @@ const kBaseFormNameOverrides = <String, String>{
   'lycanroc':             'Midday',
   'urshifu':              'Single Strike',
   'basculin-red-striped': 'Red-Striped',
+  'oricorio':             'Baile',
 };
 
 /// Maps specific base_form names (as they appear in PokéAPI evolution_details)
@@ -296,6 +297,8 @@ const _kSpecificFormLabels = <String, String>{
   'darmanitan-zen':            'Unovan Zen',
   'darmanitan-galar-standard': 'Galarian',
   'basculin-white-striped':    'Hisuian White-Striped',
+  'oricorio-pom-pom':          'Pom-Pom',
+  "oricorio-pau":              "Pa'u",
 };
 
 /// Short label for the app bar badge (e.g. "Galarian", "Alolan", "Combat Breed").
