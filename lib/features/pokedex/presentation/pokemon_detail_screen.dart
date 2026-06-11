@@ -32,6 +32,14 @@ import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
 
 /// Derives a display label from a PokéAPI cosmetic form name.
 /// e.g. "red-flower" → "Red Flower", "sandy" → "Sandy", "a" → "A".
+/// Pokémon whose PokéAPI form entries are phantom/irrelevant (e.g. Mothim
+/// inherits Burmy's Sandy/Trash form names but is visually always the same).
+const _kNoCosmeticFormsPokemon = <String>{'mothim'};
+
+/// Pokémon that have cosmetically different genders in sprites but no separate
+/// `/pokemon-form` resource in PokéAPI. A female chip is synthesised for these.
+const _kCosmeticGenderDiffPokemon = <String>{'unfezant'};
+
 /// Variety names that are purely cosmetic (same stats as base) and should
 /// appear as header cosmetic chips rather than in the Forms tab.
 const kCosmeticVarietyNames = <String>{
@@ -183,7 +191,14 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                   (battleForms.isNotEmpty
                       ? 'Base'
                       : shortBaseFormLabel(species?.generationName));
-        final cosmeticFormsBase = cosmeticFormsAsync?.asData?.value ?? const <PokemonFormEntry>[];
+        // Filter out phantom cosmetic forms for species that inherit irrelevant
+        // form names (e.g. Mothim gets Sandy/Trash from Burmy but looks identical).
+        final cosmeticFormsBase = _kNoCosmeticFormsPokemon.contains(basePokemon.name)
+            ? const <PokemonFormEntry>[]
+            : (cosmeticFormsAsync?.asData?.value ?? const <PokemonFormEntry>[]);
+        final cosmeticFormsLoading = !_kNoCosmeticFormsPokemon.contains(basePokemon.name) &&
+            cosmeticFormsAsync != null &&
+            cosmeticFormsAsync.isLoading;
 
         // Variety-based cosmetic chips are only shown for the BASE form.
         // When a regional battle form is selected (e.g. Hisuian Basculin),
@@ -213,11 +228,27 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
           }
         }
 
+        // Synthesise a female cosmetic chip for species with gender-diff sprites
+        // but no separate pokemon-form resource in PokéAPI (e.g. Unfezant).
+        if (_kCosmeticGenderDiffPokemon.contains(basePokemon.name) && _selectedFormName == null) {
+          final baseId = basePokemon.id;
+          varietyCosmeticForms.add(PokemonFormEntry(
+            id: baseId,
+            name: '${basePokemon.name}-female',
+            formName: 'female',
+            isDefault: false,
+            spriteUrl:
+                'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/female/$baseId.png',
+            spriteShinyUrl:
+                'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/female/$baseId.png',
+          ));
+        }
+
         final cosmeticForms = [...cosmeticFormsBase, ...varietyCosmeticForms];
 
         return isWide
-            ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms)
-            : _buildNarrowLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms);
+            ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms, cosmeticFormsLoading)
+            : _buildNarrowLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms, cosmeticFormsLoading);
       },
     );
   }
@@ -233,6 +264,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     List<PokemonVariety> battleForms,
     String baseFormLabel,
     List<PokemonFormEntry> cosmeticForms,
+    bool cosmeticFormsLoading,
   ) {
     return Scaffold(
       body: NestedScrollView(
@@ -250,6 +282,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
             tabController: _tabController,
             tabs: _tabs,
             cosmeticForms: cosmeticForms,
+            cosmeticFormsLoading: cosmeticFormsLoading,
             selectedCosmeticFormName: _selectedCosmeticFormName,
             onCosmeticFormSelect: (name) => setState(() => _selectedCosmeticFormName = name),
           ),
@@ -273,6 +306,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     List<PokemonVariety> battleForms,
     String baseFormLabel,
     List<PokemonFormEntry> cosmeticForms,
+    bool cosmeticFormsLoading,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -291,6 +325,9 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteUrl;
       final suffix = form.name.substring(baseName.length + 1);
+      if (suffix == 'female') {
+        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${basePokemon.id}.png';
+      }
       return cosmeticFormHomeUrl(basePokemon.id, suffix);
     }
     String? cosmeticHomeShinyUrlFor(PokemonFormEntry? form) {
@@ -299,6 +336,9 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteShinyUrl;
       final suffix = form.name.substring(baseName.length + 1);
+      if (suffix == 'female') {
+        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/female/${basePokemon.id}.png';
+      }
       return cosmeticFormHomeShinyUrl(basePokemon.id, suffix);
     }
 
@@ -494,6 +534,7 @@ class _DetailSliverAppBar extends StatelessWidget {
   final TabController tabController;
   final List<Tab> tabs;
   final List<PokemonFormEntry> cosmeticForms;
+  final bool cosmeticFormsLoading;
   final String? selectedCosmeticFormName;
   final void Function(String?) onCosmeticFormSelect;
 
@@ -510,6 +551,7 @@ class _DetailSliverAppBar extends StatelessWidget {
     required this.tabController,
     required this.tabs,
     required this.cosmeticForms,
+    required this.cosmeticFormsLoading,
     required this.selectedCosmeticFormName,
     required this.onCosmeticFormSelect,
   });
@@ -534,6 +576,10 @@ class _DetailSliverAppBar extends StatelessWidget {
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteUrl;
       final suffix = form.name.substring(baseName.length + 1);
+      // Gender forms use /home/female/{id}.png (not /home/{id}-female.png).
+      if (suffix == 'female') {
+        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${basePokemon.id}.png';
+      }
       return cosmeticFormHomeUrl(basePokemon.id, suffix);
     }
     String? cosmeticShinyUrlFor(PokemonFormEntry? form) {
@@ -544,6 +590,9 @@ class _DetailSliverAppBar extends StatelessWidget {
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteShinyUrl;
       final suffix = form.name.substring(baseName.length + 1);
+      if (suffix == 'female') {
+        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/female/${basePokemon.id}.png';
+      }
       return cosmeticFormHomeShinyUrl(basePokemon.id, suffix);
     }
 
@@ -623,7 +672,13 @@ class _DetailSliverAppBar extends StatelessWidget {
                         size: 200,
                       ),
               ),
-              if (cosmeticForms.isNotEmpty) ...[
+              if (cosmeticFormsLoading) ...[
+                const SizedBox(height: 6),
+                const SizedBox(
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+                ),
+              ] else if (cosmeticForms.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 _CosmeticFormRow(
                   forms: cosmeticForms,
