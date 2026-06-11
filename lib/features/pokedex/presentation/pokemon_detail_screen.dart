@@ -52,9 +52,9 @@ const kCosmeticVarietyNames = <String>{
   'morpeko-hangry',
   // Mimikyu — Busted form is post-disguise reveal (same stats)
   'mimikyu-busted',
-  // Minior — 6 non-default meteor colour variants (same stats as Red Meteor)
-  'minior-orange-meteor', 'minior-yellow-meteor', 'minior-green-meteor',
-  'minior-blue-meteor', 'minior-indigo-meteor', 'minior-violet-meteor',
+  // Minior — 7 core colour variants (more visual change than meteor colours)
+  'minior-red', 'minior-orange', 'minior-yellow', 'minior-green',
+  'minior-blue', 'minior-indigo', 'minior-violet',
   // Magearna — Original Color is the event-variant colour (same stats)
   'magearna-original',
   // Eiscue — Noice Face has melted ice (same stats; ability-triggered)

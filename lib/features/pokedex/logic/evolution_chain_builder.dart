@@ -269,7 +269,7 @@ const kBaseFormNameOverrides = <String, String>{
   'floette':                   'Red Flower',
   'morpeko-full-belly':        'Full Belly',
   'mimikyu-disguised':         'Disguised',
-  'minior-red-meteor':         'Red',
+  'minior-red-meteor':         'Meteor',
   'eiscue-ice':                'Ice Face',
   'maushold-family-of-four':   'Family of Four',
   'keldeo-ordinary':           'Ordinary',
@@ -282,14 +282,15 @@ const kCosmeticFormLabels = <String, String>{
   // Xerneas: the official artwork at pokemon/716 shows the Active form, so the
   // non-default form chip should be labeled "Neutral" (the resting pose).
   'xerneas-active': 'Neutral',
-  // Minior: fallback produces "Minior Orange Meteor" etc. — override to just the
-  // colour so 6 chips are visually distinct at a glance.
-  'minior-orange-meteor': 'Orange',
-  'minior-yellow-meteor': 'Yellow',
-  'minior-green-meteor':  'Green',
-  'minior-blue-meteor':   'Blue',
-  'minior-indigo-meteor': 'Indigo',
-  'minior-violet-meteor': 'Violet',
+  // Minior: fallback produces "Minior Red" etc. — override to just the colour
+  // so 7 core chips are visually distinct at a glance.
+  'minior-red':    'Red',
+  'minior-orange': 'Orange',
+  'minior-yellow': 'Yellow',
+  'minior-green':  'Green',
+  'minior-blue':   'Blue',
+  'minior-indigo': 'Indigo',
+  'minior-violet': 'Violet',
   // Eiscue: official form name is "Noice Face" — "Eiscue Noice" would be confusing.
   'eiscue-noice':         'Noice Face',
   // Magearna: official name is "Original Color Magearna" — shorten for chip.
@@ -304,12 +305,19 @@ const kCosmeticFormHomeUrlOverrides = <String, String>{
   // HOME artwork so the chip actually displays the neutral appearance.
   'xerneas-active':
       'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/716-neutral.png',
+  // mimikyu-busted has no officialArtworkUrl in PokéAPI (variety ID 10143);
+  // provide the HOME sprite directly so the chip shows artwork instead of the
+  // low-res front_default pixel sprite.
+  'mimikyu-busted':
+      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/10143.png',
 };
 
 /// Same as [kCosmeticFormHomeUrlOverrides] but for shiny HOME artwork.
 const kCosmeticFormHomeShinyUrlOverrides = <String, String>{
   'xerneas-active':
       'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/716-neutral.png',
+  'mimikyu-busted':
+      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/10143.png',
 };
 
 /// HOME artwork to use for the BASE form display when the default official
