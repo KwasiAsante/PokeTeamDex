@@ -236,16 +236,32 @@ const _kGenLabelShort = {
 String shortBaseFormLabel(String? generationName) =>
     (generationName != null ? _kGenLabelShort[generationName] : null) ?? 'Original';
 
-/// Short label for the app bar badge (e.g. "Galarian", "Alolan").
+/// Short label for the app bar badge (e.g. "Galarian", "Alolan", "Combat Breed").
+///
+/// For plain regional forms (e.g. "zigzagoon-galar") returns the region adjective.
+/// For forms with a regional infix followed by a sub-form descriptor
+/// (e.g. "tauros-paldea-combat-breed") returns the sub-form label ("Combat Breed").
 String shortFormLabel(String varietyName) {
   const suffixShort = {
     'galar': 'Galarian', 'alola': 'Alolan',
     'hisui': 'Hisuian',  'paldea': 'Paldean',
   };
+  // Plain regional suffix — return the region adjective.
   for (final entry in suffixShort.entries) {
     if (varietyName.endsWith('-${entry.key}')) return entry.value;
   }
+  // Regional infix with sub-form content after it (e.g. tauros-paldea-combat-breed).
+  const infixes = ['paldea', 'galar', 'alola', 'hisui'];
   final parts = varietyName.split('-');
+  for (final infix in infixes) {
+    final idx = parts.indexOf(infix);
+    if (idx != -1 && idx < parts.length - 1) {
+      return parts.sublist(idx + 1)
+          .map((p) => '${p[0].toUpperCase()}${p.substring(1)}')
+          .join(' ');
+    }
+  }
+  // Fallback: capitalize last segment.
   final last = parts.last;
   return '${last[0].toUpperCase()}${last.substring(1)}';
 }

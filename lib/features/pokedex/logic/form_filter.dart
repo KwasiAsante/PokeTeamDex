@@ -20,6 +20,10 @@ const _kBattleMeaningfulNames = {
   'zacian-crowned', 'zamazenta-crowned',
   'calyrex-ice', 'calyrex-shadow',
   'palafin-hero',
+  // Paldean Tauros breeds — each has distinct typing, stats, moves, and locations.
+  'tauros-paldea-combat-breed',
+  'tauros-paldea-blaze-breed',
+  'tauros-paldea-aqua-breed',
 };
 
 /// Returns non-default [varieties] that are battle-meaningful — regional forms

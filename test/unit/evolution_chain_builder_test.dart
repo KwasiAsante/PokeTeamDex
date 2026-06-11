@@ -173,4 +173,21 @@ void main() {
       expect(formLabel(isDefault: true, varietyName: 'x', generationName: null), 'Original Form');
     });
   });
+
+  group('shortFormLabel', () {
+    test('plain galar suffix → Galarian', () {
+      expect(shortFormLabel('zigzagoon-galar'), 'Galarian');
+    });
+    test('plain alola suffix → Alolan', () {
+      expect(shortFormLabel('vulpix-alola'), 'Alolan');
+    });
+    test('paldea sub-form → sub-form label', () {
+      expect(shortFormLabel('tauros-paldea-combat-breed'), 'Combat Breed');
+      expect(shortFormLabel('tauros-paldea-blaze-breed'), 'Blaze Breed');
+      expect(shortFormLabel('tauros-paldea-aqua-breed'), 'Aqua Breed');
+    });
+    test('mr-mime-galar → Galarian (not just last segment)', () {
+      expect(shortFormLabel('mr-mime-galar'), 'Galarian');
+    });
+  });
 }

@@ -87,5 +87,21 @@ void main() {
       final result = battleMeaningfulForms(varieties);
       expect(result.length, 2);
     });
+
+    test('includes all 3 Paldean Tauros breeds', () {
+      final varieties = [
+        _v('tauros', isDefault: true),
+        _v('tauros-paldea-combat-breed'),
+        _v('tauros-paldea-blaze-breed'),
+        _v('tauros-paldea-aqua-breed'),
+      ];
+      final result = battleMeaningfulForms(varieties);
+      expect(result.length, 3);
+      expect(result.map((v) => v.name), containsAll([
+        'tauros-paldea-combat-breed',
+        'tauros-paldea-blaze-breed',
+        'tauros-paldea-aqua-breed',
+      ]));
+    });
   });
 }
