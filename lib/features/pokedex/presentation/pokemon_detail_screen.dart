@@ -26,10 +26,15 @@ import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/stat_bar.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
+import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
+import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
 
 class PokemonDetailScreen extends ConsumerStatefulWidget {
   final int pokemonId;
-  const PokemonDetailScreen({super.key, required this.pokemonId});
+  /// When navigating from an evolution chain node, pre-select this form
+  /// (e.g. "zigzagoon-galar"). pokemonId must still be the species ID (≤ 1025).
+  final String? initialFormName;
+  const PokemonDetailScreen({super.key, required this.pokemonId, this.initialFormName});
 
   @override
   ConsumerState<PokemonDetailScreen> createState() => _PokemonDetailScreenState();
@@ -39,6 +44,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _shiny = false;
+  String? _selectedFormName; // null = base form
 
   // Narrow layout — horizontal TabBar
   static const _tabs = [
@@ -72,6 +78,9 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
+    if (widget.initialFormName != null) {
+      _selectedFormName = widget.initialFormName;
+    }
   }
 
   @override
@@ -81,23 +90,27 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
   }
 
   List<Widget> _tabChildren(
-    PokemonEntry pokemon,
+    PokemonEntry basePokemon,
+    PokemonEntry effectivePokemon,
     AsyncValue<PokemonSpeciesEntry> speciesAsync,
   ) => [
-    _OverviewTab(pokemon: pokemon, speciesAsync: speciesAsync),
-    _StatsTab(pokemon: pokemon),
-    _AbilitiesTab(pokemon: pokemon),
-    _MovesTab(pokemon: pokemon),
-    _EvolutionsTab(speciesAsync: speciesAsync),
-    _FormsTab(speciesAsync: speciesAsync),
-    _LocationsTab(pokemonId: widget.pokemonId),
-    _TeamsTab(pokemonId: widget.pokemonId, pokemon: pokemon),
+    _OverviewTab(pokemon: effectivePokemon, speciesAsync: speciesAsync),
+    _StatsTab(pokemon: effectivePokemon),
+    _AbilitiesTab(pokemon: effectivePokemon),
+    _MovesTab(pokemon: effectivePokemon),
+    _EvolutionsTab(speciesAsync: speciesAsync, selectedFormName: _selectedFormName),
+    _FormsTab(speciesAsync: speciesAsync, selectedFormName: _selectedFormName),
+    _LocationsTab(pokemonId: effectivePokemon.id),
+    _TeamsTab(pokemonId: widget.pokemonId, pokemon: basePokemon, selectedFormName: _selectedFormName),
   ];
 
   @override
   Widget build(BuildContext context) {
     final pokemonAsync = ref.watch(pokemonDetailProvider(widget.pokemonId));
     final speciesAsync = ref.watch(pokemonSpeciesProvider(widget.pokemonId));
+    final formAsync = _selectedFormName != null
+        ? ref.watch(pokemonByNameProvider(_selectedFormName!))
+        : null;
     final isWide = MediaQuery.sizeOf(context).width > 840;
 
     return pokemonAsync.when(
@@ -112,14 +125,36 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
           onRetry: () => ref.invalidate(pokemonDetailProvider(widget.pokemonId)),
         ),
       ),
-      data: (pokemon) {
-        final primaryType = pokemon.types[1] ?? pokemon.types.values.first;
+      data: (basePokemon) {
+        final effectivePokemon = formAsync?.asData?.value ?? basePokemon;
+        final primaryType =
+            effectivePokemon.types[1] ?? effectivePokemon.types.values.first;
         final headerColor =
             PokemonTypeColors.colors[primaryType] ?? Theme.of(context).colorScheme.primary;
+        final species = speciesAsync.asData?.value;
+        final battleForms = species != null
+            ? battleMeaningfulForms(species.varieties)
+            : <PokemonVariety>[];
+        // Derive the correct base form label:
+        // • Gender-split species (all forms end in -female) → "Male"
+        // • Species with regional forms (any form has a regional suffix) → regional adjective
+        // • Non-regional non-gender form variants (Rotom appliances, Lycanroc, Urshifu…) → "Base"
+        final allFemale = battleForms.isNotEmpty &&
+            battleForms.every((v) => v.name.endsWith('-female'));
+        final hasRegionalForm =
+            battleForms.any((v) => regionalSuffixOf(v.name) != null);
+        final baseFormLabel = allFemale
+            ? 'Male'
+            : hasRegionalForm
+                ? shortBaseFormLabel(species?.generationName)
+                : kBaseFormNameOverrides[basePokemon.name] ??
+                  (battleForms.isNotEmpty
+                      ? 'Base'
+                      : shortBaseFormLabel(species?.generationName));
 
         return isWide
-            ? _buildWideLayout(context, pokemon, speciesAsync, headerColor)
-            : _buildNarrowLayout(context, pokemon, speciesAsync, headerColor);
+            ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel)
+            : _buildNarrowLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel);
       },
     );
   }
@@ -128,15 +163,23 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
 
   Widget _buildNarrowLayout(
     BuildContext context,
-    PokemonEntry pokemon,
+    PokemonEntry basePokemon,
+    PokemonEntry effectivePokemon,
     AsyncValue<PokemonSpeciesEntry> speciesAsync,
     Color headerColor,
+    List<PokemonVariety> battleForms,
+    String baseFormLabel,
   ) {
     return Scaffold(
       body: NestedScrollView(
         headerSliverBuilder: (context, _) => [
           _DetailSliverAppBar(
-            pokemon: pokemon,
+            basePokemon: basePokemon,
+            effectivePokemon: effectivePokemon,
+            battleForms: battleForms,
+            baseFormLabel: baseFormLabel,
+            selectedFormName: _selectedFormName,
+            onFormSelect: (name) => setState(() => _selectedFormName = name),
             headerColor: headerColor,
             shiny: _shiny,
             onShinyToggle: () => setState(() => _shiny = !_shiny),
@@ -146,7 +189,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         ],
         body: TabBarView(
           controller: _tabController,
-          children: _tabChildren(pokemon, speciesAsync),
+          children: _tabChildren(basePokemon, effectivePokemon, speciesAsync),
         ),
       ),
     );
@@ -156,9 +199,12 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
 
   Widget _buildWideLayout(
     BuildContext context,
-    PokemonEntry pokemon,
+    PokemonEntry basePokemon,
+    PokemonEntry effectivePokemon,
     AsyncValue<PokemonSpeciesEntry> speciesAsync,
     Color headerColor,
+    List<PokemonVariety> battleForms,
+    String baseFormLabel,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -169,11 +215,21 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         foregroundColor: Colors.white,
         leading: BackButton(onPressed: () => context.pop()),
         title: Text(
-          '${pokemon.displayId()}  ${pokemon.displaySpeciesName}',
+          '${basePokemon.displayId()}  ${basePokemon.displaySpeciesName}',
           style: const TextStyle(color: Colors.white),
         ),
         actions: [
-          FavoriteButton(pokemonId: pokemon.id),
+          FavoriteButton(pokemonId: basePokemon.id),
+          if (battleForms.isNotEmpty)
+            _FormBadge(
+              battleForms: battleForms,
+              baseFormLabel: baseFormLabel,
+              baseSpriteUrl: basePokemon.officialArtworkUrl,
+              baseShinyUrl: basePokemon.officialArtworkShinyUrl,
+              selectedFormName: _selectedFormName,
+              shiny: _shiny,
+              onSelect: (name) => setState(() => _selectedFormName = name),
+            ),
           IconButton(
             tooltip: _shiny ? 'Show default' : 'Show shiny',
             icon: Icon(
@@ -205,18 +261,17 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                   child: Column(
                     children: [
                       Hero(
-                        tag: 'pokemon-sprite-${pokemon.id}',
+                        tag: 'pokemon-sprite-${basePokemon.id}',
                         child: PokemonSprite(
-                          defaultUrl: pokemon.officialArtworkUrl,
-                          shinyUrl: pokemon.sprites?['other']
-                              ?['official-artwork']?['front_shiny'] as String?,
+                          defaultUrl: effectivePokemon.officialArtworkUrl,
+                          shinyUrl: effectivePokemon.officialArtworkShinyUrl,
                           shiny: _shiny,
                           size: 140,
                         ),
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        pokemon.displaySpeciesName,
+                        basePokemon.displaySpeciesName,
                         style: textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                         textAlign: TextAlign.center,
@@ -225,7 +280,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                       Wrap(
                         spacing: 6,
                         alignment: WrapAlignment.center,
-                        children: pokemon.types.values
+                        children: effectivePokemon.types.values
                             .map((t) => TypeBadge(type: t))
                             .toList(),
                       ),
@@ -287,7 +342,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
               child: TabBarView(
                 controller: _tabController,
                 physics: const NeverScrollableScrollPhysics(),
-                children: _tabChildren(pokemon, speciesAsync),
+                children: _tabChildren(basePokemon, effectivePokemon, speciesAsync),
               ),
             ),
           ),
@@ -300,7 +355,12 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
 // ── Sliver AppBar ─────────────────────────────────────────────────────────────
 
 class _DetailSliverAppBar extends StatelessWidget {
-  final PokemonEntry pokemon;
+  final PokemonEntry basePokemon;
+  final PokemonEntry effectivePokemon;
+  final List<PokemonVariety> battleForms;
+  final String baseFormLabel;
+  final String? selectedFormName;
+  final void Function(String?) onFormSelect;
   final Color headerColor;
   final bool shiny;
   final VoidCallback onShinyToggle;
@@ -308,7 +368,12 @@ class _DetailSliverAppBar extends StatelessWidget {
   final List<Tab> tabs;
 
   const _DetailSliverAppBar({
-    required this.pokemon,
+    required this.basePokemon,
+    required this.effectivePokemon,
+    required this.battleForms,
+    required this.baseFormLabel,
+    required this.selectedFormName,
+    required this.onFormSelect,
     required this.headerColor,
     required this.shiny,
     required this.onShinyToggle,
@@ -325,11 +390,21 @@ class _DetailSliverAppBar extends StatelessWidget {
       foregroundColor: Colors.white,
       leading: BackButton(onPressed: () => context.pop()),
       title: Text(
-        '${pokemon.displayId()}  ${pokemon.displaySpeciesName}',
+        '${basePokemon.displayId()}  ${basePokemon.displaySpeciesName}',
         style: const TextStyle(color: Colors.white),
       ),
       actions: [
-        FavoriteButton(pokemonId: pokemon.id),
+        FavoriteButton(pokemonId: basePokemon.id),
+        if (battleForms.isNotEmpty)
+          _FormBadge(
+            battleForms: battleForms,
+            baseFormLabel: baseFormLabel,
+            baseSpriteUrl: basePokemon.officialArtworkUrl,
+            baseShinyUrl: basePokemon.officialArtworkShinyUrl,
+            selectedFormName: selectedFormName,
+            shiny: shiny,
+            onSelect: onFormSelect,
+          ),
         IconButton(
           tooltip: shiny ? 'Show default' : 'Show shiny',
           icon: Icon(
@@ -346,10 +421,10 @@ class _DetailSliverAppBar extends StatelessWidget {
           color: headerColor.withValues(alpha: 0.85),
           child: Center(
             child: Hero(
-              tag: 'pokemon-sprite-${pokemon.id}',
+              tag: 'pokemon-sprite-${basePokemon.id}',
               child: PokemonSprite(
-                defaultUrl: pokemon.officialArtworkUrl,
-                shinyUrl: pokemon.sprites?['other']?['official-artwork']?['front_shiny'] as String?,
+                defaultUrl: effectivePokemon.officialArtworkUrl,
+                shinyUrl: effectivePokemon.officialArtworkShinyUrl,
                 shiny: shiny,
                 size: 200,
               ),
@@ -1373,7 +1448,8 @@ class _AbilityCard extends ConsumerWidget {
 
 class _EvolutionsTab extends ConsumerWidget {
   final AsyncValue<PokemonSpeciesEntry> speciesAsync;
-  const _EvolutionsTab({required this.speciesAsync});
+  final String? selectedFormName;
+  const _EvolutionsTab({required this.speciesAsync, this.selectedFormName});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1383,19 +1459,84 @@ class _EvolutionsTab extends ConsumerWidget {
       data: (species) {
         final chainId = species.evolutionChainId;
         if (chainId == null) {
-          return const EmptyState(
-            icon: Icons.device_unknown,
-            title: 'No evolution data',
-          );
+          return const EmptyState(icon: Icons.device_unknown, title: 'No evolution data');
         }
         final chainAsync = ref.watch(evolutionChainProvider(chainId));
         return chainAsync.when(
           loading: () => const LoadingState(),
           error: (e, _) => ErrorState(error: e),
-          data: (root) => SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: _EvolutionTree(node: root),
-          ),
+          data: (root) {
+            // Step 1: suffix from the form switcher.
+            String? suffix = selectedFormName != null
+                ? regionalSuffixOf(selectedFormName!)
+                : null;
+            // Step 2: auto-detect for Pokémon like Obstagoon and Mr. Rime that
+            // have no regional varieties of their own but are form-exclusive evolutions.
+            suffix ??= chainHasFormDetails(root)
+                ? formSuffixForSpecies(root, species.id)
+                : null;
+
+            // Pre-resolve form IDs for terminal nodes and region branches.
+            final allNames = collectSpeciesNames(root);
+            const regionalSuffixes = ['galar', 'alola', 'hisui', 'paldea'];
+            final formIds = <String, int>{};
+            for (final name in allNames) {
+              for (final s in regionalSuffixes) {
+                final exactAsync = ref.watch(pokemonByNameProvider('$name-$s'));
+                final exactId = exactAsync.asData?.value.id;
+                if (exactId != null) {
+                  formIds['$name-$s'] = exactId;
+                } else {
+                  // Try "{name}-{suffix}-standard" for species whose Galarian/regional
+                  // form uses a compound name (e.g. darmanitan-galar-standard rather
+                  // than darmanitan-galar which doesn't exist in PokéAPI).
+                  // Try "{name}-{suffix}-standard" fallback (darmanitan-galar-standard).
+                  final stdAsync = ref.watch(pokemonByNameProvider('$name-$s-standard'));
+                  final stdId = stdAsync.asData?.value.id;
+                  if (stdId != null) {
+                    formIds['$name-$s'] = stdId;
+                    formIds['$name-$s-standard'] = stdId;
+                  } else {
+                    // Try kRegionalFormLookup for forms with non-standard naming
+                    // (e.g. basculin-hisui → basculin-white-striped).
+                    final lookupName = kRegionalFormLookup['$name-$s'];
+                    if (lookupName != null) {
+                      final lookupAsync = ref.watch(pokemonByNameProvider(lookupName));
+                      final lookupId = lookupAsync.asData?.value.id;
+                      if (lookupId != null) {
+                        formIds['$name-$s'] = lookupId;
+                        formIds[lookupName] = lookupId;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+            // Root display ID: regional form of the chain root when applicable.
+            final rootDisplayId = suffix != null
+                ? (formIds['${root.speciesName}-$suffix'] ?? root.speciesId)
+                : root.speciesId;
+
+            // Suffixes already in the form switcher — omit their region-keyed
+            // branches from the default chain (e.g. Raichu's base chain should
+            // not show the Alolan branch; the user switches via the badge).
+            final switcherSuffixes = battleMeaningfulForms(species.varieties)
+                .map((v) => regionalSuffixOf(v.name))
+                .whereType<String>()
+                .toSet();
+
+            final displayRoot = buildFormChain(
+              root, suffix, rootDisplayId,
+              formIds: formIds,
+              excludeRegionSuffixes: suffix == null ? switcherSuffixes : const {},
+            );
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: _EvolutionTree(displayNode: displayRoot),
+            );
+          },
         );
       },
     );
@@ -1406,62 +1547,49 @@ class _EvolutionsTab extends ConsumerWidget {
 /// Linear chains stay vertical; branching chains (e.g. Eevee) spread
 /// horizontally in a Wrap so they don't all stack into a single tall column.
 class _EvolutionTree extends StatelessWidget {
-  final EvolutionNode node;
-  const _EvolutionTree({required this.node});
+  final DisplayNode displayNode;
+  const _EvolutionTree({required this.displayNode});
 
   @override
   Widget build(BuildContext context) {
-    if (node.evolvesTo.isEmpty) {
-      return _EvolutionNodeCard(node: node);
-    }
+    final node = displayNode;
+    if (node.evolvesTo.isEmpty) return _EvolutionNodeCard(displayNode: node);
 
     if (node.evolvesTo.length == 1) {
-      // Linear chain — vertical layout
       final child = node.evolvesTo.first;
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _EvolutionNodeCard(node: node),
+          _EvolutionNodeCard(displayNode: node),
           const SizedBox(height: 6),
-          _EvolutionArrow(details: child.details),
+          _EvolutionArrow(details: child.matchedDetails ?? child.source.details),
           const SizedBox(height: 6),
-          _EvolutionTree(node: child),
+          _EvolutionTree(displayNode: child),
         ],
       );
     }
 
-    // Branching — show branches side-by-side in a Wrap
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _EvolutionNodeCard(node: node),
+        _EvolutionNodeCard(displayNode: node),
         const SizedBox(height: 6),
-        const Icon(
-          Icons.call_split_rounded,
-          size: 22,
-          color: Colors.grey,
-        ),
+        const Icon(Icons.call_split_rounded, size: 22, color: Colors.grey),
         const SizedBox(height: 8),
         Wrap(
           alignment: WrapAlignment.center,
           spacing: 12,
           runSpacing: 16,
-          children: node.evolvesTo.map((child) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ConditionChip(details: child.details),
-                const SizedBox(height: 4),
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 20,
-                  color: Colors.grey.shade400,
-                ),
-                const SizedBox(height: 4),
-                _EvolutionTree(node: child),
-              ],
-            );
-          }).toList(),
+          children: node.evolvesTo.map((child) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ConditionChip(details: child.matchedDetails ?? child.source.details),
+              const SizedBox(height: 4),
+              Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: Colors.grey.shade400),
+              const SizedBox(height: 4),
+              _EvolutionTree(displayNode: child),
+            ],
+          )).toList(),
         ),
       ],
     );
@@ -1491,53 +1619,48 @@ class _EvolutionArrow extends StatelessWidget {
 }
 
 class _EvolutionNodeCard extends StatelessWidget {
-  final EvolutionNode node;
-  const _EvolutionNodeCard({required this.node});
+  final DisplayNode displayNode;
+  const _EvolutionNodeCard({required this.displayNode});
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
+    final spriteUrl =
+        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${displayNode.displayId}.png';
     return GestureDetector(
-      onTap: () => context.push('/pokedex/${node.speciesId}'),
+      onTap: () {
+        final formName = displayNode.formName;
+        if (formName != null) {
+          context.push('/pokedex/${displayNode.source.speciesId}?form=${Uri.encodeComponent(formName)}');
+        } else {
+          context.push('/pokedex/${displayNode.source.speciesId}');
+        }
+      },
       child: Container(
         width: 96,
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-          ),
+          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             CachedNetworkImage(
-              imageUrl: node.spriteUrl,
-              width: 72,
-              height: 72,
-              placeholder: (_, _) => const SizedBox(
-                width: 72,
-                height: 72,
-                child: Icon(Icons.catching_pokemon, color: Colors.grey),
-              ),
-              errorWidget: (_, _, _) =>
-                  const Icon(Icons.broken_image_outlined),
+              imageUrl: spriteUrl,
+              width: 72, height: 72,
+              placeholder: (_, _) => const SizedBox(width: 72, height: 72,
+                  child: Icon(Icons.catching_pokemon, color: Colors.grey)),
+              errorWidget: (_, _, _) => const Icon(Icons.broken_image_outlined),
             ),
             const SizedBox(height: 4),
-            Text(
-              node.displayName,
-              textAlign: TextAlign.center,
-              style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            Text(
-              '#${node.speciesId.toString().padLeft(3, '0')}',
-              style: textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
+            Text(displayNode.source.displayName,
+                textAlign: TextAlign.center,
+                style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+            Text('#${displayNode.source.speciesId.toString().padLeft(3, '0')}',
+                style: textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant)),
           ],
         ),
       ),
@@ -1574,7 +1697,8 @@ class _ConditionChip extends StatelessWidget {
 
 class _FormsTab extends ConsumerWidget {
   final AsyncValue<PokemonSpeciesEntry> speciesAsync;
-  const _FormsTab({required this.speciesAsync});
+  final String? selectedFormName;
+  const _FormsTab({required this.speciesAsync, this.selectedFormName});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1582,12 +1706,24 @@ class _FormsTab extends ConsumerWidget {
       loading: () => const LoadingState(),
       error: (e, _) => ErrorState(error: e),
       data: (species) {
-        final nonDefault = species.varieties.where((v) => !v.isDefault).toList();
+        // Battle-meaningful forms live in the app bar switcher — exclude them here.
+        final switcherFormNames = battleMeaningfulForms(species.varieties)
+            .map((v) => v.name)
+            .toSet();
+        // When a regional form is selected, also hide mega/gmax forms: they
+        // belong to the base form and aren't accessible from a regional variant.
+        const megaSuffixes = {'-mega', '-mega-x', '-mega-y', '-mega-z', '-gmax', '-eternamax'};
+        final nonDefault = species.varieties.where((v) {
+          if (v.isDefault) return false;
+          if (switcherFormNames.contains(v.name)) return false;
+          if (selectedFormName != null && megaSuffixes.any((s) => v.name.endsWith(s))) return false;
+          return true;
+        }).toList();
         if (nonDefault.isEmpty) {
           return const EmptyState(
             icon: Icons.style_outlined,
             title: 'No alternate forms',
-            subtitle: 'This Pokémon has no regional forms, Mega Evolutions, or other variants.',
+            subtitle: 'Regional and battle forms are accessible via the form switcher above.',
           );
         }
         return ListView.separated(
@@ -1882,7 +2018,8 @@ class _LocationTile extends StatelessWidget {
 class _TeamsTab extends ConsumerWidget {
   final int pokemonId;
   final PokemonEntry pokemon;
-  const _TeamsTab({required this.pokemonId, required this.pokemon});
+  final String? selectedFormName;
+  const _TeamsTab({required this.pokemonId, required this.pokemon, this.selectedFormName});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1893,7 +2030,13 @@ class _TeamsTab extends ConsumerWidget {
     return pairsAsync.when(
       loading: () => const LoadingState(),
       error: (e, _) => ErrorState(error: e),
-      data: (pairs) => CustomScrollView(
+      data: (allPairs) {
+        // Show only slots matching the selected form.
+        // null selectedFormName = base form = slots where formName is null.
+        final pairs = allPairs
+            .where((pair) => pair.$2.formName == selectedFormName)
+            .toList();
+        return CustomScrollView(
         slivers: [
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
@@ -1986,7 +2129,8 @@ class _TeamsTab extends ConsumerWidget {
             ),
           ),
         ],
-      ),
+      );
+    },
     );
   }
 
@@ -2626,3 +2770,212 @@ class _AddToTeamTabState extends State<_AddToTeamTab> {
   }
 }
 
+// ── Form Badge ────────────────────────────────────────────────────────────────
+
+class _FormBadge extends StatelessWidget {
+  final List<PokemonVariety> battleForms;
+  final String baseFormLabel;
+  final String? baseSpriteUrl;
+  final String? baseShinyUrl;
+  final String? selectedFormName;
+  final bool shiny;
+  final void Function(String?) onSelect;
+
+  const _FormBadge({
+    required this.battleForms,
+    required this.baseFormLabel,
+    this.baseSpriteUrl,
+    this.baseShinyUrl,
+    required this.selectedFormName,
+    required this.shiny,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = selectedFormName != null
+        ? shortFormLabel(selectedFormName!)
+        : baseFormLabel;
+    return GestureDetector(
+      onTap: () => showModalBottomSheet(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (ctx) => _FormPickerSheet(
+          battleForms: battleForms,
+          baseFormLabel: baseFormLabel,
+          baseSpriteUrl: baseSpriteUrl,
+          baseShinyUrl: baseShinyUrl,
+          selectedFormName: selectedFormName,
+          shiny: shiny,
+          onSelect: (name) {
+            onSelect(name);
+            Navigator.pop(ctx);
+          },
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white38),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Form Picker Sheet ─────────────────────────────────────────────────────────
+
+class _FormPickerSheet extends StatelessWidget {
+  final List<PokemonVariety> battleForms;
+  final String baseFormLabel;
+  final String? baseSpriteUrl;
+  final String? baseShinyUrl;
+  final String? selectedFormName;
+  final bool shiny;
+  final void Function(String?) onSelect;
+
+  const _FormPickerSheet({
+    required this.battleForms,
+    required this.baseFormLabel,
+    this.baseSpriteUrl,
+    this.baseShinyUrl,
+    required this.selectedFormName,
+    required this.shiny,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final allOptions = <(String? name, String label)>[
+      (null, baseFormLabel),
+      ...battleForms.map((v) => (v.name, shortFormLabel(v.name))),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Select Form',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: allOptions.map((opt) {
+              final (name, label) = opt;
+              return _FormOptionTile(
+                formName: name,
+                label: label,
+                isSelected: name == selectedFormName,
+                shiny: shiny,
+                overrideSpriteUrl: name == null ? (shiny ? (baseShinyUrl ?? baseSpriteUrl) : baseSpriteUrl) : null,
+                onTap: () => onSelect(name),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Form Option Tile ──────────────────────────────────────────────────────────
+
+class _FormOptionTile extends ConsumerWidget {
+  final String? formName; // null = base form
+  final String label;
+  final bool isSelected;
+  final bool shiny;
+  /// Pre-resolved sprite URL for the base form tile (avoids a provider watch
+  /// on null formName and fixes the pokéball placeholder).
+  final String? overrideSpriteUrl;
+  final void Function() onTap;
+
+  const _FormOptionTile({
+    required this.formName,
+    required this.label,
+    required this.isSelected,
+    required this.shiny,
+    this.overrideSpriteUrl,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final pokemonAsync = formName != null
+        ? ref.watch(pokemonByNameProvider(formName!))
+        : null;
+    final formPokemon = pokemonAsync?.asData?.value;
+    final spriteUrl = overrideSpriteUrl ??
+        (shiny
+            ? (formPokemon?.officialArtworkShinyUrl ?? formPokemon?.officialArtworkUrl)
+            : formPokemon?.officialArtworkUrl);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 88,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primaryContainer
+              : colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? colorScheme.primary : colorScheme.outlineVariant,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (spriteUrl != null)
+              CachedNetworkImage(imageUrl: spriteUrl, height: 56, width: 56)
+            else
+              const SizedBox(
+                height: 56,
+                width: 56,
+                child: Icon(Icons.catching_pokemon, color: Colors.grey),
+              ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? colorScheme.primary : null,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

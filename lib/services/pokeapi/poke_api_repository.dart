@@ -244,23 +244,27 @@ class PokeApiRepository {
   }
 
   Future<PokemonSpeciesEntry> fetchPokemonSpecies(int id) async {
-    final memoized = _speciesById[id];
+    // Form-variant IDs (> 10000, e.g. 10174 for Galarian Zigzagoon) are not
+    // valid species IDs — resolve to the canonical species ID first so the
+    // /pokemon-species/ endpoint doesn't 404.
+    final speciesId = await _getSpeciesIdForPokemon(id);
+    final memoized = _speciesById[speciesId];
     if (memoized != null) return memoized;
-    final cacheKey = 'pokemon_species_$id';
+    final cacheKey = 'pokemon_species_$speciesId';
     final cached = _pokeApiCache.getIfValid(cacheKey);
     if (cached is Map<String, dynamic>) {
       final entry = PokemonSpeciesEntry.fromJson(cached);
-      _speciesById[id] = entry;
+      _speciesById[speciesId] = entry;
       return entry;
     }
-    final response = await _pokeApiClient.client.get('/pokemon-species/$id');
+    final response = await _pokeApiClient.client.get('/pokemon-species/$speciesId');
     if (response.statusCode != 200) {
-      throw Exception('Failed to fetch species $id: ${response.statusCode}');
+      throw Exception('Failed to fetch species $speciesId: ${response.statusCode}');
     }
     final data = Map<String, dynamic>.from(response.data);
     _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
     final entry = PokemonSpeciesEntry.fromJson(data);
-    _speciesById[id] = entry;
+    _speciesById[speciesId] = entry;
     return entry;
   }
 
