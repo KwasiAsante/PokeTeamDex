@@ -273,6 +273,18 @@ const kCosmeticFormHomeShinyUrlOverrides = <String, String>{
       'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/716-neutral.png',
 };
 
+/// HOME artwork to use for the BASE form display when the default official
+/// artwork doesn't match the expected canonical form (e.g. Unown's official
+/// artwork shows form-F but the canonical default is form-A).
+/// Also used as the first tile in the cosmetic form picker sheet.
+/// Key: basePokemon.name. Value: (homeUrl, shinyHomeUrl).
+const kBaseFormCosmeticHomeUrls = <String, (String homeUrl, String shinyUrl)>{
+  'unown': (
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/201-a.png',
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/201-a.png',
+  ),
+};
+
 /// Maps specific base_form names (as they appear in PokéAPI evolution_details)
 /// to their effective regional suffix. Used for forms that are regionally
 /// exclusive but don't follow the simple "{name}-{suffix}" naming convention.

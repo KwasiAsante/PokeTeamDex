@@ -307,10 +307,15 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     final wideSpriteUrl = wideSelectedCosmetic != null
         ? (_shiny ? (wideSelectedCosmetic.spriteShinyUrl ?? wideSelectedCosmetic.spriteUrl) : wideSelectedCosmetic.spriteUrl)
         : null;
-    final wideDisplayUrl =
-        wideHomeUrl ?? effectivePokemon.officialArtworkUrl;
-    final wideShinyUrl =
-        wideHomeShiny ?? effectivePokemon.officialArtworkShinyUrl;
+    final wideBaseOverride = wideSelectedCosmetic == null
+        ? kBaseFormCosmeticHomeUrls[basePokemon.name]
+        : null;
+    final wideDisplayUrl = wideHomeUrl
+        ?? (_shiny ? null : wideBaseOverride?.$1)
+        ?? effectivePokemon.officialArtworkUrl;
+    final wideShinyUrl = wideHomeShiny
+        ?? (_shiny ? wideBaseOverride?.$2 : null)
+        ?? effectivePokemon.officialArtworkShinyUrl;
 
     return Scaffold(
       appBar: AppBar(
@@ -400,6 +405,10 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                           selectedFormName: _selectedCosmeticFormName,
                           shiny: _shiny,
                           onSelect: (name) => setState(() => _selectedCosmeticFormName = name),
+                          baseHomeUrl: _shiny
+                              ? kBaseFormCosmeticHomeUrls[basePokemon.name]?.$2
+                              : kBaseFormCosmeticHomeUrls[basePokemon.name]?.$1,
+                          baseLabel: kBaseFormNameOverrides[basePokemon.name],
                         ),
                       ],
                     ],
@@ -545,10 +554,17 @@ class _DetailSliverAppBar extends StatelessWidget {
     final cosmeticSpriteUrl = selectedCosmetic != null
         ? (shiny ? (selectedCosmetic.spriteShinyUrl ?? selectedCosmetic.spriteUrl) : selectedCosmetic.spriteUrl)
         : null;
-    final displayDefaultUrl =
-        cosmeticHomeUrl ?? effectivePokemon.officialArtworkUrl;
-    final displayShinyUrl =
-        cosmeticHomeShiny ?? effectivePokemon.officialArtworkShinyUrl;
+    // When no cosmetic form is selected and there's a base HOME override
+    // (e.g. Unown shows form-A HOME artwork instead of official-artwork form-F).
+    final baseHomeOverride = selectedCosmetic == null
+        ? kBaseFormCosmeticHomeUrls[basePokemon.name]
+        : null;
+    final displayDefaultUrl = cosmeticHomeUrl
+        ?? (shiny ? null : baseHomeOverride?.$1)
+        ?? effectivePokemon.officialArtworkUrl;
+    final displayShinyUrl = cosmeticHomeShiny
+        ?? (shiny ? baseHomeOverride?.$2 : null)
+        ?? effectivePokemon.officialArtworkShinyUrl;
 
     // Expand header height when cosmetic chips are present.
     final expandedHeight = cosmeticForms.isNotEmpty ? 324.0 : 280.0;
@@ -614,6 +630,10 @@ class _DetailSliverAppBar extends StatelessWidget {
                   selectedFormName: selectedCosmeticFormName,
                   shiny: shiny,
                   onSelect: onCosmeticFormSelect,
+                  baseHomeUrl: shiny
+                      ? kBaseFormCosmeticHomeUrls[basePokemon.name]?.$2
+                      : kBaseFormCosmeticHomeUrls[basePokemon.name]?.$1,
+                  baseLabel: kBaseFormNameOverrides[basePokemon.name],
                 ),
               ],
               // Bottom spacer keeps content clear of the pinned TabBar (~48 dp).
@@ -3181,12 +3201,18 @@ class _CosmeticFormRow extends StatelessWidget {
   final String? selectedFormName;
   final bool shiny;
   final void Function(String?) onSelect;
+  /// HOME URL for the base form to show as first tile in the picker sheet
+  /// (e.g. Unown-A). Only used when forms.length > 6.
+  final String? baseHomeUrl;
+  final String? baseLabel;
 
   const _CosmeticFormRow({
     required this.forms,
     required this.selectedFormName,
     required this.shiny,
     required this.onSelect,
+    this.baseHomeUrl,
+    this.baseLabel,
   });
 
   @override
@@ -3226,6 +3252,14 @@ class _CosmeticFormRow extends StatelessWidget {
             onSelect(name == selectedFormName ? null : name);
             Navigator.pop(ctx);
           },
+          baseHomeUrl: baseHomeUrl,
+          baseLabel: baseLabel,
+          onSelectBase: selectedFormName != null
+              ? () {
+                  onSelect(null);
+                  Navigator.pop(ctx);
+                }
+              : null,
         ),
       ),
       child: Container(
@@ -3285,8 +3319,18 @@ class _CosmeticFormChip extends StatelessWidget {
               CachedNetworkImage(
                 imageUrl: spriteUrl,
                 width: 28, height: 28,
-                placeholder: (_, _) =>
-                    const SizedBox(width: 28, height: 28),
+                placeholder: (_, _) => const SizedBox(
+                  width: 28, height: 28,
+                  child: Center(
+                    child: SizedBox(
+                      width: 14, height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ),
+                ),
                 errorWidget: (_, _, _) =>
                     const Icon(Icons.catching_pokemon, color: Colors.white54, size: 20),
               )
@@ -3313,12 +3357,21 @@ class _CosmeticFormPickerSheet extends StatelessWidget {
   final String? selectedFormName;
   final bool shiny;
   final void Function(String) onSelect;
+  /// HOME artwork URL for the base form (e.g. Unown-A), shown as the first
+  /// tile so the canonical default form is always selectable in the picker.
+  final String? baseHomeUrl;
+  final String? baseLabel;
+  /// Called when the base tile is tapped (deselects the current cosmetic form).
+  final VoidCallback? onSelectBase;
 
   const _CosmeticFormPickerSheet({
     required this.forms,
     required this.selectedFormName,
     required this.shiny,
     required this.onSelect,
+    this.baseHomeUrl,
+    this.baseLabel,
+    this.onSelectBase,
   });
 
   @override
@@ -3349,7 +3402,18 @@ class _CosmeticFormPickerSheet extends StatelessWidget {
                 child: Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: forms.map((f) {
+            children: [
+              // Base form tile (e.g. Unown-A) when a specific HOME URL is provided.
+              if (baseHomeUrl != null && onSelectBase != null) ...[
+                _buildPickerTile(
+                  context: context,
+                  isSelected: selectedFormName == null,
+                  spriteUrl: baseHomeUrl!,
+                  label: baseLabel ?? 'Base',
+                  onTap: onSelectBase!,
+                ),
+              ],
+              ...forms.map((f) {
               final isSelected = f.name == selectedFormName;
               final spriteUrl =
                   (shiny ? f.spriteShinyUrl : null) ?? f.spriteUrl;
@@ -3404,8 +3468,64 @@ class _CosmeticFormPickerSheet extends StatelessWidget {
                   ),
                 ),
               );
-            }).toList(),
+            }),
+            ],
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPickerTile({
+    required BuildContext context,
+    required bool isSelected,
+    required String spriteUrl,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 80,
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primaryContainer
+              : colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? colorScheme.primary : colorScheme.outlineVariant,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CachedNetworkImage(
+              imageUrl: spriteUrl,
+              height: 52, width: 52,
+              fit: BoxFit.contain,
+              placeholder: (_, _) => const SizedBox(
+                height: 52, width: 52,
+                child: Center(child: SizedBox(
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )),
+              ),
+              errorWidget: (_, _, _) => const SizedBox(height: 52, width: 52,
+                  child: Icon(Icons.catching_pokemon, color: Colors.grey)),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? colorScheme.primary : null,
               ),
             ),
           ],
