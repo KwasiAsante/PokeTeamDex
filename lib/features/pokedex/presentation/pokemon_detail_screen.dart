@@ -48,6 +48,23 @@ const kCosmeticVarietyNames = <String>{
   'tatsugiri-droopy', 'tatsugiri-stretchy',
   'dudunsparce-three-segment',
   'basculin-blue-striped',
+  // Morpeko — Hangry mode changes colour (same stats/type/ability)
+  'morpeko-hangry',
+  // Mimikyu — Busted form is post-disguise reveal (same stats)
+  'mimikyu-busted',
+  // Minior — 7 core colour variants (more visual change than meteor colours)
+  'minior-red', 'minior-orange', 'minior-yellow', 'minior-green',
+  'minior-blue', 'minior-indigo', 'minior-violet',
+  // Magearna — Original Color is the event-variant colour (same stats)
+  'magearna-original',
+  // Eiscue — Noice Face has melted ice (same stats; ability-triggered)
+  'eiscue-noice',
+  // Zarude — Dada Zarude wears a cape; event variant with same stats
+  'zarude-dada',
+  // Maushold — Family of Three vs Four; different headcount, same stats
+  'maushold-family-of-three',
+  // Keldeo — Resolute forme is a visual/moveset cosmetic (same stats/type/ability)
+  'keldeo-resolute',
 };
 
 String cosmeticFormLabel(String formName) {
