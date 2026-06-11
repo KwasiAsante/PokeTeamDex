@@ -46,8 +46,6 @@ const _kBattleMeaningfulNames = {
   'tornadus-therian', 'thundurus-therian', 'landorus-therian', 'enamorus-therian',
   // Kyurem — fusion formes have different typing and stats
   'kyurem-black', 'kyurem-white',
-  // Keldeo — Resolute forme learns Sacred Sword and has a distinct sprite
-  'keldeo-resolute',
   // Meloetta — Pirouette forme has different type (Fighting) and stats
   'meloetta-pirouette',
   // Greninja — Ash-Greninja has boosted SpA/Spe via Battle Bond

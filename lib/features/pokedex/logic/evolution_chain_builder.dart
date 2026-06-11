@@ -250,7 +250,6 @@ const kBaseFormNameOverrides = <String, String>{
   'thundurus-incarnate':       'Incarnate',
   'landorus-incarnate':        'Incarnate',
   'enamorus-incarnate':        'Incarnate',
-  'keldeo-ordinary':           'Ordinary',
   'aegislash-shield':          'Shield',
   'gimmighoul-chest':          'Chest',
   'ogerpon-teal-mask':         'Teal Mask',
