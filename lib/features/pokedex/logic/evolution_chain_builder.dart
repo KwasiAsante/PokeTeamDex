@@ -405,6 +405,33 @@ const _kSpecificFormLabels = <String, String>{
   'ogerpon-cornerstone-mask':  'Cornerstone Mask',
 };
 
+/// Computes the label for the base/default form entry in the form picker.
+///
+/// Rules (in priority order):
+/// 1. All non-default forms end in `-female` → base is male → "Male"
+/// 2. At least one non-default form is regional → return regional adjective
+///    for [generationName] (e.g. "Hoennian", "Galarian")
+/// 3. [pokemonName] has a [kBaseFormNameOverrides] entry → return that label
+/// 4. There are non-default battle forms but no regional or override → "Base"
+/// 5. No non-default battle forms → return generation adjective or "Original"
+String computeBaseFormLabel(
+  String pokemonName,
+  String? generationName,
+  List<PokemonVariety> battleForms,
+) {
+  final allFemale = battleForms.isNotEmpty &&
+      battleForms.every((v) => v.name.endsWith('-female'));
+  final hasRegionalForm = battleForms.any((v) => regionalSuffixOf(v.name) != null);
+  return allFemale
+      ? 'Male'
+      : hasRegionalForm
+          ? shortBaseFormLabel(generationName)
+          : kBaseFormNameOverrides[pokemonName] ??
+            (battleForms.isNotEmpty
+                ? 'Base'
+                : shortBaseFormLabel(generationName));
+}
+
 /// Short label for the app bar badge (e.g. "Galarian", "Alolan", "Combat Breed").
 ///
 /// For plain regional forms (e.g. "zigzagoon-galar") returns the region adjective.

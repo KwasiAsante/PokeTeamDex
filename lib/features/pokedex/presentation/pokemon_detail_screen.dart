@@ -162,18 +162,11 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         // • Gender-split species (all forms end in -female) → "Male"
         // • Species with regional forms (any form has a regional suffix) → regional adjective
         // • Non-regional non-gender form variants (Rotom appliances, Lycanroc, Urshifu…) → "Base"
-        final allFemale = battleForms.isNotEmpty &&
-            battleForms.every((v) => v.name.endsWith('-female'));
-        final hasRegionalForm =
-            battleForms.any((v) => regionalSuffixOf(v.name) != null);
-        final baseFormLabel = allFemale
-            ? 'Male'
-            : hasRegionalForm
-                ? shortBaseFormLabel(species?.generationName)
-                : kBaseFormNameOverrides[basePokemon.name] ??
-                  (battleForms.isNotEmpty
-                      ? 'Base'
-                      : shortBaseFormLabel(species?.generationName));
+        final baseFormLabel = computeBaseFormLabel(
+          basePokemon.name,
+          species?.generationName,
+          battleForms,
+        );
         // Filter out phantom cosmetic forms for species that inherit irrelevant
         // form names (e.g. Mothim gets Sandy/Trash from Burmy but looks identical).
         final rawCosmeticForms = _kNoCosmeticFormsPokemon.contains(basePokemon.name)

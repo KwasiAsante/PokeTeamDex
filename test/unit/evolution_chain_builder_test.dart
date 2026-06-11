@@ -214,4 +214,61 @@ void main() {
       expect(regionalSuffixOf('darmanitan-zen'), isNull);
     });
   });
+
+  group('computeBaseFormLabel', () {
+    PokemonVariety v(String name) => PokemonVariety(isDefault: false, name: name);
+
+    test('all-female battle forms → Male', () {
+      expect(
+        computeBaseFormLabel('meowstic', null, [v('meowstic-female')]),
+        'Male',
+      );
+    });
+
+    test('regional form → generation adjective', () {
+      expect(
+        computeBaseFormLabel('zigzagoon', 'generation-iii', [v('zigzagoon-galar')]),
+        'Hoennian',
+      );
+    });
+
+    test('kBaseFormNameOverrides hit → override label', () {
+      expect(
+        computeBaseFormLabel('giratina-altered', null, [v('giratina-origin')]),
+        'Altered',
+      );
+    });
+
+    test('non-regional battle forms with no override → Base', () {
+      expect(
+        computeBaseFormLabel('rotom', null, [v('rotom-heat')]),
+        'Base',
+      );
+    });
+
+    test('no battle forms with generation → generation adjective', () {
+      expect(
+        computeBaseFormLabel('bulbasaur', 'generation-i', []),
+        'Kantonian',
+      );
+    });
+
+    test('no battle forms and no generation → Original', () {
+      expect(
+        computeBaseFormLabel('bulbasaur', null, []),
+        'Original',
+      );
+    });
+
+    test('Ogerpon override → Teal Mask', () {
+      expect(
+        computeBaseFormLabel('ogerpon', 'generation-ix', [
+          v('ogerpon-wellspring-mask'),
+          v('ogerpon-hearthflame-mask'),
+          v('ogerpon-cornerstone-mask'),
+        ]),
+        'Teal Mask',
+      );
+    });
+  });
 }
