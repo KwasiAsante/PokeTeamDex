@@ -243,6 +243,25 @@ const kBaseFormNameOverrides = <String, String>{
   'zacian':                    'Hero',
   'zamazenta':                 'Hero',
   'palafin-zero':              'Zero',
+  // Battle-form species where the default variety name includes a form suffix.
+  'deoxys-normal':             'Normal',
+  'giratina-altered':          'Altered',
+  'tornadus-incarnate':        'Incarnate',
+  'thundurus-incarnate':       'Incarnate',
+  'landorus-incarnate':        'Incarnate',
+  'enamorus-incarnate':        'Incarnate',
+  'keldeo-ordinary':           'Ordinary',
+  'aegislash-shield':          'Shield',
+  'gimmighoul-chest':          'Chest',
+  'ogerpon-teal-mask':         'Teal Mask',
+  // Battle-form species where the default variety has no suffix but a specific
+  // form name is clearer than the generic "Base" fallback.
+  'shaymin':                   'Land',
+  'kyurem':                    'Standard',
+  'meloetta':                  'Aria',
+  'hoopa':                     'Confined',
+  'wishiwashi':                'Solo',
+  'zygarde':                   '50%',
   // Variety-based cosmetic forms
   'wormadam-plant':            'Plant',
   'squawkabilly-green-plumage':'Green Plumage',
@@ -351,6 +370,14 @@ const _kSpecificFormLabels = <String, String>{
   "oricorio-pau":              "Pa'u",
   'toxtricity-low-key':        'Low Key',
   'urshifu-rapid-strike':      'Rapid Strike',
+  // Fallback capitalises only the last hyphen-segment, which gives wrong labels
+  // for multi-word form names.
+  'necrozma-dusk-mane':        'Dusk Mane',
+  'necrozma-dawn-wings':       'Dawn Wings',
+  'zygarde-10':                '10%',
+  'ogerpon-wellspring-mask':   'Wellspring Mask',
+  'ogerpon-hearthflame-mask':  'Hearthflame Mask',
+  'ogerpon-cornerstone-mask':  'Cornerstone Mask',
 };
 
 /// Short label for the app bar badge (e.g. "Galarian", "Alolan", "Combat Breed").
