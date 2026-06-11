@@ -243,14 +243,14 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     // Cosmetic form HOME artwork uses "{baseId}-{suffix}.png" naming
     // (e.g. 412-sandy.png for Burmy Sandy Cloak). Strip the base Pokémon name
     // prefix from the form name to get the suffix.
-    String? _cosmeticHomeUrl(PokemonFormEntry? form) {
+    String? cosmeticHomeUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteUrl;
       final suffix = form.name.substring(baseName.length + 1);
       return cosmeticFormHomeUrl(basePokemon.id, suffix);
     }
-    String? _cosmeticHomeShinyUrl(PokemonFormEntry? form) {
+    String? cosmeticHomeShinyUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteShinyUrl;
@@ -259,9 +259,9 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     }
 
     final wideDisplayUrl =
-        _cosmeticHomeUrl(wideSelectedCosmetic) ?? effectivePokemon.officialArtworkUrl;
+        cosmeticHomeUrlFor(wideSelectedCosmetic) ?? effectivePokemon.officialArtworkUrl;
     final wideShinyUrl =
-        _cosmeticHomeShinyUrl(wideSelectedCosmetic) ?? effectivePokemon.officialArtworkShinyUrl;
+        cosmeticHomeShinyUrlFor(wideSelectedCosmetic) ?? effectivePokemon.officialArtworkShinyUrl;
 
     return Scaffold(
       appBar: AppBar(
@@ -458,14 +458,14 @@ class _DetailSliverAppBar extends StatelessWidget {
         : null;
 
     // Cosmetic form HOME artwork: "{baseId}-{suffix}.png" (e.g. 201-b.png for Unown B).
-    String? _cosmeticUrl(PokemonFormEntry? form) {
+    String? cosmeticUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteUrl;
       final suffix = form.name.substring(baseName.length + 1);
       return cosmeticFormHomeUrl(basePokemon.id, suffix);
     }
-    String? _cosmeticShinyUrl(PokemonFormEntry? form) {
+    String? cosmeticShinyUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteShinyUrl;
@@ -474,9 +474,9 @@ class _DetailSliverAppBar extends StatelessWidget {
     }
 
     final displayDefaultUrl =
-        _cosmeticUrl(selectedCosmetic) ?? effectivePokemon.officialArtworkUrl;
+        cosmeticUrlFor(selectedCosmetic) ?? effectivePokemon.officialArtworkUrl;
     final displayShinyUrl =
-        _cosmeticShinyUrl(selectedCosmetic) ?? effectivePokemon.officialArtworkShinyUrl;
+        cosmeticShinyUrlFor(selectedCosmetic) ?? effectivePokemon.officialArtworkShinyUrl;
 
     // Expand header height when cosmetic chips are present.
     final expandedHeight = cosmeticForms.isNotEmpty ? 324.0 : 280.0;
