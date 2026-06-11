@@ -3211,6 +3211,11 @@ class _CosmeticFormPickerSheet extends StatelessWidget {
                         CachedNetworkImage(
                           imageUrl: spriteUrl,
                           height: 52, width: 52,
+                          placeholder: (_, _) => const SizedBox(height: 52, width: 52),
+                          errorWidget: (_, _, _) => const SizedBox(
+                            height: 52, width: 52,
+                            child: Icon(Icons.catching_pokemon, color: Colors.grey),
+                          ),
                         )
                       else
                         const SizedBox(height: 52, width: 52,
