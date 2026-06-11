@@ -106,13 +106,36 @@ DisplayNode _buildNode(
   Set<String> excludeRegionSuffixes,
 ) {
   final children = <DisplayNode>[];
-  for (final child in node.evolvesTo) {
-    if (formSuffix != null) {
-      // Regional chain: prefer a region/base_form-specific detail; fall back to
-      // a default (no-restriction) detail for intermediate edges that have no
-      // region gate (e.g. Pichu→Pikachu has no "alola" restriction, but we
-      // still need to traverse it to reach Alolan Raichu).
-      final detail = _matchingDetail(child.details, formSuffix);
+
+  if (formSuffix != null) {
+    // Regional chain.
+    //
+    // If ANY child has a form-specific evolution for this suffix, we only follow
+    // those children — we do NOT fall back to default (no-restriction) evolutions
+    // for other siblings. This prevents Galarian Meowth from inheriting the
+    // default Kantonian Meowth→Persian path when it already has Perrserker.
+    //
+    // If NO child has a form-specific evolution (e.g. Pichu→Pikachu for the
+    // Alolan chain), we fall back to default edges so intermediate steps are
+    // still traversed.
+    final hasFormSpecific = node.evolvesTo.any((c) =>
+      c.details.any((d) =>
+        d.baseForm?.name.endsWith('-$formSuffix') == true ||
+        d.region?.name == formSuffix
+      )
+    );
+
+    for (final child in node.evolvesTo) {
+      final formDetail = child.details.where((d) =>
+        d.baseForm?.name.endsWith('-$formSuffix') == true ||
+        d.region?.name == formSuffix
+      ).firstOrNull;
+
+      final detail = formDetail ??
+          (!hasFormSpecific
+              ? child.details.where((d) => d.baseForm == null && d.region == null).firstOrNull
+              : null);
+
       if (detail == null) continue;
       final childId = _resolveChildId(child, formSuffix, formIds);
       final childFormName = _resolveChildFormName(child, formSuffix, formIds);
@@ -120,7 +143,9 @@ DisplayNode _buildNode(
       n.matchedDetails = [detail];
       n.formName = childFormName;
       children.add(n);
-    } else {
+    }
+  } else {
+    for (final child in node.evolvesTo) {
       final defaultDetail =
           child.details.where((d) => d.baseForm == null && d.region == null).firstOrNull;
       if (defaultDetail != null) {
@@ -148,19 +173,6 @@ DisplayNode _buildNode(
   return DisplayNode(source: node, displayId: displayId, evolvesTo: children);
 }
 
-EvolutionDetail? _matchingDetail(List<EvolutionDetail> details, String? suffix) {
-  if (suffix == null) {
-    return details.where((d) => d.baseForm == null && d.region == null).firstOrNull;
-  }
-  // Prefer a region/base_form-specific match; fall back to a default
-  // (no-restriction) detail so intermediate edges without a region gate
-  // (e.g. Pichu→Pikachu) are still traversed in a regional chain.
-  return details.where((d) =>
-    d.baseForm?.name.endsWith('-$suffix') == true ||
-    d.region?.name == suffix
-  ).firstOrNull ??
-  details.where((d) => d.baseForm == null && d.region == null).firstOrNull;
-}
 
 int _resolveChildId(EvolutionNode child, String? suffix, Map<String, int> formIds) {
   if (suffix == null) return child.speciesId;
