@@ -29,6 +29,7 @@ import 'package:poke_team_dex/shared/widgets/stat_bar.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
 import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
+import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 
 /// Derives a display label from a PokéAPI cosmetic form name.
 /// e.g. "red-flower" → "Red Flower", "sandy" → "Sandy", "a" → "A".
@@ -3066,9 +3067,11 @@ class _FormBadge extends StatelessWidget {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
-        builder: (ctx) => _FormPickerSheet(
-          battleForms: battleForms,
-          baseFormLabel: baseFormLabel,
+        builder: (ctx) => FormPickerSheet(
+          allForms: [
+            (null, baseFormLabel),
+            ...battleForms.map((v) => (v.name, shortFormLabel(v.name))),
+          ],
           baseSpriteUrl: baseSpriteUrl,
           baseShinyUrl: baseShinyUrl,
           selectedFormName: selectedFormName,
@@ -3099,144 +3102,6 @@ class _FormBadge extends StatelessWidget {
             ),
             const SizedBox(width: 4),
             const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 16),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Form Picker Sheet ─────────────────────────────────────────────────────────
-
-class _FormPickerSheet extends StatelessWidget {
-  final List<PokemonVariety> battleForms;
-  final String baseFormLabel;
-  final String? baseSpriteUrl;
-  final String? baseShinyUrl;
-  final String? selectedFormName;
-  final bool shiny;
-  final void Function(String?) onSelect;
-
-  const _FormPickerSheet({
-    required this.battleForms,
-    required this.baseFormLabel,
-    this.baseSpriteUrl,
-    this.baseShinyUrl,
-    required this.selectedFormName,
-    required this.shiny,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final allOptions = <(String? name, String label)>[
-      (null, baseFormLabel),
-      ...battleForms.map((v) => (v.name, shortFormLabel(v.name))),
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Select Form',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: allOptions.map((opt) {
-              final (name, label) = opt;
-              return _FormOptionTile(
-                formName: name,
-                label: label,
-                isSelected: name == selectedFormName,
-                shiny: shiny,
-                overrideSpriteUrl: name == null ? (shiny ? (baseShinyUrl ?? baseSpriteUrl) : baseSpriteUrl) : null,
-                onTap: () => onSelect(name),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Form Option Tile ──────────────────────────────────────────────────────────
-
-class _FormOptionTile extends ConsumerWidget {
-  final String? formName; // null = base form
-  final String label;
-  final bool isSelected;
-  final bool shiny;
-  /// Pre-resolved sprite URL for the base form tile (avoids a provider watch
-  /// on null formName and fixes the pokéball placeholder).
-  final String? overrideSpriteUrl;
-  final void Function() onTap;
-
-  const _FormOptionTile({
-    required this.formName,
-    required this.label,
-    required this.isSelected,
-    required this.shiny,
-    this.overrideSpriteUrl,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final pokemonAsync = formName != null
-        ? ref.watch(pokemonByNameProvider(formName!))
-        : null;
-    final formPokemon = pokemonAsync?.asData?.value;
-    final spriteUrl = overrideSpriteUrl ??
-        (shiny
-            ? (formPokemon?.officialArtworkShinyUrl ?? formPokemon?.officialArtworkUrl)
-            : formPokemon?.officialArtworkUrl);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 88,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? colorScheme.primaryContainer
-              : colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? colorScheme.primary : colorScheme.outlineVariant,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (spriteUrl != null)
-              CachedNetworkImage(imageUrl: spriteUrl, height: 56, width: 56)
-            else
-              const SizedBox(
-                height: 56,
-                width: 56,
-                child: Icon(Icons.catching_pokemon, color: Colors.grey),
-              ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected ? colorScheme.primary : null,
-                  ),
-            ),
           ],
         ),
       ),
