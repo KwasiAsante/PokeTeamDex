@@ -2755,7 +2755,7 @@ class _FormBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final label = selectedFormName != null
         ? shortFormLabel(selectedFormName!)
-        : 'Base';
+        : baseFormLabel;
     return GestureDetector(
       onTap: () => showModalBottomSheet(
         context: context,
