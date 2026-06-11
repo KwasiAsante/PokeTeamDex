@@ -237,6 +237,8 @@ const kBaseFormNameOverrides = <String, String>{
   'basculin-red-striped': 'Red-Striped',
   'oricorio-baile':       'Baile',
   'toxtricity-amped':     'Amped',
+  'zacian-hero':          'Hero',
+  'zamazenta-hero':       'Hero',
 };
 
 /// Maps specific base_form names (as they appear in PokéAPI evolution_details)
