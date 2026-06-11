@@ -56,7 +56,16 @@ final cosmeticFormsProvider = FutureProvider.autoDispose
   final pokemon = await repo.fetchPokemonByName(pokemonName);
   if (pokemon.formNames.length <= 1) return const [];
   final species = await repo.fetchPokemonSpecies(pokemon.id);
-  if (species.varieties.length > 1) return const [];
+  // Skip variety-based species where every form name corresponds to one of
+  // the species' own varieties (e.g. Rotom, Aegislash). For species like
+  // Floette whose form names are DIFFERENT from their varieties (floette-red
+  // vs variety floette), we should still surface the cosmetic forms.
+  if (species.varieties.length > 1) {
+    final varietyNames = species.varieties.map((v) => v.name).toSet();
+    final allFormsAreVarieties =
+        pokemon.formNames.every((fn) => varietyNames.contains(fn));
+    if (allFormsAreVarieties) return const [];
+  }
   final forms = await Future.wait(pokemon.formNames.map(repo.fetchPokemonForm));
   return forms.where((f) => !f.isDefault).toList();
 });

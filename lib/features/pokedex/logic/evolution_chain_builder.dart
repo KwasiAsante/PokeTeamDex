@@ -232,14 +232,29 @@ String? _resolveChildFormName(EvolutionNode child, String? suffix, Map<String, i
 /// default form has its own name rather than just "Base".
 /// Key: PokéAPI species name. Value: display label for the default form.
 const kBaseFormNameOverrides = <String, String>{
-  'lycanroc-midday':      'Midday',
-  'urshifu-single-strike': 'Single Strike',
-  'basculin-red-striped': 'Red-Striped',
-  'oricorio-baile':       'Baile',
-  'toxtricity-amped':     'Amped',
-  'zacian':               'Hero',
-  'zamazenta':            'Hero',
-  'palafin-zero':         'Zero',
+  'lycanroc-midday':           'Midday',
+  'urshifu-single-strike':     'Single Strike',
+  'basculin-red-striped':      'Red-Striped',
+  'oricorio-baile':            'Baile',
+  'toxtricity-amped':          'Amped',
+  'zacian':                    'Hero',
+  'zamazenta':                 'Hero',
+  'palafin-zero':              'Zero',
+  // Variety-based cosmetic forms
+  'wormadam-plant':            'Plant',
+  'squawkabilly-green-plumage':'Green Plumage',
+  'tatsugiri-curly':           'Curly',
+  'dudunsparce-two-segment':   'Two Segment',
+  'floette':                   'Red Flower',
+};
+
+/// Override labels for specific cosmetic form chips where the PokéAPI form name
+/// would produce a misleading or incorrect label.
+/// Key: PokéAPI variety/form name. Value: display label for the chip.
+const kCosmeticFormLabels = <String, String>{
+  // Xerneas: the official artwork at pokemon/716 shows the Active form, so the
+  // non-default form chip should be labeled "Neutral" (the resting pose).
+  'xerneas-active': 'Neutral',
 };
 
 /// Maps specific base_form names (as they appear in PokéAPI evolution_details)
