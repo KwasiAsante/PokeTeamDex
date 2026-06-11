@@ -12,6 +12,7 @@ const _kBattleMeaningfulNames = {
   'meowstic-female',
   'indeedee-female',
   'basculegion-female',
+  'oinkologne-female',
   'urshifu-rapid-strike',
   'lycanroc-midnight', 'lycanroc-dusk',
   'oricorio-pom-pom', 'oricorio-pau', 'oricorio-sensu',
