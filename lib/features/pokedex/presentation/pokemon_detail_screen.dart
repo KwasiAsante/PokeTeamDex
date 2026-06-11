@@ -193,9 +193,29 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                       : shortBaseFormLabel(species?.generationName));
         // Filter out phantom cosmetic forms for species that inherit irrelevant
         // form names (e.g. Mothim gets Sandy/Trash from Burmy but looks identical).
-        final cosmeticFormsBase = _kNoCosmeticFormsPokemon.contains(basePokemon.name)
+        final rawCosmeticForms = _kNoCosmeticFormsPokemon.contains(basePokemon.name)
             ? const <PokemonFormEntry>[]
             : (cosmeticFormsAsync?.asData?.value ?? const <PokemonFormEntry>[]);
+        // Patch gender forms whose /pokemon-form endpoint returns null for
+        // front_default (e.g. frillish-female, jellicent-female) — use the
+        // pokemon/female/{id}.png sprite instead.
+        final cosmeticFormsBase = rawCosmeticForms.map((f) {
+          if (f.spriteUrl == null && f.formName == 'female') {
+            return PokemonFormEntry(
+              id: f.id,
+              name: f.name,
+              formName: f.formName,
+              isDefault: f.isDefault,
+              spriteUrl:
+                  'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/female/${basePokemon.id}.png',
+              spriteShinyUrl:
+                  'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/female/${basePokemon.id}.png',
+              officialArtworkUrl: f.officialArtworkUrl,
+              officialArtworkShinyUrl: f.officialArtworkShinyUrl,
+            );
+          }
+          return f;
+        }).toList();
         final cosmeticFormsLoading = !_kNoCosmeticFormsPokemon.contains(basePokemon.name) &&
             cosmeticFormsAsync != null &&
             cosmeticFormsAsync.isLoading;
