@@ -419,6 +419,24 @@ class PokeApiRepository {
     for (final ancestorId in ancestorIds) {
       final pokemon = await fetchPokemon(ancestorId);
       result.add((speciesName: pokemon.name, moves: pokemon.moves));
+      // Also include non-default regional forms (e.g. zigzagoon-galar) so that
+      // breeding moves exclusive to those forms surface as prior-evo moves.
+      // Regional forms can have different Gen-specific egg move pools that the
+      // default (Kantonian) form never had — Obstagoon's knockoff/partingshot/
+      // quickguard come from Galarian Zigzagoon's Gen 8 egg moves, for example.
+      final ancestorSpecies = await fetchPokemonSpecies(ancestorId);
+      for (final variety in ancestorSpecies.varieties) {
+        if (variety.isDefault) continue;
+        // Skip mega/gmax/etc. — only fetch forms that have their own /pokemon
+        // resource with a distinct move pool (regional forms do; cosmetic forms
+        // share the base species resource and have no separate entry).
+        try {
+          final formPokemon = await fetchPokemonByNameOrDefault(variety.name);
+          result.add((speciesName: variety.name, moves: formPokemon.moves));
+        } catch (_) {
+          // Best-effort: skip if the form has no dedicated /pokemon resource.
+        }
+      }
     }
     return result;
   }
