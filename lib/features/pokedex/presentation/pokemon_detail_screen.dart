@@ -240,14 +240,28 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     final wideSelectedCosmetic = _selectedCosmeticFormName != null
         ? cosmeticForms.where((f) => f.name == _selectedCosmeticFormName).firstOrNull
         : null;
-    // Cosmetic forms share the same Pokémon resource — no separate HOME artwork
-    // exists per form. Use the form's pixel sprite directly.
-    final wideDisplayUrl = wideSelectedCosmetic != null
-        ? (wideSelectedCosmetic.spriteUrl ?? effectivePokemon.officialArtworkUrl)
-        : effectivePokemon.officialArtworkUrl;
-    final wideShinyUrl = wideSelectedCosmetic != null
-        ? (wideSelectedCosmetic.spriteShinyUrl ?? wideSelectedCosmetic.spriteUrl)
-        : effectivePokemon.officialArtworkShinyUrl;
+    // Cosmetic form HOME artwork uses "{baseId}-{suffix}.png" naming
+    // (e.g. 412-sandy.png for Burmy Sandy Cloak). Strip the base Pokémon name
+    // prefix from the form name to get the suffix.
+    String? _cosmeticHomeUrl(PokemonFormEntry? form) {
+      if (form == null) return null;
+      final baseName = basePokemon.name;
+      if (!form.name.startsWith('$baseName-')) return form.spriteUrl;
+      final suffix = form.name.substring(baseName.length + 1);
+      return cosmeticFormHomeUrl(basePokemon.id, suffix);
+    }
+    String? _cosmeticHomeShinyUrl(PokemonFormEntry? form) {
+      if (form == null) return null;
+      final baseName = basePokemon.name;
+      if (!form.name.startsWith('$baseName-')) return form.spriteShinyUrl;
+      final suffix = form.name.substring(baseName.length + 1);
+      return cosmeticFormHomeShinyUrl(basePokemon.id, suffix);
+    }
+
+    final wideDisplayUrl =
+        _cosmeticHomeUrl(wideSelectedCosmetic) ?? effectivePokemon.officialArtworkUrl;
+    final wideShinyUrl =
+        _cosmeticHomeShinyUrl(wideSelectedCosmetic) ?? effectivePokemon.officialArtworkShinyUrl;
 
     return Scaffold(
       appBar: AppBar(
@@ -443,14 +457,26 @@ class _DetailSliverAppBar extends StatelessWidget {
         ? cosmeticForms.where((f) => f.name == selectedCosmeticFormName).firstOrNull
         : null;
 
-    // Cosmetic forms share the same Pokémon resource — no separate HOME artwork
-    // exists per form. Use the form's pixel sprite directly.
-    final displayDefaultUrl = selectedCosmetic != null
-        ? (selectedCosmetic.spriteUrl ?? effectivePokemon.officialArtworkUrl)
-        : effectivePokemon.officialArtworkUrl;
-    final displayShinyUrl = selectedCosmetic != null
-        ? (selectedCosmetic.spriteShinyUrl ?? selectedCosmetic.spriteUrl)
-        : effectivePokemon.officialArtworkShinyUrl;
+    // Cosmetic form HOME artwork: "{baseId}-{suffix}.png" (e.g. 201-b.png for Unown B).
+    String? _cosmeticUrl(PokemonFormEntry? form) {
+      if (form == null) return null;
+      final baseName = basePokemon.name;
+      if (!form.name.startsWith('$baseName-')) return form.spriteUrl;
+      final suffix = form.name.substring(baseName.length + 1);
+      return cosmeticFormHomeUrl(basePokemon.id, suffix);
+    }
+    String? _cosmeticShinyUrl(PokemonFormEntry? form) {
+      if (form == null) return null;
+      final baseName = basePokemon.name;
+      if (!form.name.startsWith('$baseName-')) return form.spriteShinyUrl;
+      final suffix = form.name.substring(baseName.length + 1);
+      return cosmeticFormHomeShinyUrl(basePokemon.id, suffix);
+    }
+
+    final displayDefaultUrl =
+        _cosmeticUrl(selectedCosmetic) ?? effectivePokemon.officialArtworkUrl;
+    final displayShinyUrl =
+        _cosmeticShinyUrl(selectedCosmetic) ?? effectivePokemon.officialArtworkShinyUrl;
 
     // Expand header height when cosmetic chips are present.
     final expandedHeight = cosmeticForms.isNotEmpty ? 324.0 : 280.0;
