@@ -3013,3 +3013,230 @@ class _FormOptionTile extends ConsumerWidget {
     );
   }
 }
+
+// ── Cosmetic Form Chips ───────────────────────────────────────────────────────
+
+/// Horizontal strip of cosmetic form chips (≤ 6 forms) or a single count
+/// chip that opens a picker sheet (> 6 forms).
+// ignore: unused_element
+class _CosmeticFormRow extends StatelessWidget {
+  final List<PokemonFormEntry> forms;
+  final String? selectedFormName;
+  final bool shiny;
+  final void Function(String?) onSelect;
+
+  const _CosmeticFormRow({
+    required this.forms,
+    required this.selectedFormName,
+    required this.shiny,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (forms.isEmpty) return const SizedBox.shrink();
+    if (forms.length <= 6) {
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: forms.map((f) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: _CosmeticFormChip(
+              form: f,
+              isSelected: f.name == selectedFormName,
+              shiny: shiny,
+              onTap: () => onSelect(f.name == selectedFormName ? null : f.name),
+            ),
+          )).toList(),
+        ),
+      );
+    }
+    // > 6 forms: single count chip opens picker sheet.
+    return GestureDetector(
+      onTap: () => showModalBottomSheet(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (ctx) => _CosmeticFormPickerSheet(
+          forms: forms,
+          selectedFormName: selectedFormName,
+          shiny: shiny,
+          onSelect: (name) {
+            onSelect(name == selectedFormName ? null : name);
+            Navigator.pop(ctx);
+          },
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white38),
+        ),
+        child: Text(
+          '${forms.length} forms ▾',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CosmeticFormChip extends StatelessWidget {
+  final PokemonFormEntry form;
+  final bool isSelected;
+  final bool shiny;
+  final VoidCallback onTap;
+
+  const _CosmeticFormChip({
+    required this.form,
+    required this.isSelected,
+    required this.shiny,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final spriteUrl = (shiny ? form.spriteShinyUrl : null) ?? form.spriteUrl;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Colors.white.withValues(alpha: 0.35)
+              : Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? Colors.white : Colors.white38,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (spriteUrl != null)
+              CachedNetworkImage(
+                imageUrl: spriteUrl,
+                width: 28, height: 28,
+                placeholder: (_, _) =>
+                    const SizedBox(width: 28, height: 28),
+                errorWidget: (_, _, _) =>
+                    const Icon(Icons.catching_pokemon, color: Colors.white54, size: 20),
+              )
+            else
+              const SizedBox(width: 28, height: 28),
+            const SizedBox(width: 4),
+            Text(
+              cosmeticFormLabel(form.formName),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CosmeticFormPickerSheet extends StatelessWidget {
+  final List<PokemonFormEntry> forms;
+  final String? selectedFormName;
+  final bool shiny;
+  final void Function(String) onSelect;
+
+  const _CosmeticFormPickerSheet({
+    required this.forms,
+    required this.selectedFormName,
+    required this.shiny,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Select Form',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: forms.map((f) {
+              final isSelected = f.name == selectedFormName;
+              final spriteUrl =
+                  (shiny ? f.spriteShinyUrl : null) ?? f.spriteUrl;
+              return GestureDetector(
+                onTap: () => onSelect(f.name),
+                child: Container(
+                  width: 80,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? colorScheme.primaryContainer
+                        : colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected
+                          ? colorScheme.primary
+                          : colorScheme.outlineVariant,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (spriteUrl != null)
+                        CachedNetworkImage(
+                          imageUrl: spriteUrl,
+                          height: 52, width: 52,
+                        )
+                      else
+                        const SizedBox(height: 52, width: 52,
+                            child: Icon(Icons.catching_pokemon,
+                                color: Colors.grey)),
+                      const SizedBox(height: 4),
+                      Text(
+                        cosmeticFormLabel(f.formName),
+                        textAlign: TextAlign.center,
+                        style:
+                            Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  color:
+                                      isSelected ? colorScheme.primary : null,
+                                ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
