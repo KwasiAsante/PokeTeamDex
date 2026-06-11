@@ -235,7 +235,7 @@ const kBaseFormNameOverrides = <String, String>{
   'lycanroc':             'Midday',
   'urshifu':              'Single Strike',
   'basculin-red-striped': 'Red-Striped',
-  'oricorio':             'Baile',
+  'oricorio-baile':       'Baile',
 };
 
 /// Maps specific base_form names (as they appear in PokéAPI evolution_details)
