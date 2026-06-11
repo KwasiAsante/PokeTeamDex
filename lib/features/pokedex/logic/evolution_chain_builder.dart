@@ -141,18 +141,17 @@ DisplayNode _buildNode(
     // If NO child has a form-specific evolution (e.g. Pichu→Pikachu for the
     // Alolan chain), we fall back to default edges so intermediate steps are
     // still traversed.
-    final hasFormSpecific = node.evolvesTo.any((c) =>
-      c.details.any((d) =>
+    // Checks whether a detail applies to the current form suffix, including
+    // overrides like "basculin-white-striped" mapping to "hisui".
+    bool matchesSuffix(EvolutionDetail d) =>
         d.baseForm?.name.endsWith('-$formSuffix') == true ||
-        d.region?.name == formSuffix
-      )
-    );
+        d.region?.name == formSuffix ||
+        (d.baseForm != null && kBaseFormSuffixOverrides[d.baseForm!.name] == formSuffix);
+
+    final hasFormSpecific = node.evolvesTo.any((c) => c.details.any(matchesSuffix));
 
     for (final child in node.evolvesTo) {
-      final formDetail = child.details.where((d) =>
-        d.baseForm?.name.endsWith('-$formSuffix') == true ||
-        d.region?.name == formSuffix
-      ).firstOrNull;
+      final formDetail = child.details.where(matchesSuffix).firstOrNull;
 
       final detail = formDetail ??
           (!hasFormSpecific
