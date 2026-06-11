@@ -17,6 +17,7 @@ import 'package:poke_team_dex/services/pokeapi/models/encounter_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
@@ -45,6 +46,14 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
   late TabController _tabController;
   bool _shiny = false;
   String? _selectedFormName; // null = base form
+  String? _selectedCosmeticFormName; // null = base form sprite
+
+  void _selectBattleForm(String? formName) {
+    setState(() {
+      _selectedFormName = formName;
+      _selectedCosmeticFormName = null;
+    });
+  }
 
   // Narrow layout — horizontal TabBar
   static const _tabs = [
@@ -111,6 +120,10 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     final formAsync = _selectedFormName != null
         ? ref.watch(pokemonByNameProvider(_selectedFormName!))
         : null;
+    final cosmPokemonName = pokemonAsync.asData?.value.name;
+    final cosmeticFormsAsync = cosmPokemonName != null
+        ? ref.watch(cosmeticFormsProvider(cosmPokemonName))
+        : null;
     final isWide = MediaQuery.sizeOf(context).width > 840;
 
     return pokemonAsync.when(
@@ -151,10 +164,11 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                   (battleForms.isNotEmpty
                       ? 'Base'
                       : shortBaseFormLabel(species?.generationName));
+        final cosmeticForms = cosmeticFormsAsync?.asData?.value ?? const <PokemonFormEntry>[];
 
         return isWide
-            ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel)
-            : _buildNarrowLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel);
+            ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms)
+            : _buildNarrowLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms);
       },
     );
   }
@@ -169,6 +183,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     Color headerColor,
     List<PokemonVariety> battleForms,
     String baseFormLabel,
+    List<PokemonFormEntry> cosmeticForms,
   ) {
     return Scaffold(
       body: NestedScrollView(
@@ -179,12 +194,15 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
             battleForms: battleForms,
             baseFormLabel: baseFormLabel,
             selectedFormName: _selectedFormName,
-            onFormSelect: (name) => setState(() => _selectedFormName = name),
+            onFormSelect: _selectBattleForm,
             headerColor: headerColor,
             shiny: _shiny,
             onShinyToggle: () => setState(() => _shiny = !_shiny),
             tabController: _tabController,
             tabs: _tabs,
+            cosmeticForms: cosmeticForms,
+            selectedCosmeticFormName: _selectedCosmeticFormName,
+            onCosmeticFormSelect: (name) => setState(() => _selectedCosmeticFormName = name),
           ),
         ],
         body: TabBarView(
@@ -205,6 +223,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     Color headerColor,
     List<PokemonVariety> battleForms,
     String baseFormLabel,
+    List<PokemonFormEntry> cosmeticForms,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -228,7 +247,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
               baseShinyUrl: basePokemon.officialArtworkShinyUrl,
               selectedFormName: _selectedFormName,
               shiny: _shiny,
-              onSelect: (name) => setState(() => _selectedFormName = name),
+              onSelect: _selectBattleForm,
             ),
           IconButton(
             tooltip: _shiny ? 'Show default' : 'Show shiny',
@@ -366,6 +385,9 @@ class _DetailSliverAppBar extends StatelessWidget {
   final VoidCallback onShinyToggle;
   final TabController tabController;
   final List<Tab> tabs;
+  final List<PokemonFormEntry> cosmeticForms;
+  final String? selectedCosmeticFormName;
+  final void Function(String?) onCosmeticFormSelect;
 
   const _DetailSliverAppBar({
     required this.basePokemon,
@@ -379,6 +401,9 @@ class _DetailSliverAppBar extends StatelessWidget {
     required this.onShinyToggle,
     required this.tabController,
     required this.tabs,
+    required this.cosmeticForms,
+    required this.selectedCosmeticFormName,
+    required this.onCosmeticFormSelect,
   });
 
   @override
