@@ -11,6 +11,7 @@ import 'package:poke_team_dex/features/pokedex/presentation/widget/pokemon_grid_
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -342,7 +343,7 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
     );
   }
 
-  String _buildImageUrl(dynamic formEntry, PokedexFilter filter) {
+  String _buildImageUrl(PokemonEntry? formEntry, PokedexFilter filter) {
     if (_selectedFormName != null && formEntry != null) {
       if (widget.imageType == PokedexImageType.artwork) {
         return formEntry.officialArtworkUrl ??

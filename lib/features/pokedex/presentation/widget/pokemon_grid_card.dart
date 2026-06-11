@@ -6,6 +6,7 @@ import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dar
 import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -258,7 +259,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
     );
   }
 
-  String _buildImageUrl(dynamic formEntry) {
+  String _buildImageUrl(PokemonEntry? formEntry) {
     if (_selectedFormName != null && formEntry != null) {
       if (widget.imageType == PokedexImageType.artwork) {
         return formEntry.officialArtworkUrl ??
