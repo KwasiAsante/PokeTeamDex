@@ -1,5 +1,22 @@
 # PokeTeamDex — Claude Instructions
 
+## TODO.md ↔ GitHub Issues Sync
+
+`TODO.md` and GitHub issues are the single source of truth for planned and deferred work. Keep them in sync at all times.
+
+### Adding work
+- **Creating a GitHub issue** → add a matching `- [ ]` entry to the relevant section of `TODO.md` (or update an existing one to reference the issue).
+- **Adding a `- [ ]` item to `TODO.md`** → open a corresponding GitHub issue with appropriate labels.
+
+### Completing work
+- **Closing a GitHub issue** → mark the matching `TODO.md` entry as `- [x]`.
+- **Checking off a `TODO.md` item** → close the corresponding GitHub issue.
+
+### Labels to use (existing labels)
+`enhancement`, `bug`, `ui/ux`, `sync`, `pokémon-details`, `investigation`, `mobile`, `web`, `windows`, `documentation`
+
+---
+
 ## Git Workflow
 
 **Always use branches and PRs. Never commit directly to `main` unless explicitly told to.**

@@ -91,7 +91,7 @@
 - [x] **gen-sprites** — PS transparent sprites for Gen 1–5 (gen5ani animated GIFs for BW), HOME/official artwork for Gen 6+; "Use generation sprites" toggle in Settings
 - [x] **gen-learnsets** — move picker filtered by format version groups; game formats check exact version-group, gen formats union all groups in that gen; validation flags illegal moves/abilities/items
 - [x] **event/gift movesets** — event and gift Pokémon movesets sourced from PS learnset data; surfaced in slot config move picker and used during move legality validation
-- [ ] **banlist** — Layer 2 competitive ban checking (Ubers, clause violations, format-specific bans) *(deferred — post-release)*
+- [ ] **format-sync** — fetch and sync competitive formats (tiers, rulesets) from Pokémon Showdown and Smogon *(deferred — post-release)*
 - [ ] **custom-formats** — custom format builder UI *(deferred — post-release)*
 
 ---
@@ -141,7 +141,6 @@
 - [x] Integration tests — full CRUD flow: create folder → team → add slots → verify Drift DB
 - [x] Integration tests — conflict resolution (local newer, remote newer, remote deleted)
 - [ ] Integration tests — offline → online sync (write offline, come online, verify push + pull) *(requires HTTP mock layer; deferred post-release)*
-- [ ] Manual test matrix — iOS, Android, Web (Chrome) *(final pre-release gate)*
 
 ---
 
@@ -154,7 +153,7 @@
 ### Navigation & Shell
 
 - [x] **Adaptive nav** — `BottomNavigationBar` < 600dp, `NavigationRail` 600–840dp, permanent `NavigationDrawer` > 840dp; overflow fixes for team tile sprites, slot card type badges, location encounter table
-- [ ] **Pokéathlon tab** — removed; PokéAPI `/pokeathlon-stat/` only returns nature-affinity data, not per-Pokémon base values — no data source available
+- [ ] **Pokéathlon stats in Slot Config** — display Pokéathlon stats per Pokémon in Slot Config; requires investigation into a viable data source (PokéAPI `/pokeathlon-stat/` only returns nature-affinity data, not per-Pokémon base values) *(requires investigation)*
 - [x] **Connectivity status button** — wifi icon + coloured dot on every screen's AppBar; green = online + signed in, amber = online + not signed in, red = offline; tapping opens sheet with live Device / PokéAPI / Backend API / Account status rows + refresh button
 - [x] **Teams tab** — shows "On your teams" list (team name, slot #, nickname, format label, tap to navigate); "Add to a team" sheet with team picker → slot grid showing current occupants; replacement confirmation dialog; "New team" creation from the sheet; inserts slot with defaults (L50, IVs 31) and queues sync op
 
@@ -288,7 +287,3 @@
 - [ ] **G-Max moves in move list + detail** — G-Max moves (`g-max-*`) are currently accessible via the moves browser but don't appear in PokéAPI's learned-by lists; source from PS/Bulbapedia data and surface them as a filterable category in the move list and as a distinct section in Pokémon detail Moves tab
 - [ ] **PS sync: live directory watch** — `Directory.watch()` + three-way conflict resolution (PS file mtime vs local `updated_at` vs remote `updated_at`)
 - [ ] **Contest moves toggle** — contest move mode in slot config; separate 4-move picker showing contest information (appeal, jam, type) per move
-- Real-time battle simulation
-- Multi-user / public team sharing
-- Pokémon GO data
-- In-app purchases
