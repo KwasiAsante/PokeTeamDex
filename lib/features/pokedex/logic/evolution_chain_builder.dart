@@ -267,6 +267,12 @@ const kBaseFormNameOverrides = <String, String>{
   'tatsugiri-curly':           'Curly',
   'dudunsparce-two-segment':   'Two Segment',
   'floette':                   'Red Flower',
+  'morpeko-full-belly':        'Full Belly',
+  'mimikyu-disguised':         'Disguised',
+  'minior-red-meteor':         'Red',
+  'eiscue-ice':                'Ice Face',
+  'maushold-family-of-four':   'Family of Four',
+  'keldeo-ordinary':           'Ordinary',
 };
 
 /// Override labels for specific cosmetic form chips where the PokéAPI form name
@@ -276,6 +282,18 @@ const kCosmeticFormLabels = <String, String>{
   // Xerneas: the official artwork at pokemon/716 shows the Active form, so the
   // non-default form chip should be labeled "Neutral" (the resting pose).
   'xerneas-active': 'Neutral',
+  // Minior: fallback produces "Minior Orange Meteor" etc. — override to just the
+  // colour so 6 chips are visually distinct at a glance.
+  'minior-orange-meteor': 'Orange',
+  'minior-yellow-meteor': 'Yellow',
+  'minior-green-meteor':  'Green',
+  'minior-blue-meteor':   'Blue',
+  'minior-indigo-meteor': 'Indigo',
+  'minior-violet-meteor': 'Violet',
+  // Eiscue: official form name is "Noice Face" — "Eiscue Noice" would be confusing.
+  'eiscue-noice':         'Noice Face',
+  // Magearna: official name is "Original Color Magearna" — shorten for chip.
+  'magearna-original':    'Original Color',
 };
 
 /// Override HOME artwork URLs for cosmetic form chips where the default URL
