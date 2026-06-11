@@ -491,7 +491,6 @@ class _DetailSliverAppBar extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(height: 56), // clear the collapsed app bar height
               Hero(
                 tag: 'pokemon-sprite-${basePokemon.id}',
                 child: PokemonSprite(
@@ -510,6 +509,8 @@ class _DetailSliverAppBar extends StatelessWidget {
                   onSelect: onCosmeticFormSelect,
                 ),
               ],
+              // Bottom spacer keeps content clear of the pinned TabBar (~48 dp).
+              const SizedBox(height: 48),
             ],
           ),
         ),
