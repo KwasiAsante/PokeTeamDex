@@ -232,14 +232,60 @@ String? _resolveChildFormName(EvolutionNode child, String? suffix, Map<String, i
 /// default form has its own name rather than just "Base".
 /// Key: PokéAPI species name. Value: display label for the default form.
 const kBaseFormNameOverrides = <String, String>{
-  'lycanroc-midday':      'Midday',
-  'urshifu-single-strike': 'Single Strike',
-  'basculin-red-striped': 'Red-Striped',
-  'oricorio-baile':       'Baile',
-  'toxtricity-amped':     'Amped',
-  'zacian':               'Hero',
-  'zamazenta':            'Hero',
-  'palafin-zero':         'Zero',
+  'lycanroc-midday':           'Midday',
+  'urshifu-single-strike':     'Single Strike',
+  'basculin-red-striped':      'Red-Striped',
+  'oricorio-baile':            'Baile',
+  'toxtricity-amped':          'Amped',
+  // Gender-differentiated Pokémon where the base default is the male form.
+  'frillish-male':             'Male',
+  'jellicent-male':            'Male',
+  'zacian':                    'Hero',
+  'zamazenta':                 'Hero',
+  'palafin-zero':              'Zero',
+  // Variety-based cosmetic forms
+  'wormadam-plant':            'Plant',
+  'squawkabilly-green-plumage':'Green Plumage',
+  'tatsugiri-curly':           'Curly',
+  'dudunsparce-two-segment':   'Two Segment',
+  'floette':                   'Red Flower',
+};
+
+/// Override labels for specific cosmetic form chips where the PokéAPI form name
+/// would produce a misleading or incorrect label.
+/// Key: PokéAPI variety/form name. Value: display label for the chip.
+const kCosmeticFormLabels = <String, String>{
+  // Xerneas: the official artwork at pokemon/716 shows the Active form, so the
+  // non-default form chip should be labeled "Neutral" (the resting pose).
+  'xerneas-active': 'Neutral',
+};
+
+/// Override HOME artwork URLs for cosmetic form chips where the default URL
+/// derivation would show the wrong visual.
+/// Key: PokéAPI form/variety name. Value: full HOME artwork URL.
+const kCosmeticFormHomeUrlOverrides = <String, String>{
+  // xerneas-active is relabeled "Neutral" — show the neutral (resting) form
+  // HOME artwork so the chip actually displays the neutral appearance.
+  'xerneas-active':
+      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/716-neutral.png',
+};
+
+/// Same as [kCosmeticFormHomeUrlOverrides] but for shiny HOME artwork.
+const kCosmeticFormHomeShinyUrlOverrides = <String, String>{
+  'xerneas-active':
+      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/716-neutral.png',
+};
+
+/// HOME artwork to use for the BASE form display when the default official
+/// artwork doesn't match the expected canonical form (e.g. Unown's official
+/// artwork shows form-F but the canonical default is form-A).
+/// Also used as the first tile in the cosmetic form picker sheet.
+/// Key: basePokemon.name. Value: (homeUrl, shinyHomeUrl).
+const kBaseFormCosmeticHomeUrls = <String, (String homeUrl, String shinyUrl)>{
+  'unown': (
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/201-a.png',
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/201-a.png',
+  ),
 };
 
 /// Maps specific base_form names (as they appear in PokéAPI evolution_details)

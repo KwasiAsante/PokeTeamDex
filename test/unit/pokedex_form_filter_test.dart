@@ -103,5 +103,78 @@ void main() {
         'tauros-paldea-aqua-breed',
       ]));
     });
+
+    test('includes Darmanitan forms (Unovan zen, Galarian standard + zen)', () {
+      final varieties = [
+        _v('darmanitan', isDefault: true),
+        _v('darmanitan-zen'),
+        _v('darmanitan-galar-standard'),
+        _v('darmanitan-galar-zen'),
+      ];
+      final result = battleMeaningfulForms(varieties);
+      expect(result.length, 3);
+      expect(result.map((v) => v.name), containsAll([
+        'darmanitan-zen', 'darmanitan-galar-standard', 'darmanitan-galar-zen',
+      ]));
+    });
+
+    test('includes Oinkologne female', () {
+      final varieties = [
+        _v('oinkologne', isDefault: true),
+        _v('oinkologne-female'),
+      ];
+      final result = battleMeaningfulForms(varieties);
+      expect(result.map((v) => v.name), contains('oinkologne-female'));
+    });
+
+    test('excludes Wormadam cloaks (cosmetic variety chips, not battle switcher)', () {
+      final varieties = [
+        _v('wormadam-plant', isDefault: true),
+        _v('wormadam-sandy'),
+        _v('wormadam-trash'),
+      ];
+      // Wormadam cloaks are in kCosmeticVarietyNames, NOT in battleMeaningfulForms.
+      expect(battleMeaningfulForms(varieties), isEmpty);
+    });
+
+    test('excludes Squawkabilly plumages (cosmetic variety chips)', () {
+      final varieties = [
+        _v('squawkabilly-green-plumage', isDefault: true),
+        _v('squawkabilly-blue-plumage'),
+        _v('squawkabilly-yellow-plumage'),
+        _v('squawkabilly-white-plumage'),
+      ];
+      expect(battleMeaningfulForms(varieties), isEmpty);
+    });
+
+    test('includes Basculin white-striped (Hisuian regional form)', () {
+      final varieties = [
+        _v('basculin-red-striped', isDefault: true),
+        _v('basculin-blue-striped'),
+        _v('basculin-white-striped'),
+      ];
+      final result = battleMeaningfulForms(varieties);
+      // White-striped is battle-meaningful (evolves into Basculegion).
+      expect(result.map((v) => v.name), contains('basculin-white-striped'));
+      // Blue-striped is a cosmetic variety chip, not a battle form.
+      expect(result.map((v) => v.name), isNot(contains('basculin-blue-striped')));
+    });
+
+    test('excludes totem forms', () {
+      final varieties = [
+        _v('marowak', isDefault: true),
+        _v('marowak-totem'),
+      ];
+      expect(battleMeaningfulForms(varieties), isEmpty);
+    });
+
+    test('returns empty for Pokémon with no meaningful alternate forms', () {
+      final varieties = [_v('pikachu', isDefault: true)];
+      expect(battleMeaningfulForms(varieties), isEmpty);
+    });
+
+    test('returns empty list for empty input', () {
+      expect(battleMeaningfulForms([]), isEmpty);
+    });
   });
 }
