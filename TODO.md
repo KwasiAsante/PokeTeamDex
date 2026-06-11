@@ -282,6 +282,12 @@
 
 ---
 
+## Investigations
+
+- [ ] **Unified Pokémon data resolution layer** — cross-source gaps (PokéAPI / Showdown / Smogon), scattered override maps, and unresiolved form data are recomputed on every request with no single cached result; investigate a unified model that does gap-filling once and caches the resolved output *(#201)*
+
+---
+
 ## Deferred / Post-release
 
 - [ ] **G-Max moves in move list + detail** — G-Max moves (`g-max-*`) are currently accessible via the moves browser but don't appear in PokéAPI's learned-by lists; source from PS/Bulbapedia data and surface them as a filterable category in the move list and as a distinct section in Pokémon detail Moves tab
