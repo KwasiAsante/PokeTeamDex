@@ -28,6 +28,10 @@ bool isRegionalVariety(PokemonVariety variety) {
 }
 
 String? regionalSuffixOf(String varietyName) {
+  // Specific form overrides (e.g. "basculin-white-striped" is Hisuian-exclusive).
+  final override = kBaseFormSuffixOverrides[varietyName];
+  if (override != null) return override;
+
   // Exact suffix (e.g. "zigzagoon-galar" → "galar").
   for (final s in _kRegionalSuffixes) {
     if (varietyName.endsWith(s)) return s.substring(1);
@@ -108,8 +112,11 @@ DisplayNode buildFormChain(
   // e.g. Alolan Vulpix root: displayId=10103, speciesId=37 → formName="vulpix-alola"
   if (formSuffix != null && rootDisplayId != root.speciesId) {
     final simpleName = '${root.speciesName}-$formSuffix';
+    final lookupName = kRegionalFormLookup[simpleName];
     final compoundName = '$simpleName-standard';
-    node.formName = formIds.containsKey(compoundName) ? compoundName : simpleName;
+    node.formName = (lookupName != null && formIds.containsKey(lookupName))
+        ? lookupName
+        : formIds.containsKey(compoundName) ? compoundName : simpleName;
   }
   return node;
 }
@@ -211,8 +218,10 @@ String? _resolveChildFormName(EvolutionNode child, String? suffix, Map<String, i
   }
   final simpleName = '${child.speciesName}-$suffix';
   if (formIds.containsKey(simpleName)) {
-    // Prefer the compound form name when it exists — e.g. "darmanitan-galar-standard"
-    // over "darmanitan-galar" (the latter doesn't exist as a PokéAPI endpoint).
+    // Prefer a specific lookup override (e.g. "basculin-hisui" → "basculin-white-striped").
+    final lookupName = kRegionalFormLookup[simpleName];
+    if (lookupName != null && formIds.containsKey(lookupName)) return lookupName;
+    // Prefer compound form name (e.g. "darmanitan-galar-standard" over "darmanitan-galar").
     final compoundName = '$simpleName-standard';
     if (formIds.containsKey(compoundName)) return compoundName;
     return simpleName;
@@ -224,8 +233,24 @@ String? _resolveChildFormName(EvolutionNode child, String? suffix, Map<String, i
 /// default form has its own name rather than just "Base".
 /// Key: PokéAPI species name. Value: display label for the default form.
 const kBaseFormNameOverrides = <String, String>{
-  'lycanroc': 'Midday',
-  'urshifu':  'Single Strike',
+  'lycanroc':             'Midday',
+  'urshifu':              'Single Strike',
+  'basculin-red-striped': 'Red-Striped',
+};
+
+/// Maps specific base_form names (as they appear in PokéAPI evolution_details)
+/// to their effective regional suffix. Used for forms that are regionally
+/// exclusive but don't follow the simple "{name}-{suffix}" naming convention.
+const kBaseFormSuffixOverrides = <String, String>{
+  'basculin-white-striped': 'hisui',
+};
+
+/// Maps "{speciesName}-{suffix}" to the actual PokéAPI Pokémon name when the
+/// true form name doesn't follow the "{name}-{suffix}" convention.
+/// Used by _EvolutionsTab to pre-resolve form IDs and by _resolveChildFormName
+/// to produce correct navigation targets.
+const kRegionalFormLookup = <String, String>{
+  'basculin-hisui': 'basculin-white-striped',
 };
 
 const _kSuffixLabel = {
@@ -271,6 +296,7 @@ String shortBaseFormLabel(String? generationName) =>
 const _kSpecificFormLabels = <String, String>{
   'darmanitan-zen':            'Unovan Zen',
   'darmanitan-galar-standard': 'Galarian',
+  'basculin-white-striped':    'Hisuian White-Striped',
 };
 
 /// Short label for the app bar badge (e.g. "Galarian", "Alolan", "Combat Breed").

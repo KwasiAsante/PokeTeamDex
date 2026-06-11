@@ -29,6 +29,9 @@ const _kBattleMeaningfulNames = {
   'darmanitan-zen',
   'darmanitan-galar-standard',
   'darmanitan-galar-zen',
+  // Basculin White-Striped is Hisui-exclusive and the only form that evolves
+  // into Basculegion; treated as a regional form.
+  'basculin-white-striped',
 };
 
 /// Returns non-default [varieties] that are battle-meaningful — regional forms

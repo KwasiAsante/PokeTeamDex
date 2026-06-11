@@ -1490,11 +1490,24 @@ class _EvolutionsTab extends ConsumerWidget {
                   // Try "{name}-{suffix}-standard" for species whose Galarian/regional
                   // form uses a compound name (e.g. darmanitan-galar-standard rather
                   // than darmanitan-galar which doesn't exist in PokéAPI).
+                  // Try "{name}-{suffix}-standard" fallback (darmanitan-galar-standard).
                   final stdAsync = ref.watch(pokemonByNameProvider('$name-$s-standard'));
                   final stdId = stdAsync.asData?.value.id;
                   if (stdId != null) {
-                    formIds['$name-$s'] = stdId;          // simplified key for ID lookup
-                    formIds['$name-$s-standard'] = stdId; // actual key for formName resolution
+                    formIds['$name-$s'] = stdId;
+                    formIds['$name-$s-standard'] = stdId;
+                  } else {
+                    // Try kRegionalFormLookup for forms with non-standard naming
+                    // (e.g. basculin-hisui → basculin-white-striped).
+                    final lookupName = kRegionalFormLookup['$name-$s'];
+                    if (lookupName != null) {
+                      final lookupAsync = ref.watch(pokemonByNameProvider(lookupName));
+                      final lookupId = lookupAsync.asData?.value.id;
+                      if (lookupId != null) {
+                        formIds['$name-$s'] = lookupId;
+                        formIds[lookupName] = lookupId;
+                      }
+                    }
                   }
                 }
               }
