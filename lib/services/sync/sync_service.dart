@@ -469,7 +469,7 @@ class SyncService {
         } else {
           final team = await teamRepo.getByIdOrNull(teamLocalId);
           if (team == null) return _kDiscard; // team deleted
-          if (team.remoteId == null) return null; // wait for team create
+          if (team.remoteId == null) return _kDiscard; // team never synced → slot never on server
           entry['team_remote_id'] = int.parse(team.remoteId!);
         }
         return entry;

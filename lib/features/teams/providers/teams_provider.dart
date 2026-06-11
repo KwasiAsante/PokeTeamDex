@@ -332,6 +332,19 @@ Future<void> deleteTeam(WidgetRef ref, int id) async {
   final syncQueue = ref.read(syncQueueRepositoryProvider);
 
   final team = await repo.getById(id);
+
+  // Cancel any pending create/update ops for this team. If a sync is
+  // in-flight and has already sent a team:create to the server, the
+  // remoteId won't be stored on the now-deleted row, so the team:delete
+  // below would be discarded. Cancelling the op here prevents a retry
+  // from re-creating the team on the server after deletion.
+  final pending = await syncQueue.getPending();
+  for (final op in pending) {
+    if (op.entityType == 'team' && op.entityId == id) {
+      await syncQueue.delete(op.id);
+    }
+  }
+
   // Delete slots first — team row deletion doesn't cascade in SQLite.
   await slotRepo.deleteAllForTeam(id);
   await repo.delete(id);

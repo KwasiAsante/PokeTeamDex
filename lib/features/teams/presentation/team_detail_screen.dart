@@ -107,7 +107,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
         allSlots.where((s) => _selectedSlotIds.contains(s.id)).toList();
     final slotRepo = ref.read(teamSlotRepositoryProvider);
     for (final s in toDelete) {
-      await slotRepo.deleteSlot(s.teamId, s.slot);
+      await slotRepo.deleteSlotWithQueue(s.teamId, s.slot, s.id);
     }
     _clearSelection();
     if (mounted) {
@@ -586,7 +586,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
     final keepIds = toKeep.map((s) => s.id).toSet();
     for (final slot in all) {
       if (!keepIds.contains(slot.id)) {
-        await slotRepo.deleteSlot(slot.teamId, slot.slot);
+        await slotRepo.deleteSlotWithQueue(slot.teamId, slot.slot, slot.id);
       }
     }
 
@@ -1406,7 +1406,7 @@ class _FilledSlotCard extends ConsumerWidget {
     } else if (action == 'remove') {
       await ref
           .read(teamSlotRepositoryProvider)
-          .deleteSlot(slot.teamId, slot.slot);
+          .deleteSlotWithQueue(slot.teamId, slot.slot, slot.id);
     }
   }
 }
