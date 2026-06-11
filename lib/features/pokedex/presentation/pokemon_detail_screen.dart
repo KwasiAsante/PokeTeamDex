@@ -237,6 +237,16 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    final wideSelectedCosmetic = _selectedCosmeticFormName != null
+        ? cosmeticForms.where((f) => f.name == _selectedCosmeticFormName).firstOrNull
+        : null;
+    final wideDisplayUrl = wideSelectedCosmetic != null
+        ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${wideSelectedCosmetic.id}.png'
+        : effectivePokemon.officialArtworkUrl;
+    final wideShinyUrl = wideSelectedCosmetic != null
+        ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/${wideSelectedCosmetic.id}.png'
+        : effectivePokemon.officialArtworkShinyUrl;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: headerColor,
@@ -291,8 +301,8 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                       Hero(
                         tag: 'pokemon-sprite-${basePokemon.id}',
                         child: PokemonSprite(
-                          defaultUrl: effectivePokemon.officialArtworkUrl,
-                          shinyUrl: effectivePokemon.officialArtworkShinyUrl,
+                          defaultUrl: wideDisplayUrl,
+                          shinyUrl: wideShinyUrl,
                           shiny: _shiny,
                           size: 140,
                         ),
@@ -312,6 +322,15 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                             .map((t) => TypeBadge(type: t))
                             .toList(),
                       ),
+                      if (cosmeticForms.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        _CosmeticFormRow(
+                          forms: cosmeticForms,
+                          selectedFormName: _selectedCosmeticFormName,
+                          shiny: _shiny,
+                          onSelect: (name) => setState(() => _selectedCosmeticFormName = name),
+                        ),
+                      ],
                     ],
                   ),
                 ),
