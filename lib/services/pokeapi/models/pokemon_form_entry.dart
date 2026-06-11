@@ -11,6 +11,10 @@ class PokemonFormEntry {
   final bool isDefault;
   final String? spriteUrl;
   final String? spriteShinyUrl;
+  /// Official artwork URL (populated for variety-based forms fetched via
+  /// /pokemon/{name}; null for form-name-based cosmetics from /pokemon-form).
+  final String? officialArtworkUrl;
+  final String? officialArtworkShinyUrl;
 
   PokemonFormEntry({
     required this.id,
@@ -19,6 +23,8 @@ class PokemonFormEntry {
     required this.isDefault,
     this.spriteUrl,
     this.spriteShinyUrl,
+    this.officialArtworkUrl,
+    this.officialArtworkShinyUrl,
   });
 
   factory PokemonFormEntry.fromJson(Map<String, dynamic> json) {

@@ -17,6 +17,7 @@ import 'package:poke_team_dex/services/pokeapi/models/encounter_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
@@ -28,6 +29,33 @@ import 'package:poke_team_dex/shared/widgets/stat_bar.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
 import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
+
+/// Derives a display label from a PokéAPI cosmetic form name.
+/// e.g. "red-flower" → "Red Flower", "sandy" → "Sandy", "a" → "A".
+/// Pokémon whose PokéAPI form entries are phantom/irrelevant (e.g. Mothim
+/// inherits Burmy's Sandy/Trash form names but is visually always the same).
+const _kNoCosmeticFormsPokemon = <String>{'mothim'};
+
+/// Pokémon that have cosmetically different genders in sprites but no separate
+/// `/pokemon-form` resource in PokéAPI. A female chip is synthesised for these.
+const _kCosmeticGenderDiffPokemon = <String>{'unfezant'};
+
+/// Variety names that are purely cosmetic (same stats as base) and should
+/// appear as header cosmetic chips rather than in the Forms tab.
+const kCosmeticVarietyNames = <String>{
+  'wormadam-sandy', 'wormadam-trash',
+  'squawkabilly-blue-plumage', 'squawkabilly-yellow-plumage', 'squawkabilly-white-plumage',
+  'tatsugiri-droopy', 'tatsugiri-stretchy',
+  'dudunsparce-three-segment',
+  'basculin-blue-striped',
+};
+
+String cosmeticFormLabel(String formName) {
+  if (formName.isEmpty) return 'Default';
+  return formName.split('-')
+      .map((p) => p.isEmpty ? '' : '${p[0].toUpperCase()}${p.substring(1)}')
+      .join(' ');
+}
 
 class PokemonDetailScreen extends ConsumerStatefulWidget {
   final int pokemonId;
@@ -45,6 +73,14 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
   late TabController _tabController;
   bool _shiny = false;
   String? _selectedFormName; // null = base form
+  String? _selectedCosmeticFormName; // null = base form sprite
+
+  void _selectBattleForm(String? formName) {
+    setState(() {
+      _selectedFormName = formName;
+      _selectedCosmeticFormName = null;
+    });
+  }
 
   // Narrow layout — horizontal TabBar
   static const _tabs = [
@@ -111,6 +147,10 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     final formAsync = _selectedFormName != null
         ? ref.watch(pokemonByNameProvider(_selectedFormName!))
         : null;
+    final cosmPokemonName = pokemonAsync.asData?.value.name;
+    final cosmeticFormsAsync = cosmPokemonName != null
+        ? ref.watch(cosmeticFormsProvider(cosmPokemonName))
+        : null;
     final isWide = MediaQuery.sizeOf(context).width > 840;
 
     return pokemonAsync.when(
@@ -151,10 +191,84 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                   (battleForms.isNotEmpty
                       ? 'Base'
                       : shortBaseFormLabel(species?.generationName));
+        // Filter out phantom cosmetic forms for species that inherit irrelevant
+        // form names (e.g. Mothim gets Sandy/Trash from Burmy but looks identical).
+        final rawCosmeticForms = _kNoCosmeticFormsPokemon.contains(basePokemon.name)
+            ? const <PokemonFormEntry>[]
+            : (cosmeticFormsAsync?.asData?.value ?? const <PokemonFormEntry>[]);
+        // Patch gender forms whose /pokemon-form endpoint returns null for
+        // front_default (e.g. frillish-female, jellicent-female) — use the
+        // pokemon/female/{id}.png sprite instead.
+        final cosmeticFormsBase = rawCosmeticForms.map((f) {
+          if (f.spriteUrl == null && f.formName == 'female') {
+            return PokemonFormEntry(
+              id: f.id,
+              name: f.name,
+              formName: f.formName,
+              isDefault: f.isDefault,
+              spriteUrl:
+                  'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/female/${basePokemon.id}.png',
+              spriteShinyUrl:
+                  'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/female/${basePokemon.id}.png',
+              officialArtworkUrl: f.officialArtworkUrl,
+              officialArtworkShinyUrl: f.officialArtworkShinyUrl,
+            );
+          }
+          return f;
+        }).toList();
+        final cosmeticFormsLoading = !_kNoCosmeticFormsPokemon.contains(basePokemon.name) &&
+            cosmeticFormsAsync != null &&
+            cosmeticFormsAsync.isLoading;
+
+        // Variety-based cosmetic chips are only shown for the BASE form.
+        // When a regional battle form is selected (e.g. Hisuian Basculin),
+        // Unovan cosmetic variants (Blue-Striped) are not relevant.
+        final varietyCosmeticForms = <PokemonFormEntry>[];
+        if (species != null && _selectedFormName == null) {
+          for (final variety in species.varieties) {
+            if (variety.isDefault) continue;
+            if (!kCosmeticVarietyNames.contains(variety.name)) continue;
+            final vAsync = ref.watch(pokemonByNameProvider(variety.name));
+            final vData = vAsync.asData?.value;
+            if (vData == null) continue;
+            final formName = variety.name.startsWith('${basePokemon.name}-')
+                ? variety.name.substring(basePokemon.name.length + 1)
+                : variety.name;
+            varietyCosmeticForms.add(PokemonFormEntry(
+              id: vData.id,
+              name: variety.name,
+              formName: formName,
+              isDefault: false,
+              // Chip thumbnail uses the small sprite; header uses official artwork.
+              spriteUrl: vData.sprites?['front_default'] as String?,
+              spriteShinyUrl: vData.sprites?['front_shiny'] as String?,
+              officialArtworkUrl: vData.officialArtworkUrl,
+              officialArtworkShinyUrl: vData.officialArtworkShinyUrl,
+            ));
+          }
+        }
+
+        // Synthesise a female cosmetic chip for species with gender-diff sprites
+        // but no separate pokemon-form resource in PokéAPI (e.g. Unfezant).
+        if (_kCosmeticGenderDiffPokemon.contains(basePokemon.name) && _selectedFormName == null) {
+          final baseId = basePokemon.id;
+          varietyCosmeticForms.add(PokemonFormEntry(
+            id: baseId,
+            name: '${basePokemon.name}-female',
+            formName: 'female',
+            isDefault: false,
+            spriteUrl:
+                'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/female/$baseId.png',
+            spriteShinyUrl:
+                'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/female/$baseId.png',
+          ));
+        }
+
+        final cosmeticForms = [...cosmeticFormsBase, ...varietyCosmeticForms];
 
         return isWide
-            ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel)
-            : _buildNarrowLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel);
+            ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms, cosmeticFormsLoading)
+            : _buildNarrowLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms, cosmeticFormsLoading);
       },
     );
   }
@@ -169,6 +283,8 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     Color headerColor,
     List<PokemonVariety> battleForms,
     String baseFormLabel,
+    List<PokemonFormEntry> cosmeticForms,
+    bool cosmeticFormsLoading,
   ) {
     return Scaffold(
       body: NestedScrollView(
@@ -179,12 +295,16 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
             battleForms: battleForms,
             baseFormLabel: baseFormLabel,
             selectedFormName: _selectedFormName,
-            onFormSelect: (name) => setState(() => _selectedFormName = name),
+            onFormSelect: _selectBattleForm,
             headerColor: headerColor,
             shiny: _shiny,
             onShinyToggle: () => setState(() => _shiny = !_shiny),
             tabController: _tabController,
             tabs: _tabs,
+            cosmeticForms: cosmeticForms,
+            cosmeticFormsLoading: cosmeticFormsLoading,
+            selectedCosmeticFormName: _selectedCosmeticFormName,
+            onCosmeticFormSelect: (name) => setState(() => _selectedCosmeticFormName = name),
           ),
         ],
         body: TabBarView(
@@ -205,9 +325,57 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     Color headerColor,
     List<PokemonVariety> battleForms,
     String baseFormLabel,
+    List<PokemonFormEntry> cosmeticForms,
+    bool cosmeticFormsLoading,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
+    final wideSelectedCosmetic = _selectedCosmeticFormName != null
+        ? cosmeticForms.where((f) => f.name == _selectedCosmeticFormName).firstOrNull
+        : null;
+    // Cosmetic form HOME artwork uses "{baseId}-{suffix}.png" naming
+    // (e.g. 412-sandy.png for Burmy Sandy Cloak). Strip the base Pokémon name
+    // prefix from the form name to get the suffix.
+    String? cosmeticHomeUrlFor(PokemonFormEntry? form) {
+      if (form == null) return null;
+      if (form.officialArtworkUrl != null) return form.officialArtworkUrl;
+      final override = kCosmeticFormHomeUrlOverrides[form.name];
+      if (override != null) return override;
+      if (form.formName == 'female') {
+        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${basePokemon.id}.png';
+      }
+      final baseName = basePokemon.name;
+      if (!form.name.startsWith('$baseName-')) return form.spriteUrl;
+      final suffix = form.name.substring(baseName.length + 1);
+      return cosmeticFormHomeUrl(basePokemon.id, suffix);
+    }
+    String? cosmeticHomeShinyUrlFor(PokemonFormEntry? form) {
+      if (form == null) return null;
+      if (form.officialArtworkShinyUrl != null) return form.officialArtworkShinyUrl;
+      if (form.formName == 'female') {
+        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/female/${basePokemon.id}.png';
+      }
+      final baseName = basePokemon.name;
+      if (!form.name.startsWith('$baseName-')) return form.spriteShinyUrl;
+      final suffix = form.name.substring(baseName.length + 1);
+      return cosmeticFormHomeShinyUrl(basePokemon.id, suffix);
+    }
+
+    final wideHomeUrl = cosmeticHomeUrlFor(wideSelectedCosmetic);
+    final wideHomeShiny = cosmeticHomeShinyUrlFor(wideSelectedCosmetic);
+    final wideSpriteUrl = wideSelectedCosmetic != null
+        ? (_shiny ? (wideSelectedCosmetic.spriteShinyUrl ?? wideSelectedCosmetic.spriteUrl) : wideSelectedCosmetic.spriteUrl)
+        : null;
+    final wideBaseOverride = wideSelectedCosmetic == null
+        ? kBaseFormCosmeticHomeUrls[basePokemon.name]
+        : null;
+    final wideDisplayUrl = wideHomeUrl
+        ?? (_shiny ? null : wideBaseOverride?.$1)
+        ?? effectivePokemon.officialArtworkUrl;
+    final wideShinyUrl = wideHomeShiny
+        ?? (_shiny ? wideBaseOverride?.$2 : null)
+        ?? effectivePokemon.officialArtworkShinyUrl;
 
     return Scaffold(
       appBar: AppBar(
@@ -228,7 +396,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
               baseShinyUrl: basePokemon.officialArtworkShinyUrl,
               selectedFormName: _selectedFormName,
               shiny: _shiny,
-              onSelect: (name) => setState(() => _selectedFormName = name),
+              onSelect: _selectBattleForm,
             ),
           IconButton(
             tooltip: _shiny ? 'Show default' : 'Show shiny',
@@ -262,12 +430,18 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                     children: [
                       Hero(
                         tag: 'pokemon-sprite-${basePokemon.id}',
-                        child: PokemonSprite(
-                          defaultUrl: effectivePokemon.officialArtworkUrl,
-                          shinyUrl: effectivePokemon.officialArtworkShinyUrl,
-                          shiny: _shiny,
-                          size: 140,
-                        ),
+                        child: wideSelectedCosmetic != null && wideSpriteUrl != null
+                            ? _CosmeticFormHeaderSprite(
+                                homeUrl: _shiny ? (wideHomeShiny ?? wideHomeUrl) : wideHomeUrl,
+                                fallbackSpriteUrl: wideSpriteUrl,
+                                size: 140,
+                              )
+                            : PokemonSprite(
+                                defaultUrl: wideDisplayUrl,
+                                shinyUrl: wideShinyUrl,
+                                shiny: _shiny,
+                                size: 140,
+                              ),
                       ),
                       const SizedBox(height: 10),
                       Text(
@@ -284,6 +458,19 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                             .map((t) => TypeBadge(type: t))
                             .toList(),
                       ),
+                      if (cosmeticForms.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        _CosmeticFormRow(
+                          forms: cosmeticForms,
+                          selectedFormName: _selectedCosmeticFormName,
+                          shiny: _shiny,
+                          onSelect: (name) => setState(() => _selectedCosmeticFormName = name),
+                          baseHomeUrl: _shiny
+                              ? kBaseFormCosmeticHomeUrls[basePokemon.name]?.$2
+                              : kBaseFormCosmeticHomeUrls[basePokemon.name]?.$1,
+                          baseLabel: kBaseFormNameOverrides[basePokemon.name],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -366,6 +553,10 @@ class _DetailSliverAppBar extends StatelessWidget {
   final VoidCallback onShinyToggle;
   final TabController tabController;
   final List<Tab> tabs;
+  final List<PokemonFormEntry> cosmeticForms;
+  final bool cosmeticFormsLoading;
+  final String? selectedCosmeticFormName;
+  final void Function(String?) onCosmeticFormSelect;
 
   const _DetailSliverAppBar({
     required this.basePokemon,
@@ -379,12 +570,77 @@ class _DetailSliverAppBar extends StatelessWidget {
     required this.onShinyToggle,
     required this.tabController,
     required this.tabs,
+    required this.cosmeticForms,
+    required this.cosmeticFormsLoading,
+    required this.selectedCosmeticFormName,
+    required this.onCosmeticFormSelect,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Resolve the cosmetic form to display (if one is selected).
+    final selectedCosmetic = selectedCosmeticFormName != null
+        ? cosmeticForms.where((f) => f.name == selectedCosmeticFormName).firstOrNull
+        : null;
+
+    // Resolve header display URL for a cosmetic form.
+    // Priority: official artwork (variety-based) → HOME override → HOME → sprite.
+    String? cosmeticUrlFor(PokemonFormEntry? form) {
+      if (form == null) return null;
+      // Variety-based forms have their own official artwork URL.
+      if (form.officialArtworkUrl != null) return form.officialArtworkUrl;
+      // Specific URL overrides (e.g. xerneas-active → show neutral form).
+      final override = kCosmeticFormHomeUrlOverrides[form.name];
+      if (override != null) return override;
+      // Gender forms: check formName directly so it works even when basePokemon.name
+      // includes a suffix (e.g. "frillish-male" → "frillish-female" prefix check fails).
+      if (form.formName == 'female') {
+        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${basePokemon.id}.png';
+      }
+      // Form-name-based: try "{baseId}-{suffix}.png" HOME URL.
+      final baseName = basePokemon.name;
+      if (!form.name.startsWith('$baseName-')) return form.spriteUrl;
+      final suffix = form.name.substring(baseName.length + 1);
+      return cosmeticFormHomeUrl(basePokemon.id, suffix);
+    }
+    String? cosmeticShinyUrlFor(PokemonFormEntry? form) {
+      if (form == null) return null;
+      if (form.officialArtworkShinyUrl != null) return form.officialArtworkShinyUrl;
+      final shinyOverride = kCosmeticFormHomeShinyUrlOverrides[form.name];
+      if (shinyOverride != null) return shinyOverride;
+      if (form.formName == 'female') {
+        return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/female/${basePokemon.id}.png';
+      }
+      final baseName = basePokemon.name;
+      if (!form.name.startsWith('$baseName-')) return form.spriteShinyUrl;
+      final suffix = form.name.substring(baseName.length + 1);
+      return cosmeticFormHomeShinyUrl(basePokemon.id, suffix);
+    }
+
+    // When a cosmetic form is selected: try HOME artwork, fall back to the
+    // form's pixel sprite (handles forms with no HOME artwork like Pichu Spiky-Eared).
+    final cosmeticHomeUrl = cosmeticUrlFor(selectedCosmetic);
+    final cosmeticHomeShiny = cosmeticShinyUrlFor(selectedCosmetic);
+    final cosmeticSpriteUrl = selectedCosmetic != null
+        ? (shiny ? (selectedCosmetic.spriteShinyUrl ?? selectedCosmetic.spriteUrl) : selectedCosmetic.spriteUrl)
+        : null;
+    // When no cosmetic form is selected and there's a base HOME override
+    // (e.g. Unown shows form-A HOME artwork instead of official-artwork form-F).
+    final baseHomeOverride = selectedCosmetic == null
+        ? kBaseFormCosmeticHomeUrls[basePokemon.name]
+        : null;
+    final displayDefaultUrl = cosmeticHomeUrl
+        ?? (shiny ? null : baseHomeOverride?.$1)
+        ?? effectivePokemon.officialArtworkUrl;
+    final displayShinyUrl = cosmeticHomeShiny
+        ?? (shiny ? baseHomeOverride?.$2 : null)
+        ?? effectivePokemon.officialArtworkShinyUrl;
+
+    // Expand header height when cosmetic chips are present.
+    final expandedHeight = cosmeticForms.isNotEmpty ? 324.0 : 280.0;
+
     return SliverAppBar(
-      expandedHeight: 280,
+      expandedHeight: expandedHeight,
       pinned: true,
       backgroundColor: headerColor,
       foregroundColor: Colors.white,
@@ -419,16 +675,46 @@ class _DetailSliverAppBar extends StatelessWidget {
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           color: headerColor.withValues(alpha: 0.85),
-          child: Center(
-            child: Hero(
-              tag: 'pokemon-sprite-${basePokemon.id}',
-              child: PokemonSprite(
-                defaultUrl: effectivePokemon.officialArtworkUrl,
-                shinyUrl: effectivePokemon.officialArtworkShinyUrl,
-                shiny: shiny,
-                size: 200,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Hero(
+                tag: 'pokemon-sprite-${basePokemon.id}',
+                child: selectedCosmetic != null && cosmeticSpriteUrl != null
+                    ? _CosmeticFormHeaderSprite(
+                        homeUrl: shiny ? (cosmeticHomeShiny ?? cosmeticHomeUrl) : cosmeticHomeUrl,
+                        fallbackSpriteUrl: cosmeticSpriteUrl,
+                        size: 200,
+                      )
+                    : PokemonSprite(
+                        defaultUrl: displayDefaultUrl,
+                        shinyUrl: displayShinyUrl,
+                        shiny: shiny,
+                        size: 200,
+                      ),
               ),
-            ),
+              if (cosmeticFormsLoading) ...[
+                const SizedBox(height: 6),
+                const SizedBox(
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+                ),
+              ] else if (cosmeticForms.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _CosmeticFormRow(
+                  forms: cosmeticForms,
+                  selectedFormName: selectedCosmeticFormName,
+                  shiny: shiny,
+                  onSelect: onCosmeticFormSelect,
+                  baseHomeUrl: shiny
+                      ? kBaseFormCosmeticHomeUrls[basePokemon.name]?.$2
+                      : kBaseFormCosmeticHomeUrls[basePokemon.name]?.$1,
+                  baseLabel: kBaseFormNameOverrides[basePokemon.name],
+                ),
+              ],
+              // Bottom spacer keeps content clear of the pinned TabBar (~48 dp).
+              const SizedBox(height: 48),
+            ],
           ),
         ),
       ),
@@ -1716,6 +2002,8 @@ class _FormsTab extends ConsumerWidget {
         final nonDefault = species.varieties.where((v) {
           if (v.isDefault) return false;
           if (switcherFormNames.contains(v.name)) return false;
+          // Also exclude variety-based cosmetic forms — they appear as header chips.
+          if (kCosmeticVarietyNames.contains(v.name)) return false;
           if (selectedFormName != null && megaSuffixes.any((s) => v.name.endsWith(s))) return false;
           return true;
         }).toList();
@@ -2976,6 +3264,397 @@ class _FormOptionTile extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Cosmetic Form Chips ───────────────────────────────────────────────────────
+
+/// Horizontal strip of cosmetic form chips (≤ 6 forms) or a single count
+/// chip that opens a picker sheet (> 6 forms).
+class _CosmeticFormRow extends StatelessWidget {
+  final List<PokemonFormEntry> forms;
+  final String? selectedFormName;
+  final bool shiny;
+  final void Function(String?) onSelect;
+  /// HOME URL for the base form to show as first tile in the picker sheet
+  /// (e.g. Unown-A). Only used when forms.length > 6.
+  final String? baseHomeUrl;
+  final String? baseLabel;
+
+  const _CosmeticFormRow({
+    required this.forms,
+    required this.selectedFormName,
+    required this.shiny,
+    required this.onSelect,
+    this.baseHomeUrl,
+    this.baseLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (forms.isEmpty) return const SizedBox.shrink();
+    if (forms.length <= 6) {
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: forms.map((f) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: _CosmeticFormChip(
+              form: f,
+              isSelected: f.name == selectedFormName,
+              shiny: shiny,
+              onTap: () => onSelect(f.name == selectedFormName ? null : f.name),
+            ),
+          )).toList(),
+        ),
+      );
+    }
+    // > 6 forms: single count chip opens picker sheet.
+    return GestureDetector(
+      onTap: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (ctx) => _CosmeticFormPickerSheet(
+          forms: forms,
+          selectedFormName: selectedFormName,
+          shiny: shiny,
+          onSelect: (name) {
+            onSelect(name == selectedFormName ? null : name);
+            Navigator.pop(ctx);
+          },
+          baseHomeUrl: baseHomeUrl,
+          baseLabel: baseLabel,
+          onSelectBase: selectedFormName != null
+              ? () {
+                  onSelect(null);
+                  Navigator.pop(ctx);
+                }
+              : null,
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white38),
+        ),
+        child: Text(
+          '${forms.length} forms ▾',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CosmeticFormChip extends StatelessWidget {
+  final PokemonFormEntry form;
+  final bool isSelected;
+  final bool shiny;
+  final VoidCallback onTap;
+
+  const _CosmeticFormChip({
+    required this.form,
+    required this.isSelected,
+    required this.shiny,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final spriteUrl = (shiny ? form.spriteShinyUrl : null) ?? form.spriteUrl;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Colors.white.withValues(alpha: 0.35)
+              : Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? Colors.white : Colors.white38,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (spriteUrl != null)
+              CachedNetworkImage(
+                imageUrl: spriteUrl,
+                width: 28, height: 28,
+                placeholder: (_, _) => const SizedBox(
+                  width: 28, height: 28,
+                  child: Center(
+                    child: SizedBox(
+                      width: 14, height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ),
+                ),
+                errorWidget: (_, _, _) =>
+                    const Icon(Icons.catching_pokemon, color: Colors.white54, size: 20),
+              )
+            else
+              const SizedBox(width: 28, height: 28),
+            const SizedBox(width: 4),
+            Text(
+              kCosmeticFormLabels[form.name] ?? cosmeticFormLabel(form.formName),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CosmeticFormPickerSheet extends StatelessWidget {
+  final List<PokemonFormEntry> forms;
+  final String? selectedFormName;
+  final bool shiny;
+  final void Function(String) onSelect;
+  /// HOME artwork URL for the base form (e.g. Unown-A), shown as the first
+  /// tile so the canonical default form is always selectable in the picker.
+  final String? baseHomeUrl;
+  final String? baseLabel;
+  /// Called when the base tile is tapped (deselects the current cosmetic form).
+  final VoidCallback? onSelectBase;
+
+  const _CosmeticFormPickerSheet({
+    required this.forms,
+    required this.selectedFormName,
+    required this.shiny,
+    required this.onSelect,
+    this.baseHomeUrl,
+    this.baseLabel,
+    this.onSelectBase,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.3,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (_, controller) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Select Form',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: SingleChildScrollView(
+                controller: controller,
+                child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              // Base form tile (e.g. Unown-A) when a specific HOME URL is provided.
+              if (baseHomeUrl != null && onSelectBase != null) ...[
+                _buildPickerTile(
+                  context: context,
+                  isSelected: selectedFormName == null,
+                  spriteUrl: baseHomeUrl!,
+                  label: baseLabel ?? 'Base',
+                  onTap: onSelectBase!,
+                ),
+              ],
+              ...forms.map((f) {
+              final isSelected = f.name == selectedFormName;
+              final spriteUrl =
+                  (shiny ? f.spriteShinyUrl : null) ?? f.spriteUrl;
+              return GestureDetector(
+                onTap: () => onSelect(f.name),
+                child: Container(
+                  width: 80,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? colorScheme.primaryContainer
+                        : colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected
+                          ? colorScheme.primary
+                          : colorScheme.outlineVariant,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (spriteUrl != null)
+                        CachedNetworkImage(
+                          imageUrl: spriteUrl,
+                          height: 52, width: 52,
+                          placeholder: (_, _) => const SizedBox(height: 52, width: 52),
+                          errorWidget: (_, _, _) => const SizedBox(
+                            height: 52, width: 52,
+                            child: Icon(Icons.catching_pokemon, color: Colors.grey),
+                          ),
+                        )
+                      else
+                        const SizedBox(height: 52, width: 52,
+                            child: Icon(Icons.catching_pokemon,
+                                color: Colors.grey)),
+                      const SizedBox(height: 4),
+                      Text(
+                        kCosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
+                        textAlign: TextAlign.center,
+                        style:
+                            Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  color:
+                                      isSelected ? colorScheme.primary : null,
+                                ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPickerTile({
+    required BuildContext context,
+    required bool isSelected,
+    required String spriteUrl,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 80,
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primaryContainer
+              : colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? colorScheme.primary : colorScheme.outlineVariant,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CachedNetworkImage(
+              imageUrl: spriteUrl,
+              height: 52, width: 52,
+              fit: BoxFit.contain,
+              placeholder: (_, _) => const SizedBox(
+                height: 52, width: 52,
+                child: Center(child: SizedBox(
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )),
+              ),
+              errorWidget: (_, _, _) => const SizedBox(height: 52, width: 52,
+                  child: Icon(Icons.catching_pokemon, color: Colors.grey)),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? colorScheme.primary : null,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Cosmetic Form Header Sprite ───────────────────────────────────────────────
+
+/// Tries to display the cosmetic form's HOME artwork; falls back to the pixel
+/// sprite when the HOME URL doesn't exist (e.g. Pichu Spiky-eared).
+class _CosmeticFormHeaderSprite extends StatelessWidget {
+  final String? homeUrl;
+  final String? fallbackSpriteUrl;
+  final double size;
+
+  const _CosmeticFormHeaderSprite({
+    required this.homeUrl,
+    required this.fallbackSpriteUrl,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final sprite = fallbackSpriteUrl;
+    if (homeUrl == null) {
+      return sprite != null
+          ? CachedNetworkImage(
+              imageUrl: sprite,
+              width: size, height: size, fit: BoxFit.contain,
+              placeholder: (_, _) => SizedBox(width: size, height: size),
+              errorWidget: (_, _, _) => SizedBox(width: size, height: size,
+                  child: Icon(Icons.catching_pokemon, color: Colors.white54)),
+            )
+          : SizedBox(width: size, height: size,
+              child: Icon(Icons.catching_pokemon, color: Colors.white54, size: size * 0.5));
+    }
+    return CachedNetworkImage(
+      imageUrl: homeUrl!,
+      width: size, height: size, fit: BoxFit.contain,
+      placeholder: (_, _) => SizedBox(width: size, height: size),
+      errorWidget: (_, _, _) => sprite != null
+          ? CachedNetworkImage(
+              imageUrl: sprite,
+              width: size, height: size, fit: BoxFit.contain,
+              placeholder: (_, _) => SizedBox(width: size, height: size),
+              errorWidget: (_, _, _) => SizedBox(width: size, height: size,
+                  child: Icon(Icons.catching_pokemon, color: Colors.white54)),
+            )
+          : SizedBox(width: size, height: size,
+              child: Icon(Icons.catching_pokemon, color: Colors.white54, size: size * 0.5)),
     );
   }
 }
