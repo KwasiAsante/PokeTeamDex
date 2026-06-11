@@ -81,3 +81,32 @@ List<PokemonVariety> battleMeaningfulForms(List<PokemonVariety> varieties) {
     return false;
   }).toList();
 }
+
+/// Variety names that are purely cosmetic (same stats as base) and should
+/// appear as cosmetic chips rather than in the Forms tab.
+const kCosmeticVarietyNames = <String>{
+  'wormadam-sandy', 'wormadam-trash',
+  'squawkabilly-blue-plumage', 'squawkabilly-yellow-plumage', 'squawkabilly-white-plumage',
+  'tatsugiri-droopy', 'tatsugiri-stretchy',
+  'dudunsparce-three-segment',
+  'basculin-blue-striped',
+  'morpeko-hangry',
+  'mimikyu-busted',
+  'minior-red', 'minior-orange', 'minior-yellow', 'minior-green',
+  'minior-blue', 'minior-indigo', 'minior-violet',
+  'magearna-original',
+  'eiscue-noice',
+  'zarude-dada',
+  'maushold-family-of-three',
+  'keldeo-resolute',
+};
+
+/// Derives a display label from a PokéAPI cosmetic form suffix.
+/// e.g. "red-flower" → "Red Flower", "sandy" → "Sandy", "a" → "A".
+String cosmeticFormLabel(String formName) {
+  if (formName.isEmpty) return 'Default';
+  return formName
+      .split('-')
+      .map((p) => p.isEmpty ? '' : '${p[0].toUpperCase()}${p.substring(1)}')
+      .join(' ');
+}

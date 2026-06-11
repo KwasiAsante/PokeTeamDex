@@ -40,40 +40,6 @@ const _kNoCosmeticFormsPokemon = <String>{'mothim'};
 /// `/pokemon-form` resource in PokéAPI. A female chip is synthesised for these.
 const _kCosmeticGenderDiffPokemon = <String>{'unfezant'};
 
-/// Variety names that are purely cosmetic (same stats as base) and should
-/// appear as header cosmetic chips rather than in the Forms tab.
-const kCosmeticVarietyNames = <String>{
-  'wormadam-sandy', 'wormadam-trash',
-  'squawkabilly-blue-plumage', 'squawkabilly-yellow-plumage', 'squawkabilly-white-plumage',
-  'tatsugiri-droopy', 'tatsugiri-stretchy',
-  'dudunsparce-three-segment',
-  'basculin-blue-striped',
-  // Morpeko — Hangry mode changes colour (same stats/type/ability)
-  'morpeko-hangry',
-  // Mimikyu — Busted form is post-disguise reveal (same stats)
-  'mimikyu-busted',
-  // Minior — 7 core colour variants (more visual change than meteor colours)
-  'minior-red', 'minior-orange', 'minior-yellow', 'minior-green',
-  'minior-blue', 'minior-indigo', 'minior-violet',
-  // Magearna — Original Color is the event-variant colour (same stats)
-  'magearna-original',
-  // Eiscue — Noice Face has melted ice (same stats; ability-triggered)
-  'eiscue-noice',
-  // Zarude — Dada Zarude wears a cape; event variant with same stats
-  'zarude-dada',
-  // Maushold — Family of Three vs Four; different headcount, same stats
-  'maushold-family-of-three',
-  // Keldeo — Resolute forme is a visual/moveset cosmetic (same stats/type/ability)
-  'keldeo-resolute',
-};
-
-String cosmeticFormLabel(String formName) {
-  if (formName.isEmpty) return 'Default';
-  return formName.split('-')
-      .map((p) => p.isEmpty ? '' : '${p[0].toUpperCase()}${p.substring(1)}')
-      .join(' ');
-}
-
 class PokemonDetailScreen extends ConsumerStatefulWidget {
   final int pokemonId;
   /// When navigating from an evolution chain node, pre-select this form

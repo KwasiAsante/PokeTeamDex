@@ -1,7 +1,7 @@
 // ignore_for_file: depend_on_referenced_packages
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
-import 'package:poke_team_dex/features/pokedex/presentation/pokemon_detail_screen.dart';
+import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
 
 void main() {
