@@ -87,8 +87,16 @@ DisplayNode buildFormChain(
   int rootDisplayId, {
   Map<String, int> formIds = const {},
   Set<String> excludeRegionSuffixes = const {},
-}) =>
-    _buildNode(root, formSuffix, rootDisplayId, formIds, excludeRegionSuffixes);
+}) {
+  final node = _buildNode(root, formSuffix, rootDisplayId, formIds, excludeRegionSuffixes);
+  // Set formName on the root node when it has a form-specific display ID so
+  // tapping it navigates to /pokedex/{speciesId}?form={formName} correctly.
+  // e.g. Alolan Vulpix root: displayId=10103, speciesId=37 → formName="vulpix-alola"
+  if (formSuffix != null && rootDisplayId != root.speciesId) {
+    node.formName = '${root.speciesName}-$formSuffix';
+  }
+  return node;
+}
 
 DisplayNode _buildNode(
   EvolutionNode node,
