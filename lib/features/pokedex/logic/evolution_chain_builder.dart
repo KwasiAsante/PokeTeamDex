@@ -267,6 +267,12 @@ const kCosmeticFormHomeUrlOverrides = <String, String>{
       'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/716-neutral.png',
 };
 
+/// Same as [kCosmeticFormHomeUrlOverrides] but for shiny HOME artwork.
+const kCosmeticFormHomeShinyUrlOverrides = <String, String>{
+  'xerneas-active':
+      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/716-neutral.png',
+};
+
 /// Maps specific base_form names (as they appear in PokéAPI evolution_details)
 /// to their effective regional suffix. Used for forms that are regionally
 /// exclusive but don't follow the simple "{name}-{suffix}" naming convention.

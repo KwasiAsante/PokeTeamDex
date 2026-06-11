@@ -530,7 +530,8 @@ class _DetailSliverAppBar extends StatelessWidget {
     String? cosmeticShinyUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
       if (form.officialArtworkShinyUrl != null) return form.officialArtworkShinyUrl;
-      // No shiny override for now; fall back to non-shiny HOME or sprite.
+      final shinyOverride = kCosmeticFormHomeShinyUrlOverrides[form.name];
+      if (shinyOverride != null) return shinyOverride;
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteShinyUrl;
       final suffix = form.name.substring(baseName.length + 1);
