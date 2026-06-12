@@ -275,6 +275,7 @@
 - [x] **Link UI** — "Pokémon Identity" section in slot config; link type chooser (child vs origin); instance picker sheet; chain view showing ancestors + current slot + direct children with origin/child badges; "Add child" button on linked state; copy-to-team-slot destination picker (new team or empty slot in existing team)
 - [x] **Data inheritance** — ribbon merging from `inheritedRibbons`; "Previously known as" alias display when nickname differs from parent; gender/isShiny propagated when copying to child slot
 - [x] **Inherited ribbons excluded from picker** — ribbons already in the instance chain are shown in the read-only "Inherited" chips section only; filtered out of the selectable catalog so they can't be redundantly toggled (#207)
+- [x] **Ribbon gen gating** — ribbon picker filtered by format generation; each ribbon carries a `minGen` and is hidden when the team format's gen is below it; no-format teams remain unrestricted (#205)
 - [x] **Navigation** — tapping a chain row navigates to that slot's config screen
 - [x] **Chain sync fix** — `parent_instance_id` now preserved across devices: backend pull ordered by ID, push topologically sorts instance ops, Flutter merge uses two-pass resolution (#214)
 - [x] **Unlink / remove resets chain** — unlinking a slot or removing a Pokémon from a team immediately re-parents orphaned chain descendants and deletes orphaned instances; chain view filters out orphaned ancestor nodes; backend `InstanceUpdateOp` extended with `update_parent_instance` + `parent_instance_remote_id` for sync (#204)
