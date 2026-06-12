@@ -275,6 +275,7 @@
 - [x] **Data inheritance** — ribbon merging from `inheritedRibbons`; "Previously known as" alias display when nickname differs from parent; gender/isShiny propagated when copying to child slot
 - [x] **Inherited ribbons excluded from picker** — ribbons already in the instance chain are shown in the read-only "Inherited" chips section only; filtered out of the selectable catalog so they can't be redundantly toggled (#207)
 - [x] **Navigation** — tapping a chain row navigates to that slot's config screen
+- [x] **Chain sync fix** — `parent_instance_id` now preserved across devices: backend pull ordered by ID, push topologically sorts instance ops, Flutter merge uses two-pass resolution (#214)
 
 ---
 
