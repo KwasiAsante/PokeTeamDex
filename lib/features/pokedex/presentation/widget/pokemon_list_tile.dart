@@ -178,8 +178,10 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
         final suffix = v.name.startsWith('$sn-')
             ? v.name.substring(sn.length + 1)
             : v.name;
-        // Cosmetic variety forms have a pokemonByNameProvider resource — no sprite override.
-        return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix), null as String?);
+        // Use HOME artwork override when available (e.g. mimikyu-busted has no
+        // officialArtworkUrl in PokéAPI so pokemonByNameProvider returns null artwork).
+        return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix),
+            kCosmeticFormHomeUrlOverrides[v.name] as String?);
       }),
       // Form-entry cosmetics: carry sprite so FormOptionTile doesn't call
       // pokemonByNameProvider with a form name that has no /pokemon endpoint.
@@ -293,7 +295,13 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
         margin: EdgeInsets.zero,
         child: InkWell(
           onTap: () {
-            if (_selectedFormName != null) {
+            // Only pass ?form= for battle-meaningful variety forms (Giratina-Origin,
+            // Alolan Raticate, etc.). Cosmetic varieties (mimikyu-busted, etc.) and
+            // form-entry cosmetics (shellos-east-sea, etc.) are not handled by the
+            // detail screen's initialFormName — navigate to the base screen instead.
+            final isBattleForm = _selectedFormName != null &&
+                battleForms.any((v) => v.name == _selectedFormName);
+            if (isBattleForm) {
               context.push(
                   '/pokedex/${widget.pokemon.id}?form=$_selectedFormName');
             } else {
@@ -440,7 +448,13 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
       }
       if (formEntry != null) {
         if (widget.imageType == PokedexImageType.artwork) {
-          return formEntry.officialArtworkUrl ??
+          // HOME artwork override takes priority (e.g. mimikyu-busted has no
+          // officialArtworkUrl in PokéAPI but has a HOME sprite at 10143.png).
+          final homeOverride = _selectedFormName != null
+              ? kCosmeticFormHomeUrlOverrides[_selectedFormName!]
+              : null;
+          return homeOverride ??
+              formEntry.officialArtworkUrl ??
               '${_kBase}other/official-artwork/${widget.pokemon.id}.png';
         }
         if (widget.imageType == PokedexImageType.sprite) {

@@ -112,7 +112,8 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         final suffix = v.name.startsWith('$sn-')
             ? v.name.substring(sn.length + 1)
             : v.name;
-        return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix), null as String?);
+        return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix),
+            kCosmeticFormHomeUrlOverrides[v.name] as String?);
       }),
       ...cosmeticFormEntries.map((f) => (
         f.name,
@@ -162,7 +163,9 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          if (_selectedFormName != null) {
+          final isBattleForm = _selectedFormName != null &&
+              battleForms.any((v) => v.name == _selectedFormName);
+          if (isBattleForm) {
             context
                 .push('/pokedex/${widget.pokemon.id}?form=$_selectedFormName');
           } else {
@@ -330,7 +333,11 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
       }
       if (formEntry != null) {
         if (widget.imageType == PokedexImageType.artwork) {
-          return formEntry.officialArtworkUrl ??
+          final homeOverride = _selectedFormName != null
+              ? kCosmeticFormHomeUrlOverrides[_selectedFormName!]
+              : null;
+          return homeOverride ??
+              formEntry.officialArtworkUrl ??
               '${_kBase}other/official-artwork/${widget.pokemon.id}.png';
         }
         return (formEntry.sprites?['front_default'] as String?) ??
