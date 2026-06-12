@@ -136,6 +136,20 @@ const Map<String, int> kFormMinGen = {
   'unown-question':    3,
 };
 
+/// Regional form suffix → minimum generation (inclusive).
+///
+/// Regional suffixes can appear as infixes (e.g. `darmanitan-galar-zen`),
+/// so [filterFormChips] uses `.contains()` rather than `.endsWith()`.
+/// Hisuian forms are Gen 9 because they were not available in any mainline
+/// Gen 8 game (Sword/Shield) and only became usable competitively via
+/// Pokémon HOME transfer into Scarlet/Violet.
+const Map<String, int> kRegionalSuffixMinGen = {
+  '-alola': 7,
+  '-galar': 8,
+  '-hisui': 9,
+  '-paldea': 9,
+};
+
 // ── Public API ────────────────────────────────────────────────────────────
 
 /// Returns the non-default form names that should be shown as chips.
@@ -171,6 +185,13 @@ List<String> filterFormChips({
     // 2. Generation-gated: hide forms introduced after the current format's gen
     final minGen = kFormMinGen[form];
     if (minGen != null && gen != null && gen < minGen) return false;
+
+    // 2b. Regional-suffix gen gating (suffix may appear mid-name, e.g. darmanitan-galar-zen)
+    if (gen != null) {
+      for (final entry in kRegionalSuffixMinGen.entries) {
+        if (form.contains(entry.key) && gen < entry.value) return false;
+      }
+    }
 
     // 3. Ability-gated
     final abilityRule = kAbilityGatingRules[form];

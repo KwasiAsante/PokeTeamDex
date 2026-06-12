@@ -188,6 +188,7 @@
 
 ### Bug Fixes & Polish Applied
 
+- [x] **Regional form gen gating** — Alolan/Galarian/Hisuian/Paldean form chips are now hidden when the team format's gen is below their introduction gen (7/8/9/9); uses `.contains()` so infix forms like `darmanitan-galar-zen` are also covered (#202)
 - [x] Moves damage class filter no longer leaves blank gaps — `itemExtent` disabled when filter active
 - [x] Moves list: type filter chips (all 18 types, API-backed, cached)
 - [x] Slot Config: ⓘ info icons on ability cards, held item, move slots → link to detail screens

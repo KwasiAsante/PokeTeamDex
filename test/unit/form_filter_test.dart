@@ -411,4 +411,136 @@ void main() {
       expect(result, contains('unown-question'));
     });
   });
+
+  group('filterFormChips — regional form gen gating', () {
+    // ── Alolan forms (min gen 7) ──────────────────────────────────────────
+    test('alolan forms hidden in Gen 6', () {
+      final result = filterFormChips(
+        varieties: ['meowth', 'meowth-alola', 'meowth-galar'],
+        heldItem: null,
+        abilityName: null,
+        gen: 6,
+      );
+      expect(result, isNot(contains('meowth-alola')));
+      expect(result, isNot(contains('meowth-galar')));
+    });
+
+    test('alolan forms shown in Gen 7', () {
+      final result = filterFormChips(
+        varieties: ['meowth', 'meowth-alola'],
+        heldItem: null,
+        abilityName: null,
+        gen: 7,
+      );
+      expect(result, contains('meowth-alola'));
+    });
+
+    // ── Galarian forms (min gen 8) ────────────────────────────────────────
+    test('galarian forms hidden in Gen 7', () {
+      final result = filterFormChips(
+        varieties: ['ponyta', 'ponyta-galar'],
+        heldItem: null,
+        abilityName: null,
+        gen: 7,
+      );
+      expect(result, isNot(contains('ponyta-galar')));
+    });
+
+    test('galarian forms shown in Gen 8', () {
+      final result = filterFormChips(
+        varieties: ['ponyta', 'ponyta-galar'],
+        heldItem: null,
+        abilityName: null,
+        gen: 8,
+      );
+      expect(result, contains('ponyta-galar'));
+    });
+
+    test('galarian infix form (darmanitan-galar-zen) hidden below Gen 8', () {
+      final result = filterFormChips(
+        varieties: ['darmanitan-galar', 'darmanitan-galar-zen'],
+        heldItem: null,
+        abilityName: 'zen-mode',
+        gen: 7,
+      );
+      expect(result, isNot(contains('darmanitan-galar-zen')));
+    });
+
+    test('galarian infix form (darmanitan-galar-zen) shown in Gen 8 with zen-mode', () {
+      final result = filterFormChips(
+        varieties: ['darmanitan-galar', 'darmanitan-galar-zen'],
+        heldItem: null,
+        abilityName: 'zen-mode',
+        gen: 8,
+      );
+      expect(result, contains('darmanitan-galar-zen'));
+    });
+
+    // ── Hisuian forms (min gen 9) ─────────────────────────────────────────
+    test('hisuian forms hidden in Gen 8', () {
+      final result = filterFormChips(
+        varieties: ['typhlosion', 'typhlosion-hisui'],
+        heldItem: null,
+        abilityName: null,
+        gen: 8,
+      );
+      expect(result, isNot(contains('typhlosion-hisui')));
+    });
+
+    test('hisuian forms hidden in Gen 1 (original issue)', () {
+      final result = filterFormChips(
+        varieties: ['typhlosion', 'typhlosion-hisui'],
+        heldItem: null,
+        abilityName: null,
+        gen: 1,
+      );
+      expect(result, isNot(contains('typhlosion-hisui')));
+    });
+
+    test('hisuian forms shown in Gen 9', () {
+      final result = filterFormChips(
+        varieties: ['typhlosion', 'typhlosion-hisui'],
+        heldItem: null,
+        abilityName: null,
+        gen: 9,
+      );
+      expect(result, contains('typhlosion-hisui'));
+    });
+
+    // ── Paldean forms (min gen 9) ─────────────────────────────────────────
+    test('paldean forms hidden in Gen 8', () {
+      final result = filterFormChips(
+        varieties: ['tauros', 'tauros-paldea-combat', 'tauros-paldea-blaze', 'tauros-paldea-aqua'],
+        heldItem: null,
+        abilityName: null,
+        gen: 8,
+      );
+      expect(result, isNot(contains('tauros-paldea-combat')));
+      expect(result, isNot(contains('tauros-paldea-blaze')));
+      expect(result, isNot(contains('tauros-paldea-aqua')));
+    });
+
+    test('paldean forms shown in Gen 9', () {
+      final result = filterFormChips(
+        varieties: ['tauros', 'tauros-paldea-combat'],
+        heldItem: null,
+        abilityName: null,
+        gen: 9,
+      );
+      expect(result, contains('tauros-paldea-combat'));
+    });
+
+    // ── No-format (no gen restriction) ───────────────────────────────────
+    test('all regional forms shown when no format (gen is null)', () {
+      final result = filterFormChips(
+        varieties: [
+          'meowth', 'meowth-alola', 'meowth-galar',
+          'typhlosion', 'typhlosion-hisui',
+        ],
+        heldItem: null,
+        abilityName: null,
+      );
+      expect(result, containsAll(['meowth-alola', 'meowth-galar', 'typhlosion-hisui']));
+    });
+  });
 }
