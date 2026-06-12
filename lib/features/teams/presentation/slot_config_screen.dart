@@ -1125,7 +1125,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 const SizedBox(height: 24),
                 _SectionTitle('Ribbons'),
                 const SizedBox(height: 8),
-                _buildRibbons(),
+                _buildRibbons(mechanics),
               ],
               // ── Pokémon Instance ──
               const SizedBox(height: 24),
@@ -3055,7 +3055,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     );
   }
 
-  Widget _buildRibbons() {
+  Widget _buildRibbons(GenerationMechanics? mechanics) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -3064,12 +3064,15 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         _inheritedRibbons.difference(_ribbons).toList()..sort();
 
     // Pre-filter the catalog: inherited ribbons are already shown above and
-    // should not appear again as selectable options.
+    // should not appear again as selectable options. When a format is set,
+    // also hide ribbons introduced in a later generation.
     final selectableCatalog = kRibbonCatalog
         .map((cat) => (
               name: cat.name,
               ribbons: cat.ribbons
-                  .where((r) => !_inheritedRibbons.contains(r.id))
+                  .where((r) =>
+                      !_inheritedRibbons.contains(r.id) &&
+                      (mechanics == null || r.minGen <= mechanics.gen))
                   .toList(),
             ))
         .where((cat) => cat.ribbons.isNotEmpty)
