@@ -117,7 +117,8 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
       ...cosmeticFormEntries.map((f) => (
         f.name,
         kCosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
-        kCosmeticFormHomeUrlOverrides[f.name] ?? f.spriteUrl,
+        kCosmeticFormHomeUrlOverrides[f.name] ??
+            (f.formName == 'female' ? '${_kBase}female/${widget.pokemon.id}.png' : f.spriteUrl),
       )),
     ];
     final hasFormChip = allForms.length > 1;
@@ -313,11 +314,17 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         if (widget.imageType == PokedexImageType.artwork) {
           final override = kCosmeticFormHomeUrlOverrides[cosmeticEntry.name];
           if (override != null) return override;
+          if (cosmeticEntry.formName == 'female') {
+            return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${widget.pokemon.id}.png';
+          }
           final sn = base?.speciesName ?? widget.pokemon.name;
           if (cosmeticEntry.name.startsWith('$sn-')) {
             final suffix = cosmeticEntry.name.substring(sn.length + 1);
             return cosmeticFormHomeUrl(widget.pokemon.id, suffix);
           }
+        }
+        if (cosmeticEntry.formName == 'female') {
+          return '${_kBase}female/${widget.pokemon.id}.png';
         }
         return cosmeticEntry.spriteUrl ?? '${_kBase}${widget.pokemon.id}.png';
       }

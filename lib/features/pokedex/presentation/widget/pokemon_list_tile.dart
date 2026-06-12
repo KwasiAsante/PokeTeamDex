@@ -188,7 +188,8 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
       ...cosmeticFormEntries.map((f) => (
         f.name,
         kCosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
-        kCosmeticFormHomeUrlOverrides[f.name] ?? f.spriteUrl,
+        kCosmeticFormHomeUrlOverrides[f.name] ??
+            (f.formName == 'female' ? '${_kBase}female/${widget.pokemon.id}.png' : f.spriteUrl),
       )),
     ];
     final hasFormChip = allForms.length > 1;
@@ -419,12 +420,21 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
           // Explicit override first (e.g. xerneas-active → 716-neutral.png).
           final override = kCosmeticFormHomeUrlOverrides[cosmeticEntry.name];
           if (override != null) return override;
+          // Female HOME artwork lives under home/female/{id}.png — a different
+          // path from the {id}-{suffix}.png pattern used for other cosmetics.
+          if (cosmeticEntry.formName == 'female') {
+            return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${widget.pokemon.id}.png';
+          }
           // Pattern-based HOME artwork (e.g. shellos → 422-east-sea.png).
           final sn = base?.speciesName ?? widget.pokemon.name;
           if (cosmeticEntry.name.startsWith('$sn-')) {
             final suffix = cosmeticEntry.name.substring(sn.length + 1);
             return cosmeticFormHomeUrl(widget.pokemon.id, suffix);
           }
+        }
+        // Female sprites live under pokemon/female/{id}.png, not the standard path.
+        if (cosmeticEntry.formName == 'female') {
+          return '${_kBase}female/${widget.pokemon.id}.png';
         }
         return cosmeticEntry.spriteUrl ?? '$_kBase${widget.pokemon.id}.png';
       }
