@@ -181,12 +181,14 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
         // Cosmetic variety forms have a pokemonByNameProvider resource — no sprite override.
         return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix), null as String?);
       }),
-      // Form-entry cosmetics: carry spriteUrl so FormOptionTile doesn't call
+      // Form-entry cosmetics: carry sprite so FormOptionTile doesn't call
       // pokemonByNameProvider with a form name that has no /pokemon endpoint.
+      // kCosmeticFormHomeUrlOverrides takes priority (e.g. xerneas-active shows
+      // the neutral pose image, not the active-pose sprite).
       ...cosmeticFormEntries.map((f) => (
         f.name,
         kCosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
-        f.spriteUrl,
+        kCosmeticFormHomeUrlOverrides[f.name] ?? f.spriteUrl,
       )),
     ];
     final hasFormChip = allForms.length > 1;
@@ -414,7 +416,10 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
     if (_selectedFormName != null) {
       if (cosmeticEntry != null) {
         if (widget.imageType == PokedexImageType.artwork) {
-          // Try HOME artwork (e.g. 422-east-sea.png); fall back to sprite.
+          // Explicit override first (e.g. xerneas-active → 716-neutral.png).
+          final override = kCosmeticFormHomeUrlOverrides[cosmeticEntry.name];
+          if (override != null) return override;
+          // Pattern-based HOME artwork (e.g. shellos → 422-east-sea.png).
           final sn = base?.speciesName ?? widget.pokemon.name;
           if (cosmeticEntry.name.startsWith('$sn-')) {
             final suffix = cosmeticEntry.name.substring(sn.length + 1);

@@ -117,7 +117,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
       ...cosmeticFormEntries.map((f) => (
         f.name,
         kCosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
-        f.spriteUrl,
+        kCosmeticFormHomeUrlOverrides[f.name] ?? f.spriteUrl,
       )),
     ];
     final hasFormChip = allForms.length > 1;
@@ -311,6 +311,8 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
     if (_selectedFormName != null) {
       if (cosmeticEntry != null) {
         if (widget.imageType == PokedexImageType.artwork) {
+          final override = kCosmeticFormHomeUrlOverrides[cosmeticEntry.name];
+          if (override != null) return override;
           final sn = base?.speciesName ?? widget.pokemon.name;
           if (cosmeticEntry.name.startsWith('$sn-')) {
             final suffix = cosmeticEntry.name.substring(sn.length + 1);
