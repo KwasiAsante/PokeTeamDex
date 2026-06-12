@@ -269,6 +269,9 @@ const kBaseFormNameOverrides = <String, String>{
   'frillish':      'Male',
   'jellicent':     'Male',
   'unfezant':      'Male',
+  // Seasonal forms — default is Spring.
+  'deerling':      'Spring',
+  'sawsbuck':      'Spring',
   // Plate/drive forms — default is the no-item form.
   'arceus':        'Normal',
   'shellos':       'West Sea',
