@@ -250,6 +250,8 @@ class InstanceUpdateOp(BaseModel):
     remote_id: int
     nickname_aliases: str | None = None
     inherited_ribbons: str | None = None
+    update_parent_instance: bool = False
+    parent_instance_remote_id: int | None = None
 
 
 class SlotUpsertOp(BaseModel):
