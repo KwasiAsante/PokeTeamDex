@@ -776,6 +776,21 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               ..sort((a, b) => a.abilitySlot.compareTo(b.abilitySlot)))
             : abilities;
 
+        // Filter abilities to only those introduced by the selected generation.
+        // The currently-selected ability is always kept visible so the violation
+        // banner can explain why it's invalid rather than silently hiding it.
+        final genAvailableAbilityIds = (format != null && formatService.isInitialized)
+            ? formatService.abilitiesForGen(format.gen).map((a) => a.id).toSet()
+            : null;
+        final genFilteredAbilities = genAvailableAbilityIds == null
+            ? effectiveAbilities
+            : effectiveAbilities
+                .where((a) =>
+                    genAvailableAbilityIds
+                        .contains(a.name.replaceAll('-', '').toLowerCase()) ||
+                    a.name == _abilityName)
+                .toList();
+
         final effectivePokemonMoves = formPokemon != null &&
                 formPokemon.moves.isNotEmpty
             ? formPokemon.moves.cast<Map<String, dynamic>>()
@@ -1014,7 +1029,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 const SizedBox(height: 24),
                 _SectionTitle('Ability'),
                 const SizedBox(height: 8),
-                _buildAbility(effectiveAbilities, effectiveViolations['ability']),
+                _buildAbility(genFilteredAbilities, effectiveViolations['ability']),
                 // Mega form ability shown as read-only info when evolved.
                 if (canMegaEvolve && _isMegaEvolved && megaPokemon != null &&
                     megaPokemon.abilities.isNotEmpty) ...[
