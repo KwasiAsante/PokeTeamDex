@@ -332,7 +332,7 @@ class _ExpandedLayoutState extends State<_ExpandedLayout> {
             child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeInOut,
-            width: _collapsed ? 72 : 260,
+            width: _collapsed ? 72 : 304,
             child: _collapsed
                 // ── Collapsed: icon-only rail + expand button ─────────────
                 ? Column(
@@ -360,7 +360,15 @@ class _ExpandedLayoutState extends State<_ExpandedLayout> {
                     ],
                   )
                 // ── Expanded: full NavigationDrawer ───────────────────────
-                : NavigationDrawer(
+                // OverflowBox gives the drawer its full 304dp regardless of
+                // the AnimatedContainer's current animated width so that the
+                // NavigationDrawerDestination indicator layout never overflows
+                // during the expand/collapse animation; ClipRect above clips
+                // the visual result to the container width.
+                : OverflowBox(
+                    alignment: Alignment.centerLeft,
+                    maxWidth: 304,
+                    child: NavigationDrawer(
                     selectedIndex: widget.currentIndex,
                     onDestinationSelected: widget.onTap,
                     children: [
@@ -368,16 +376,18 @@ class _ExpandedLayoutState extends State<_ExpandedLayout> {
                         padding: const EdgeInsets.fromLTRB(16, 12, 4, 8),
                         child: Row(
                           children: [
-                            Padding(
-                              padding:
-                                  const EdgeInsets.only(left: 12),
-                              child: Text(
-                                'PokeTeamDex',
-                                style: textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.bold),
+                            Expanded(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.only(left: 12),
+                                child: Text(
+                                  'PokeTeamDex',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.bold),
+                                ),
                               ),
                             ),
-                            const Spacer(),
                             // Collapse toggle
                             IconButton(
                               icon: const Icon(Icons.menu_open),
@@ -397,7 +407,7 @@ class _ExpandedLayoutState extends State<_ExpandedLayout> {
                           label: Text(d.label),
                         ),
                     ],
-                  ),
+                  )),
           ), // AnimatedContainer
           ), // ClipRect
           VerticalDivider(

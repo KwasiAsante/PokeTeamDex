@@ -23,7 +23,17 @@ class AppLogger {
   factory AppLogger() => _instance;
 
   late final Logger _logger;
+  late final Logger _consoleLogger;
   late final LogsServerOutput _serverOutput;
+
+  static PrettyPrinter get _printer => PrettyPrinter(
+    methodCount: 0,
+    errorMethodCount: 5,
+    lineLength: 80,
+    colors: true,
+    printEmojis: true,
+    dateTimeFormat: DateTimeFormat.onlyTimeAndSinceStart,
+  );
 
   // Calls (`d`/`i`/`w`/`e`) only enqueue a closure — formatting (the printer
   // builds padded/joined strings, e.g. full Dio request/response dumps) and
@@ -61,6 +71,15 @@ class AppLogger {
       output: MultiOutput(outputs),
       level: kDebugMode ? Level.debug : Level.info,
     );
+
+    if (kDebugMode) {
+      _consoleLogger = Logger(
+        filter: ProductionFilter(),
+        printer: _printer,
+        output: ConsoleOutput(),
+        level: Level.debug,
+      );
+    }
   }
 
   /// Update the backend URL at runtime (called after DB loads).
@@ -74,16 +93,36 @@ class AppLogger {
   }
 
   void d(String message, {Object? error, StackTrace? stackTrace}) =>
-      _enqueue(() => _logger.d(message, error: error, stackTrace: stackTrace));
+      _enqueue(() {
+        _logger.d(message, error: error, stackTrace: stackTrace);
+        if (kDebugMode) {
+          _consoleLogger.d(message, error: error, stackTrace: stackTrace);
+        }
+      });
 
   void i(String message, {Object? error, StackTrace? stackTrace}) =>
-      _enqueue(() => _logger.i(message, error: error, stackTrace: stackTrace));
+      _enqueue(() {
+        _logger.i(message, error: error, stackTrace: stackTrace);
+        if (kDebugMode) {
+          _consoleLogger.i(message, error: error, stackTrace: stackTrace);
+        }
+      });
 
   void w(String message, {Object? error, StackTrace? stackTrace}) =>
-      _enqueue(() => _logger.w(message, error: error, stackTrace: stackTrace));
+      _enqueue(() {
+        _logger.w(message, error: error, stackTrace: stackTrace);
+        if (kDebugMode) {
+          _consoleLogger.w(message, error: error, stackTrace: stackTrace);
+        }
+      });
 
   void e(String message, {Object? error, StackTrace? stackTrace}) =>
-      _enqueue(() => _logger.e(message, error: error, stackTrace: stackTrace));
+      _enqueue(() {
+        _logger.e(message, error: error, stackTrace: stackTrace);
+        if (kDebugMode) {
+          _consoleLogger.e(message, error: error, stackTrace: stackTrace);
+        }
+      });
 }
 
 // ── Printers / outputs ────────────────────────────────────────────────────────
@@ -94,7 +133,8 @@ class _SimplePrinter extends LogPrinter {
     final level = event.level.name.toUpperCase().padRight(5);
     final msg = event.message;
     final err = event.error != null ? '\n  error: ${event.error}' : '';
-    final st = (event.stackTrace != null && event.level.index >= Level.warning.index)
+    final st =
+        (event.stackTrace != null && event.level.index >= Level.warning.index)
         ? '\n${event.stackTrace}'
         : '';
     return ['[$level] $msg$err$st'];
