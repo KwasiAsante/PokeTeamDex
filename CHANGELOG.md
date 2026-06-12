@@ -4,6 +4,33 @@ All notable changes to PokeTeamDex are documented here.
 
 ---
 
+## [1.0.7] — 2026-06-12
+
+### Added
+
+- **Form switching on Pokédex list screen** — form chip on every list tile and grid card that has switchable forms; tapping opens a bottom-sheet picker; covers battle-meaningful variety forms, cosmetic variety forms, and form-entry cosmetics; selecting a form updates the card's sprite, gradient, and display name in place
+- **Hidden Power type in team detail move strip** — the inferred Hidden Power type is shown alongside the move name on the team card
+
+### Fixed
+
+- **Ability gen gating in Slot Config** — ability picker now filtered by format generation: hidden abilities suppressed for Gen 1–4 (Dream World didn't exist); abilities introduced after the format gen hidden via PokéAPI `generationName`; currently-selected ability always kept visible so the violation banner can explain any mismatch
+- **Ribbon gen gating** — ribbon picker filtered by format generation; ribbons with a `minGen` higher than the team format's gen are hidden; no-format teams remain unrestricted
+- Snackbar auto-dismiss restored; duration tiers added (short 2 s / medium 4 s / long 6 s)
+- Unlink and remove now reset the instance link chain — orphaned descendants are relinked to the grandparent; chain view filters out orphaned ancestor nodes
+- Instance chain `parent_instance_id` links now preserved across sync devices
+- Hidden Power damage formula corrected for Gen 2 (uses the Gen 2 DV-based formula instead of the Gen 3+ IV-based formula)
+- Regional forms gated by generation in the form chip filter
+- Inherited ribbons excluded from the selectable ribbon catalog in Slot Config
+- Slot and team deletions now propagate to the server on next sync
+- Breeding moves no longer missing for Pokémon whose regional-form ancestor has extra moves
+- PS-imported box no longer demoted to a regular team on sync
+- Renaming a box no longer demotes it to a regular team
+- Team ownership verified server-side before slot upsert/delete (sync push)
+- Unown ! and ? forms hidden in Gen 1–2 formats (those forms were introduced in Gen 3)
+- Gen 2 Pokémon Crystal sprite fallback URLs corrected
+
+---
+
 ## [1.0.6] — 2026-06-09
 
 ### Fixed

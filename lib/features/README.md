@@ -8,7 +8,7 @@ Feature modules. Each module owns its screens, Riverpod providers, and local dat
 
 Every feature follows the same layout:
 
-```
+```text
 features/<name>/
 ├── presentation/
 │   ├── <name>_screen.dart      # Root screen widget
@@ -26,15 +26,23 @@ features/<name>/
 Pokémon browser across all 9 generations.
 
 | Screen | Description |
-|--------|-------------|
-| `PokemonListScreen` | Infinite-scroll list (50/page); search, gen/type/game filter, sort |
+| ------ | ----------- |
+| `PokemonListScreen` | Infinite-scroll list (50/page); search, gen/type/game filter, sort; form chip on every tile/card |
 | `PokemonDetailScreen` | Tabbed detail: Overview, Stats, Abilities, Moves, Evolutions, Forms, Locations |
+| `FormPickerSheet` (`presentation/widget/`) | Bottom-sheet form picker opened from list card chips and detail header |
 
 Notable behaviours:
+
 - **Hero animation** — sprite transitions from list card to detail header
 - **Adaptive layout** — tab bar becomes a left sidebar on wide screens (> 840dp)
 - **Stat bars** — staggered animated fill using `AnimationController`
 - **Favorites** — star button writes to the `Favorites` Drift table
+- **Form switching** — form chip on list tiles and grid cards; selecting a form updates the sprite, gradient, and display name in place; covers battle-meaningful variety forms, cosmetic variety forms, and form-entry cosmetics
+
+`logic/` files:
+
+- `form_filter.dart` — `filterFormChips()`: determines which form chips to show for a species, gated by generation and prerequisite item/ability
+- `evolution_chain_builder.dart` — builds a typed evolution tree from PokéAPI `evolution_chain` JSON
 
 ---
 
@@ -43,27 +51,37 @@ Notable behaviours:
 The core team builder feature — the most complex module.
 
 | Screen | Description |
-|--------|-------------|
+| ------ | ----------- |
 | `TeamsScreen` | Folder hierarchy; create/rename/delete teams and folders; drag-reorder; drag-to-folder |
 | `TeamDetailScreen` | 6-slot list with filled/empty slot cards; Showdown export; format picker; rename |
 | `SlotPickerScreen` | Browse Pokédex to assign a Pokémon to a slot (format auto-filters to eligible Pokémon) |
 | `SlotConfigScreen` | Full slot configuration — all per-Pokémon fields |
 
 **SlotConfigScreen** sections:
+
 - Form picker (regional variants, Mega, Gigantamax, cosmetic variants — Unown, Vivillon, Alcremie, etc.)
 - Level slider (1–100)
 - Gender chips + shiny toggle + friendship slider
-- Ability cards (labelled Hidden if applicable)
+- Ability cards — gen-gated (hidden abilities hidden for Gen 1–4; abilities not yet introduced hidden by format gen)
 - Nature dropdown (25 natures with stat deltas inline)
 - Held item — searchable picker with sprite + effect
 - 4 Move slots — learnable moves filtered by generation/format
 - EV grid (0–252/stat, 510 total cap with overflow block)
 - IV grid (0–31/stat, renamed DVs with max 15 in Gen 1–2)
 - Tera Type selector (18-type chips, Gen 9 / SV formats only)
-- Ribbon catalog (chip-grid picker)
+- Ribbon catalog — gen-gated chip-grid picker
 - Mega/Dynamax/Gigantamax/Alpha toggles (gated by generation)
 - Contest stat sliders + radar chart (Gen 3–4 / no-format only)
 - Pokémon Identity section (instance chain browser)
+
+`data/` files:
+
+- `form_data.dart` — PS form exception maps and cosmetic sprite stem constants
+- `form_descriptor.dart` — `FormDescriptor` value object: bundles form name, sprite hint, and battle-meaningful flag
+
+`logic/` files:
+
+- `ps_form_resolver.dart` — heuristics for resolving a PS form name from PokéAPI variety name; exceptions-first lookup
 
 **`services/showdown_export.dart`** — `buildShowdownExport(team, slots)` produces standard Showdown `.txt` format.
 

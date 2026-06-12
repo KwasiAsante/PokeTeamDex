@@ -9,7 +9,7 @@ Cross-feature services. These are pure logic / IO layers — no Flutter widgets,
 Thin wrappers around Dio for backend communication.
 
 | File | Class | Purpose |
-|------|-------|---------|
+| ---- | ----- | ------- |
 | `api_client.dart` | `ApiClient` | Dio instance; injects `Authorization: Bearer <token>` header on every request; base URL from `AppConfigs` |
 | `auth_api.dart` | `AuthApiClient` | `login(email, password)`, `register(email, password)` — returns JWT token |
 | `team_sync_api.dart` | `TeamSyncApi` | `push(ops)` → `SyncPushResponse`, `pull(since)` → `SyncPullResponse` |
@@ -19,7 +19,7 @@ Thin wrappers around Dio for backend communication.
 ## `connectivity/`
 
 | File | Provider | Output |
-|------|----------|--------|
+| ---- | -------- | ------ |
 | `connectivity_provider.dart` | `isOnlineProvider` | `Stream<bool>` via `connectivity_plus`; emits `false` on no connection |
 
 Used by `SyncService` to gate sync attempts and by `TeamsScreen` to show the offline banner.
@@ -31,16 +31,16 @@ Used by `SyncService` to gate sync attempts and by `TeamsScreen` to show the off
 The format engine — the most complex service. Validates team slots against Pokémon Showdown competitive rules.
 
 | File | Purpose |
-|------|---------|
+| ---- | ------- |
 | `format_service.dart` | Loads PS JSON data, exposes learnset/item/ability/format queries |
 | `format_models.dart` | `GameFormat`, `GenerationMechanics`, `PsMoveEntry`, `PsItemEntry`, `PsAbilityEntry` |
 | `format_providers.dart` | Riverpod: `allFormatsProvider`, `generalFormatsProvider`, `gameFormatsProvider`, `learnsetProvider`, `itemsForGenProvider`, `abilitiesForGenProvider`, `slotValidationProvider` |
 | `slot_validator.dart` | `validateSlot()` → `SlotValidation` (per-move/item/ability legality flags) |
-| `sprite_resolver.dart` | `resolveSprite(pokemonId, form, gen, isShiny)` → sprite URL string |
+| `sprite_resolver.dart` | `resolveSprite(sprites, pokemonId, pokemonName, format, …, hint: SpriteHint)` → `SpriteUrls` |
 
 ### FormatService data loading flow
 
-```
+```text
 initialize()
 ├── Try Hive cache for each JSON file
 │   └── Cache miss → load from assets/data/ps/
@@ -53,7 +53,7 @@ initialize()
 ### Key methods
 
 | Method | Returns | Description |
-|--------|---------|-------------|
+| ------ | ------- | ----------- |
 | `learnsetForGen(pokemon, gen)` | `List<String>` | All moves legal in gens 1–gen |
 | `itemsForGen(gen)` | `List<PsItemEntry>` | Items available in that generation |
 | `abilitiesForGen(gen)` | `List<PsAbilityEntry>` | Abilities available in that generation |
@@ -68,7 +68,7 @@ initialize()
 PokéAPI integration with Hive TTL cache.
 
 | File | Purpose |
-|------|---------|
+| ---- | ------- |
 | `poke_api_client.dart` | Dio configured for `https://pokeapi.co/api/v2` |
 | `poke_api_repository.dart` | `fetchPokemon(id)`, `fetchPokemonSpecies(id)`, `fetchPokemonByName(name)`, `fetchPokemonEncounters(id)` |
 | `poke_api_cache.dart` | Hive box wrapper; TTL = 24h for list data, 7d for detail data |
@@ -82,7 +82,7 @@ PokéAPI integration with Hive TTL cache.
 Bidirectional sync engine.
 
 | File | Purpose |
-|------|---------|
+| ---- | ------- |
 | `sync_service.dart` | `SyncService.run(token)` — orchestrates push then pull |
 | `sync_providers.dart` | `syncServiceProvider`; `triggerSync(ref)` helper called from screens |
 | `sync_status.dart` | `SyncResult` (success/failure/partial), `SyncPhase` enum |
@@ -113,7 +113,7 @@ Bidirectional sync engine.
 Desktop-only system tray integration via `tray_manager`.
 
 | File | Purpose |
-|------|---------|
+| ---- | ------- |
 | `tray_service.dart` | `TrayService.init()` — sets tray icon + menu (Sync Now, Quit); routes tray events to `SyncService` |
 
 Active only on macOS, Windows, and Linux. No-op on iOS/Android/Web.
@@ -125,7 +125,7 @@ Active only on macOS, Windows, and Linux. No-op on iOS/Android/Web.
 In-app update checker. Queries the GitHub Releases API and compares against the running app version.
 
 | File | Class / Provider | Purpose |
-|------|-----------------|---------|
+| ---- | ---------------- | ------- |
 | `update_service.dart` | `UpdateService` | `checkForUpdate()` — fetches latest GitHub release, semver-compares against current version, returns `UpdateInfo?` if newer |
 | `update_info.dart` | `UpdateInfo` | Data class: version string + per-platform download URLs (APK, MSI, EXE, web) |
 | `update_provider.dart` | `updateCheckProvider` | `FutureProvider<UpdateInfo?>` — consumed by `UpdateBanner` in `shared/widgets/` |
@@ -139,7 +139,7 @@ In-app update checker. Queries the GitHub Releases API and compares against the 
 Remote log forwarding to the backend `/logs/device` endpoint.
 
 | File | Class | Purpose |
-|------|-------|---------|
+| ---- | ----- | ------- |
 | `logs_server_output.dart` | `LogsServerOutput` | `LogOutput` subclass (from the `logger` package); buffers lines by level and flushes every 3 s or when 20 lines accumulate; drops silently on network failure |
 
 Used by `AppLogger` in `lib/utils/app_logger.dart`. Requires a valid auth token — lines are dropped when unauthenticated. Call `updateToken(token)` after login/logout.
