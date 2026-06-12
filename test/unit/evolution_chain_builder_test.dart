@@ -246,18 +246,29 @@ void main() {
       );
     });
 
-    test('no battle forms with generation → generation adjective', () {
+    test('no battle forms → Normal (generation adjective no longer used as fallback)', () {
+      // The generation adjective was previously used as a fallback here, which
+      // produced "Sinnohian" for Arceus, "Kalosian" for Vivillon, etc. Species
+      // without regional variety counterparts should never show a regional adjective.
       expect(
         computeBaseFormLabel('bulbasaur', 'generation-i', []),
-        'Kantonian',
+        'Normal',
       );
     });
 
-    test('no battle forms and no generation → Original', () {
-      expect(
-        computeBaseFormLabel('bulbasaur', null, []),
-        'Original',
-      );
+    test('no battle forms → Normal regardless of generation', () {
+      // Form-based cosmetic species (Arceus, Castform, Shellos, etc.) have no
+      // battle variety forms. The generation adjective is wrong for them —
+      // fallback is 'Normal', with explicit overrides for species whose default
+      // isn't the Normal form.
+      expect(computeBaseFormLabel('arceus', 'generation-iv', []), 'Normal');
+      expect(computeBaseFormLabel('castform', 'generation-iii', []), 'Normal');
+      expect(computeBaseFormLabel('bulbasaur', null, []), 'Normal');
+    });
+
+    test('override takes priority over Normal fallback', () {
+      expect(computeBaseFormLabel('shellos', 'generation-iv', []), 'West Sea');
+      expect(computeBaseFormLabel('frillish', 'generation-v', []), 'Male');
     });
 
     test('Ogerpon override → Teal Mask', () {
