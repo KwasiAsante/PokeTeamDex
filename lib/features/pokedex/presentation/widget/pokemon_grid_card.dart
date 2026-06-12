@@ -223,6 +223,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
                       child: GestureDetector(
                         onTap: () => showModalBottomSheet(
                           context: context,
+                          isScrollControlled: true,
                           shape: const RoundedRectangleBorder(
                             borderRadius:
                                 BorderRadius.vertical(top: Radius.circular(16)),

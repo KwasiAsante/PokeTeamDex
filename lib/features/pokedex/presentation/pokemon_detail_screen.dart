@@ -3060,6 +3060,7 @@ class _FormBadge extends StatelessWidget {
     return GestureDetector(
       onTap: () => showModalBottomSheet(
         context: context,
+        isScrollControlled: true,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),

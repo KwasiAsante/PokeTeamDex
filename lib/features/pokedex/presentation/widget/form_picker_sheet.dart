@@ -30,42 +30,51 @@ class FormPickerSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Select Form',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: allForms.map((opt) {
-              final (name, label, spriteOverride) = opt;
-              // Base form uses baseSpriteUrl; cosmetic entries carry their own
-              // spriteOverride; variety forms fetch via pokemonByNameProvider.
-              final resolvedOverride = spriteOverride ??
-                  (name == null
-                      ? (shiny ? (baseShinyUrl ?? baseSpriteUrl) : baseSpriteUrl)
-                      : null);
-              return FormOptionTile(
-                formName: name,
-                label: label,
-                isSelected: name == selectedFormName,
-                shiny: shiny,
-                overrideSpriteUrl: resolvedOverride,
-                onTap: () => onSelect(name),
-              );
-            }).toList(),
-          ),
-        ],
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    return ConstrainedBox(
+      // Cap at 85 % of screen height so large form sets (Vivillon, Furfrou,
+      // Unown) don't overflow; the ScrollView handles the rest.
+      constraints: BoxConstraints(maxHeight: screenHeight * 0.85),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          20,
+          16,
+          16 + MediaQuery.paddingOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Select Form',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: allForms.map((opt) {
+                final (name, label, spriteOverride) = opt;
+                final resolvedOverride = spriteOverride ??
+                    (name == null
+                        ? (shiny ? (baseShinyUrl ?? baseSpriteUrl) : baseSpriteUrl)
+                        : null);
+                return FormOptionTile(
+                  formName: name,
+                  label: label,
+                  isSelected: name == selectedFormName,
+                  shiny: shiny,
+                  overrideSpriteUrl: resolvedOverride,
+                  onTap: () => onSelect(name),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
       ),
     );
   }
