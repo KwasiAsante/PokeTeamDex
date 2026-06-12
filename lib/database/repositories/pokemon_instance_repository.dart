@@ -182,6 +182,95 @@ class PokemonInstanceRepository {
     ));
   }
 
+  /// Re-parents direct children of orphaned instances (those with no active
+  /// slot pointing to them) to their grandparent. Repeats until no further
+  /// changes are needed so chains of consecutive orphans are fully collapsed.
+  /// Enqueues instance_update sync ops for each re-parented instance.
+  /// Returns the total number of instances updated.
+  Future<int> relinkOrphanedChain() async {
+    int total = 0;
+    int changed;
+    do {
+      // Snapshot the children of orphaned instances BEFORE the SQL update so
+      // we know which local IDs moved and can enqueue sync ops for them.
+      final snapshot = await _db.customSelect(
+        '''
+        SELECT pi.id AS id, pi.remote_id AS remote_id
+        FROM pokemon_instances pi
+        WHERE pi.parent_instance_id IN (
+          SELECT id FROM pokemon_instances
+          WHERE id NOT IN (
+            SELECT DISTINCT instance_id
+            FROM team_slots
+            WHERE instance_id IS NOT NULL AND is_deleted = 0
+          )
+        )
+        ''',
+        readsFrom: {_db.pokemonInstances, _db.teamSlots},
+      ).get();
+
+      changed = await _db.customUpdate(
+        '''
+        UPDATE pokemon_instances
+        SET parent_instance_id = (
+          SELECT orphan.parent_instance_id
+          FROM pokemon_instances AS orphan
+          WHERE orphan.id = pokemon_instances.parent_instance_id
+            AND orphan.id NOT IN (
+              SELECT DISTINCT instance_id
+              FROM team_slots
+              WHERE instance_id IS NOT NULL
+                AND is_deleted = 0
+            )
+        )
+        WHERE parent_instance_id IN (
+          SELECT id FROM pokemon_instances
+          WHERE id NOT IN (
+            SELECT DISTINCT instance_id
+            FROM team_slots
+            WHERE instance_id IS NOT NULL
+              AND is_deleted = 0
+          )
+        )
+        ''',
+        updates: {_db.pokemonInstances},
+        updateKind: UpdateKind.update,
+      );
+      total += changed;
+
+      if (changed > 0) {
+        for (final row in snapshot) {
+          final localId = row.read<int>('id');
+          final remoteId = row.readNullable<String>('remote_id');
+          if (remoteId == null) continue; // not yet synced; skip
+
+          final inst = await getById(localId);
+          if (inst == null) continue;
+
+          int? newParentRemoteId;
+          if (inst.parentInstanceId != null) {
+            final parent = await getById(inst.parentInstanceId!);
+            if (parent?.remoteId != null) {
+              newParentRemoteId = int.tryParse(parent!.remoteId!);
+            }
+          }
+
+          await _syncQueue.enqueue(PendingSyncOpsCompanion(
+            operation: const Value('update'),
+            entityType: const Value('pokemon_instance'),
+            entityId: Value(localId),
+            payload: Value(jsonEncode({
+              'update_parent': true,
+              'parent_instance_remote_id': ?newParentRemoteId,
+            })),
+            createdAt: Value(DateTime.now()),
+          ));
+        }
+      }
+    } while (changed > 0);
+    return total;
+  }
+
   // ── Delete ────────────────────────────────────────────────────────────────
 
   Future<void> delete(int instanceId) async {

@@ -161,6 +161,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // Pokemon instance link
   int? _instanceId;
+  int? _originalInstanceId;
 
   // Data inherited from the instance chain
   Set<String> _inheritedRibbons = {};
@@ -250,6 +251,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _ivCtrls[5].text = (slot.ivSpe ?? 31).toString();
     _formName = slot.formName;
     _instanceId = slot.instanceId;
+    _originalInstanceId = slot.instanceId;
     _originalNickname = slot.nickname ?? '';
     if (slot.instanceId != null) _loadInheritedData(slot.instanceId!, currentSlotId: slot.id);
     _isMegaEvolved = slot.isMegaEvolved;
@@ -498,6 +500,15 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         if (_ribbons.isNotEmpty) {
           await instanceRepo.mergeRibbons(_instanceId!, _ribbons.toList());
         }
+      }
+
+      // Repair chain continuity when a link is removed: re-parent any
+      // descendants of the now-orphaned instance to their grandparent.
+      if (_originalInstanceId != null && _instanceId == null) {
+        await ref
+            .read(pokemonInstanceRepositoryProvider)
+            .relinkOrphanedChain();
+        _originalInstanceId = null;
       }
 
       // Best-effort PS export — runs after the DB write succeeds.

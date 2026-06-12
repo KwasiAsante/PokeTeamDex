@@ -388,6 +388,11 @@ class SyncService {
             'nickname_aliases': payload['nickname_aliases'],
           if (payload['inherited_ribbons'] != null)
             'inherited_ribbons': payload['inherited_ribbons'],
+          if (payload['update_parent'] == true) ...{
+            'update_parent_instance': true,
+            if (payload['parent_instance_remote_id'] != null)
+              'parent_instance_remote_id': payload['parent_instance_remote_id'],
+          },
         };
 
       // ── Slots ─────────────────────────────────────────────────────────────

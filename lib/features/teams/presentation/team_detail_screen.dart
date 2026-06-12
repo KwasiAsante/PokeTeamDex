@@ -111,6 +111,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
     for (final s in toDelete) {
       await slotRepo.deleteSlotWithQueue(s.teamId, s.slot, s.id);
     }
+    await ref.read(pokemonInstanceRepositoryProvider).relinkOrphanedChain();
     _clearSelection();
     if (mounted) {
       showAppSnackBar(
@@ -591,6 +592,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
         await slotRepo.deleteSlotWithQueue(slot.teamId, slot.slot, slot.id);
       }
     }
+    await ref.read(pokemonInstanceRepositoryProvider).relinkOrphanedChain();
 
     // Renumber kept slots to positions 1–6 in ascending order to avoid
     // transient conflicts when two slots swap positions.
@@ -1437,6 +1439,9 @@ class _FilledSlotCard extends ConsumerWidget {
       await ref
           .read(teamSlotRepositoryProvider)
           .deleteSlotWithQueue(slot.teamId, slot.slot, slot.id);
+      await ref
+          .read(pokemonInstanceRepositoryProvider)
+          .relinkOrphanedChain();
     }
   }
 }

@@ -257,6 +257,8 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
                     instance.nickname_aliases = op.nickname_aliases
                 if op.inherited_ribbons is not None:
                     instance.inherited_ribbons = op.inherited_ribbons
+                if op.update_parent_instance:
+                    instance.parent_instance_id = op.parent_instance_remote_id
                 instance.updated_at = datetime.now(timezone.utc)
 
         elif isinstance(op, SlotUpsertOp):
