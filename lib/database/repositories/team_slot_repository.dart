@@ -40,6 +40,38 @@ class TeamSlotRepository {
   Future<int> deleteAllForTeam(int teamId) =>
       (_db.delete(_db.teamSlots)..where((s) => s.teamId.equals(teamId))).go();
 
+  /// Removes a slot locally, cancels any pending upsert for it so it is not
+  /// pushed back to the server, and enqueues a server-side delete op.
+  ///
+  /// Use this for all user-driven slot removals. Use [deleteSlot] only when
+  /// the parent team is also being deleted — its team:delete op handles
+  /// server-side slot cleanup.
+  Future<void> deleteSlotWithQueue(
+      int teamId, int slotPosition, int slotId) async {
+    // Cancel any pending upsert for this slot so a just-removed slot is not
+    // pushed back to the server on the next sync.
+    final ops = await _syncQueue.getPending();
+    for (final op in ops) {
+      if (op.entityType != 'team_slot' || op.operation != 'upsert') continue;
+      try {
+        final p = jsonDecode(op.payload) as Map<String, dynamic>;
+        if (p['team_local_id'] == teamId && p['slot'] == slotPosition) {
+          await _syncQueue.delete(op.id);
+        }
+      } catch (_) {}
+    }
+
+    await deleteSlot(teamId, slotPosition);
+
+    await _syncQueue.enqueue(PendingSyncOpsCompanion(
+      operation: const Value('delete'),
+      entityType: const Value('team_slot'),
+      entityId: Value(slotId),
+      payload: Value(jsonEncode({'team_local_id': teamId, 'slot': slotPosition})),
+      createdAt: Value(DateTime.now()),
+    ));
+  }
+
   /// All non-deleted slots that contain [pokemonId] across every team.
   Stream<List<TeamSlot>> watchByPokemonId(int pokemonId) =>
       (_db.select(_db.teamSlots)
