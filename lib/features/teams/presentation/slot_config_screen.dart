@@ -502,12 +502,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         }
       }
 
-      // Repair chain continuity when a link is removed: re-parent any
-      // descendants of the now-orphaned instance to their grandparent.
+      // Repair chain continuity when a link is removed: re-parent
+      // descendants of the orphaned instance, then delete it immediately
+      // so the chain view is clean without waiting for manual cleanup.
       if (_originalInstanceId != null && _instanceId == null) {
-        await ref
-            .read(pokemonInstanceRepositoryProvider)
-            .relinkOrphanedChain();
+        final instanceRepo = ref.read(pokemonInstanceRepositoryProvider);
+        await instanceRepo.relinkOrphanedChain();
+        await instanceRepo.deleteOrphanedInstances();
         _originalInstanceId = null;
       }
 

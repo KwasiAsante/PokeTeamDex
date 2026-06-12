@@ -673,5 +673,185 @@ void main() {
         expect(await repo.relinkOrphanedChain(), greaterThanOrEqualTo(2));
       });
     });
+
+    // ── 4. deleteOrphanedInstances ────────────────────────────────────────────
+    group('deleteOrphanedInstances', () {
+      test('empty DB — 0 deletions, no crash', () async {
+        final db = openTestDatabase();
+        addTearDown(db.close);
+        final repo = PokemonInstanceRepository(db, SyncQueueRepository(db));
+
+        expect(await repo.deleteOrphanedInstances(), 0);
+      });
+
+      test('all instances linked — 0 deletions', () async {
+        final db = openTestDatabase();
+        addTearDown(db.close);
+        final repo = PokemonInstanceRepository(db, SyncQueueRepository(db));
+        final teamId = await _mkTeam(db);
+
+        final a = await _mkInstance(db);
+        final b = await _mkInstance(db, parentId: a);
+        await _link(db, teamId, 1, a);
+        await _link(db, teamId, 2, b);
+
+        expect(await repo.deleteOrphanedInstances(), 0);
+        expect(await _allIds(db), containsAll([a, b]));
+      });
+
+      test('orphaned instance (no active slot) is deleted', () async {
+        final db = openTestDatabase();
+        addTearDown(db.close);
+        final repo = PokemonInstanceRepository(db, SyncQueueRepository(db));
+        final teamId = await _mkTeam(db);
+
+        final a = await _mkInstance(db);
+        final b = await _mkInstance(db, parentId: a); // orphan
+        await _link(db, teamId, 1, a);
+        // B has no slot
+
+        expect(await repo.deleteOrphanedInstances(), 1);
+        expect(await _allIds(db), [a]);
+        expect(await _allIds(db), isNot(contains(b)));
+      });
+
+      test('soft-deleted slot does not protect its instance', () async {
+        final db = openTestDatabase();
+        addTearDown(db.close);
+        final repo = PokemonInstanceRepository(db, SyncQueueRepository(db));
+        final teamId = await _mkTeam(db);
+
+        final a = await _mkInstance(db);
+        final b = await _mkInstance(db, parentId: a);
+        await _link(db, teamId, 1, a);
+        await _linkDeleted(db, teamId, 2, b); // only soft-deleted slot → B is orphaned
+
+        expect(await repo.deleteOrphanedInstances(), 1);
+        expect(await _allIds(db), [a]);
+      });
+
+      test('instance with one active and one soft-deleted slot is NOT deleted', () async {
+        final db = openTestDatabase();
+        addTearDown(db.close);
+        final repo = PokemonInstanceRepository(db, SyncQueueRepository(db));
+        final teamId = await _mkTeam(db);
+
+        final a = await _mkInstance(db);
+        final b = await _mkInstance(db, parentId: a);
+        await _link(db, teamId, 1, a);
+        await _link(db, teamId, 2, b);        // active slot protects B
+        await _linkDeleted(db, teamId, 3, b); // soft-deleted (irrelevant)
+
+        expect(await repo.deleteOrphanedInstances(), 0);
+        expect(await _allIds(db), containsAll([a, b]));
+      });
+
+      test('relink then delete: A→B[O]→C becomes A→C with B removed', () async {
+        final db = openTestDatabase();
+        addTearDown(db.close);
+        final repo = PokemonInstanceRepository(db, SyncQueueRepository(db));
+        final teamId = await _mkTeam(db);
+
+        final a = await _mkInstance(db);
+        final b = await _mkInstance(db, parentId: a);
+        final c = await _mkInstance(db, parentId: b);
+        await _link(db, teamId, 1, a);
+        await _link(db, teamId, 2, c);
+        // B orphaned
+
+        await repo.relinkOrphanedChain();       // C re-parented to A
+        await repo.deleteOrphanedInstances();   // B deleted
+
+        expect(await _allIds(db), [a, c]);
+        expect(await _parent(db, c), a);
+      });
+
+      test('relink then delete: root orphan B→C becomes C (root), B removed', () async {
+        final db = openTestDatabase();
+        addTearDown(db.close);
+        final repo = PokemonInstanceRepository(db, SyncQueueRepository(db));
+        final teamId = await _mkTeam(db);
+
+        final b = await _mkInstance(db);           // root orphan
+        final c = await _mkInstance(db, parentId: b);
+        await _link(db, teamId, 1, c);
+
+        await repo.relinkOrphanedChain();
+        await repo.deleteOrphanedInstances();
+
+        expect(await _allIds(db), [c]);
+        expect(await _parent(db, c), isNull);
+      });
+
+      test('relink then delete: branching orphan — B removed, C1 and C2 point to A', () async {
+        final db = openTestDatabase();
+        addTearDown(db.close);
+        final repo = PokemonInstanceRepository(db, SyncQueueRepository(db));
+        final teamId = await _mkTeam(db);
+
+        final a  = await _mkInstance(db);
+        final b  = await _mkInstance(db, parentId: a);
+        final c1 = await _mkInstance(db, parentId: b);
+        final c2 = await _mkInstance(db, parentId: b);
+        await _link(db, teamId, 1, a);
+        await _link(db, teamId, 2, c1);
+        await _link(db, teamId, 3, c2);
+
+        await repo.relinkOrphanedChain();
+        await repo.deleteOrphanedInstances();
+
+        expect(await _allIds(db), containsAll([a, c1, c2]));
+        expect(await _allIds(db), isNot(contains(b)));
+        expect(await _parent(db, c1), a);
+        expect(await _parent(db, c2), a);
+      });
+
+      test('relink then delete with consecutive orphans: only linked instances survive', () async {
+        final db = openTestDatabase();
+        addTearDown(db.close);
+        final repo = PokemonInstanceRepository(db, SyncQueueRepository(db));
+        final teamId = await _mkTeam(db);
+
+        // A → B[O] → D[O] → C — B and D both orphaned
+        final a = await _mkInstance(db);
+        final b = await _mkInstance(db, parentId: a);
+        final d = await _mkInstance(db, parentId: b);
+        final c = await _mkInstance(db, parentId: d);
+        await _link(db, teamId, 1, a);
+        await _link(db, teamId, 2, c);
+
+        await repo.relinkOrphanedChain();
+        await repo.deleteOrphanedInstances();
+
+        expect(await _allIds(db), [a, c]);
+        expect(await _parent(db, c), a);
+      });
+
+      test('two independent chains: orphaned middle nodes both removed', () async {
+        final db = openTestDatabase();
+        addTearDown(db.close);
+        final repo = PokemonInstanceRepository(db, SyncQueueRepository(db));
+        final teamId = await _mkTeam(db);
+
+        final a = await _mkInstance(db);
+        final b = await _mkInstance(db, parentId: a);
+        final c = await _mkInstance(db, parentId: b);
+        await _link(db, teamId, 1, a);
+        await _link(db, teamId, 2, c);
+
+        final x = await _mkInstance(db);
+        final y = await _mkInstance(db, parentId: x);
+        final z = await _mkInstance(db, parentId: y);
+        await _link(db, teamId, 3, x);
+        await _link(db, teamId, 4, z);
+
+        await repo.relinkOrphanedChain();
+        await repo.deleteOrphanedInstances();
+
+        expect(await _allIds(db), containsAll([a, c, x, z]));
+        expect(await _allIds(db), isNot(contains(b)));
+        expect(await _allIds(db), isNot(contains(y)));
+      });
+    });
   });
 }

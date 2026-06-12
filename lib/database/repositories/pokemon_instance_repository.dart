@@ -271,6 +271,20 @@ class PokemonInstanceRepository {
     return total;
   }
 
+  /// Deletes all pokemon_instances that are no longer referenced by any
+  /// active (non-deleted) slot. Call this after [relinkOrphanedChain] so
+  /// children are re-parented before their former parent is removed.
+  /// Returns the number of rows deleted.
+  Future<int> deleteOrphanedInstances() => _db.customUpdate(
+        'DELETE FROM pokemon_instances '
+        'WHERE id NOT IN ('
+        '  SELECT DISTINCT instance_id FROM team_slots '
+        '  WHERE instance_id IS NOT NULL AND is_deleted = 0'
+        ')',
+        updates: {_db.pokemonInstances},
+        updateKind: UpdateKind.delete,
+      );
+
   // ── Delete ────────────────────────────────────────────────────────────────
 
   Future<void> delete(int instanceId) async {
