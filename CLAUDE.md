@@ -24,6 +24,8 @@ Directories that always have READMEs in this project: `lib/`, `lib/features/`, `
 - **Closing a GitHub issue** → mark the matching `TODO.md` entry as `- [x]`.
 - **Checking off a `TODO.md` item** → close the corresponding GitHub issue.
 
+**Important:** Only close a GitHub issue after its PR has been **merged into main**. Do not close issues when a PR is merely opened — nothing has been tested or shipped yet.
+
 ### Labels to use (existing labels)
 `enhancement`, `bug`, `ui/ux`, `sync`, `pokémon-details`, `investigation`, `mobile`, `web`, `windows`, `documentation`
 
