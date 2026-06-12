@@ -255,6 +255,7 @@
 - [x] **Ribbons** — hardcoded ribbon catalog by category (League, Contest, Tower, Memorial, Gift, Special) sourced from Bulbapedia; `ribbons` JSON column on `team_slots`; chip-grid picker in slot config
 - [x] **Tera Type** — 18-type chip selector in slot config; shown only for Gen 9 / SV formats; `tera_type` column on `team_slots`; displayed on team card
 - [x] **Cosmetic form support** — Unown letters, Vivillon patterns, Alcremie decorations, and other cosmetic-only variants tracked per slot; cosmetic forms do not change stats/typing/moves
+- [x] **Ability gen gating** (#218) — ability picker filters by format generation: hidden abilities suppressed for Gen 1–4 (Dream World didn't exist); abilities not yet introduced filtered via PokéAPI `generationName`; currently-selected ability always kept visible so the violation banner explains any mismatch
 
 ### Pokémon Showdown Sync
 - [x] **PS import** — parse PS team `.txt` format (Nickname (Species) @ Item, Ability, EVs, moves) → create teams + slots locally; folder mapping from PS subfolder structure
