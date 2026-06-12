@@ -2020,11 +2020,15 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     'Psychic',  'Ice',    'Dragon', 'Dark',
   ];
 
-  /// Returns 0–15 index of the Hidden Power type from current IVs.
-  /// Uses the standard Gen 3+ formula.
-  int _hiddenPowerTypeIndex() {
+  /// Returns 0–15 index of the Hidden Power type from current IVs/DVs.
+  /// Gen 2: type = (Atk_DV mod 4)*4 + (Def_DV mod 4).
+  /// Gen 3+: uses LSB of each IV in HP/Atk/Def/Spe/SpA/SpD order.
+  int _hiddenPowerTypeIndex({int? gen}) {
     final iv = _ivCtrls.map((c) => int.tryParse(c.text) ?? 31).toList();
-    // Bit order: HP, Atk, Def, Spe, SpA, SpD (note Spe=index 5, SpA=index 3, SpD=index 4)
+    if (gen == 2) {
+      return (iv[1] % 4) * 4 + (iv[2] % 4);
+    }
+    // Bit order: HP, Atk, Def, Spe, SpA, SpD (Spe=index 5, SpA=index 3, SpD=index 4)
     final n = (iv[0] & 1) +
         (iv[1] & 1) * 2 +
         (iv[2] & 1) * 4 +
@@ -2034,10 +2038,23 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     return (n * 15) ~/ 63;
   }
 
-  /// Returns the power of Hidden Power (30–70 in Gen 2–5; always 60 in Gen 6+).
+  /// Returns the power of Hidden Power.
+  /// Gen 2: 31–70, using MSBs of Atk/Def/Spe/Special DVs and Special mod 4.
+  /// Gen 3–5: 30–70, using second bits of all IVs.
+  /// Gen 6+: always 60.
   int _hiddenPowerPower({int? gen}) {
     if (gen != null && gen >= 6) return 60;
     final iv = _ivCtrls.map((c) => int.tryParse(c.text) ?? 31).toList();
+    if (gen == 2) {
+      // HPpower = floor((5*(v + 2w + 4x + 8y) + Z) / 2) + 31
+      // v=Special MSB, w=Speed MSB, x=Def MSB, y=Atk MSB, Z=Special mod 4
+      final v = iv[3] >= 8 ? 1 : 0;
+      final w = iv[5] >= 8 ? 1 : 0;
+      final x = iv[2] >= 8 ? 1 : 0;
+      final y = iv[1] >= 8 ? 1 : 0;
+      final z = iv[3] % 4;
+      return (5 * (v + 2 * w + 4 * x + 8 * y) + z) ~/ 2 + 31;
+    }
     final u = ((iv[0] >> 1) & 1) +
         ((iv[1] >> 1) & 1) * 2 +
         ((iv[2] >> 1) & 1) * 4 +
@@ -2048,7 +2065,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   }
 
   Widget _buildHiddenPower({int? gen}) {
-    final typeIdx = _hiddenPowerTypeIndex();
+    final typeIdx = _hiddenPowerTypeIndex(gen: gen);
     final typeName = _hpTypeNames[typeIdx].toLowerCase();
     final power = _hiddenPowerPower(gen: gen);
     final typeColor = PokemonTypeColors.colors[typeName] ??
