@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 /// Show a floating snackbar, clearing any queued snackbars first to avoid
-/// stacking. Pass [isError] to use the error colour scheme.
+/// stacking. Pass [isError] to use the error colour scheme. A "Dismiss" action
+/// is shown by default unless [action] is provided.
 void showAppSnackBar(
   BuildContext context,
   String message, {
@@ -13,6 +14,12 @@ void showAppSnackBar(
 
   final colorScheme = Theme.of(context).colorScheme;
 
+  final resolvedAction = action ??
+      SnackBarAction(
+        label: 'Dismiss',
+        onPressed: messenger.hideCurrentSnackBar,
+      );
+
   messenger.showSnackBar(
     SnackBar(
       content: Text(
@@ -23,7 +30,7 @@ void showAppSnackBar(
       ),
       backgroundColor: isError ? colorScheme.errorContainer : null,
       behavior: SnackBarBehavior.floating,
-      action: action,
+      action: resolvedAction,
     ),
   );
 }
