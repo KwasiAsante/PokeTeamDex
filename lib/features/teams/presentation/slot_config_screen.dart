@@ -3034,6 +3034,18 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     final inheritedOnly =
         _inheritedRibbons.difference(_ribbons).toList()..sort();
 
+    // Pre-filter the catalog: inherited ribbons are already shown above and
+    // should not appear again as selectable options.
+    final selectableCatalog = kRibbonCatalog
+        .map((cat) => (
+              name: cat.name,
+              ribbons: cat.ribbons
+                  .where((r) => !_inheritedRibbons.contains(r.id))
+                  .toList(),
+            ))
+        .where((cat) => cat.ribbons.isNotEmpty)
+        .toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3104,54 +3116,50 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   ?.copyWith(color: colorScheme.onSurfaceVariant),
             ),
           ),
-        for (final category in kRibbonCatalog)
-          if (category.ribbons
-              .any((r) => !_inheritedRibbons.contains(r.id))) ...[
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4, top: 8),
-              child: Text(
-                category.name,
-                style: textTheme.labelMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
+        for (final category in selectableCatalog) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4, top: 8),
+            child: Text(
+              category.name,
+              style: textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: category.ribbons
-                  .where((r) => !_inheritedRibbons.contains(r.id))
-                  .map((r) {
-                final selected = _ribbons.contains(r.id);
-                return FilterChip(
-                  avatar: r.spriteUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: r.spriteUrl!,
-                          width: 20,
-                          height: 20,
-                          fit: BoxFit.contain,
-                          errorWidget: (_, _, _) => const Icon(
-                            Icons.workspace_premium_rounded,
-                            size: 16,
-                          ),
-                        )
-                      : const Icon(Icons.workspace_premium_rounded, size: 16),
-                  label: Text(r.name),
-                  selected: selected,
-                  visualDensity: VisualDensity.compact,
-                  labelStyle: textTheme.labelSmall?.copyWith(
-                    fontWeight:
-                        selected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                  onSelected: (on) => setState(() {
-                      on ? _ribbons.add(r.id) : _ribbons.remove(r.id);
-                      _dirty = true;
-                    }),
-                );
-              }).toList(),
-            ),
-          ],
+          ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: category.ribbons.map((r) {
+              final selected = _ribbons.contains(r.id);
+              return FilterChip(
+                avatar: r.spriteUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: r.spriteUrl!,
+                        width: 20,
+                        height: 20,
+                        fit: BoxFit.contain,
+                        errorWidget: (_, _, _) => const Icon(
+                          Icons.workspace_premium_rounded,
+                          size: 16,
+                        ),
+                      )
+                    : const Icon(Icons.workspace_premium_rounded, size: 16),
+                label: Text(r.name),
+                selected: selected,
+                visualDensity: VisualDensity.compact,
+                labelStyle: textTheme.labelSmall?.copyWith(
+                  fontWeight:
+                      selected ? FontWeight.bold : FontWeight.normal,
+                ),
+                onSelected: (on) => setState(() {
+                    on ? _ribbons.add(r.id) : _ribbons.remove(r.id);
+                    _dirty = true;
+                  }),
+              );
+            }).toList(),
+          ),
+        ],
       ],
     );
   }
