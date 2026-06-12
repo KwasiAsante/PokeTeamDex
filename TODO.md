@@ -272,6 +272,7 @@
 - [x] **Data model** — `pokemon_instances` table (schema v9): `id`, `parent_instance_id` (nullable self-ref chain), `nickname_aliases` (JSON), `inherited_ribbons` (JSON); `team_slots.instance_id` nullable FK; `PokemonInstanceRepository` with full CRUD + `getChain` / `getDirectChildren`
 - [x] **Link UI** — "Pokémon Identity" section in slot config; link type chooser (child vs origin); instance picker sheet; chain view showing ancestors + current slot + direct children with origin/child badges; "Add child" button on linked state; copy-to-team-slot destination picker (new team or empty slot in existing team)
 - [x] **Data inheritance** — ribbon merging from `inheritedRibbons`; "Previously known as" alias display when nickname differs from parent; gender/isShiny propagated when copying to child slot
+- [x] **Inherited ribbons excluded from picker** — ribbons already in the instance chain are shown in the read-only "Inherited" chips section only; filtered out of the selectable catalog so they can't be redundantly toggled (#207)
 - [x] **Navigation** — tapping a chain row navigates to that slot's config screen
 
 ---
