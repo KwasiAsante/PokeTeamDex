@@ -38,6 +38,10 @@ async def pull(
         instance_q = instance_q.where(PokemonInstance.updated_at > since)
         slot_q = slot_q.where(TeamSlot.updated_at > since)
 
+    # Parents always have lower IDs than their children — ascending order
+    # guarantees the receiving client can resolve parent links on first pass.
+    instance_q = instance_q.order_by(PokemonInstance.id)
+
     folders = (await db.execute(folder_q)).scalars().all()
     teams = (await db.execute(team_q)).scalars().all()
     instances = (await db.execute(instance_q)).scalars().all()
@@ -66,7 +70,43 @@ async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> Sync
     instance_map: dict[int, int] = {}
     created: list[SyncPushCreated] = []
 
-    for op in body.ops:
+    # Reorder InstanceCreateOps within the batch so parents precede children.
+    # Other op types stay in their original relative positions.
+    def _topo_sort_instance_creates(ops: list) -> list:
+        non_instance_creates = [o for o in ops if not isinstance(o, InstanceCreateOp)]
+        instance_creates = [o for o in ops if isinstance(o, InstanceCreateOp)]
+        local_ids = {o.client_local_id for o in instance_creates}
+        ordered: list[InstanceCreateOp] = []
+        placed: set[int] = set()
+        remaining = list(instance_creates)
+        while remaining:
+            progress = False
+            for op in list(remaining):
+                parent_local = op.parent_instance_client_local_id
+                # Place if: no local-batch parent, or parent already placed.
+                if parent_local is None or parent_local not in local_ids or parent_local in placed:
+                    ordered.append(op)
+                    placed.add(op.client_local_id)
+                    remaining.remove(op)
+                    progress = True
+            if not progress:
+                # Cycle or unresolvable — append remainder as-is to avoid infinite loop.
+                ordered.extend(remaining)
+                break
+        # Reconstruct: keep non-instance-creates in original positions,
+        # slot sorted instance creates into where the originals were.
+        result = []
+        create_iter = iter(ordered)
+        for o in ops:
+            if isinstance(o, InstanceCreateOp):
+                result.append(next(create_iter))
+            else:
+                result.append(o)
+        return result
+
+    ops = _topo_sort_instance_creates(body.ops)
+
+    for op in ops:
         if isinstance(op, FolderCreateOp):
             folder = TeamFolder(user_id=current_user.id, name=op.name, sort_order=op.sort_order)
             db.add(folder)
