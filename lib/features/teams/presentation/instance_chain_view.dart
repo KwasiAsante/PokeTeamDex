@@ -143,14 +143,26 @@ class _ChainListState extends ConsumerState<_ChainList> {
       );
     }
 
-    final totalRows = widget.chain.length + _descendants.length;
+    // Filter the ancestor chain to only show instances that either have an
+    // active slot pointing to them OR are the current instance. Orphaned
+    // intermediate nodes ("Unlinked instance") carry no useful slot info and
+    // accumulate as DB clutter when unlinking without cleanup; hide them so
+    // the chain always shows a clean, meaningful timeline.
+    final currentId = _currentInstance.id;
+    final displayChain = widget.chain.where((inst) {
+      final hasSlot = (_slotCache[inst.id] ?? []).isNotEmpty;
+      final isCurrent = inst.id == currentId;
+      return hasSlot || isCurrent;
+    }).toList();
+
+    final totalRows = displayChain.length + _descendants.length;
 
     // Accumulate aliases across the ancestor chain so each row shows the full
     // nickname history up to that point (oldest first).
     final accumulated = <String>[];
     final accumulatedPerIndex = <int, List<String>>{};
-    for (int i = 0; i < widget.chain.length; i++) {
-      final inst = widget.chain[i];
+    for (int i = 0; i < displayChain.length; i++) {
+      final inst = displayChain[i];
 
       // Include current active nicknames from all slots referencing this instance
       // (skip the slot currently being configured — its name is shown elsewhere).
@@ -186,13 +198,13 @@ class _ChainListState extends ConsumerState<_ChainList> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Ancestor chain (origin → current) ──
-        for (int i = 0; i < widget.chain.length; i++)
+        for (int i = 0; i < displayChain.length; i++)
           _ChainRow(
-            instance: widget.chain[i],
-            slots: _slotCache[widget.chain[i].id] ?? [],
+            instance: displayChain[i],
+            slots: _slotCache[displayChain[i].id] ?? [],
             teamCache: _teamCache,
             isOrigin: i == 0,
-            isCurrent: (_slotCache[widget.chain[i].id] ?? [])
+            isCurrent: (_slotCache[displayChain[i].id] ?? [])
                 .any((s) => s.id == widget.currentSlotId),
             isLast: i == totalRows - 1,
             isChild: false,
