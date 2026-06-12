@@ -189,7 +189,53 @@ Apply this whenever:
 
 ---
 
+## Pokémon Detail Screen as the Source of Truth
+
+`pokemon_detail_screen.dart` is the canonical implementation for all Pokémon data display. **Before writing any new display code** (list cards, grid cards, team slots, etc.), read the relevant section of the detail screen and replicate its logic exactly. Do not invent your own approach.
+
+### Mandatory pre-implementation audit
+
+When a new widget needs to display Pokémon form data, run this checklist before writing a single line:
+
+1. **Read the detail screen's image handling** — grep for `cosmeticHomeUrlFor`, `kCosmeticFormHomeUrlOverrides`, and the female form special case (`formName == 'female'`). Every new image-displaying widget must replicate this logic.
+2. **Check all constant maps** — `kCosmeticFormHomeUrlOverrides`, `kCosmeticFormHomeShinyUrlOverrides`, `kBaseFormCosmeticHomeUrls`, `kBaseFormNameOverrides`, `kCosmeticFormLabels`. If the detail screen uses them, the new widget must too.
+3. **Understand the two cosmetic form sources** — `cosmeticFormsProvider` (form-entry cosmetics: Shellos, Cherrim, Frillish, Vivillon, etc.) AND `kCosmeticVarietyNames` (variety-based cosmetics: Wormadam, Mimikyu, etc.). Both must be included; scoping out one produces visible missing chips.
+
+### Female form URL pattern
+
+Female HOME artwork is at `sprites/pokemon/other/home/female/{id}.png` — **not** `sprites/pokemon/other/home/{id}-female.png`. The generic `cosmeticFormHomeUrl(id, suffix)` generates the wrong path for female forms. Always check `formName == 'female'` before calling `cosmeticFormHomeUrl`, exactly as `cosmeticHomeUrlFor` does in the detail screen.
+
+### Navigation from list cards
+
+Only pass `?form=` in navigation for **battle-meaningful variety forms** (`battleForms` list). Cosmetic variety forms (in `kCosmeticVarietyNames`) and form-entry cosmetics (from `cosmeticFormsProvider`) must navigate to the base detail screen without a form param — the detail screen's `initialFormName` mechanism only handles battle-meaningful forms. Passing a cosmetic form name as `initialFormName` suppresses the cosmetic chip row and breaks the header image.
+
+---
+
+## Flutter List Widget Rules
+
+### Stateful list items must have identity keys
+
+Any `ConsumerStatefulWidget` rendered inside a `ListView.builder` or `GridView.builder` **must** receive `key: ValueKey(pokemon.id)` (or equivalent unique identifier) at the call site. Without a key, Flutter reuses widget state across position changes — a form selection on item 0 leaks into a different Pokémon when the list reorders or filters. This is not optional.
+
+### Scrollable bottom sheets for variable-length content
+
+When a `showModalBottomSheet` may display a variable number of items (form pickers, option lists), always use `isScrollControlled: true` and wrap the sheet content in a height-capped `SingleChildScrollView` or `DraggableScrollableSheet`. A fixed-height sheet with many items (e.g. Vivillon's 20 forms, Unown's 28 letters) will overflow.
+
+---
+
 ## PokéAPI Data Patterns
+
+### Totem form names are not always suffix-based
+
+PokéAPI names some Totem forms with `-totem-` as an **infix**, not a suffix. For example, Raticate's Alolan Totem form is `raticate-totem-alola`, not `raticate-alola-totem`. Any filter that excludes Totem forms must use `.contains('-totem')`, not `.endsWith('-totem')`.
+
+### `speciesName` vs `name` for form suffix stripping
+
+When deriving a form label suffix from a variety name (e.g. extracting `"sandy"` from `"wormadam-sandy"`), always strip the **species name** prefix, not the pokemon name. For default varieties that include a form infix (e.g. `wormadam-plant`), `pokemon.name = "wormadam-plant"` but `pokemon.speciesName = "wormadam"`. Stripping the wrong prefix produces labels like "Wormadam Sandy" instead of "Sandy". Always use `basePokemon.speciesName ?? basePokemon.name` as the prefix.
+
+### Base form labels for form-based cosmetic species
+
+`computeBaseFormLabel` returns `'Normal'` when `battleForms` is empty and no override exists. Form-based cosmetic species (Shellos, Arceus, Deerling, Vivillon, etc.) whose default form is **not** Normal must have an explicit entry in `kBaseFormNameOverrides`. Before shipping any form chip implementation, check every species that reaches `cosmeticFormsProvider` and verify its base label is correct. Never rely on the `'Normal'` fallback without confirming it is actually accurate for that species.
 
 ### Variety names — always verify before coding
 
@@ -218,6 +264,14 @@ The key used in `kBaseFormNameOverrides` must be the exact default variety name 
 - Visual/sprite difference only, or a move requirement that doesn't change the Pokémon's data
 
 When in doubt: look up both forms on Bulbapedia and compare the stat totals and type lines. If they match, it's cosmetic.
+
+### Test coverage for form display widgets
+
+When writing tests for form picker or form display widgets, **tests must cover both form types**:
+1. **Variety forms** (e.g. Giratina-Origin) — have a `/pokemon` resource; `pokemonByNameProvider` works.
+2. **Form-entry cosmetics** (e.g. Shellos-East-Sea) — have no `/pokemon` resource; `pokemonByNameProvider` will fail. These forms must receive a pre-resolved sprite override so no provider call is made.
+
+A test suite that only covers variety forms provides false confidence. Always include at least one test that verifies `pokemonByNameProvider` is **not** called for a form-entry cosmetic tile.
 
 ---
 
