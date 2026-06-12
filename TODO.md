@@ -243,6 +243,7 @@
 ### Pokédex
 - [x] **Favorites** — star `IconButton` on Pokédex list tile, detail header, team slot card, and slot config AppBar; favorites `FilterChip` in Pokédex filter bar; `favorites` Drift table (`pokemon_id` PK)
 - [x] **Slot picker: format auto-filter** — when team has a `formatLabel`, pre-seed the generation filter (and game chip for game-specific formats) in the slot picker so only eligible Pokémon are shown
+- [x] **Form switching on Pokédex list screen** (#192) — form chip on every list tile and grid card that has switchable forms; chip opens a bottom-sheet picker; selecting a form updates the card's sprite, gradient, and display name in place; covers battle-meaningful variety forms, cosmetic variety forms (`kCosmeticVarietyNames`), and form-entry cosmetics (`cosmeticFormsProvider`); tapping a card with a battle form selected navigates to the detail screen with that form pre-selected
 
 ### Reference Browsers
 - [x] **Move chips: Z / Max / G-Max** — "Z" chip (IDs 622–658, 695–703, 719, 723–728), "Max" chip (IDs 734, 757–774) on move tiles + detail; "G-Max" chip derived from PS `moves.json` (names starting with `g-max-`)
