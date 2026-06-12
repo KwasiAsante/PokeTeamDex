@@ -1014,7 +1014,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 const SizedBox(height: 24),
                 _SectionTitle('Ability'),
                 const SizedBox(height: 8),
-                _buildAbility(effectiveAbilities, effectiveViolations['ability']),
+                _buildAbility(effectiveAbilities, effectiveViolations['ability'], format),
                 // Mega form ability shown as read-only info when evolved.
                 if (canMegaEvolve && _isMegaEvolved && megaPokemon != null &&
                     megaPokemon.abilities.isNotEmpty) ...[
@@ -1493,9 +1493,19 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // ── Ability — selectable cards with descriptions ───────────────────────────
 
+  static int? _genNameToNumber(String? generationName) {
+    const map = {
+      'generation-i': 1, 'generation-ii': 2, 'generation-iii': 3,
+      'generation-iv': 4, 'generation-v': 5, 'generation-vi': 6,
+      'generation-vii': 7, 'generation-viii': 8, 'generation-ix': 9,
+    };
+    return generationName == null ? null : map[generationName];
+  }
+
   Widget _buildAbility(
     List<({String name, bool isHidden, int abilitySlot})> abilities,
     String? violation,
+    GameFormat? format,
   ) {
     if (abilities.isEmpty) return const Text('No abilities available');
 
@@ -1509,6 +1519,25 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final description = detailAsync.whenOrNull(
           data: (entry) => entry.shortEffect,
         );
+
+        // Gen gating — two rules, always exempting the currently-selected
+        // ability so the violation banner can explain any mismatch:
+        //
+        // Rule 1 (synchronous): hidden abilities didn't exist until Gen 5
+        // (Dream World). Hides e.g. Umbreon's Inner Focus in Gen 3.
+        //
+        // Rule 2 (async): PS ability data lacks accurate gen info, so use
+        // PokéAPI's generationName to gate abilities not yet introduced.
+        // Hides e.g. Super Luck (Gen 4 ability) in a Gen 3 format.
+        if (format != null && !isSelected) {
+          if (a.isHidden && format.gen < 5) return const SizedBox.shrink();
+          final abilityGen = detailAsync.whenOrNull(
+            data: (entry) => _genNameToNumber(entry.generationName),
+          );
+          if (abilityGen != null && abilityGen > format.gen) {
+            return const SizedBox.shrink();
+          }
+        }
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
