@@ -170,6 +170,7 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
                                   return const _LoadMoreFooter();
                                 }
                                 return PokemonListTile(
+                                  key: ValueKey(visible[i].id),
                                   pokemon: visible[i],
                                   imageType: listImageType,
                                 );
@@ -195,6 +196,7 @@ class _PokedexScreenState extends ConsumerState<PokedexScreen> {
                                   return const _LoadMoreFooter();
                                 }
                                 return PokemonGridCard(
+                                  key: ValueKey(visible[i].id),
                                   pokemon: visible[i],
                                   imageType: gridImageType,
                                 );
