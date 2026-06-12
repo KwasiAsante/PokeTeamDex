@@ -160,12 +160,25 @@ void main() {
       expect(result.map((v) => v.name), isNot(contains('basculin-blue-striped')));
     });
 
-    test('excludes totem forms', () {
+    test('excludes totem forms with -totem suffix (marowak-totem)', () {
       final varieties = [
         _v('marowak', isDefault: true),
         _v('marowak-totem'),
       ];
       expect(battleMeaningfulForms(varieties), isEmpty);
+    });
+
+    test('excludes totem forms with -totem- infix (raticate-totem-alola)', () {
+      // PokéAPI names Raticate's Alolan Totem form "raticate-totem-alola",
+      // not "raticate-alola-totem" — endsWith('-totem') would miss it.
+      final varieties = [
+        _v('raticate', isDefault: true),
+        _v('raticate-alola'),
+        _v('raticate-totem-alola'),
+      ];
+      final result = battleMeaningfulForms(varieties);
+      expect(result.length, 1);
+      expect(result.single.name, 'raticate-alola');
     });
 
     test('returns empty for Pokémon with no meaningful alternate forms', () {

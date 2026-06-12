@@ -4,8 +4,12 @@ const _kRegionalSuffixes = {'-galar', '-alola', '-hisui', '-paldea'};
 
 const _kExcludeSuffixes = {
   '-mega', '-mega-x', '-mega-y', '-mega-z',
-  '-gmax', '-eternamax', '-totem',
+  '-gmax', '-eternamax',
 };
+
+// Totem forms appear as both suffix (e.g. "marowak-totem") and infix
+// (e.g. "raticate-totem-alola"), so contains() is more reliable than endsWith().
+const _kExcludeSubstrings = {'-totem'};
 
 /// Non-regional forms with meaningfully different stats, moves, or abilities.
 const _kBattleMeaningfulNames = {
@@ -76,6 +80,7 @@ List<PokemonVariety> battleMeaningfulForms(List<PokemonVariety> varieties) {
     if (v.isDefault) return false;
     final name = v.name;
     if (_kExcludeSuffixes.any((s) => name.endsWith(s))) return false;
+    if (_kExcludeSubstrings.any((s) => name.contains(s))) return false;
     if (_kRegionalSuffixes.any((s) => name.endsWith(s))) return true;
     if (_kBattleMeaningfulNames.contains(name)) return true;
     return false;
