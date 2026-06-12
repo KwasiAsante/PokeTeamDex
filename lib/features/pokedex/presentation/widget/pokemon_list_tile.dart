@@ -12,6 +12,7 @@ import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -91,12 +92,68 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
 
     final detailAsync = ref.watch(pokemonDetailProvider(widget.pokemon.id));
     final speciesAsync = ref.watch(pokemonSpeciesProvider(widget.pokemon.id));
-    final formAsync = _selectedFormName != null
-        ? ref.watch(pokemonByNameProvider(_selectedFormName!))
+
+    // Resolved early — speciesName needed for cosmetic label derivation,
+    // and formNames needed to gate the cosmeticFormsProvider watch.
+    final basePokemon = detailAsync.asData?.value;
+
+    // Form-based cosmetics (Shellos, Cherrim, Burmy, Frillish, Vivillon, etc.)
+    // Gate on formNames.length > 1 so we don't fire the provider for the ~90%
+    // of species that have no cosmetic forms at all.
+    final shouldFetchCosmetic = basePokemon != null &&
+        basePokemon.formNames.length > 1 &&
+        !kNoCosmeticFormsPokemon.contains(basePokemon.name);
+    final cosmeticFormsAsync = shouldFetchCosmetic
+        ? ref.watch(cosmeticFormsProvider(basePokemon.name))
         : null;
 
-    // Resolved early so speciesName is available for cosmetic form label derivation.
-    final basePokemon = detailAsync.asData?.value;
+    // Build the resolved cosmetic form entries, applying patches:
+    // • Gender forms whose /pokemon-form sprite is null (frillish-female,
+    //   jellicent-female) get a synthetic sprite URL.
+    // • Species with gender-diff sprites but no pokemon-form resource at all
+    //   (unfezant) get a fully synthetic entry.
+    final rawEntries =
+        cosmeticFormsAsync?.asData?.value ?? const <PokemonFormEntry>[];
+    final cosmeticFormEntries = <PokemonFormEntry>[
+      ...rawEntries.map((f) {
+        if (f.spriteUrl == null && f.formName == 'female' && basePokemon != null) {
+          return PokemonFormEntry(
+            id: f.id,
+            name: f.name,
+            formName: f.formName,
+            isDefault: f.isDefault,
+            spriteUrl:
+                '${_kBase}female/${basePokemon.id}.png',
+            spriteShinyUrl:
+                '${_kBase}shiny/female/${basePokemon.id}.png',
+          );
+        }
+        return f;
+      }),
+      if (basePokemon != null &&
+          kCosmeticGenderDiffPokemon.contains(basePokemon.name))
+        PokemonFormEntry(
+          id: basePokemon.id,
+          name: '${basePokemon.name}-female',
+          formName: 'female',
+          isDefault: false,
+          spriteUrl: '${_kBase}female/${basePokemon.id}.png',
+          spriteShinyUrl: '${_kBase}shiny/female/${basePokemon.id}.png',
+        ),
+    ];
+
+    // Check if the currently selected form is a cosmetic form entry.
+    // Cosmetic form entries share the base Pokémon's types — no provider call
+    // needed. Variety forms (Giratina Origin, Alolan Raticate, etc.) need
+    // pokemonByNameProvider to get updated types and artwork.
+    final selectedCosmeticEntry = _selectedFormName != null
+        ? cosmeticFormEntries
+            .where((f) => f.name == _selectedFormName)
+            .firstOrNull
+        : null;
+    final formAsync = (_selectedFormName != null && selectedCosmeticEntry == null)
+        ? ref.watch(pokemonByNameProvider(_selectedFormName!))
+        : null;
 
     // Form list — computed once species resolves
     final species = speciesAsync.asData?.value;
@@ -116,18 +173,18 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
       (null, baseFormLabel),
       ...battleForms.map((v) => (v.name, shortFormLabel(v.name))),
       ...cosmeticVarietyForms.map((v) {
-        // speciesName ("wormadam") strips cleanly; pokemon.name may be a
-        // default-variety name like "wormadam-plant" which won't match.
         final sn = basePokemon?.speciesName ?? widget.pokemon.name;
         final suffix = v.name.startsWith('$sn-')
             ? v.name.substring(sn.length + 1)
             : v.name;
         return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix));
       }),
+      ...cosmeticFormEntries.map((f) =>
+          (f.name, kCosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName))),
     ];
     final hasFormChip = allForms.length > 1;
 
-    // Effective type/color: use form types when available
+    // Effective type/color — cosmetic form entries keep base types unchanged.
     final formEntry = formAsync?.asData?.value;
     final isFormLoading = formAsync != null && formAsync.isLoading;
 
@@ -141,15 +198,9 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
         ? (PokemonTypeColors.colors[primaryType] ?? colorScheme.primary)
         : colorScheme.surfaceContainerLow;
 
-    // Image URL — form sprite when selected, else base sprite
-    final imageUrl = _buildImageUrl(formEntry, filter);
-    // Compact + form selected: fallback chain is gen-viii icon → front_default → pokeball.
-    // For all other cases the standard front sprite is the single fallback.
-    final fallbackUrl =
-        (_selectedFormName != null && formEntry != null && widget.imageType == null)
-            ? (formEntry.sprites?['front_default'] as String? ??
-                '$_kBase${widget.pokemon.id}.png')
-            : '$_kBase${widget.pokemon.id}.png';
+    // Image URL
+    final imageUrl = _buildImageUrl(formEntry, selectedCosmeticEntry, filter);
+    final fallbackUrl = _buildFallbackUrl(formEntry, selectedCosmeticEntry);
 
     // Display name
     final baseDisplayName = basePokemon?.displaySpeciesName ??
@@ -170,7 +221,7 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
         ? '$baseDisplayName - $selectedLabel'
         : baseDisplayName;
 
-    // Image dimensions (unchanged from original)
+    // Image dimensions
     final imageSize = switch (widget.imageType) {
       PokedexImageType.artwork => 180.0,
       PokedexImageType.sprite  => 64.0,
@@ -182,7 +233,6 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
       null                     => 50.0,
     };
 
-    // Form chip widget (null when no forms available)
     Widget? formChip;
     if (hasFormChip) {
       final chipLabel = selectedLabel ?? baseFormLabel;
@@ -194,8 +244,7 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
           ),
           builder: (ctx) => FormPickerSheet(
             allForms: allForms,
-            baseSpriteUrl:
-                basePokemon?.sprites?['front_default'] as String?,
+            baseSpriteUrl: basePokemon?.sprites?['front_default'] as String?,
             selectedFormName: _selectedFormName,
             shiny: false,
             onSelect: (name) {
@@ -252,11 +301,9 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
                 ],
               ),
             ),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                // Image
                 Hero(
                   tag:
                       'pokemon-sprite-${widget.pokemon.id}${_selectedFormName != null ? '-$_selectedFormName' : ''}',
@@ -302,7 +349,6 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
                 ),
                 const SizedBox(width: 12),
 
-                // Info column
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -320,7 +366,6 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
                             ?.copyWith(fontWeight: FontWeight.bold),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      // Type badges + inline chip (medium+) or just badges
                       if (types.isNotEmpty || (hasFormChip && !isCompact))
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
@@ -333,7 +378,6 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
                             ],
                           ),
                         ),
-                      // Compact: chip on its own row
                       if (isCompact && formChip != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
@@ -353,21 +397,27 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
     );
   }
 
-  String _buildImageUrl(PokemonEntry? formEntry, PokedexFilter filter) {
-    if (_selectedFormName != null && formEntry != null) {
-      if (widget.imageType == PokedexImageType.artwork) {
-        return formEntry.officialArtworkUrl ??
-            '${_kBase}other/official-artwork/${widget.pokemon.id}.png';
+  String _buildImageUrl(
+    PokemonEntry? formEntry,
+    PokemonFormEntry? cosmeticEntry,
+    PokedexFilter filter,
+  ) {
+    if (_selectedFormName != null) {
+      if (cosmeticEntry != null) {
+        // Form-based cosmetic: sprite only, no artwork in PokemonFormEntry.
+        return cosmeticEntry.spriteUrl ?? '$_kBase${widget.pokemon.id}.png';
       }
-      if (widget.imageType == PokedexImageType.sprite) {
-        // Medium sprite tier — use form's front_default (same scale as base sprite).
-        return (formEntry.sprites?['front_default'] as String?) ??
-            '$_kBase${widget.pokemon.id}.png';
+      if (formEntry != null) {
+        if (widget.imageType == PokedexImageType.artwork) {
+          return formEntry.officialArtworkUrl ??
+              '${_kBase}other/official-artwork/${widget.pokemon.id}.png';
+        }
+        if (widget.imageType == PokedexImageType.sprite) {
+          return (formEntry.sprites?['front_default'] as String?) ??
+              '$_kBase${widget.pokemon.id}.png';
+        }
+        return '${_kBase}versions/generation-viii/icons/${formEntry.id}.png';
       }
-      // Compact (null) — try gen-viii icon for the form's numeric ID first.
-      // If the icon doesn't exist, the errorWidget falls back to front_default
-      // via the form-aware fallbackUrl computed in build().
-      return '${_kBase}versions/generation-viii/icons/${formEntry.id}.png';
     }
     return switch (widget.imageType) {
       PokedexImageType.artwork =>
@@ -376,5 +426,18 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
       null =>
         '${_kBase}versions/generation-viii/icons/${widget.pokemon.id}.png',
     };
+  }
+
+  String _buildFallbackUrl(
+    PokemonEntry? formEntry,
+    PokemonFormEntry? cosmeticEntry,
+  ) {
+    if (widget.imageType == null && _selectedFormName != null) {
+      // Compact + form selected: fallback is the form's front_default sprite.
+      final formSprite = cosmeticEntry?.spriteUrl ??
+          (formEntry?.sprites?['front_default'] as String?);
+      if (formSprite != null) return formSprite;
+    }
+    return '$_kBase${widget.pokemon.id}.png';
   }
 }

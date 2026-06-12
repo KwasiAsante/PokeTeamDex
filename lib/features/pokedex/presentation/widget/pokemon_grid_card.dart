@@ -7,10 +7,13 @@ import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
+
+const _kBase = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
 
 enum PokedexImageType { artwork, sprite }
 
@@ -38,11 +41,53 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
 
     final detailAsync = ref.watch(pokemonDetailProvider(widget.pokemon.id));
     final speciesAsync = ref.watch(pokemonSpeciesProvider(widget.pokemon.id));
-    final formAsync = _selectedFormName != null
-        ? ref.watch(pokemonByNameProvider(_selectedFormName!))
-        : null;
 
     final basePokemon = detailAsync.asData?.value;
+
+    // Form-based cosmetics — gated on formNames.length > 1
+    final shouldFetchCosmetic = basePokemon != null &&
+        basePokemon.formNames.length > 1 &&
+        !kNoCosmeticFormsPokemon.contains(basePokemon.name);
+    final cosmeticFormsAsync = shouldFetchCosmetic
+        ? ref.watch(cosmeticFormsProvider(basePokemon.name))
+        : null;
+
+    final rawEntries =
+        cosmeticFormsAsync?.asData?.value ?? const <PokemonFormEntry>[];
+    final cosmeticFormEntries = <PokemonFormEntry>[
+      ...rawEntries.map((f) {
+        if (f.spriteUrl == null && f.formName == 'female' && basePokemon != null) {
+          return PokemonFormEntry(
+            id: f.id,
+            name: f.name,
+            formName: f.formName,
+            isDefault: f.isDefault,
+            spriteUrl: '${_kBase}female/${basePokemon.id}.png',
+            spriteShinyUrl: '${_kBase}shiny/female/${basePokemon.id}.png',
+          );
+        }
+        return f;
+      }),
+      if (basePokemon != null &&
+          kCosmeticGenderDiffPokemon.contains(basePokemon.name))
+        PokemonFormEntry(
+          id: basePokemon.id,
+          name: '${basePokemon.name}-female',
+          formName: 'female',
+          isDefault: false,
+          spriteUrl: '${_kBase}female/${basePokemon.id}.png',
+          spriteShinyUrl: '${_kBase}shiny/female/${basePokemon.id}.png',
+        ),
+    ];
+
+    final selectedCosmeticEntry = _selectedFormName != null
+        ? cosmeticFormEntries
+            .where((f) => f.name == _selectedFormName)
+            .firstOrNull
+        : null;
+    final formAsync = (_selectedFormName != null && selectedCosmeticEntry == null)
+        ? ref.watch(pokemonByNameProvider(_selectedFormName!))
+        : null;
 
     // Form list
     final species = speciesAsync.asData?.value;
@@ -68,10 +113,12 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
             : v.name;
         return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix));
       }),
+      ...cosmeticFormEntries.map((f) =>
+          (f.name, kCosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName))),
     ];
     final hasFormChip = allForms.length > 1;
 
-    // Effective types
+    // Cosmetic form entries keep base types — no gradient change needed.
     final formEntry = formAsync?.asData?.value;
     final isFormLoading = formAsync != null && formAsync.isLoading;
 
@@ -85,10 +132,8 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         ? (PokemonTypeColors.colors[primaryType] ?? colorScheme.primary)
         : colorScheme.surfaceContainerHighest;
 
-    // Image URL
-    final imageUrl = _buildImageUrl(formEntry);
+    final imageUrl = _buildImageUrl(formEntry, selectedCosmeticEntry);
 
-    // Display name
     final baseDisplayName = basePokemon?.displaySpeciesName ??
         widget.pokemon.name
             .split('-')
@@ -122,7 +167,6 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image area with optional form-chip overlay
             Expanded(
               child: Stack(
                 fit: StackFit.expand,
@@ -168,7 +212,6 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
                             ),
                     ),
                   ),
-                  // Form chip overlay — bottom-left over artwork
                   if (hasFormChip)
                     Positioned(
                       bottom: 6,
@@ -222,7 +265,6 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
               ),
             ),
 
-            // Info strip
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
               child: Column(
@@ -260,24 +302,24 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
     );
   }
 
-  String _buildImageUrl(PokemonEntry? formEntry) {
-    if (_selectedFormName != null && formEntry != null) {
-      if (widget.imageType == PokedexImageType.artwork) {
-        return formEntry.officialArtworkUrl ??
-            'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-                'sprites/pokemon/other/official-artwork/${widget.pokemon.id}.png';
+  String _buildImageUrl(PokemonEntry? formEntry, PokemonFormEntry? cosmeticEntry) {
+    if (_selectedFormName != null) {
+      if (cosmeticEntry != null) {
+        return cosmeticEntry.spriteUrl ?? '${_kBase}${widget.pokemon.id}.png';
       }
-      return (formEntry.sprites?['front_default'] as String?) ??
-          'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-              'sprites/pokemon/${widget.pokemon.id}.png';
+      if (formEntry != null) {
+        if (widget.imageType == PokedexImageType.artwork) {
+          return formEntry.officialArtworkUrl ??
+              '${_kBase}other/official-artwork/${widget.pokemon.id}.png';
+        }
+        return (formEntry.sprites?['front_default'] as String?) ??
+            '${_kBase}${widget.pokemon.id}.png';
+      }
     }
     return switch (widget.imageType) {
       PokedexImageType.artwork =>
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-            'sprites/pokemon/other/official-artwork/${widget.pokemon.id}.png',
-      PokedexImageType.sprite =>
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-            'sprites/pokemon/${widget.pokemon.id}.png',
+        '${_kBase}other/official-artwork/${widget.pokemon.id}.png',
+      PokedexImageType.sprite => '${_kBase}${widget.pokemon.id}.png',
     };
   }
 }

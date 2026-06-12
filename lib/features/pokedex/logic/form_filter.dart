@@ -106,6 +106,14 @@ const kCosmeticVarietyNames = <String>{
   'keldeo-resolute',
 };
 
+/// Species whose `pokemon-form` entries are phantom / irrelevant.
+/// Mothim inherits Burmy's Sandy/Trash form names but always looks identical.
+const kNoCosmeticFormsPokemon = <String>{'mothim'};
+
+/// Species with cosmetically different gender sprites but no `/pokemon-form`
+/// resource in PokéAPI. A female chip is synthesised for these in the UI.
+const kCosmeticGenderDiffPokemon = <String>{'unfezant'};
+
 /// Derives a display label from a PokéAPI cosmetic form suffix.
 /// e.g. "red-flower" → "Red Flower", "sandy" → "Sandy", "a" → "A".
 String cosmeticFormLabel(String formName) {

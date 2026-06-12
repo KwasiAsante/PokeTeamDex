@@ -33,13 +33,6 @@ import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_s
 
 /// Derives a display label from a PokéAPI cosmetic form name.
 /// e.g. "red-flower" → "Red Flower", "sandy" → "Sandy", "a" → "A".
-/// Pokémon whose PokéAPI form entries are phantom/irrelevant (e.g. Mothim
-/// inherits Burmy's Sandy/Trash form names but is visually always the same).
-const _kNoCosmeticFormsPokemon = <String>{'mothim'};
-
-/// Pokémon that have cosmetically different genders in sprites but no separate
-/// `/pokemon-form` resource in PokéAPI. A female chip is synthesised for these.
-const _kCosmeticGenderDiffPokemon = <String>{'unfezant'};
 
 class PokemonDetailScreen extends ConsumerStatefulWidget {
   final int pokemonId;
@@ -170,7 +163,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         );
         // Filter out phantom cosmetic forms for species that inherit irrelevant
         // form names (e.g. Mothim gets Sandy/Trash from Burmy but looks identical).
-        final rawCosmeticForms = _kNoCosmeticFormsPokemon.contains(basePokemon.name)
+        final rawCosmeticForms = kNoCosmeticFormsPokemon.contains(basePokemon.name)
             ? const <PokemonFormEntry>[]
             : (cosmeticFormsAsync?.asData?.value ?? const <PokemonFormEntry>[]);
         // Patch gender forms whose /pokemon-form endpoint returns null for
@@ -193,7 +186,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
           }
           return f;
         }).toList();
-        final cosmeticFormsLoading = !_kNoCosmeticFormsPokemon.contains(basePokemon.name) &&
+        final cosmeticFormsLoading = !kNoCosmeticFormsPokemon.contains(basePokemon.name) &&
             cosmeticFormsAsync != null &&
             cosmeticFormsAsync.isLoading;
 
@@ -230,7 +223,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
 
         // Synthesise a female cosmetic chip for species with gender-diff sprites
         // but no separate pokemon-form resource in PokéAPI (e.g. Unfezant).
-        if (_kCosmeticGenderDiffPokemon.contains(basePokemon.name) && _selectedFormName == null) {
+        if (kCosmeticGenderDiffPokemon.contains(basePokemon.name) && _selectedFormName == null) {
           final baseId = basePokemon.id;
           varietyCosmeticForms.add(PokemonFormEntry(
             id: baseId,
