@@ -5,10 +5,13 @@ import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider
 
 /// Bottom-sheet form picker.
 ///
-/// [allForms] is a pre-computed list of (pokéApiName, displayLabel) pairs.
-/// The base/default form always has `name == null` and must be the first entry.
+/// [allForms] is a pre-computed list of (name, label, spriteOverride) triples.
+/// - `name == null` → base/default form (first entry).
+/// - `spriteOverride != null` → use this URL directly in the tile instead of
+///   calling [pokemonByNameProvider]. Required for form-entry cosmetics whose
+///   names are not valid `/pokemon` resources (e.g. "shellos-east-sea").
 class FormPickerSheet extends StatelessWidget {
-  final List<(String?, String)> allForms;
+  final List<(String?, String, String?)> allForms;
   final String? baseSpriteUrl;
   final String? baseShinyUrl;
   final String? selectedFormName;
@@ -45,15 +48,19 @@ class FormPickerSheet extends StatelessWidget {
             spacing: 12,
             runSpacing: 12,
             children: allForms.map((opt) {
-              final (name, label) = opt;
+              final (name, label, spriteOverride) = opt;
+              // Base form uses baseSpriteUrl; cosmetic entries carry their own
+              // spriteOverride; variety forms fetch via pokemonByNameProvider.
+              final resolvedOverride = spriteOverride ??
+                  (name == null
+                      ? (shiny ? (baseShinyUrl ?? baseSpriteUrl) : baseSpriteUrl)
+                      : null);
               return FormOptionTile(
                 formName: name,
                 label: label,
                 isSelected: name == selectedFormName,
                 shiny: shiny,
-                overrideSpriteUrl: name == null
-                    ? (shiny ? (baseShinyUrl ?? baseSpriteUrl) : baseSpriteUrl)
-                    : null,
+                overrideSpriteUrl: resolvedOverride,
                 onTap: () => onSelect(name),
               );
             }).toList(),
@@ -64,8 +71,12 @@ class FormPickerSheet extends StatelessWidget {
   }
 }
 
-/// Single tile inside [FormPickerSheet]. Fetches artwork via
-/// [pokemonByNameProvider] when [formName] is non-null.
+/// Single tile inside [FormPickerSheet].
+///
+/// When [overrideSpriteUrl] is provided the tile uses it directly and skips
+/// the [pokemonByNameProvider] call — this is essential for cosmetic form
+/// entries (Shellos East Sea, Cherrim Sunshine, etc.) whose form names are
+/// not valid `/pokemon` API resources.
 class FormOptionTile extends ConsumerWidget {
   final String? formName;
   final String label;
@@ -87,8 +98,11 @@ class FormOptionTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    final pokemonAsync =
-        formName != null ? ref.watch(pokemonByNameProvider(formName!)) : null;
+    // Skip the provider call when an override is already available — avoids
+    // a failing fetch for form names that have no /pokemon endpoint.
+    final pokemonAsync = (formName != null && overrideSpriteUrl == null)
+        ? ref.watch(pokemonByNameProvider(formName!))
+        : null;
     final formPokemon = pokemonAsync?.asData?.value;
     final spriteUrl = overrideSpriteUrl ??
         (shiny

@@ -261,6 +261,23 @@ const kBaseFormNameOverrides = <String, String>{
   'hoopa':                     'Confined',
   'wishiwashi':                'Solo',
   'zygarde':                   '50%',
+  // Form-based cosmetic species — default form label so the base chip reads
+  // meaningfully instead of falling through to the generation adjective.
+  // Labels match cosmeticFormLabel(defaultFormName) for the default form entry.
+  'shellos':       'West Sea',
+  'gastrodon':     'West Sea',
+  'cherrim':       'Overcast',
+  'burmy':         'Plant Cloak',
+  'castform':      'Normal',
+  'unown':         'A',
+  'furfrou':       'Natural',
+  'pumpkaboo':     'Average',
+  'gourgeist':     'Average',
+  'genesect':      'Normal',
+  'vivillon':      'Meadow',
+  'xerneas':       'Active',
+  'flabebe':       'Red Flower',
+  'florges':       'Red Flower',
   // Variety-based cosmetic forms
   'wormadam-plant':            'Plant',
   'squawkabilly-green-plumage':'Green Plumage',

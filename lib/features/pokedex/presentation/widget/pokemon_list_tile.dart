@@ -13,6 +13,7 @@ import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.d
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
+import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart' show cosmeticFormHomeUrl;
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -169,18 +170,24 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
             widget.pokemon.name, species.generationName, battleForms)
         : 'Base';
 
-    final allForms = <(String?, String)>[
-      (null, baseFormLabel),
-      ...battleForms.map((v) => (v.name, shortFormLabel(v.name))),
+    final allForms = <(String?, String, String?)>[
+      (null, baseFormLabel, null),
+      ...battleForms.map((v) => (v.name, shortFormLabel(v.name), null as String?)),
       ...cosmeticVarietyForms.map((v) {
         final sn = basePokemon?.speciesName ?? widget.pokemon.name;
         final suffix = v.name.startsWith('$sn-')
             ? v.name.substring(sn.length + 1)
             : v.name;
-        return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix));
+        // Cosmetic variety forms have a pokemonByNameProvider resource — no sprite override.
+        return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix), null as String?);
       }),
-      ...cosmeticFormEntries.map((f) =>
-          (f.name, kCosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName))),
+      // Form-entry cosmetics: carry spriteUrl so FormOptionTile doesn't call
+      // pokemonByNameProvider with a form name that has no /pokemon endpoint.
+      ...cosmeticFormEntries.map((f) => (
+        f.name,
+        kCosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
+        f.spriteUrl,
+      )),
     ];
     final hasFormChip = allForms.length > 1;
 
@@ -199,7 +206,7 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
         : colorScheme.surfaceContainerLow;
 
     // Image URL
-    final imageUrl = _buildImageUrl(formEntry, selectedCosmeticEntry, filter);
+    final imageUrl = _buildImageUrl(formEntry, selectedCosmeticEntry, filter, basePokemon);
     final fallbackUrl = _buildFallbackUrl(formEntry, selectedCosmeticEntry);
 
     // Display name
@@ -213,7 +220,7 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
         ? allForms
             .firstWhere(
               (f) => f.$1 == _selectedFormName,
-              orElse: () => (_selectedFormName, shortFormLabel(_selectedFormName!)),
+              orElse: () => (_selectedFormName, shortFormLabel(_selectedFormName!), null),
             )
             .$2
         : null;
@@ -401,10 +408,18 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
     PokemonEntry? formEntry,
     PokemonFormEntry? cosmeticEntry,
     PokedexFilter filter,
+    PokemonEntry? base,
   ) {
     if (_selectedFormName != null) {
       if (cosmeticEntry != null) {
-        // Form-based cosmetic: sprite only, no artwork in PokemonFormEntry.
+        if (widget.imageType == PokedexImageType.artwork) {
+          // Try HOME artwork (e.g. 422-east-sea.png); fall back to sprite.
+          final sn = base?.speciesName ?? widget.pokemon.name;
+          if (cosmeticEntry.name.startsWith('$sn-')) {
+            final suffix = cosmeticEntry.name.substring(sn.length + 1);
+            return cosmeticFormHomeUrl(widget.pokemon.id, suffix);
+          }
+        }
         return cosmeticEntry.spriteUrl ?? '$_kBase${widget.pokemon.id}.png';
       }
       if (formEntry != null) {

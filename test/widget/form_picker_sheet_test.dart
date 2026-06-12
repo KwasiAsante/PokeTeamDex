@@ -18,8 +18,8 @@ PokemonEntry _entry(String name) => PokemonEntry(
     );
 
 const _giratinaForms = [
-  (null as String?, 'Altered'),
-  ('giratina-origin', 'Origin'),
+  (null as String?, 'Altered', null as String?),
+  ('giratina-origin', 'Origin', null as String?),
 ];
 
 void main() {
@@ -105,10 +105,10 @@ void main() {
 
     testWidgets('renders multiple forms without crashing', (tester) async {
       const ogerponForms = [
-        (null as String?, 'Teal Mask'),
-        ('ogerpon-wellspring-mask', 'Wellspring Mask'),
-        ('ogerpon-hearthflame-mask', 'Hearthflame Mask'),
-        ('ogerpon-cornerstone-mask', 'Cornerstone Mask'),
+        (null as String?, 'Teal Mask', null as String?),
+        ('ogerpon-wellspring-mask', 'Wellspring Mask', null as String?),
+        ('ogerpon-hearthflame-mask', 'Hearthflame Mask', null as String?),
+        ('ogerpon-cornerstone-mask', 'Cornerstone Mask', null as String?),
       ];
 
       await tester.pumpWidget(
@@ -142,7 +142,7 @@ void main() {
           child: MaterialApp(
             home: Scaffold(
               body: FormPickerSheet(
-                allForms: const [(null, 'Base')],
+                allForms: const [(null, 'Base', null)],
                 baseSpriteUrl: 'https://example.com/sprite.png',
                 selectedFormName: null,
                 shiny: false,
@@ -156,6 +156,69 @@ void main() {
 
       // The base tile uses overrideSpriteUrl; pokemonByNameProvider must not fire.
       verifyNever(() => mockApi.fetchPokemonByNameOrDefault(any()));
+    });
+
+    testWidgets(
+        'cosmetic form entry with sprite override does not call pokemonByNameProvider',
+        (tester) async {
+      // Shellos East Sea is a pokemon-form name, not a /pokemon resource.
+      // The sprite override must be used and no provider fetch triggered.
+      const shellosEastForms = [
+        (null as String?, 'West Sea', null as String?),
+        ('shellos-east-sea', 'East Sea', 'https://example.com/east-sea-sprite.png'),
+      ];
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [pokeApiRepositoryProvider.overrideWithValue(mockApi)],
+          child: MaterialApp(
+            home: Scaffold(
+              body: FormPickerSheet(
+                allForms: shellosEastForms,
+                selectedFormName: null,
+                shiny: false,
+                onSelect: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('West Sea'), findsOneWidget);
+      expect(find.text('East Sea'), findsOneWidget);
+      // The East Sea tile has a sprite override; pokemonByNameProvider must NOT
+      // be called with 'shellos-east-sea' (that endpoint doesn't exist).
+      verifyNever(() => mockApi.fetchPokemonByNameOrDefault('shellos-east-sea'));
+    });
+
+    testWidgets('tapping cosmetic form tile calls onSelect with form name',
+        (tester) async {
+      const shellosEastForms = [
+        (null as String?, 'West Sea', null as String?),
+        ('shellos-east-sea', 'East Sea', 'https://example.com/east-sea-sprite.png'),
+      ];
+
+      String? received = 'sentinel';
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [pokeApiRepositoryProvider.overrideWithValue(mockApi)],
+          child: MaterialApp(
+            home: Scaffold(
+              body: FormPickerSheet(
+                allForms: shellosEastForms,
+                selectedFormName: null,
+                shiny: false,
+                onSelect: (name) => received = name,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('East Sea'));
+      expect(received, 'shellos-east-sea');
     });
   });
 }

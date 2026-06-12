@@ -3065,8 +3065,8 @@ class _FormBadge extends StatelessWidget {
         ),
         builder: (ctx) => FormPickerSheet(
           allForms: [
-            (null, baseFormLabel),
-            ...battleForms.map((v) => (v.name, shortFormLabel(v.name))),
+            (null, baseFormLabel, null as String?),
+            ...battleForms.map((v) => (v.name, shortFormLabel(v.name), null as String?)),
           ],
           baseSpriteUrl: baseSpriteUrl,
           baseShinyUrl: baseShinyUrl,

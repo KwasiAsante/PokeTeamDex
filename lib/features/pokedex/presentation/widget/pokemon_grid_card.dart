@@ -8,6 +8,7 @@ import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_s
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
+import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart' show cosmeticFormHomeUrl;
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -103,18 +104,21 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
             widget.pokemon.name, species.generationName, battleForms)
         : 'Base';
 
-    final allForms = <(String?, String)>[
-      (null, baseFormLabel),
-      ...battleForms.map((v) => (v.name, shortFormLabel(v.name))),
+    final allForms = <(String?, String, String?)>[
+      (null, baseFormLabel, null),
+      ...battleForms.map((v) => (v.name, shortFormLabel(v.name), null as String?)),
       ...cosmeticVarietyForms.map((v) {
         final sn = basePokemon?.speciesName ?? widget.pokemon.name;
         final suffix = v.name.startsWith('$sn-')
             ? v.name.substring(sn.length + 1)
             : v.name;
-        return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix));
+        return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix), null as String?);
       }),
-      ...cosmeticFormEntries.map((f) =>
-          (f.name, kCosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName))),
+      ...cosmeticFormEntries.map((f) => (
+        f.name,
+        kCosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
+        f.spriteUrl,
+      )),
     ];
     final hasFormChip = allForms.length > 1;
 
@@ -132,7 +136,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         ? (PokemonTypeColors.colors[primaryType] ?? colorScheme.primary)
         : colorScheme.surfaceContainerHighest;
 
-    final imageUrl = _buildImageUrl(formEntry, selectedCosmeticEntry);
+    final imageUrl = _buildImageUrl(formEntry, selectedCosmeticEntry, basePokemon);
 
     final baseDisplayName = basePokemon?.displaySpeciesName ??
         widget.pokemon.name
@@ -145,7 +149,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
             .firstWhere(
               (f) => f.$1 == _selectedFormName,
               orElse: () =>
-                  (_selectedFormName, shortFormLabel(_selectedFormName!)),
+                  (_selectedFormName, shortFormLabel(_selectedFormName!), null),
             )
             .$2
         : null;
@@ -302,9 +306,16 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
     );
   }
 
-  String _buildImageUrl(PokemonEntry? formEntry, PokemonFormEntry? cosmeticEntry) {
+  String _buildImageUrl(PokemonEntry? formEntry, PokemonFormEntry? cosmeticEntry, PokemonEntry? base) {
     if (_selectedFormName != null) {
       if (cosmeticEntry != null) {
+        if (widget.imageType == PokedexImageType.artwork) {
+          final sn = base?.speciesName ?? widget.pokemon.name;
+          if (cosmeticEntry.name.startsWith('$sn-')) {
+            final suffix = cosmeticEntry.name.substring(sn.length + 1);
+            return cosmeticFormHomeUrl(widget.pokemon.id, suffix);
+          }
+        }
         return cosmeticEntry.spriteUrl ?? '${_kBase}${widget.pokemon.id}.png';
       }
       if (formEntry != null) {
