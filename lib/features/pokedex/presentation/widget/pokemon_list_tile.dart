@@ -139,7 +139,13 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
 
     // Image URL — form sprite when selected, else base sprite
     final imageUrl = _buildImageUrl(formEntry, filter);
-    final fallbackUrl = '$_kBase${widget.pokemon.id}.png';
+    // Compact + form selected: fallback chain is gen-viii icon → front_default → pokeball.
+    // For all other cases the standard front sprite is the single fallback.
+    final fallbackUrl =
+        (_selectedFormName != null && formEntry != null && widget.imageType == null)
+            ? (formEntry.sprites?['front_default'] as String? ??
+                '$_kBase${widget.pokemon.id}.png')
+            : '$_kBase${widget.pokemon.id}.png';
 
     // Display name
     final baseDisplayName = basePokemon?.displaySpeciesName ??
@@ -349,8 +355,15 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
         return formEntry.officialArtworkUrl ??
             '${_kBase}other/official-artwork/${widget.pokemon.id}.png';
       }
-      return (formEntry.sprites?['front_default'] as String?) ??
-          '$_kBase${widget.pokemon.id}.png';
+      if (widget.imageType == PokedexImageType.sprite) {
+        // Medium sprite tier — use form's front_default (same scale as base sprite).
+        return (formEntry.sprites?['front_default'] as String?) ??
+            '$_kBase${widget.pokemon.id}.png';
+      }
+      // Compact (null) — try gen-viii icon for the form's numeric ID first.
+      // If the icon doesn't exist, the errorWidget falls back to front_default
+      // via the form-aware fallbackUrl computed in build().
+      return '${_kBase}versions/generation-viii/icons/${formEntry.id}.png';
     }
     return switch (widget.imageType) {
       PokedexImageType.artwork =>
