@@ -261,6 +261,33 @@ const kBaseFormNameOverrides = <String, String>{
   'hoopa':                     'Confined',
   'wishiwashi':                'Solo',
   'zygarde':                   '50%',
+  // Form-based cosmetic species — default form label so the base chip reads
+  // meaningfully instead of falling through to "Normal".
+  // Labels match cosmeticFormLabel(defaultFormName) for the default form entry.
+  // Gender-diff species whose default form is male (female added via cosmeticFormsProvider
+  // or kCosmeticGenderDiffPokemon synthesis).
+  'frillish':      'Male',
+  'jellicent':     'Male',
+  'unfezant':      'Male',
+  // Seasonal forms — default is Spring.
+  'deerling':      'Spring',
+  'sawsbuck':      'Spring',
+  // Plate/drive forms — default is the no-item form.
+  'arceus':        'Normal',
+  'shellos':       'West Sea',
+  'gastrodon':     'West Sea',
+  'cherrim':       'Overcast',
+  'burmy':         'Plant Cloak',
+  'castform':      'Normal',
+  'unown':         'A',
+  'furfrou':       'Natural',
+  'pumpkaboo':     'Average',
+  'gourgeist':     'Average',
+  'genesect':      'Normal',
+  'vivillon':      'Meadow',
+  'xerneas':       'Active',
+  'flabebe':       'Red Flower',
+  'florges':       'Red Flower',
   // Variety-based cosmetic forms
   'wormadam-plant':            'Plant',
   'squawkabilly-green-plumage':'Green Plumage',
@@ -404,6 +431,33 @@ const _kSpecificFormLabels = <String, String>{
   'ogerpon-hearthflame-mask':  'Hearthflame Mask',
   'ogerpon-cornerstone-mask':  'Cornerstone Mask',
 };
+
+/// Computes the label for the base/default form entry in the form picker.
+///
+/// Rules (in priority order):
+/// 1. All non-default forms end in `-female` → base is male → "Male"
+/// 2. At least one non-default form is regional → return regional adjective
+///    for [generationName] (e.g. "Hoennian", "Galarian")
+/// 3. [pokemonName] has a [kBaseFormNameOverrides] entry → return that label
+/// 4. There are non-default battle forms but no regional or override → "Base"
+/// 5. No non-default battle forms → "Normal"
+///    (Generation adjective is never used here — it only makes sense when the
+///    species has regional variety counterparts, which is covered by rule 2.)
+String computeBaseFormLabel(
+  String pokemonName,
+  String? generationName,
+  List<PokemonVariety> battleForms,
+) {
+  final allFemale = battleForms.isNotEmpty &&
+      battleForms.every((v) => v.name.endsWith('-female'));
+  final hasRegionalForm = battleForms.any((v) => regionalSuffixOf(v.name) != null);
+  return allFemale
+      ? 'Male'
+      : hasRegionalForm
+          ? shortBaseFormLabel(generationName)
+          : kBaseFormNameOverrides[pokemonName] ??
+            (battleForms.isNotEmpty ? 'Base' : 'Normal');
+}
 
 /// Short label for the app bar badge (e.g. "Galarian", "Alolan", "Combat Breed").
 ///

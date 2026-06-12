@@ -29,50 +29,10 @@ import 'package:poke_team_dex/shared/widgets/stat_bar.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
 import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
+import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 
 /// Derives a display label from a PokéAPI cosmetic form name.
 /// e.g. "red-flower" → "Red Flower", "sandy" → "Sandy", "a" → "A".
-/// Pokémon whose PokéAPI form entries are phantom/irrelevant (e.g. Mothim
-/// inherits Burmy's Sandy/Trash form names but is visually always the same).
-const _kNoCosmeticFormsPokemon = <String>{'mothim'};
-
-/// Pokémon that have cosmetically different genders in sprites but no separate
-/// `/pokemon-form` resource in PokéAPI. A female chip is synthesised for these.
-const _kCosmeticGenderDiffPokemon = <String>{'unfezant'};
-
-/// Variety names that are purely cosmetic (same stats as base) and should
-/// appear as header cosmetic chips rather than in the Forms tab.
-const kCosmeticVarietyNames = <String>{
-  'wormadam-sandy', 'wormadam-trash',
-  'squawkabilly-blue-plumage', 'squawkabilly-yellow-plumage', 'squawkabilly-white-plumage',
-  'tatsugiri-droopy', 'tatsugiri-stretchy',
-  'dudunsparce-three-segment',
-  'basculin-blue-striped',
-  // Morpeko — Hangry mode changes colour (same stats/type/ability)
-  'morpeko-hangry',
-  // Mimikyu — Busted form is post-disguise reveal (same stats)
-  'mimikyu-busted',
-  // Minior — 7 core colour variants (more visual change than meteor colours)
-  'minior-red', 'minior-orange', 'minior-yellow', 'minior-green',
-  'minior-blue', 'minior-indigo', 'minior-violet',
-  // Magearna — Original Color is the event-variant colour (same stats)
-  'magearna-original',
-  // Eiscue — Noice Face has melted ice (same stats; ability-triggered)
-  'eiscue-noice',
-  // Zarude — Dada Zarude wears a cape; event variant with same stats
-  'zarude-dada',
-  // Maushold — Family of Three vs Four; different headcount, same stats
-  'maushold-family-of-three',
-  // Keldeo — Resolute forme is a visual/moveset cosmetic (same stats/type/ability)
-  'keldeo-resolute',
-};
-
-String cosmeticFormLabel(String formName) {
-  if (formName.isEmpty) return 'Default';
-  return formName.split('-')
-      .map((p) => p.isEmpty ? '' : '${p[0].toUpperCase()}${p.substring(1)}')
-      .join(' ');
-}
 
 class PokemonDetailScreen extends ConsumerStatefulWidget {
   final int pokemonId;
@@ -196,21 +156,14 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         // • Gender-split species (all forms end in -female) → "Male"
         // • Species with regional forms (any form has a regional suffix) → regional adjective
         // • Non-regional non-gender form variants (Rotom appliances, Lycanroc, Urshifu…) → "Base"
-        final allFemale = battleForms.isNotEmpty &&
-            battleForms.every((v) => v.name.endsWith('-female'));
-        final hasRegionalForm =
-            battleForms.any((v) => regionalSuffixOf(v.name) != null);
-        final baseFormLabel = allFemale
-            ? 'Male'
-            : hasRegionalForm
-                ? shortBaseFormLabel(species?.generationName)
-                : kBaseFormNameOverrides[basePokemon.name] ??
-                  (battleForms.isNotEmpty
-                      ? 'Base'
-                      : shortBaseFormLabel(species?.generationName));
+        final baseFormLabel = computeBaseFormLabel(
+          basePokemon.name,
+          species?.generationName,
+          battleForms,
+        );
         // Filter out phantom cosmetic forms for species that inherit irrelevant
         // form names (e.g. Mothim gets Sandy/Trash from Burmy but looks identical).
-        final rawCosmeticForms = _kNoCosmeticFormsPokemon.contains(basePokemon.name)
+        final rawCosmeticForms = kNoCosmeticFormsPokemon.contains(basePokemon.name)
             ? const <PokemonFormEntry>[]
             : (cosmeticFormsAsync?.asData?.value ?? const <PokemonFormEntry>[]);
         // Patch gender forms whose /pokemon-form endpoint returns null for
@@ -233,7 +186,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
           }
           return f;
         }).toList();
-        final cosmeticFormsLoading = !_kNoCosmeticFormsPokemon.contains(basePokemon.name) &&
+        final cosmeticFormsLoading = !kNoCosmeticFormsPokemon.contains(basePokemon.name) &&
             cosmeticFormsAsync != null &&
             cosmeticFormsAsync.isLoading;
 
@@ -248,8 +201,11 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
             final vAsync = ref.watch(pokemonByNameProvider(variety.name));
             final vData = vAsync.asData?.value;
             if (vData == null) continue;
-            final formName = variety.name.startsWith('${basePokemon.name}-')
-                ? variety.name.substring(basePokemon.name.length + 1)
+            // Use speciesName ("wormadam") not the variety name ("wormadam-plant")
+            // so the suffix strip works for default varieties with a form infix.
+            final sn = basePokemon.speciesName ?? basePokemon.name;
+            final formName = variety.name.startsWith('$sn-')
+                ? variety.name.substring(sn.length + 1)
                 : variety.name;
             varietyCosmeticForms.add(PokemonFormEntry(
               id: vData.id,
@@ -267,7 +223,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
 
         // Synthesise a female cosmetic chip for species with gender-diff sprites
         // but no separate pokemon-form resource in PokéAPI (e.g. Unfezant).
-        if (_kCosmeticGenderDiffPokemon.contains(basePokemon.name) && _selectedFormName == null) {
+        if (kCosmeticGenderDiffPokemon.contains(basePokemon.name) && _selectedFormName == null) {
           final baseId = basePokemon.id;
           varietyCosmeticForms.add(PokemonFormEntry(
             id: baseId,
@@ -3104,12 +3060,15 @@ class _FormBadge extends StatelessWidget {
     return GestureDetector(
       onTap: () => showModalBottomSheet(
         context: context,
+        isScrollControlled: true,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
-        builder: (ctx) => _FormPickerSheet(
-          battleForms: battleForms,
-          baseFormLabel: baseFormLabel,
+        builder: (ctx) => FormPickerSheet(
+          allForms: [
+            (null, baseFormLabel, null as String?),
+            ...battleForms.map((v) => (v.name, shortFormLabel(v.name), null as String?)),
+          ],
           baseSpriteUrl: baseSpriteUrl,
           baseShinyUrl: baseShinyUrl,
           selectedFormName: selectedFormName,
@@ -3140,144 +3099,6 @@ class _FormBadge extends StatelessWidget {
             ),
             const SizedBox(width: 4),
             const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 16),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Form Picker Sheet ─────────────────────────────────────────────────────────
-
-class _FormPickerSheet extends StatelessWidget {
-  final List<PokemonVariety> battleForms;
-  final String baseFormLabel;
-  final String? baseSpriteUrl;
-  final String? baseShinyUrl;
-  final String? selectedFormName;
-  final bool shiny;
-  final void Function(String?) onSelect;
-
-  const _FormPickerSheet({
-    required this.battleForms,
-    required this.baseFormLabel,
-    this.baseSpriteUrl,
-    this.baseShinyUrl,
-    required this.selectedFormName,
-    required this.shiny,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final allOptions = <(String? name, String label)>[
-      (null, baseFormLabel),
-      ...battleForms.map((v) => (v.name, shortFormLabel(v.name))),
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Select Form',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: allOptions.map((opt) {
-              final (name, label) = opt;
-              return _FormOptionTile(
-                formName: name,
-                label: label,
-                isSelected: name == selectedFormName,
-                shiny: shiny,
-                overrideSpriteUrl: name == null ? (shiny ? (baseShinyUrl ?? baseSpriteUrl) : baseSpriteUrl) : null,
-                onTap: () => onSelect(name),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Form Option Tile ──────────────────────────────────────────────────────────
-
-class _FormOptionTile extends ConsumerWidget {
-  final String? formName; // null = base form
-  final String label;
-  final bool isSelected;
-  final bool shiny;
-  /// Pre-resolved sprite URL for the base form tile (avoids a provider watch
-  /// on null formName and fixes the pokéball placeholder).
-  final String? overrideSpriteUrl;
-  final void Function() onTap;
-
-  const _FormOptionTile({
-    required this.formName,
-    required this.label,
-    required this.isSelected,
-    required this.shiny,
-    this.overrideSpriteUrl,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final pokemonAsync = formName != null
-        ? ref.watch(pokemonByNameProvider(formName!))
-        : null;
-    final formPokemon = pokemonAsync?.asData?.value;
-    final spriteUrl = overrideSpriteUrl ??
-        (shiny
-            ? (formPokemon?.officialArtworkShinyUrl ?? formPokemon?.officialArtworkUrl)
-            : formPokemon?.officialArtworkUrl);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 88,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? colorScheme.primaryContainer
-              : colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? colorScheme.primary : colorScheme.outlineVariant,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (spriteUrl != null)
-              CachedNetworkImage(imageUrl: spriteUrl, height: 56, width: 56)
-            else
-              const SizedBox(
-                height: 56,
-                width: 56,
-                child: Icon(Icons.catching_pokemon, color: Colors.grey),
-              ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected ? colorScheme.primary : null,
-                  ),
-            ),
           ],
         ),
       ),

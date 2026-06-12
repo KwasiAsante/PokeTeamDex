@@ -160,12 +160,25 @@ void main() {
       expect(result.map((v) => v.name), isNot(contains('basculin-blue-striped')));
     });
 
-    test('excludes totem forms', () {
+    test('excludes totem forms with -totem suffix (marowak-totem)', () {
       final varieties = [
         _v('marowak', isDefault: true),
         _v('marowak-totem'),
       ];
       expect(battleMeaningfulForms(varieties), isEmpty);
+    });
+
+    test('excludes totem forms with -totem- infix (raticate-totem-alola)', () {
+      // PokéAPI names Raticate's Alolan Totem form "raticate-totem-alola",
+      // not "raticate-alola-totem" — endsWith('-totem') would miss it.
+      final varieties = [
+        _v('raticate', isDefault: true),
+        _v('raticate-alola'),
+        _v('raticate-totem-alola'),
+      ];
+      final result = battleMeaningfulForms(varieties);
+      expect(result.length, 1);
+      expect(result.single.name, 'raticate-alola');
     });
 
     test('returns empty for Pokémon with no meaningful alternate forms', () {
@@ -175,6 +188,71 @@ void main() {
 
     test('returns empty list for empty input', () {
       expect(battleMeaningfulForms([]), isEmpty);
+    });
+  });
+
+  group('kCosmeticVarietyNames', () {
+    test('contains Wormadam cosmetic cloaks', () {
+      expect(kCosmeticVarietyNames, containsAll(['wormadam-sandy', 'wormadam-trash']));
+    });
+
+    test('contains Squawkabilly plumage variants', () {
+      expect(kCosmeticVarietyNames, containsAll([
+        'squawkabilly-blue-plumage',
+        'squawkabilly-yellow-plumage',
+        'squawkabilly-white-plumage',
+      ]));
+    });
+
+    test('contains Minior core colour variants', () {
+      expect(kCosmeticVarietyNames, containsAll([
+        'minior-red', 'minior-orange', 'minior-yellow', 'minior-green',
+        'minior-blue', 'minior-indigo', 'minior-violet',
+      ]));
+    });
+
+    test('contains Morpeko Hangry mode', () {
+      expect(kCosmeticVarietyNames, contains('morpeko-hangry'));
+    });
+
+    test('contains Mimikyu Busted form', () {
+      expect(kCosmeticVarietyNames, contains('mimikyu-busted'));
+    });
+
+    test('does not contain battle-meaningful forms', () {
+      expect(kCosmeticVarietyNames, isNot(contains('giratina-origin')));
+      expect(kCosmeticVarietyNames, isNot(contains('rotom-heat')));
+      expect(kCosmeticVarietyNames, isNot(contains('meowstic-female')));
+      expect(kCosmeticVarietyNames, isNot(contains('urshifu-rapid-strike')));
+    });
+
+    test('does not contain mega, gmax, or totem forms', () {
+      expect(kCosmeticVarietyNames, isNot(contains('charizard-mega-x')));
+      expect(kCosmeticVarietyNames, isNot(contains('charizard-gmax')));
+      expect(kCosmeticVarietyNames, isNot(contains('marowak-totem')));
+    });
+
+    test('battle-meaningful forms and cosmetic forms are disjoint', () {
+      // No variety should appear in both sets — that would make its chip
+      // appear in the Forms tab AND as a cosmetic chip simultaneously.
+      final allBattle = battleMeaningfulForms([
+        _v('wormadam-plant', isDefault: true),
+        _v('wormadam-sandy'),
+        _v('wormadam-trash'),
+        _v('squawkabilly-green-plumage', isDefault: true),
+        _v('squawkabilly-blue-plumage'),
+        _v('morpeko-full-belly', isDefault: true),
+        _v('morpeko-hangry'),
+        _v('mimikyu-disguised', isDefault: true),
+        _v('mimikyu-busted'),
+      ]);
+      for (final v in allBattle) {
+        expect(
+          kCosmeticVarietyNames,
+          isNot(contains(v.name)),
+          reason: '${v.name} should not be in both sets',
+        );
+      }
     });
   });
 }

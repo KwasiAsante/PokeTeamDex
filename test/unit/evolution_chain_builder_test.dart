@@ -214,4 +214,72 @@ void main() {
       expect(regionalSuffixOf('darmanitan-zen'), isNull);
     });
   });
+
+  group('computeBaseFormLabel', () {
+    PokemonVariety v(String name) => PokemonVariety(isDefault: false, name: name);
+
+    test('all-female battle forms → Male', () {
+      expect(
+        computeBaseFormLabel('meowstic', null, [v('meowstic-female')]),
+        'Male',
+      );
+    });
+
+    test('regional form → generation adjective', () {
+      expect(
+        computeBaseFormLabel('zigzagoon', 'generation-iii', [v('zigzagoon-galar')]),
+        'Hoennian',
+      );
+    });
+
+    test('kBaseFormNameOverrides hit → override label', () {
+      expect(
+        computeBaseFormLabel('giratina-altered', null, [v('giratina-origin')]),
+        'Altered',
+      );
+    });
+
+    test('non-regional battle forms with no override → Base', () {
+      expect(
+        computeBaseFormLabel('rotom', null, [v('rotom-heat')]),
+        'Base',
+      );
+    });
+
+    test('no battle forms → Normal (generation adjective no longer used as fallback)', () {
+      // The generation adjective was previously used as a fallback here, which
+      // produced "Sinnohian" for Arceus, "Kalosian" for Vivillon, etc. Species
+      // without regional variety counterparts should never show a regional adjective.
+      expect(
+        computeBaseFormLabel('bulbasaur', 'generation-i', []),
+        'Normal',
+      );
+    });
+
+    test('no battle forms → Normal regardless of generation', () {
+      // Form-based cosmetic species (Arceus, Castform, Shellos, etc.) have no
+      // battle variety forms. The generation adjective is wrong for them —
+      // fallback is 'Normal', with explicit overrides for species whose default
+      // isn't the Normal form.
+      expect(computeBaseFormLabel('arceus', 'generation-iv', []), 'Normal');
+      expect(computeBaseFormLabel('castform', 'generation-iii', []), 'Normal');
+      expect(computeBaseFormLabel('bulbasaur', null, []), 'Normal');
+    });
+
+    test('override takes priority over Normal fallback', () {
+      expect(computeBaseFormLabel('shellos', 'generation-iv', []), 'West Sea');
+      expect(computeBaseFormLabel('frillish', 'generation-v', []), 'Male');
+    });
+
+    test('Ogerpon override → Teal Mask', () {
+      expect(
+        computeBaseFormLabel('ogerpon', 'generation-ix', [
+          v('ogerpon-wellspring-mask'),
+          v('ogerpon-hearthflame-mask'),
+          v('ogerpon-cornerstone-mask'),
+        ]),
+        'Teal Mask',
+      );
+    });
+  });
 }

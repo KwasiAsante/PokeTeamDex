@@ -4,8 +4,12 @@ const _kRegionalSuffixes = {'-galar', '-alola', '-hisui', '-paldea'};
 
 const _kExcludeSuffixes = {
   '-mega', '-mega-x', '-mega-y', '-mega-z',
-  '-gmax', '-eternamax', '-totem',
+  '-gmax', '-eternamax',
 };
+
+// Totem forms appear as both suffix (e.g. "marowak-totem") and infix
+// (e.g. "raticate-totem-alola"), so contains() is more reliable than endsWith().
+const _kExcludeSubstrings = {'-totem'};
 
 /// Non-regional forms with meaningfully different stats, moves, or abilities.
 const _kBattleMeaningfulNames = {
@@ -76,8 +80,46 @@ List<PokemonVariety> battleMeaningfulForms(List<PokemonVariety> varieties) {
     if (v.isDefault) return false;
     final name = v.name;
     if (_kExcludeSuffixes.any((s) => name.endsWith(s))) return false;
+    if (_kExcludeSubstrings.any((s) => name.contains(s))) return false;
     if (_kRegionalSuffixes.any((s) => name.endsWith(s))) return true;
     if (_kBattleMeaningfulNames.contains(name)) return true;
     return false;
   }).toList();
+}
+
+/// Variety names that are purely cosmetic (same stats as base) and should
+/// appear as cosmetic chips rather than in the Forms tab.
+const kCosmeticVarietyNames = <String>{
+  'wormadam-sandy', 'wormadam-trash',
+  'squawkabilly-blue-plumage', 'squawkabilly-yellow-plumage', 'squawkabilly-white-plumage',
+  'tatsugiri-droopy', 'tatsugiri-stretchy',
+  'dudunsparce-three-segment',
+  'basculin-blue-striped',
+  'morpeko-hangry',
+  'mimikyu-busted',
+  'minior-red', 'minior-orange', 'minior-yellow', 'minior-green',
+  'minior-blue', 'minior-indigo', 'minior-violet',
+  'magearna-original',
+  'eiscue-noice',
+  'zarude-dada',
+  'maushold-family-of-three',
+  'keldeo-resolute',
+};
+
+/// Species whose `pokemon-form` entries are phantom / irrelevant.
+/// Mothim inherits Burmy's Sandy/Trash form names but always looks identical.
+const kNoCosmeticFormsPokemon = <String>{'mothim'};
+
+/// Species with cosmetically different gender sprites but no `/pokemon-form`
+/// resource in PokéAPI. A female chip is synthesised for these in the UI.
+const kCosmeticGenderDiffPokemon = <String>{'unfezant'};
+
+/// Derives a display label from a PokéAPI cosmetic form suffix.
+/// e.g. "red-flower" → "Red Flower", "sandy" → "Sandy", "a" → "A".
+String cosmeticFormLabel(String formName) {
+  if (formName.isEmpty) return 'Default';
+  return formName
+      .split('-')
+      .map((p) => p.isEmpty ? '' : '${p[0].toUpperCase()}${p.substring(1)}')
+      .join(' ');
 }
