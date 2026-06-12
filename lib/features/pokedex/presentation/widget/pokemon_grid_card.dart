@@ -42,6 +42,8 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         ? ref.watch(pokemonByNameProvider(_selectedFormName!))
         : null;
 
+    final basePokemon = detailAsync.asData?.value;
+
     // Form list
     final species = speciesAsync.asData?.value;
     final battleForms =
@@ -60,9 +62,9 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
       (null, baseFormLabel),
       ...battleForms.map((v) => (v.name, shortFormLabel(v.name))),
       ...cosmeticVarietyForms.map((v) {
-        final baseName = widget.pokemon.name;
-        final suffix = v.name.startsWith('$baseName-')
-            ? v.name.substring(baseName.length + 1)
+        final sn = basePokemon?.speciesName ?? widget.pokemon.name;
+        final suffix = v.name.startsWith('$sn-')
+            ? v.name.substring(sn.length + 1)
             : v.name;
         return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix));
       }),
@@ -70,7 +72,6 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
     final hasFormChip = allForms.length > 1;
 
     // Effective types
-    final basePokemon = detailAsync.asData?.value;
     final formEntry = formAsync?.asData?.value;
     final isFormLoading = formAsync != null && formAsync.isLoading;
 

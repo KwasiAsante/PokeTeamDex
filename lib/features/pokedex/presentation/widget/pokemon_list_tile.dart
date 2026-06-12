@@ -95,6 +95,9 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
         ? ref.watch(pokemonByNameProvider(_selectedFormName!))
         : null;
 
+    // Resolved early so speciesName is available for cosmetic form label derivation.
+    final basePokemon = detailAsync.asData?.value;
+
     // Form list — computed once species resolves
     final species = speciesAsync.asData?.value;
     final battleForms =
@@ -113,9 +116,11 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
       (null, baseFormLabel),
       ...battleForms.map((v) => (v.name, shortFormLabel(v.name))),
       ...cosmeticVarietyForms.map((v) {
-        final baseName = widget.pokemon.name;
-        final suffix = v.name.startsWith('$baseName-')
-            ? v.name.substring(baseName.length + 1)
+        // speciesName ("wormadam") strips cleanly; pokemon.name may be a
+        // default-variety name like "wormadam-plant" which won't match.
+        final sn = basePokemon?.speciesName ?? widget.pokemon.name;
+        final suffix = v.name.startsWith('$sn-')
+            ? v.name.substring(sn.length + 1)
             : v.name;
         return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix));
       }),
@@ -123,7 +128,6 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
     final hasFormChip = allForms.length > 1;
 
     // Effective type/color: use form types when available
-    final basePokemon = detailAsync.asData?.value;
     final formEntry = formAsync?.asData?.value;
     final isFormLoading = formAsync != null && formAsync.isLoading;
 

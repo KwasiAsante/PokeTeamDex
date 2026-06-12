@@ -208,8 +208,11 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
             final vAsync = ref.watch(pokemonByNameProvider(variety.name));
             final vData = vAsync.asData?.value;
             if (vData == null) continue;
-            final formName = variety.name.startsWith('${basePokemon.name}-')
-                ? variety.name.substring(basePokemon.name.length + 1)
+            // Use speciesName ("wormadam") not the variety name ("wormadam-plant")
+            // so the suffix strip works for default varieties with a form infix.
+            final sn = basePokemon.speciesName ?? basePokemon.name;
+            final formName = variety.name.startsWith('$sn-')
+                ? variety.name.substring(sn.length + 1)
                 : variety.name;
             varietyCosmeticForms.add(PokemonFormEntry(
               id: vData.id,
