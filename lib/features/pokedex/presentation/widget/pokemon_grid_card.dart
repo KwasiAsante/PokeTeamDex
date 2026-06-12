@@ -113,7 +113,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
             ? v.name.substring(sn.length + 1)
             : v.name;
         return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix),
-            kCosmeticFormHomeUrlOverrides[v.name] as String?);
+            kCosmeticFormHomeUrlOverrides[v.name]);
       }),
       ...cosmeticFormEntries.map((f) => (
         f.name,
@@ -329,7 +329,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         if (cosmeticEntry.formName == 'female') {
           return '${_kBase}female/${widget.pokemon.id}.png';
         }
-        return cosmeticEntry.spriteUrl ?? '${_kBase}${widget.pokemon.id}.png';
+        return cosmeticEntry.spriteUrl ?? '$_kBase${widget.pokemon.id}.png';
       }
       if (formEntry != null) {
         if (widget.imageType == PokedexImageType.artwork) {
@@ -341,13 +341,13 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
               '${_kBase}other/official-artwork/${widget.pokemon.id}.png';
         }
         return (formEntry.sprites?['front_default'] as String?) ??
-            '${_kBase}${widget.pokemon.id}.png';
+            '$_kBase${widget.pokemon.id}.png';
       }
     }
     return switch (widget.imageType) {
       PokedexImageType.artwork =>
         '${_kBase}other/official-artwork/${widget.pokemon.id}.png',
-      PokedexImageType.sprite => '${_kBase}${widget.pokemon.id}.png',
+      PokedexImageType.sprite => '$_kBase${widget.pokemon.id}.png',
     };
   }
 }

@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:change_case/change_case.dart';
 import 'package:flutter/material.dart';
@@ -760,6 +762,34 @@ class _FilledSlotCard extends ConsumerWidget {
     'hp', 'attack', 'defense', 'special-attack', 'special-defense', 'speed',
   ];
 
+  static const _hpTypeNames = [
+    'Fighting', 'Flying', 'Poison', 'Ground', 'Rock', 'Bug',
+    'Ghost',    'Steel',  'Fire',   'Water',  'Grass', 'Electric',
+    'Psychic',  'Ice',    'Dragon', 'Dark',
+  ];
+
+  static String _hiddenPowerTypeName(TeamSlot slot, {int? gen}) {
+    final ivHp  = slot.ivHp  ?? 31;
+    final ivAtk = slot.ivAtk ?? 31;
+    final ivDef = slot.ivDef ?? 31;
+    final ivSpa = slot.ivSpa ?? 31;
+    final ivSpd = slot.ivSpd ?? 31;
+    final ivSpe = slot.ivSpe ?? 31;
+    int idx;
+    if (gen == 2) {
+      idx = (ivAtk % 4) * 4 + (ivDef % 4);
+    } else {
+      final n = (ivHp  & 1) +
+                (ivAtk & 1) * 2 +
+                (ivDef & 1) * 4 +
+                (ivSpe & 1) * 8 +
+                (ivSpa & 1) * 16 +
+                (ivSpd & 1) * 32;
+      idx = (n * 15) ~/ 63;
+    }
+    return _hpTypeNames[idx];
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pokemonAsync = ref.watch(pokemonDetailProvider(slot.pokemonId));
@@ -1309,12 +1339,12 @@ class _FilledSlotCard extends ConsumerWidget {
                     child: Wrap(
                       spacing: 12,
                       runSpacing: 2,
-                      children: moves
-                          .map((m) => Text(
-                                '• ${m.toCapitalCase()}',
-                                style: textTheme.bodySmall,
-                              ))
-                          .toList(),
+                      children: moves.map((m) {
+                        final label = m == 'hidden-power'
+                            ? 'Hidden Power (${_hiddenPowerTypeName(slot, gen: format?.gen)})'
+                            : m.toCapitalCase();
+                        return Text('• $label', style: textTheme.bodySmall);
+                      }).toList(),
                     ),
                   ),
                 ],

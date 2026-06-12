@@ -181,7 +181,7 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
         // Use HOME artwork override when available (e.g. mimikyu-busted has no
         // officialArtworkUrl in PokéAPI so pokemonByNameProvider returns null artwork).
         return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix),
-            kCosmeticFormHomeUrlOverrides[v.name] as String?);
+            kCosmeticFormHomeUrlOverrides[v.name]);
       }),
       // Form-entry cosmetics: carry sprite so FormOptionTile doesn't call
       // pokemonByNameProvider with a form name that has no /pokemon endpoint.
