@@ -608,7 +608,12 @@ class SyncService {
   }
 
   Future<void> _mergeInstances(List remote) async {
-    for (final ri in remote.cast<Map<String, dynamic>>()) {
+    final rows = remote.cast<Map<String, dynamic>>();
+
+    // Pass 1 — upsert all instances. Parent links are resolved where possible;
+    // children that arrive before their parent get parentInstanceId = null for
+    // now and are fixed in pass 2.
+    for (final ri in rows) {
       final remoteId = ri['id'].toString();
       final remoteDeleted = ri['is_deleted'] as bool? ?? false;
       final remoteUpdatedAt =
@@ -625,7 +630,6 @@ class SyncService {
       final nicknameAliases = ri['nickname_aliases'] as String?;
       final inheritedRibbons = ri['inherited_ribbons'] as String?;
 
-      // Resolve remote parent id → local instance id.
       int? localParentId;
       final remoteParentId = ri['parent_instance_id'];
       if (remoteParentId != null) {
@@ -649,8 +653,9 @@ class SyncService {
         await (db.update(db.pokemonInstances)
               ..where((i) => i.id.equals(existing.id)))
             .write(PokemonInstancesCompanion(
-          // Only overwrite with server data when non-null — preserves locally-set
-          // data that hasn't reached the server yet (e.g. same-batch ordering).
+          parentInstanceId: localParentId != null
+              ? Value(localParentId)
+              : const Value.absent(),
           nicknameAliases: nicknameAliases != null
               ? Value(nicknameAliases)
               : const Value.absent(),
@@ -660,6 +665,32 @@ class SyncService {
           updatedAt: Value(remoteUpdatedAt),
         ));
       }
+    }
+
+    // Pass 2 — fix any parent links that were unresolvable in pass 1 because
+    // the parent hadn't been inserted yet. Now that all instances are in the
+    // local DB, every remote parent ID should resolve.
+    for (final ri in rows) {
+      final remoteParentId = ri['parent_instance_id'];
+      if (remoteParentId == null) continue;
+      if (ri['is_deleted'] as bool? ?? false) continue;
+
+      final remoteId = ri['id'].toString();
+      final local = await instanceRepo.getByRemoteId(remoteId);
+      if (local == null) continue;
+
+      // Already linked correctly — skip.
+      if (local.parentInstanceId != null) continue;
+
+      final parent =
+          await instanceRepo.getByRemoteId(remoteParentId.toString());
+      if (parent == null) continue;
+
+      await (db.update(db.pokemonInstances)
+            ..where((i) => i.id.equals(local.id)))
+          .write(PokemonInstancesCompanion(
+        parentInstanceId: Value(parent.id),
+      ));
     }
   }
 
