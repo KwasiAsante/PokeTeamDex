@@ -905,7 +905,7 @@ git commit -m "chore: update PS data"
 
 ## Deploying the Frontend
 
-Web, Android, and Windows release builds are fully automated via GitHub Actions — no manual steps needed after pushing a version tag.
+Web, Android, Windows, and Linux release builds are fully automated via GitHub Actions — no manual steps needed after pushing a version tag.
 
 ### Web — Firebase Hosting
 
@@ -927,14 +927,123 @@ Both installers built on every version tag and uploaded to the GitHub Release au
 
 > **Known issue #96**: the MSI "Launch after Finish" checkbox does not start the app. Use the EXE installer as the primary Windows download.
 
-### macOS / iOS / Linux
+### Linux — tar.gz, AppImage, Flatpak
+
+Three artifacts are built and uploaded to every GitHub Release automatically (`release.yml`). To build manually:
+
+#### Prerequisites
+
+```bash
+sudo apt-get install -y \
+  clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+  libfuse2 libayatana-appindicator3-1 libdbusmenu-gtk3-4 \
+  flatpak flatpak-builder
+
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user --noninteractive flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08
+```
+
+#### 1. Build the Flutter bundle
+
+```bash
+flutter build linux --release
+```
+
+#### 2. Bundle tray native dependencies
+
+`tray_manager` links against `libayatana-appindicator3`, which must be copied into the bundle so it is available inside AppImage and Flatpak sandboxes.
+
+```bash
+LIBDIR=build/linux/x64/release/bundle/lib
+for lib in \
+  /usr/lib/x86_64-linux-gnu/libayatana-appindicator3.so.1 \
+  /usr/lib/x86_64-linux-gnu/libayatana-ido3-0.4.so.0 \
+  /usr/lib/x86_64-linux-gnu/libdbusmenu-glib.so.4 \
+  /usr/lib/x86_64-linux-gnu/libdbusmenu-gtk3.so.4; do
+  [ -e "$lib" ] && cp -L "$lib" "$LIBDIR/$(basename "$lib")"
+done
+```
+
+#### 3. Package tar.gz
+
+Includes a `.desktop` file, app icon, and `install.sh` for desktop integration.
+
+```bash
+TAG=v1.0.7   # replace with actual tag
+BUNDLE=build/linux/x64/release/bundle
+cp linux/flatpak/io.github.KwasiAsante.PokeTeamDex.desktop "$BUNDLE/"
+cp assets/images/app_icon.png "$BUNDLE/io.github.KwasiAsante.PokeTeamDex.png"
+cp linux/install.sh "$BUNDLE/install.sh"
+chmod +x "$BUNDLE/install.sh"
+cd "$BUNDLE" && tar -czf ~/PokeTeamDex-$TAG-linux-x64.tar.gz . && cd -
+```
+
+After extracting, users run `./install.sh` once to register the app in their launcher.
+
+#### 4. Build AppImage
+
+Requires `libfuse2`. Run `appimagetool` with `APPIMAGE_EXTRACT_AND_RUN=1` if FUSE is unavailable.
+
+```bash
+TAG=v1.0.7
+wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" \
+  -O /tmp/appimagetool
+chmod +x /tmp/appimagetool
+
+mkdir -p /tmp/PokeTeamDex.AppDir
+cp -r build/linux/x64/release/bundle/. /tmp/PokeTeamDex.AppDir/
+
+printf '#!/bin/bash\nSELF=$(readlink -f "$0")\nHERE=$(dirname "$SELF")\nexec "$HERE/poke_team_dex" "$@"\n' \
+  > /tmp/PokeTeamDex.AppDir/AppRun
+chmod +x /tmp/PokeTeamDex.AppDir/AppRun
+
+printf '[Desktop Entry]\nName=PokeTeamDex\nExec=poke_team_dex\nIcon=io.github.KwasiAsante.PokeTeamDex\nType=Application\nCategories=Game;\n' \
+  > /tmp/PokeTeamDex.AppDir/io.github.KwasiAsante.PokeTeamDex.desktop
+cp assets/images/app_icon.png /tmp/PokeTeamDex.AppDir/io.github.KwasiAsante.PokeTeamDex.png
+ln -sf io.github.KwasiAsante.PokeTeamDex.png /tmp/PokeTeamDex.AppDir/.DirIcon
+
+APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 /tmp/appimagetool \
+  /tmp/PokeTeamDex.AppDir ~/PokeTeamDex-$TAG-x86_64.AppImage
+```
+
+To run: `chmod +x PokeTeamDex-*.AppImage && ./PokeTeamDex-*.AppImage`. Double-click in a file manager requires `libfuse2` installed on the host.
+
+#### 5. Build Flatpak
+
+```bash
+TAG=v1.0.7
+flatpak-builder --user --force-clean --disable-rofiles-fuse \
+  --repo=flatpak-repo flatpak-build-dir linux/flatpak/manifest.yml
+flatpak build-bundle flatpak-repo ~/PokeTeamDex-$TAG.flatpak \
+  io.github.KwasiAsante.PokeTeamDex
+
+# Clean up build artefacts
+rm -rf flatpak-build-dir flatpak-repo .flatpak-builder
+```
+
+To install: `flatpak install PokeTeamDex-*.flatpak`  
+To run: `flatpak run io.github.KwasiAsante.PokeTeamDex`
+
+> **Note**: `--disable-rofiles-fuse` is required when the working directory is on an NTFS/exFAT or other FUSE-mounted filesystem.
+
+#### 6. Upload to GitHub Release
+
+```bash
+TAG=v1.0.7
+gh release upload $TAG \
+  ~/PokeTeamDex-$TAG-linux-x64.tar.gz \
+  ~/PokeTeamDex-$TAG-x86_64.AppImage \
+  ~/PokeTeamDex-$TAG.flatpak \
+  --clobber
+```
+
+### macOS / iOS
 
 Not automated — build and distribute manually:
 
 ```bash
 flutter build macos --release
 flutter build ios --release     # requires macOS + Xcode + provisioning profile
-flutter build linux --release
 ```
 
 ### Platform summary
@@ -944,9 +1053,9 @@ flutter build linux --release
 | Web | Firebase Hosting (`poketeamdex.web.app`) | ✓ push to main + tags |
 | Android | APK on GitHub Releases | ✓ tags only |
 | Windows | MSI + EXE on GitHub Releases | ✓ tags only |
+| Linux | tar.gz + AppImage + Flatpak on GitHub Releases | ✓ tags only |
 | macOS | Manual | — |
 | iOS | Manual | — |
-| Linux | Manual | — |
 
 ---
 
