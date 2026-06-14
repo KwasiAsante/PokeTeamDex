@@ -213,10 +213,11 @@ jobs:
             > PokeTeamDex.AppDir/AppRun
           chmod +x PokeTeamDex.AppDir/AppRun
 
-          printf '[Desktop Entry]\nName=PokeTeamDex\nExec=poke_team_dex\nIcon=poketeamdex\nType=Application\nCategories=Game;\n' \
-            > PokeTeamDex.AppDir/poketeamdex.desktop
+          printf '[Desktop Entry]\nName=PokeTeamDex\nExec=poke_team_dex\nIcon=io.github.KwasiAsante.PokeTeamDex\nType=Application\nCategories=Game;\n' \
+            > PokeTeamDex.AppDir/io.github.KwasiAsante.PokeTeamDex.desktop
 
-          cp assets/images/app_icon.png PokeTeamDex.AppDir/poketeamdex.png
+          cp assets/images/app_icon.png PokeTeamDex.AppDir/io.github.KwasiAsante.PokeTeamDex.png
+          ln -s io.github.KwasiAsante.PokeTeamDex.png PokeTeamDex.AppDir/.DirIcon
 
           ARCH=x86_64 ./appimagetool PokeTeamDex.AppDir \
             "PokeTeamDex-${{ needs.create-release.outputs.tag }}-x86_64.AppImage"
