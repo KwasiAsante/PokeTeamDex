@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=PokeTeamDex
+Exec=poke_team_dex
+Icon=io.github.KwasiAsante.PokeTeamDex
+Type=Application
+Categories=Game;

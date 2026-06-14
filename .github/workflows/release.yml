@@ -182,7 +182,7 @@ jobs:
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libfuse2
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libfuse2 flatpak flatpak-builder
 
       - uses: subosito/flutter-action@v2
         with:
@@ -221,6 +221,29 @@ jobs:
           ARCH=x86_64 ./appimagetool PokeTeamDex.AppDir \
             "PokeTeamDex-${{ needs.create-release.outputs.tag }}-x86_64.AppImage"
 
+      - name: Add Flathub remote
+        run: flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Cache Flatpak runtime
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/flatpak
+          key: flatpak-freedesktop-23.08
+
+      - name: Install Flatpak runtime
+        run: |
+          flatpak install --user --noninteractive flathub \
+            org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08
+
+      - name: Build Flatpak
+        run: |
+          flatpak-builder --user --force-clean \
+            --repo=flatpak-repo \
+            flatpak-build-dir linux/flatpak/manifest.yml
+          flatpak build-bundle flatpak-repo \
+            "PokeTeamDex-${{ needs.create-release.outputs.tag }}.flatpak" \
+            io.github.KwasiAsante.PokeTeamDex
+
       - name: Upload to Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -228,6 +251,7 @@ jobs:
           gh release upload "${{ needs.create-release.outputs.tag }}" \
             "PokeTeamDex-${{ needs.create-release.outputs.tag }}-linux-x64.tar.gz" \
             "PokeTeamDex-${{ needs.create-release.outputs.tag }}-x86_64.AppImage" \
+            "PokeTeamDex-${{ needs.create-release.outputs.tag }}.flatpak" \
             --clobber
 
   # ── Backend Docker image ──────────────────────────────────────────────────

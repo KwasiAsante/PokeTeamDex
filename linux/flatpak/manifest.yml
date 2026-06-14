@@ -1,0 +1,32 @@
+app-id: io.github.KwasiAsante.PokeTeamDex
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: poke_team_dex
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+modules:
+  - name: poketeamdex
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 poke_team_dex /app/poke_team_dex
+      - cp -r data /app/data
+      - cp -r lib /app/lib
+      - install -Dm644 io.github.KwasiAsante.PokeTeamDex.desktop /app/share/applications/io.github.KwasiAsante.PokeTeamDex.desktop
+      - install -Dm644 poketeamdex.png /app/share/icons/hicolor/256x256/apps/io.github.KwasiAsante.PokeTeamDex.png
+      - install -Dm755 run.sh /app/bin/poke_team_dex
+    sources:
+      - type: dir
+        path: ../../build/linux/x64/release/bundle
+      - type: file
+        path: io.github.KwasiAsante.PokeTeamDex.desktop
+      - type: file
+        path: ../../assets/images/app_icon.png
+        dest-filename: poketeamdex.png
+      - type: inline
+        contents: "#!/bin/sh\nexec /app/poke_team_dex \"$@\"\n"
+        dest-filename: run.sh
