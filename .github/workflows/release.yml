@@ -197,7 +197,14 @@ jobs:
 
       - name: Package tar.gz
         run: |
-          cd build/linux/x64/release/bundle
+          BUNDLE=build/linux/x64/release/bundle
+          cp linux/flatpak/io.github.KwasiAsante.PokeTeamDex.desktop \
+            "$BUNDLE/io.github.KwasiAsante.PokeTeamDex.desktop"
+          cp assets/images/app_icon.png \
+            "$BUNDLE/io.github.KwasiAsante.PokeTeamDex.png"
+          cp linux/install.sh "$BUNDLE/install.sh"
+          chmod +x "$BUNDLE/install.sh"
+          cd "$BUNDLE"
           tar -czf "$OLDPWD/PokeTeamDex-${{ needs.create-release.outputs.tag }}-linux-x64.tar.gz" .
 
       - name: Build AppImage
