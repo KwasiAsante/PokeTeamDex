@@ -18,7 +18,7 @@ modules:
       - cp -r data /app/data
       - rm -f lib/libayatana-appindicator3.so.1 lib/libayatana-indicator3.so.7
       - rm -f lib/libayatana-ido3-0.4.so.0 lib/libdbusmenu-glib.so.4 lib/libdbusmenu-gtk3.so.4
-      - cp -r lib /app/lib
+      - cp -r lib/. /app/lib/
       - install -Dm644 io.github.KwasiAsante.PokeTeamDex.desktop /app/share/applications/io.github.KwasiAsante.PokeTeamDex.desktop
       - install -Dm644 poketeamdex.png /app/share/icons/hicolor/256x256/apps/io.github.KwasiAsante.PokeTeamDex.png
       - install -Dm755 run.sh /app/bin/poke_team_dex
