@@ -10,11 +10,14 @@ finish-args:
   - --socket=fallback-x11
   - --device=dri
 modules:
+  - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
   - name: poketeamdex
     buildsystem: simple
     build-commands:
       - install -Dm755 poke_team_dex /app/poke_team_dex
       - cp -r data /app/data
+      - rm -f lib/libayatana-appindicator3.so.1 lib/libayatana-indicator3.so.7
+      - rm -f lib/libayatana-ido3-0.4.so.0 lib/libdbusmenu-glib.so.4 lib/libdbusmenu-gtk3.so.4
       - cp -r lib /app/lib
       - install -Dm644 io.github.KwasiAsante.PokeTeamDex.desktop /app/share/applications/io.github.KwasiAsante.PokeTeamDex.desktop
       - install -Dm644 poketeamdex.png /app/share/icons/hicolor/256x256/apps/io.github.KwasiAsante.PokeTeamDex.png

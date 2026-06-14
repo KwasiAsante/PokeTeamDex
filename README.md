@@ -951,7 +951,7 @@ flutter build linux --release
 
 #### 2. Bundle tray native dependencies
 
-`tray_manager` links against `libayatana-appindicator3`, which must be copied into the bundle so it is available inside AppImage and Flatpak sandboxes.
+`tray_manager` links against `libayatana-appindicator3`, which must be copied into the bundle for **tar.gz and AppImage**. The Flatpak build skips these (it builds them from source inside the runtime via `shared-modules` to avoid glib ABI mismatches).
 
 ```bash
 LIBDIR=build/linux/x64/release/bundle/lib
@@ -1011,8 +1011,11 @@ To run: `chmod +x PokeTeamDex-*.AppImage && ./PokeTeamDex-*.AppImage`. Double-cl
 
 #### 5. Build Flatpak
 
+The Flatpak manifest uses `shared-modules` (a git submodule) to build `libdbusmenu`, `libayatana-ido3`, `libayatana-indicator3`, and `libayatana-appindicator3` from source inside the runtime, avoiding glib ABI mismatches that occur when bundling host binaries.
+
 ```bash
 TAG=v1.0.7
+git submodule update --init --recursive   # only needed once after cloning
 flatpak-builder --user --force-clean --disable-rofiles-fuse \
   --repo=flatpak-repo flatpak-build-dir linux/flatpak/manifest.yml
 flatpak build-bundle flatpak-repo ~/PokeTeamDex-$TAG.flatpak \
