@@ -250,12 +250,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local/share/flatpak
-          key: flatpak-freedesktop-23.08
+          key: flatpak-freedesktop-24.08
 
       - name: Install Flatpak runtime
         run: |
           flatpak install --user --noninteractive flathub \
-            org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08
+            org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
 
       - name: Build Flatpak
         run: |
