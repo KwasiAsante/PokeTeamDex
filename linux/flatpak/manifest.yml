@@ -1,6 +1,6 @@
 app-id: io.github.KwasiAsante.PokeTeamDex
 runtime: org.freedesktop.Platform
-runtime-version: '23.08'
+runtime-version: '24.08'
 sdk: org.freedesktop.Sdk
 command: poke_team_dex
 finish-args:
@@ -9,13 +9,101 @@ finish-args:
   - --socket=wayland
   - --socket=fallback-x11
   - --device=dri
+  - --system-talk-name=org.freedesktop.NetworkManager
 modules:
+  - name: intltool
+    buildsystem: autotools
+    cleanup:
+      - '*'
+    sources:
+      - type: archive
+        url: https://launchpad.net/intltool/trunk/0.51.0/+download/intltool-0.51.0.tar.gz
+        sha256: 67c74d94196b153b774ab9f89b2fa6c6ba79352407037c8c14d5aeb334e959cd
+      - type: patch
+        path: shared-modules/intltool/intltool-perl5.26-regex-fixes.patch
+
+  - name: libdbusmenu
+    buildsystem: autotools
+    build-options:
+      cflags: "-Wno-error"
+    cleanup:
+      - "*.la"
+      - /include
+      - /lib/pkgconfig
+      - /libexec
+      - /share/doc
+      - /share/gtk-doc
+    config-opts:
+      - --with-gtk=3
+      - --disable-dumper
+      - --disable-static
+      - --disable-tests
+      - --disable-gtk-doc
+      - --enable-introspection=no
+      - --disable-vala
+    sources:
+      - type: archive
+        url: https://launchpad.net/libdbusmenu/16.04/16.04.0/+download/libdbusmenu-16.04.0.tar.gz
+        sha256: b9cc4a2acd74509435892823607d966d424bd9ad5d0b00938f27240a1bfa878a
+      - type: patch
+        path: shared-modules/libayatana-appindicator/0001-Fix-HAVE_VALGRIND-AM_CONDITIONAL.patch
+
+  - name: ayatana-ido
+    buildsystem: cmake-ninja
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+    config-opts:
+      - -DENABLE_INTROSPECTION=OFF
+      - -DCMAKE_INSTALL_LIBDIR=lib
+    sources:
+      - type: git
+        url: https://github.com/AyatanaIndicators/ayatana-ido.git
+        tag: "0.10.4"
+        commit: f968079b09e2310fefc3fc307359025f1c74b3eb
+      - type: patch
+        path: shared-modules/libayatana-appindicator/0001-Make-introspection-configurable.patch
+
+  - name: libayatana-indicator
+    buildsystem: cmake-ninja
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /libexec
+      - /share
+    config-opts:
+      - -DCMAKE_INSTALL_LIBDIR=lib
+    sources:
+      - type: git
+        url: https://github.com/AyatanaIndicators/libayatana-indicator.git
+        tag: "0.9.4"
+        commit: 611bb384b73fa6311777ba4c41381a06f5b99dad
+
+  - name: libayatana-appindicator
+    buildsystem: cmake-ninja
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+    config-opts:
+      - -DENABLE_BINDINGS_MONO=NO
+      - -DENABLE_BINDINGS_VALA=NO
+      - -DENABLE_GTKDOC=NO
+      - -DENABLE_INTROSPECTION=NO
+      - -DCMAKE_INSTALL_LIBDIR=lib
+    sources:
+      - type: git
+        url: https://github.com/AyatanaIndicators/libayatana-appindicator.git
+        tag: "0.5.94"
+        commit: 31e8bb083b307e1cc96af4874a94707727bd1e79
+
   - name: poketeamdex
     buildsystem: simple
     build-commands:
       - install -Dm755 poke_team_dex /app/poke_team_dex
       - cp -r data /app/data
-      - cp -r lib /app/lib
+      - rm -f lib/libayatana-appindicator3.so.1 lib/libayatana-indicator3.so.7
+      - rm -f lib/libayatana-ido3-0.4.so.0 lib/libdbusmenu-glib.so.4 lib/libdbusmenu-gtk3.so.4
+      - cp -r lib/. /app/lib/
       - install -Dm644 io.github.KwasiAsante.PokeTeamDex.desktop /app/share/applications/io.github.KwasiAsante.PokeTeamDex.desktop
       - install -Dm644 poketeamdex.png /app/share/icons/hicolor/256x256/apps/io.github.KwasiAsante.PokeTeamDex.png
       - install -Dm755 run.sh /app/bin/poke_team_dex
