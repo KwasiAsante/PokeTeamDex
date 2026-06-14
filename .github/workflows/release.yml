@@ -182,7 +182,7 @@ jobs:
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libfuse2
 
       - uses: subosito/flutter-action@v2
         with:
@@ -195,17 +195,39 @@ jobs:
       - name: Build Linux
         run: flutter build linux --release
 
-      - name: Package bundle
+      - name: Package tar.gz
         run: |
           cd build/linux/x64/release/bundle
           tar -czf "$OLDPWD/PokeTeamDex-${{ needs.create-release.outputs.tag }}-linux-x64.tar.gz" .
 
-      - name: Upload bundle to Release
+      - name: Build AppImage
+        run: |
+          wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" \
+            -O appimagetool
+          chmod +x appimagetool
+
+          mkdir -p PokeTeamDex.AppDir
+          cp -r build/linux/x64/release/bundle/. PokeTeamDex.AppDir/
+
+          printf '#!/bin/bash\nSELF=$(readlink -f "$0")\nHERE=$(dirname "$SELF")\nexec "$HERE/poke_team_dex" "$@"\n' \
+            > PokeTeamDex.AppDir/AppRun
+          chmod +x PokeTeamDex.AppDir/AppRun
+
+          printf '[Desktop Entry]\nName=PokeTeamDex\nExec=poke_team_dex\nIcon=poketeamdex\nType=Application\nCategories=Game;\n' \
+            > PokeTeamDex.AppDir/poketeamdex.desktop
+
+          cp assets/images/app_icon.png PokeTeamDex.AppDir/poketeamdex.png
+
+          ARCH=x86_64 ./appimagetool PokeTeamDex.AppDir \
+            "PokeTeamDex-${{ needs.create-release.outputs.tag }}-x86_64.AppImage"
+
+      - name: Upload to Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ needs.create-release.outputs.tag }}" \
             "PokeTeamDex-${{ needs.create-release.outputs.tag }}-linux-x64.tar.gz" \
+            "PokeTeamDex-${{ needs.create-release.outputs.tag }}-x86_64.AppImage" \
             --clobber
 
   # ── Backend Docker image ──────────────────────────────────────────────────
