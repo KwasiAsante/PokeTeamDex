@@ -9,6 +9,7 @@ finish-args:
   - --socket=wayland
   - --socket=fallback-x11
   - --device=dri
+  - --system-talk-name=org.freedesktop.NetworkManager
 modules:
   - name: intltool
     buildsystem: autotools
