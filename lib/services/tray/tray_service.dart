@@ -35,19 +35,31 @@ class TrayService with TrayListener, WindowListener {
   /// Shows the tray icon and intercepts window-close to hide instead of quit.
   Future<void> enable() async {
     if (!_initialized || _trayEnabled) return;
-
-    final iconPath = Platform.isWindows
-        ? 'windows/runner/resources/app_icon.ico'
-        : 'macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png';
-
     try {
-      await trayManager.setIcon(iconPath);
-    } catch (_) {}
+      final String iconPath;
+      if (Platform.isWindows) {
+        iconPath = 'windows/runner/resources/app_icon.ico';
+      } else if (Platform.isLinux) {
+        final execDir = File(Platform.resolvedExecutable).parent.path;
+        iconPath =
+            '$execDir/data/flutter_assets/assets/images/app_icon.png';
+      } else {
+        iconPath =
+            'macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png';
+      }
 
-    await trayManager.setToolTip('PokeTeamDex');
-    await _setContextMenu();
-    await windowManager.setPreventClose(true);
-    _trayEnabled = true;
+      try {
+        await trayManager.setIcon(iconPath);
+      } catch (_) {}
+
+      await trayManager.setToolTip('PokeTeamDex');
+      await _setContextMenu();
+      await windowManager.setPreventClose(true);
+      _trayEnabled = true;
+    } catch (_) {
+      // Tray not available in this environment; minimize-to-tray is silently
+      // disabled rather than crashing the app.
+    }
   }
 
   /// Removes the tray icon and lets window-close exit the app normally.
