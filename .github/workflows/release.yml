@@ -245,7 +245,7 @@ jobs:
 
       - name: Build Flatpak
         run: |
-          flatpak-builder --user --force-clean \
+          flatpak-builder --user --force-clean --disable-rofiles-fuse \
             --repo=flatpak-repo \
             flatpak-build-dir linux/flatpak/manifest.yml
           flatpak build-bundle flatpak-repo \
