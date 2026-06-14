@@ -940,7 +940,7 @@ sudo apt-get install -y \
   flatpak flatpak-builder
 
 flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak install --user --noninteractive flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08
+flatpak install --user --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
 ```
 
 #### 1. Build the Flutter bundle
@@ -1016,19 +1016,25 @@ The Flatpak manifest uses `shared-modules` (a git submodule) to build `libdbusme
 ```bash
 TAG=v1.0.7
 git submodule update --init --recursive   # only needed once after cloning
-flatpak-builder --user --force-clean --disable-rofiles-fuse \
-  --repo=flatpak-repo flatpak-build-dir linux/flatpak/manifest.yml
-flatpak build-bundle flatpak-repo ~/PokeTeamDex-$TAG.flatpak \
+
+# Route all output through /tmp (ext4) so rofiles-fuse overlay works correctly.
+# Required when the project directory is on NTFS/exFAT/FUSE-mounted storage.
+flatpak-builder --user --force-clean \
+  --state-dir=/tmp/poke-flatpak-state \
+  --repo=/tmp/poke-flatpak-repo \
+  /tmp/poke-flatpak-build \
+  linux/flatpak/manifest.yml
+flatpak build-bundle /tmp/poke-flatpak-repo ~/PokeTeamDex-$TAG.flatpak \
   io.github.KwasiAsante.PokeTeamDex
 
 # Clean up build artefacts
-rm -rf flatpak-build-dir flatpak-repo .flatpak-builder
+rm -rf /tmp/poke-flatpak-state /tmp/poke-flatpak-repo /tmp/poke-flatpak-build
 ```
 
 To install: `flatpak install PokeTeamDex-*.flatpak`  
 To run: `flatpak run io.github.KwasiAsante.PokeTeamDex`
 
-> **Note**: `--disable-rofiles-fuse` is required when the working directory is on an NTFS/exFAT or other FUSE-mounted filesystem.
+> **Note**: if your project directory is on a native ext4/btrfs filesystem, you can omit the `--state-dir`/`--repo` overrides and build in-place using `--disable-rofiles-fuse` instead.
 
 #### 6. Upload to GitHub Release
 
