@@ -957,6 +957,7 @@ flutter build linux --release
 LIBDIR=build/linux/x64/release/bundle/lib
 for lib in \
   /usr/lib/x86_64-linux-gnu/libayatana-appindicator3.so.1 \
+  /usr/lib/x86_64-linux-gnu/libayatana-indicator3.so.7 \
   /usr/lib/x86_64-linux-gnu/libayatana-ido3-0.4.so.0 \
   /usr/lib/x86_64-linux-gnu/libdbusmenu-glib.so.4 \
   /usr/lib/x86_64-linux-gnu/libdbusmenu-gtk3.so.4; do
