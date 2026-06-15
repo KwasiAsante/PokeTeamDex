@@ -355,6 +355,8 @@ class PokeApiRepository {
     return species.varieties.any((v) => v.name.endsWith('-$formName'));
   }
 
+  Future<int> getSpeciesId(int pokemonId) => _getSpeciesIdForPokemon(pokemonId);
+
   Future<int> _getSpeciesIdForPokemon(int pokemonId) async {
     if (pokemonId <= 10000) return pokemonId;
     final cacheKey = 'species_id_for_pokemon_$pokemonId';

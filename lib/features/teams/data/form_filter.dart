@@ -33,6 +33,48 @@ const Set<String> kAlwaysExcludeForms = {
   'oinkologne-female',
 };
 
+// ── Mutable-form species ──────────────────────────────────────────────────
+
+/// Species whose forms can change on the same individual (in or out of battle,
+/// seasonally, or via item/ability). Slots of these species may be linked
+/// across different form selections.
+///
+/// Excludes: regional variants, gender forms, size forms, and any form that
+/// is permanently determined at evolution or birth — those require an exact
+/// form match to link.
+///
+/// Mega Evolution and Gigantamax forms are excluded from the form chip selector
+/// entirely and handled via separate toggles, so they are not listed here.
+const Set<int> kMutableFormSpeciesIds = {
+  // Ability-gated battle forms (form switches automatically in battle)
+  421,  // Cherrim          – Overcast ↔ Sunshine
+  555,  // Darmanitan       – Standard ↔ Zen Mode (also Galarian)
+  676,  // Furfrou          – all groomed haircuts
+  681,  // Aegislash        – Shield ↔ Blade
+  746,  // Wishiwashi       – Solo ↔ School
+  773,  // Silvally         – all memory-type forms
+  774,  // Minior           – Meteor ↔ Core (any colour)
+  778,  // Mimikyu          – Disguised ↔ Busted
+  875,  // Eiscue           – Ice Face ↔ No-Ice Face
+  877,  // Morpeko          – Full Belly ↔ Hangry
+  964,  // Palafin          – Zero ↔ Hero
+
+  // Item-bound form changes (form switches when holding a specific item)
+  382,  // Kyogre           – Primal Reversion
+  383,  // Groudon          – Primal Reversion
+  483,  // Dialga           – Origin Forme (Adamant Crystal)
+  484,  // Palkia           – Origin Forme (Lustrous Globe)
+  487,  // Giratina         – Altered ↔ Origin (Griseous Orb/Core)
+  493,  // Arceus           – all 18 type-plate forms
+  888,  // Zacian           – Hero ↔ Crowned Sword
+  889,  // Zamazenta        – Hero ↔ Crowned Shield
+  898,  // Calyrex          – solo ↔ Ice Rider / Shadow Rider
+
+  // Seasonal / cosmetic-changeable forms
+  585,  // Deerling         – Spring / Summer / Autumn / Winter
+  586,  // Sawsbuck         – Spring / Summer / Autumn / Winter
+};
+
 // ── Typed gating rule classes ──────────────────────────────────────────────
 
 /// A form chip that is shown only when a specific ability is active.

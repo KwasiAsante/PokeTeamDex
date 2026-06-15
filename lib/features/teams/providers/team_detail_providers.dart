@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
+import 'package:poke_team_dex/features/teams/data/form_filter.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 
@@ -37,6 +38,7 @@ typedef LinkableSlotParams = ({
   int originPokemonId,
   int currentSlotId,
   String? originFormName,
+  String? originGender,
   bool forwardDirection,
 });
 
@@ -99,28 +101,71 @@ final linkableSlotsProvider =
 
   final allSlots = await slotRepo.watchAll().first;
 
+  // Pre-resolve species IDs for all form-variant candidates (cached, cheap).
+  // This lets us allow same-species cross-form links (e.g. Aegislash Shield/Sword,
+  // Meowstic male/female, Lycanroc forms) without requiring an exact formName match.
+  final formVariantIds = allSlots
+      .where((s) => s.pokemonId > 10000 && s.id != params.currentSlotId)
+      .map((s) => s.pokemonId)
+      .toSet();
+  final formVariantSpecies = <int, int>{};
+  await Future.wait(formVariantIds.map((id) async {
+    formVariantSpecies[id] = await pokeApi.getSpeciesId(id);
+  }));
+
   return allSlots.where((s) {
     if (s.id == params.currentSlotId) return false;
     if (!validTeamIds.contains(s.teamId)) return false;
 
     final candidatePokemonId = s.pokemonId;
     final candidateFormName = s.formName;
+    final isMutable = kMutableFormSpeciesIds.contains(originSpeciesId);
 
     if (candidatePokemonId <= 10000) {
       // Standard-form slot: speciesId == pokemonId.
       if (!validSpeciesIds.contains(candidatePokemonId)) return false;
 
+      if (candidatePokemonId == originSpeciesId) {
+        // Same species, base-form candidate.
+        // Mutable species (Aegislash, Darmanitan Zen, etc.) → allow any form.
+        if (isMutable) return true;
+        // Immutable: origin must also be a base-form slot; form-variant origins
+        // (originPokemonId > 10000) represent a different, fixed form.
+        if (params.originPokemonId != originSpeciesId) return false;
+        // Both base-form: require matching formName AND gender (handles
+        // Meowstic female vs male — both have pokemonId=678, formName=null,
+        // but different permanent genders).
+        if (s.gender != params.originGender) return false;
+        return candidateFormName == params.originFormName;
+      }
+
+      // Different species (cross-evolution):
       if (params.originFormName == null) {
         return candidateFormName == null;
       } else {
-        // Regional-form origin:
-        if (candidatePokemonId == originSpeciesId) return false;
+        // Regional-form origin: suppress species that also carry this regional
+        // form (their form-variant slot appears via the pokemonId > 10000 path).
         if (speciesWithSameForm.contains(candidatePokemonId)) return false;
         return candidateFormName == null;
       }
     } else {
-      // Form-variant slot (pokemonId > 10000): require matching non-null formName.
-      if (candidateFormName == null) return false;
+      // Form-variant slot (pokemonId > 10000).
+      final candidateSpeciesId = formVariantSpecies[candidatePokemonId];
+      if (candidateSpeciesId == null) return false;
+
+      if (candidateSpeciesId == originSpeciesId) {
+        // Same species, form-variant candidate.
+        // Mutable species → allow any form.
+        if (isMutable) return true;
+        // Immutable: require the same pokemonId (same form-variant, e.g.
+        // meowstic-female slot can only link to another meowstic-female slot).
+        return candidatePokemonId == params.originPokemonId;
+      }
+
+      // Cross-species form-variant (e.g. Alolan Meowth → Alolan Persian):
+      // must be in the valid evolution set and carry the same regional form.
+      if (!validSpeciesIds.contains(candidateSpeciesId)) return false;
+      if (params.originFormName == null) return false;
       return candidateFormName == params.originFormName;
     }
   }).toList();

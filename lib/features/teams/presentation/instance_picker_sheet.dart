@@ -2,6 +2,7 @@ import 'package:change_case/change_case.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
+import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
 
@@ -34,6 +35,7 @@ class InstancePickerSheet extends ConsumerWidget {
       originPokemonId: originSlot.pokemonId,
       currentSlotId: originSlot.id,
       originFormName: originSlot.formName,
+      originGender: originSlot.gender,
       forwardDirection: forwardDirection,
     );
     final slotsAsync = ref.watch(linkableSlotsProvider(params));
@@ -123,6 +125,7 @@ class InstancePickerSheet extends ConsumerWidget {
                       ),
                       for (final slot in entry.value)
                         _SlotTile(
+                          key: ValueKey(slot.id),
                           slot: slot,
                           onTap: () => onPick(slot),
                         ),
@@ -159,14 +162,14 @@ class _TeamHeader extends StatelessWidget {
   }
 }
 
-class _SlotTile extends StatelessWidget {
+class _SlotTile extends ConsumerWidget {
   final TeamSlot slot;
   final VoidCallback onTap;
 
-  const _SlotTile({required this.slot, required this.onTap});
+  const _SlotTile({super.key, required this.slot, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -175,13 +178,31 @@ class _SlotTile extends StatelessWidget {
         : 'Pokémon #${slot.pokemonId}';
     final hasInstance = slot.instanceId != null;
 
+    // Resolve the HOME sprite URL for the active form. Variety-based forms
+    // (Lycanroc Midnight, Alolan Sandshrew, Aegislash Blade, etc.) have their
+    // own /pokemon resource with a distinct ID — use that ID for the URL.
+    // Cosmetic forms (Burmy cloaks, Cherrim Sunshine, etc.) have no such
+    // resource so pokemonByNameProvider returns null; we fall back to the
+    // base species URL in that case.
+    final int spriteId;
+    if (slot.formName != null) {
+      final formId = ref
+          .watch(pokemonByNameProvider(slot.formName!))
+          .asData
+          ?.value
+          .id;
+      spriteId = formId ?? slot.pokemonId;
+    } else {
+      spriteId = slot.pokemonId;
+    }
+
     return ListTile(
       leading: SizedBox(
         width: 40,
         height: 40,
         child: PokemonSprite(
-          defaultUrl: pokemonHomeUrl(slot.pokemonId),
-          shinyUrl: slot.isShiny ? pokemonHomeShinyUrl(slot.pokemonId) : null,
+          defaultUrl: pokemonHomeUrl(spriteId),
+          shinyUrl: slot.isShiny ? pokemonHomeShinyUrl(spriteId) : null,
           shiny: slot.isShiny,
           size: 40,
         ),
