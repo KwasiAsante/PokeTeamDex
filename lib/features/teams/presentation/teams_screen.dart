@@ -1254,40 +1254,50 @@ class _SlotSprite extends ConsumerWidget {
       id = slot.pokemonId;
     }
 
-    const base =
+    const versionsBase =
         'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions';
-    final iconGen7 = '$base/generation-vii/icons/$id.png';
-    final iconGen8 = '$base/generation-viii/icons/$id.png';
-    final fallback =
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$id.png';
+    const spriteBase =
+        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
+    final iconGen8    = '$versionsBase/generation-viii/icons/$id.png';
+    final iconGen7    = '$versionsBase/generation-vii/icons/$id.png';
+    final iconCurrent = '$spriteBase/icons/$id.png';
+    final sprite      = '$spriteBase/$id.png';
 
     return Padding(
       padding: const EdgeInsets.only(right: 2),
       child: CachedNetworkImage(
-        imageUrl: iconGen7,
+        imageUrl: iconGen8,
         width: width,
         height: height,
         fit: BoxFit.contain,
         memCacheWidth: cacheWidth,
         memCacheHeight: cacheHeight,
         errorWidget: (_, _, _) => CachedNetworkImage(
-          imageUrl: iconGen8,
+          imageUrl: iconGen7,
           width: width,
           height: height,
           fit: BoxFit.contain,
           memCacheWidth: cacheWidth,
           memCacheHeight: cacheHeight,
           errorWidget: (_, _, _) => CachedNetworkImage(
-            imageUrl: fallback,
+            imageUrl: iconCurrent,
             width: width,
             height: height,
             fit: BoxFit.contain,
             memCacheWidth: cacheWidth,
             memCacheHeight: cacheHeight,
-            errorWidget: (_, _, _) => Icon(
-              Icons.catching_pokemon,
-              size: 60,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+            errorWidget: (_, _, _) => CachedNetworkImage(
+              imageUrl: sprite,
+              width: width,
+              height: height,
+              fit: BoxFit.contain,
+              memCacheWidth: cacheWidth,
+              memCacheHeight: cacheHeight,
+              errorWidget: (_, _, _) => Icon(
+                Icons.catching_pokemon,
+                size: 60,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+              ),
             ),
           ),
         ),
