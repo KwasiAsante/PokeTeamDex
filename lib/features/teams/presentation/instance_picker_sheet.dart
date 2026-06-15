@@ -35,6 +35,7 @@ class InstancePickerSheet extends ConsumerWidget {
       originPokemonId: originSlot.pokemonId,
       currentSlotId: originSlot.id,
       originFormName: originSlot.formName,
+      originGender: originSlot.gender,
       forwardDirection: forwardDirection,
     );
     final slotsAsync = ref.watch(linkableSlotsProvider(params));

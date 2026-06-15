@@ -38,6 +38,7 @@ typedef LinkableSlotParams = ({
   int originPokemonId,
   int currentSlotId,
   String? originFormName,
+  String? originGender,
   bool forwardDirection,
 });
 
@@ -131,7 +132,10 @@ final linkableSlotsProvider =
         // Immutable: origin must also be a base-form slot; form-variant origins
         // (originPokemonId > 10000) represent a different, fixed form.
         if (params.originPokemonId != originSpeciesId) return false;
-        // Both base-form: require matching formName (same permanent form).
+        // Both base-form: require matching formName AND gender (handles
+        // Meowstic female vs male — both have pokemonId=678, formName=null,
+        // but different permanent genders).
+        if (s.gender != params.originGender) return false;
         return candidateFormName == params.originFormName;
       }
 
