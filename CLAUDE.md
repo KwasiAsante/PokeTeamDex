@@ -31,6 +31,40 @@ Directories that always have READMEs in this project: `lib/`, `lib/features/`, `
 
 ---
 
+## Investigation Issues
+
+When a GitHub issue is labeled `investigation`, follow this workflow. **No implementation code is written until the investigation PR is merged.**
+
+Plan mode is active by default during the investigation and research phases. Exit plan mode only when writing the investigation document.
+
+### Steps
+
+1. **Deep research phase**
+   - Do a full end-to-end investigation of the codebase covering all relevant files, providers, services, and data flows.
+   - Search outside the codebase: relevant repos, pub.dev packages, GitHub issues, and web searches to find answers or inform the implementation approach.
+   - Ask the user clarifying questions whenever their vision or preferences for the implementation are unclear — do not guess.
+
+2. **Formulate the implementation plan**
+   - After research is complete, produce a concrete implementation plan.
+   - For larger plans, split the work into discrete, independently-shippable tasks.
+
+3. **Write the investigation document**
+   - Create a markdown file at `docs/investigation/<issue-number>-<issue-slug>.md`.
+   - The document must contain: research findings, answered investigation questions, and the full implementation plan (with individual tasks if applicable).
+
+4. **Open an investigation PR**
+   - Branch name: `investigation/<issue-slug>` (following the existing naming convention).
+   - Commit only the investigation document — **absolutely no implementation code**.
+   - PR description must include a summary of the research results and the implementation plan.
+
+5. **After the PR is merged**
+   - Do **not** close the investigation issue.
+   - Create a native GitHub sub-issue for each task in the implementation plan, attached to the parent investigation issue.
+   - Sub-issues inherit the parent issue's labels, minus `investigation`.
+   - The investigation issue is only closed once **all sub-issues are closed**.
+
+---
+
 ## Git Workflow
 
 **Always use branches and PRs. Never commit directly to `main` unless explicitly told to.**
