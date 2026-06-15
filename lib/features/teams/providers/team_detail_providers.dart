@@ -99,6 +99,18 @@ final linkableSlotsProvider =
 
   final allSlots = await slotRepo.watchAll().first;
 
+  // Pre-resolve species IDs for all form-variant candidates (cached, cheap).
+  // This lets us allow same-species cross-form links (e.g. Aegislash Shield/Sword,
+  // Meowstic male/female, Lycanroc forms) without requiring an exact formName match.
+  final formVariantIds = allSlots
+      .where((s) => s.pokemonId > 10000 && s.id != params.currentSlotId)
+      .map((s) => s.pokemonId)
+      .toSet();
+  final formVariantSpecies = <int, int>{};
+  await Future.wait(formVariantIds.map((id) async {
+    formVariantSpecies[id] = await pokeApi.getSpeciesId(id);
+  }));
+
   return allSlots.where((s) {
     if (s.id == params.currentSlotId) return false;
     if (!validTeamIds.contains(s.teamId)) return false;
@@ -110,17 +122,32 @@ final linkableSlotsProvider =
       // Standard-form slot: speciesId == pokemonId.
       if (!validSpeciesIds.contains(candidatePokemonId)) return false;
 
+      // Same species → always allow, regardless of origin form (handles
+      // Meowstic female origin seeing male slot, Alolan origin seeing base slot).
+      if (candidatePokemonId == originSpeciesId) return true;
+
       if (params.originFormName == null) {
+        // Standard-form origin → only standard-form cross-species evolutions.
         return candidateFormName == null;
       } else {
-        // Regional-form origin:
-        if (candidatePokemonId == originSpeciesId) return false;
+        // Regional-form origin: suppress species that have the same regional
+        // form (their regional-form slot appears via the pokemonId > 10000 path).
         if (speciesWithSameForm.contains(candidatePokemonId)) return false;
         return candidateFormName == null;
       }
     } else {
-      // Form-variant slot (pokemonId > 10000): require matching non-null formName.
-      if (candidateFormName == null) return false;
+      // Form-variant slot (pokemonId > 10000).
+      final candidateSpeciesId = formVariantSpecies[candidatePokemonId];
+      if (candidateSpeciesId == null) return false;
+
+      // Same species → always allow (handles Shield/Sword, Lycanroc forms,
+      // Meowstic male origin seeing female slot, etc.).
+      if (candidateSpeciesId == originSpeciesId) return true;
+
+      // Cross-species form-variant (e.g. Alolan Meowth → Alolan Persian):
+      // must be in the valid evolution set and carry the same regional form.
+      if (!validSpeciesIds.contains(candidateSpeciesId)) return false;
+      if (params.originFormName == null) return false;
       return candidateFormName == params.originFormName;
     }
   }).toList();
