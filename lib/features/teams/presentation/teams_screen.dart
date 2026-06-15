@@ -18,6 +18,7 @@ import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
     show teamSlotsProvider;
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
@@ -743,7 +744,7 @@ class _TeamTile extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _TeamSpriteRow(teamId: team.id, isBox: team.isBox),
+          _TeamSpriteRow(teamId: team.id, isBox: team.isBox, formatLabel: team.formatLabel),
           if (hasError)
             Text(
               'Sync issue — check sync monitor',
@@ -1153,7 +1154,8 @@ class _DesktopRefreshBar extends ConsumerWidget {
 class _TeamSpriteRow extends ConsumerWidget {
   final int teamId;
   final bool isBox;
-  const _TeamSpriteRow({required this.teamId, this.isBox = false});
+  final String? formatLabel;
+  const _TeamSpriteRow({required this.teamId, this.isBox = false, this.formatLabel});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1184,6 +1186,7 @@ class _TeamSpriteRow extends ConsumerWidget {
           : filled.map((s) => _SlotSprite(
               key: ValueKey(s.id),
               slot: s,
+              formatLabel: formatLabel,
               width: width,
               height: height,
               cacheWidth: cacheWidth,
@@ -1198,6 +1201,7 @@ class _TeamSpriteRow extends ConsumerWidget {
             : _SlotSprite(
                 key: ValueKey(slot.id),
                 slot: slot,
+                formatLabel: formatLabel,
                 width: width,
                 height: height,
                 cacheWidth: cacheWidth,
@@ -1218,11 +1222,16 @@ class _TeamSpriteRow extends ConsumerWidget {
 
 // ── Team slot sprite (form-aware) ─────────────────────────────────────────────
 
-/// Single party-icon sprite for a team slot. Resolves the form-specific
-/// pokemonId (via [pokemonByNameProvider]) so form variants show the correct
-/// icon rather than the base-species icon.
+/// Single party-icon sprite for a team slot. Resolves the correct pokemonId for:
+/// - Variety-based form variants (via [pokemonByNameProvider] on formName)
+/// - Mega Evolution, Primal Reversion, and Gigantamax when the format supports
+///   them and the slot has the relevant toggle/item active.
+///
+/// Falls back to the base species ID when no format is set ("no format" or
+/// "all formats" context) or when a transformation is not active.
 class _SlotSprite extends ConsumerWidget {
   final TeamSlot slot;
+  final String? formatLabel;
   final double width;
   final double height;
   final int cacheWidth;
@@ -1231,6 +1240,7 @@ class _SlotSprite extends ConsumerWidget {
   const _SlotSprite({
     super.key,
     required this.slot,
+    required this.formatLabel,
     required this.width,
     required this.height,
     required this.cacheWidth,
@@ -1241,9 +1251,47 @@ class _SlotSprite extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    // Resolve the form-specific pokemonId when the slot has a formName.
+    // Resolve format mechanics. Null means no format set → don't apply
+    // Mega/Primal/Gmax icons (transformation context is ambiguous).
+    final mechanics = formatLabel != null
+        ? ref.read(formatServiceProvider).formatById(formatLabel!)?.mechanics
+        : null;
+
+    // Determine whether the slot is actively using a Mega, Primal, or Gmax
+    // transformation that is valid for the current format.
+    String? transformFormName;
+    if (mechanics != null) {
+      final item = slot.heldItemName;
+      if (mechanics.hasMegaStone && slot.isMegaEvolved && item != null) {
+        // Mega Evolution: derive form name from the held Mega Stone.
+        final megaEntry = kMegaStoneMap[item];
+        if (megaEntry != null) transformFormName = megaEntry.megaForm;
+      } else if ((mechanics.gen == 6 || mechanics.gen == 7) && item != null) {
+        // Primal Reversion: only applies in Gen 6/7 via orb.
+        if (item == 'red-orb')  transformFormName = 'groudon-primal';
+        if (item == 'blue-orb') transformFormName = 'kyogre-primal';
+      } else if (mechanics.hasGigantamax && slot.hasGigantamax && slot.gigantamaxEnabled) {
+        // Gigantamax: construct form name from the base (or active form) species.
+        // Watch the base pokemon to get its name; falls back to base ID while loading.
+        final baseName = ref
+            .watch(pokemonDetailProvider(slot.pokemonId))
+            .asData
+            ?.value
+            .name;
+        if (baseName != null) transformFormName = '$baseName-gmax';
+      }
+    }
+
+    // Resolve sprite ID: transformation > formName variant > base species.
     final int id;
-    if (slot.formName != null) {
+    if (transformFormName != null) {
+      final formId = ref
+          .watch(pokemonByNameProvider(transformFormName))
+          .asData
+          ?.value
+          .id;
+      id = formId ?? slot.pokemonId;
+    } else if (slot.formName != null) {
       final formId = ref
           .watch(pokemonByNameProvider(slot.formName!))
           .asData
