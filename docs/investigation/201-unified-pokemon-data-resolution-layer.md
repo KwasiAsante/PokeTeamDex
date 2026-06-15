@@ -54,9 +54,13 @@ FutureProvider.autoDispose   ← disposed when widget leaves screen
 
 **autoDispose behaviour:** Because all data providers are `.autoDispose`, scrolling a Pokédex list tile off-screen disposes its providers. Scrolling back rebuilds them. The in-memory memoization in `PokeApiRepository` prevents repeat HTTP calls, but it still triggers Hive reads and object re-parsing on every scroll cycle. With 50 tiles per page and 4–6 provider subscriptions per tile, this adds up to 200–300 provider rebuilds on a single scroll pass through the list.
 
-### 1.4 Provider Over-fetching on List Screens
+### 1.4 Provider Lifecycle on List Screens
 
-`PokemonGridCard` and `PokemonListTile` both unconditionally watch `pokemonDetailProvider` and `pokemonSpeciesProvider` for every rendered tile — even in the compact list view where only the name, ID, and a single sprite URL are needed. `pokemonSpeciesProvider` is required for form classification, but that data is only used when the user taps the form chip — not during initial render.
+`PokemonGridCard` and `PokemonListTile` both unconditionally watch `pokemonDetailProvider` and `pokemonSpeciesProvider` for every rendered tile. Both are legitimately needed on initial render: `pokemonDetailProvider` supplies the type gradient and gates the cosmetic form fetch via `formNames.length`; `pokemonSpeciesProvider` supplies `battleForms` and `cosmeticVarietyForms`, which determine whether the form chip is shown at all and what `baseFormLabel` reads. Neither can be deferred to user interaction.
+
+`cosmeticFormsProvider` is already properly gated — it only fires when `basePokemon.formNames.length > 1`. `pokemonByNameProvider` for selected alternate forms fires only on explicit user form selection. Both are correct.
+
+The real issue is **provider disposal**: all of these are `.autoDispose`, so when a tile scrolls off-screen, its providers are torn down. Scrolling back rebuilds them from scratch. The in-memory memoization in `PokeApiRepository` prevents repeat HTTP calls, but it still triggers Hive reads and object re-parsing on every scroll cycle. With 50 tiles per page and 2 unconditional provider subscriptions per tile, every full list scroll generates ~100 provider rebuild cycles.
 
 ### 1.5 Backend Is Purely a Sync/Storage Layer
 
@@ -215,7 +219,7 @@ Six tasks, each independently shippable. Tasks A–C are pure Flutter refactors 
 
 **Scope (to be determined during implementation — audit-first task):**
 - Audit all screens and list widgets for `autoDispose` providers that should be `keepAlive` given their usage frequency
-- Identify tiles or cards that watch providers for data only needed on user interaction (e.g. species data for form classification fetched before the form chip is tapped)
+- Identify tiles or cards that watch providers for data not needed until user interaction (note: `pokemonDetailProvider` and `pokemonSpeciesProvider` are both legitimately needed on initial render for type gradients and form chip visibility — any deferral opportunity is likely elsewhere)
 - Find any remaining inline sprite URL construction not yet covered by Task B
 - Implement fixes for findings — each fix should be a small, independently reviewable change within the same PR
 
