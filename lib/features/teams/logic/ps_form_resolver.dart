@@ -1,9 +1,10 @@
 // lib/features/teams/logic/ps_form_resolver.dart
-import 'package:poke_team_dex/features/teams/data/form_data.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 
 /// Checks the static exceptions table first (O(1), no API call).
 /// Returns the mapped PokeAPI name or null if the PS name is not a known exception.
-String? applyPsFormExceptions(String psName) => kPsFormExceptions[psName];
+String? applyPsFormExceptions(String psName) =>
+    PokemonDataRegistry.instance.psFormExceptions[psName];
 
 /// Runs the heuristic pipeline against [varieties] (the full varieties list,
 /// including the default form). Non-default filtering is applied internally.

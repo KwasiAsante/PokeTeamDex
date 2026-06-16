@@ -27,9 +27,9 @@ import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/teams/data/dynamax_data.dart';
 import 'package:poke_team_dex/features/teams/data/form_filter.dart';
-import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
 import 'package:poke_team_dex/features/teams/data/z_moves_data.dart';
 import 'package:poke_team_dex/features/teams/data/ribbon_catalog.dart';
 import 'package:poke_team_dex/features/teams/presentation/instance_chain_view.dart';
@@ -667,7 +667,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         // Determine if a mega toggle should be shown for the current slot.
         final megaEntry = rayquazaDragonAscent
             ? (baseSpecies: 'rayquaza', megaForm: 'rayquaza-mega')
-            : (_heldItemName != null ? kMegaStoneMap[_heldItemName] : null);
+            : (_heldItemName != null ? PokemonDataRegistry.instance.megaStoneMap[_heldItemName] : null);
         // No format = no restrictions; hasMegaStone applies only for specific gens.
         final canMegaEvolve = megaEntry != null &&
             pokemon.name == megaEntry.baseSpecies &&

@@ -1,10 +1,16 @@
 // ignore_for_file: depend_on_referenced_packages
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
 import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
 
 void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    await PokemonDataRegistry.initialize();
+  });
+
   // ── cosmeticFormLabel ──────────────────────────────────────────────────────
 
   group('cosmeticFormLabel', () {
@@ -22,88 +28,88 @@ void main() {
     test('trash cloak', () => expect(cosmeticFormLabel('trash'), 'Trash'));
     test('east sea', () => expect(cosmeticFormLabel('east'), 'East'));
     // Note: "active" returns "Active" — the Xerneas label override is applied externally
-    // via kCosmeticFormLabels, not inside cosmeticFormLabel itself.
+    // via cosmeticFormLabels, not inside cosmeticFormLabel itself.
     test('raw active → Active (override applied separately)', () =>
         expect(cosmeticFormLabel('active'), 'Active'));
   });
 
-  // ── kCosmeticFormLabels overrides ─────────────────────────────────────────
+  // ── cosmeticFormLabels overrides ──────────────────────────────────────────
 
-  group('kCosmeticFormLabels', () {
+  group('cosmeticFormLabels', () {
     test('xerneas-active chip relabeled Neutral', () =>
-        expect(kCosmeticFormLabels['xerneas-active'], 'Neutral'));
+        expect(PokemonDataRegistry.instance.cosmeticFormLabels['xerneas-active'], 'Neutral'));
     test('forms without overrides return null', () {
-      expect(kCosmeticFormLabels['sandy'], isNull);
-      expect(kCosmeticFormLabels['frillish-female'], isNull);
-      expect(kCosmeticFormLabels['unown-b'], isNull);
+      expect(PokemonDataRegistry.instance.cosmeticFormLabels['sandy'], isNull);
+      expect(PokemonDataRegistry.instance.cosmeticFormLabels['frillish-female'], isNull);
+      expect(PokemonDataRegistry.instance.cosmeticFormLabels['unown-b'], isNull);
     });
   });
 
-  // ── kBaseFormCosmeticHomeUrls ──────────────────────────────────────────────
+  // ── baseFormCosmeticHomeUrls ───────────────────────────────────────────────
 
-  group('kBaseFormCosmeticHomeUrls', () {
+  group('baseFormCosmeticHomeUrls', () {
     test('unown maps to form-A HOME artwork', () {
-      final entry = kBaseFormCosmeticHomeUrls['unown'];
+      final entry = PokemonDataRegistry.instance.baseFormCosmeticHomeUrls['unown'];
       expect(entry, isNotNull);
-      expect(entry!.$1, contains('201-a.png'));
-      expect(entry.$1, isNot(contains('/shiny/')));
-      expect(entry.$2, contains('201-a.png'));
-      expect(entry.$2, contains('/shiny/'));
+      expect(entry!.homeUrl, contains('201-a.png'));
+      expect(entry.homeUrl, isNot(contains('/shiny/')));
+      expect(entry.shinyUrl, contains('201-a.png'));
+      expect(entry.shinyUrl, contains('/shiny/'));
     });
     test('non-overridden species return null', () {
-      expect(kBaseFormCosmeticHomeUrls['pikachu'], isNull);
-      expect(kBaseFormCosmeticHomeUrls['frillish'], isNull);
-      expect(kBaseFormCosmeticHomeUrls['burmy'], isNull);
+      expect(PokemonDataRegistry.instance.baseFormCosmeticHomeUrls['pikachu'], isNull);
+      expect(PokemonDataRegistry.instance.baseFormCosmeticHomeUrls['frillish'], isNull);
+      expect(PokemonDataRegistry.instance.baseFormCosmeticHomeUrls['burmy'], isNull);
     });
   });
 
-  // ── kCosmeticFormHomeUrlOverrides ─────────────────────────────────────────
+  // ── cosmeticFormHomeUrlOverrides ──────────────────────────────────────────
 
-  group('kCosmeticFormHomeUrlOverrides', () {
+  group('cosmeticFormHomeUrlOverrides', () {
     test('xerneas-active → neutral HOME URL (not active)', () {
-      final url = kCosmeticFormHomeUrlOverrides['xerneas-active'];
+      final url = PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides['xerneas-active'];
       expect(url, isNotNull);
       expect(url, contains('716-neutral.png'));
       expect(url, isNot(contains('active')));
     });
     test('xerneas-active shiny → neutral shiny HOME URL', () {
-      final url = kCosmeticFormHomeShinyUrlOverrides['xerneas-active'];
+      final url = PokemonDataRegistry.instance.cosmeticFormHomeShinyUrlOverrides['xerneas-active'];
       expect(url, isNotNull);
       expect(url, contains('716-neutral.png'));
       expect(url, contains('/shiny/'));
     });
     test('forms without overrides return null', () {
-      expect(kCosmeticFormHomeUrlOverrides['burmy-sandy'], isNull);
-      expect(kCosmeticFormHomeUrlOverrides['unown-b'], isNull);
-      expect(kCosmeticFormHomeUrlOverrides['frillish-female'], isNull);
+      expect(PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides['burmy-sandy'], isNull);
+      expect(PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides['unown-b'], isNull);
+      expect(PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides['frillish-female'], isNull);
     });
   });
 
-  // ── kCosmeticVarietyNames ─────────────────────────────────────────────────
+  // ── cosmeticVarietyNames ──────────────────────────────────────────────────
 
-  group('kCosmeticVarietyNames', () {
+  group('cosmeticVarietyNames', () {
     test('Wormadam cloaks included', () =>
-        expect(kCosmeticVarietyNames, containsAll(['wormadam-sandy', 'wormadam-trash'])));
+        expect(PokemonDataRegistry.instance.cosmeticVarietyNames, containsAll(['wormadam-sandy', 'wormadam-trash'])));
     test('Squawkabilly plumages included (non-default only)', () {
-      expect(kCosmeticVarietyNames, containsAll([
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, containsAll([
         'squawkabilly-blue-plumage', 'squawkabilly-yellow-plumage', 'squawkabilly-white-plumage',
       ]));
-      expect(kCosmeticVarietyNames, isNot(contains('squawkabilly-green-plumage')));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, isNot(contains('squawkabilly-green-plumage')));
     });
     test('Tatsugiri shapes included (non-default only)', () {
-      expect(kCosmeticVarietyNames, containsAll(['tatsugiri-droopy', 'tatsugiri-stretchy']));
-      expect(kCosmeticVarietyNames, isNot(contains('tatsugiri-curly')));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, containsAll(['tatsugiri-droopy', 'tatsugiri-stretchy']));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, isNot(contains('tatsugiri-curly')));
     });
     test('Dudunsparce three-segment included', () {
-      expect(kCosmeticVarietyNames, contains('dudunsparce-three-segment'));
-      expect(kCosmeticVarietyNames, isNot(contains('dudunsparce-two-segment')));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, contains('dudunsparce-three-segment'));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, isNot(contains('dudunsparce-two-segment')));
     });
     test('Basculin blue-striped included (Unovan stripe variant)', () =>
-        expect(kCosmeticVarietyNames, contains('basculin-blue-striped')));
+        expect(PokemonDataRegistry.instance.cosmeticVarietyNames, contains('basculin-blue-striped')));
     test('Regional forms NOT in cosmetic varieties (handled by battle switcher)', () {
-      expect(kCosmeticVarietyNames, isNot(contains('meowth-galar')));
-      expect(kCosmeticVarietyNames, isNot(contains('zigzagoon-galar')));
-      expect(kCosmeticVarietyNames, isNot(contains('basculin-white-striped')));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, isNot(contains('meowth-galar')));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, isNot(contains('zigzagoon-galar')));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, isNot(contains('basculin-white-striped')));
     });
   });
 
@@ -177,43 +183,43 @@ void main() {
     test('unknown generation → Original', () => expect(shortBaseFormLabel('generation-x'), 'Original'));
   });
 
-  // ── kBaseFormNameOverrides — PokéAPI name accuracy ─────────────────────────
+  // ── baseFormNameOverrides — PokéAPI name accuracy ──────────────────────────
 
-  group('kBaseFormNameOverrides — PokéAPI name accuracy', () {
+  group('baseFormNameOverrides — PokéAPI name accuracy', () {
     // Keys must match exactly what GET /pokemon/{id} returns as `name`.
     test('lycanroc default is lycanroc-midday (not lycanroc)', () {
-      expect(kBaseFormNameOverrides['lycanroc-midday'], 'Midday');
-      expect(kBaseFormNameOverrides['lycanroc'], isNull);
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['lycanroc-midday'], 'Midday');
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['lycanroc'], isNull);
     });
     test('urshifu default is urshifu-single-strike (not urshifu)', () {
-      expect(kBaseFormNameOverrides['urshifu-single-strike'], 'Single Strike');
-      expect(kBaseFormNameOverrides['urshifu'], isNull);
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['urshifu-single-strike'], 'Single Strike');
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['urshifu'], isNull);
     });
     test('palafin default is palafin-zero (not palafin)', () {
-      expect(kBaseFormNameOverrides['palafin-zero'], 'Zero');
-      expect(kBaseFormNameOverrides['palafin'], isNull);
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['palafin-zero'], 'Zero');
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['palafin'], isNull);
     });
     test('oricorio default is oricorio-baile (not oricorio)', () {
-      expect(kBaseFormNameOverrides['oricorio-baile'], 'Baile');
-      expect(kBaseFormNameOverrides['oricorio'], isNull);
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['oricorio-baile'], 'Baile');
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['oricorio'], isNull);
     });
     test('zacian and zamazenta are plain species names', () {
-      expect(kBaseFormNameOverrides['zacian'], 'Hero');
-      expect(kBaseFormNameOverrides['zamazenta'], 'Hero');
-      expect(kBaseFormNameOverrides['zacian-hero'], isNull);
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['zacian'], 'Hero');
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['zamazenta'], 'Hero');
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['zacian-hero'], isNull);
     });
     test('frillish-male and jellicent-male → Male', () {
-      expect(kBaseFormNameOverrides['frillish-male'], 'Male');
-      expect(kBaseFormNameOverrides['jellicent-male'], 'Male');
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['frillish-male'], 'Male');
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['jellicent-male'], 'Male');
     });
     test('basculin default is basculin-red-striped', () =>
-        expect(kBaseFormNameOverrides['basculin-red-striped'], 'Red-Striped'));
+        expect(PokemonDataRegistry.instance.baseFormNameOverrides['basculin-red-striped'], 'Red-Striped'));
     test('variety cosmetic form defaults', () {
-      expect(kBaseFormNameOverrides['wormadam-plant'], 'Plant');
-      expect(kBaseFormNameOverrides['squawkabilly-green-plumage'], 'Green Plumage');
-      expect(kBaseFormNameOverrides['tatsugiri-curly'], 'Curly');
-      expect(kBaseFormNameOverrides['dudunsparce-two-segment'], 'Two Segment');
-      expect(kBaseFormNameOverrides['floette'], 'Red Flower');
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['wormadam-plant'], 'Plant');
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['squawkabilly-green-plumage'], 'Green Plumage');
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['tatsugiri-curly'], 'Curly');
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['dudunsparce-two-segment'], 'Two Segment');
+      expect(PokemonDataRegistry.instance.baseFormNameOverrides['floette'], 'Red Flower');
     });
   });
 }

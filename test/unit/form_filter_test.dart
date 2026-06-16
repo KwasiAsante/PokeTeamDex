@@ -1,7 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/teams/data/form_filter.dart';
 
 void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    await PokemonDataRegistry.initialize();
+  });
+
   group('filterFormChips — empty / trivial', () {
     test('returns empty when varieties is empty', () {
       expect(filterFormChips(varieties: [], heldItem: null, abilityName: null), isEmpty);

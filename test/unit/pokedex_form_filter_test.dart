@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 
@@ -6,6 +7,11 @@ PokemonVariety _v(String name, {bool isDefault = false}) =>
     PokemonVariety(isDefault: isDefault, name: name);
 
 void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    await PokemonDataRegistry.initialize();
+  });
+
   group('battleMeaningfulForms', () {
     test('excludes default variety', () {
       final result = battleMeaningfulForms([
@@ -133,7 +139,7 @@ void main() {
         _v('wormadam-sandy'),
         _v('wormadam-trash'),
       ];
-      // Wormadam cloaks are in kCosmeticVarietyNames, NOT in battleMeaningfulForms.
+      // Wormadam cloaks are in PokemonDataRegistry.instance.cosmeticVarietyNames, NOT in battleMeaningfulForms.
       expect(battleMeaningfulForms(varieties), isEmpty);
     });
 
@@ -191,13 +197,13 @@ void main() {
     });
   });
 
-  group('kCosmeticVarietyNames', () {
+  group('PokemonDataRegistry.instance.cosmeticVarietyNames', () {
     test('contains Wormadam cosmetic cloaks', () {
-      expect(kCosmeticVarietyNames, containsAll(['wormadam-sandy', 'wormadam-trash']));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, containsAll(['wormadam-sandy', 'wormadam-trash']));
     });
 
     test('contains Squawkabilly plumage variants', () {
-      expect(kCosmeticVarietyNames, containsAll([
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, containsAll([
         'squawkabilly-blue-plumage',
         'squawkabilly-yellow-plumage',
         'squawkabilly-white-plumage',
@@ -205,31 +211,31 @@ void main() {
     });
 
     test('contains Minior core colour variants', () {
-      expect(kCosmeticVarietyNames, containsAll([
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, containsAll([
         'minior-red', 'minior-orange', 'minior-yellow', 'minior-green',
         'minior-blue', 'minior-indigo', 'minior-violet',
       ]));
     });
 
     test('contains Morpeko Hangry mode', () {
-      expect(kCosmeticVarietyNames, contains('morpeko-hangry'));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, contains('morpeko-hangry'));
     });
 
     test('contains Mimikyu Busted form', () {
-      expect(kCosmeticVarietyNames, contains('mimikyu-busted'));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, contains('mimikyu-busted'));
     });
 
     test('does not contain battle-meaningful forms', () {
-      expect(kCosmeticVarietyNames, isNot(contains('giratina-origin')));
-      expect(kCosmeticVarietyNames, isNot(contains('rotom-heat')));
-      expect(kCosmeticVarietyNames, isNot(contains('meowstic-female')));
-      expect(kCosmeticVarietyNames, isNot(contains('urshifu-rapid-strike')));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, isNot(contains('giratina-origin')));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, isNot(contains('rotom-heat')));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, isNot(contains('meowstic-female')));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, isNot(contains('urshifu-rapid-strike')));
     });
 
     test('does not contain mega, gmax, or totem forms', () {
-      expect(kCosmeticVarietyNames, isNot(contains('charizard-mega-x')));
-      expect(kCosmeticVarietyNames, isNot(contains('charizard-gmax')));
-      expect(kCosmeticVarietyNames, isNot(contains('marowak-totem')));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, isNot(contains('charizard-mega-x')));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, isNot(contains('charizard-gmax')));
+      expect(PokemonDataRegistry.instance.cosmeticVarietyNames, isNot(contains('marowak-totem')));
     });
 
     test('battle-meaningful forms and cosmetic forms are disjoint', () {
@@ -248,7 +254,7 @@ void main() {
       ]);
       for (final v in allBattle) {
         expect(
-          kCosmeticVarietyNames,
+          PokemonDataRegistry.instance.cosmeticVarietyNames,
           isNot(contains(v.name)),
           reason: '${v.name} should not be in both sets',
         );

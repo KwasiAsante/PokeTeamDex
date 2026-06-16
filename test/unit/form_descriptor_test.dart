@@ -1,8 +1,14 @@
 // test/unit/form_descriptor_test.dart
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/teams/data/form_descriptor.dart';
 
 void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    await PokemonDataRegistry.initialize();
+  });
+
   group('FormDescriptor.empty', () {
     test('isDefault is true', () {
       expect(FormDescriptor.empty().isDefault, isTrue);

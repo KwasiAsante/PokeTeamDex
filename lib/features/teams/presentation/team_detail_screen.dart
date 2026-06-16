@@ -11,7 +11,7 @@ import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/teams/data/dynamax_data.dart';
 import 'package:poke_team_dex/features/teams/data/form_descriptor.dart';
-import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/presentation/ps_import_sheet.dart';
 import 'package:poke_team_dex/features/teams/presentation/slot_config_screen.dart';
@@ -852,7 +852,7 @@ class _FilledSlotCard extends ConsumerWidget {
         final megaEntry = rayquazaDragonAscent
             ? (baseSpecies: 'rayquaza', megaForm: 'rayquaza-mega')
             : (slot.heldItemName != null
-                ? kMegaStoneMap[slot.heldItemName]
+                ? PokemonDataRegistry.instance.megaStoneMap[slot.heldItemName]
                 : null);
         final isMegaApplicable = descriptor.isMegaEvolved &&
             megaEntry != null &&

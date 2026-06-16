@@ -10,7 +10,7 @@ import 'package:poke_team_dex/features/pokedex/presentation/widget/pokemon_grid_
     show PokedexImageType;
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
-import 'package:poke_team_dex/services/format/format_models.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart' show cosmeticFormHomeUrl;
@@ -23,46 +23,15 @@ import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 const _kBase =
     'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
 
-const _kVgToSubpath = <String, String?>{
-  'red-blue':                        'versions/generation-i/red-blue',
-  'yellow':                          'versions/generation-i/yellow',
-  'gold-silver':                     'versions/generation-ii/gold',
-  'crystal':                         'versions/generation-ii/crystal',
-  'ruby-sapphire':                   'versions/generation-iii/ruby-sapphire',
-  'emerald':                         'versions/generation-iii/emerald',
-  'firered-leafgreen':               'versions/generation-iii/firered-leafgreen',
-  'diamond-pearl':                   'versions/generation-iv/diamond-pearl',
-  'platinum':                        'versions/generation-iv/platinum',
-  'heartgold-soulsilver':            'versions/generation-iv/heartgold-soulsilver',
-  'black-white':                     'versions/generation-v/black-white',
-  'black-2-white-2':                 'versions/generation-v/black-white',
-  'x-y':                             null,
-  'omega-ruby-alpha-sapphire':       null,
-  'sun-moon':                        null,
-  'ultra-sun-ultra-moon':            null,
-  'lets-go-pikachu-lets-go-eevee':   null,
-  'sword-shield':                    null,
-  'brilliant-diamond-and-shining-pearl': null,
-  'legends-arceus':                  null,
-  'scarlet-violet':                  null,
-};
-
-const _kGenToLastVg = <int, String>{
-  1: 'yellow',   2: 'crystal',
-  3: 'emerald',  4: 'heartgold-soulsilver',
-  5: 'black-white',         6: 'omega-ruby-alpha-sapphire',
-  7: 'ultra-sun-ultra-moon', 8: 'sword-shield',
-  9: 'scarlet-violet',
-};
-
 String _compactIconUrl(int pokemonId, PokedexFilter filter) {
+  final registry = PokemonDataRegistry.instance;
   String? vg;
   if (filter.game != null) {
-    vg = kFormatToVersionGroup[filter.game];
+    vg = registry.formatToVersionGroup[filter.game];
   } else if (filter.generation != null) {
-    vg = _kGenToLastVg[filter.generation];
+    vg = registry.genToLastVg[filter.generation];
   }
-  final subpath = vg != null ? _kVgToSubpath[vg] : null;
+  final subpath = vg != null ? registry.vgToSubpath[vg] : null;
   if (subpath == null) return '$_kBase$pokemonId.png';
   return '$_kBase$subpath/$pokemonId.png';
 }
@@ -103,7 +72,7 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
     // of species that have no cosmetic forms at all.
     final shouldFetchCosmetic = basePokemon != null &&
         basePokemon.formNames.length > 1 &&
-        !kNoCosmeticFormsPokemon.contains(basePokemon.name);
+        !PokemonDataRegistry.instance.noCosmeticFormsPokemon.contains(basePokemon.name);
     final cosmeticFormsAsync = shouldFetchCosmetic
         ? ref.watch(cosmeticFormsProvider(basePokemon.name))
         : null;
@@ -132,7 +101,7 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
         return f;
       }),
       if (basePokemon != null &&
-          kCosmeticGenderDiffPokemon.contains(basePokemon.name))
+          PokemonDataRegistry.instance.cosmeticGenderDiffPokemon.contains(basePokemon.name))
         PokemonFormEntry(
           id: basePokemon.id,
           name: '${basePokemon.name}-female',
@@ -162,7 +131,7 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
         species != null ? battleMeaningfulForms(species.varieties) : <PokemonVariety>[];
     final cosmeticVarietyForms = species != null
         ? species.varieties
-            .where((v) => kCosmeticVarietyNames.contains(v.name))
+            .where((v) => PokemonDataRegistry.instance.cosmeticVarietyNames.contains(v.name))
             .toList()
         : <PokemonVariety>[];
     final baseFormLabel = species != null
@@ -180,17 +149,17 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
             : v.name;
         // Use HOME artwork override when available (e.g. mimikyu-busted has no
         // officialArtworkUrl in PokéAPI so pokemonByNameProvider returns null artwork).
-        return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix),
-            kCosmeticFormHomeUrlOverrides[v.name]);
+        return (v.name, PokemonDataRegistry.instance.cosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix),
+            PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[v.name]);
       }),
       // Form-entry cosmetics: carry sprite so FormOptionTile doesn't call
       // pokemonByNameProvider with a form name that has no /pokemon endpoint.
-      // kCosmeticFormHomeUrlOverrides takes priority (e.g. xerneas-active shows
+      // PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides takes priority (e.g. xerneas-active shows
       // the neutral pose image, not the active-pose sprite).
       ...cosmeticFormEntries.map((f) => (
         f.name,
-        kCosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
-        kCosmeticFormHomeUrlOverrides[f.name] ??
+        PokemonDataRegistry.instance.cosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
+        PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[f.name] ??
             (f.formName == 'female' ? '${_kBase}female/${widget.pokemon.id}.png' : f.spriteUrl),
       )),
     ];
@@ -426,7 +395,7 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
       if (cosmeticEntry != null) {
         if (widget.imageType == PokedexImageType.artwork) {
           // Explicit override first (e.g. xerneas-active → 716-neutral.png).
-          final override = kCosmeticFormHomeUrlOverrides[cosmeticEntry.name];
+          final override = PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[cosmeticEntry.name];
           if (override != null) return override;
           // Female HOME artwork lives under home/female/{id}.png — a different
           // path from the {id}-{suffix}.png pattern used for other cosmetics.
@@ -451,7 +420,7 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
           // HOME artwork override takes priority (e.g. mimikyu-busted has no
           // officialArtworkUrl in PokéAPI but has a HOME sprite at 10143.png).
           final homeOverride = _selectedFormName != null
-              ? kCosmeticFormHomeUrlOverrides[_selectedFormName!]
+              ? PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[_selectedFormName!]
               : null;
           return homeOverride ??
               formEntry.officialArtworkUrl ??

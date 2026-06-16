@@ -1,9 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:poke_team_dex/services/format/sprite_resolver.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/teams/data/form_descriptor.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
+import 'package:poke_team_dex/services/format/sprite_resolver.dart';
 
 void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    await PokemonDataRegistry.initialize();
+  });
+
   group('resolveSprite — no format (HOME / artwork path)', () {
     test('returns HOME url when sprites json has home entry', () {
       final sprites = {

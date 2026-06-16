@@ -1,52 +1,16 @@
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
+
 // Safe helpers — PS JSON can have unexpected types (e.g. accuracy: true,
 // type stored as nested object in some edge cases).
 String? _str(dynamic v) => v is String ? v : null;
 int? _int(dynamic v) => v is int ? v : null;
 
-// ── Version-group mapping ────────────────────────────────────────────────────
-// Maps format game id → PokéAPI version-group name.
-const kFormatToVersionGroup = <String, String>{
-  'rb':       'red-blue',
-  'yellow':   'yellow',
-  'gs':       'gold-silver',
-  'crystal':  'crystal',
-  'rs':       'ruby-sapphire',
-  'emerald':  'emerald',
-  'frlg':     'firered-leafgreen',
-  'dp':       'diamond-pearl',
-  'platinum': 'platinum',
-  'hgss':     'heartgold-soulsilver',
-  'bw':       'black-white',
-  'b2w2':     'black-2-white-2',
-  'xy':       'x-y',
-  'oras':     'omega-ruby-alpha-sapphire',
-  'sm':       'sun-moon',
-  'usum':     'ultra-sun-ultra-moon',
-  'swsh':     'sword-shield',
-  'bdsp':     'brilliant-diamond-and-shining-pearl',
-  'pla':      'legends-arceus',
-  'sv':       'scarlet-violet',
-};
-
-// Maps generation number → all PokéAPI version-groups in that gen.
-const kGenToVersionGroups = <int, List<String>>{
-  1: ['red-blue', 'yellow'],
-  2: ['gold-silver', 'crystal'],
-  3: ['ruby-sapphire', 'emerald', 'firered-leafgreen'],
-  4: ['diamond-pearl', 'platinum', 'heartgold-soulsilver'],
-  5: ['black-white', 'black-2-white-2'],
-  6: ['x-y', 'omega-ruby-alpha-sapphire'],
-  7: ['sun-moon', 'ultra-sun-ultra-moon'],
-  8: ['sword-shield', 'brilliant-diamond-and-shining-pearl', 'legends-arceus'],
-  9: ['scarlet-violet'],
-};
-
-/// Reverse lookup of [kGenToVersionGroups]: which generation a PokéAPI
+/// Reverse lookup of genToVersionGroups: which generation a PokéAPI
 /// version-group belongs to. Needed wherever PS data (keyed by raw generation
 /// number, e.g. `eventData[].generation`) must be cross-referenced against the
 /// version-group-driven move tables/chips PokéAPI data is organised around.
 int? genForVersionGroup(String versionGroup) {
-  for (final entry in kGenToVersionGroups.entries) {
+  for (final entry in PokemonDataRegistry.instance.genToVersionGroups.entries) {
     if (entry.value.contains(versionGroup)) return entry.key;
   }
   return null;

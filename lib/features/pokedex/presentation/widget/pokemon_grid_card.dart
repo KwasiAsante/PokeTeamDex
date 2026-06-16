@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
 import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
@@ -48,7 +49,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
     // Form-based cosmetics — gated on formNames.length > 1
     final shouldFetchCosmetic = basePokemon != null &&
         basePokemon.formNames.length > 1 &&
-        !kNoCosmeticFormsPokemon.contains(basePokemon.name);
+        !PokemonDataRegistry.instance.noCosmeticFormsPokemon.contains(basePokemon.name);
     final cosmeticFormsAsync = shouldFetchCosmetic
         ? ref.watch(cosmeticFormsProvider(basePokemon.name))
         : null;
@@ -70,7 +71,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         return f;
       }),
       if (basePokemon != null &&
-          kCosmeticGenderDiffPokemon.contains(basePokemon.name))
+          PokemonDataRegistry.instance.cosmeticGenderDiffPokemon.contains(basePokemon.name))
         PokemonFormEntry(
           id: basePokemon.id,
           name: '${basePokemon.name}-female',
@@ -96,7 +97,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         species != null ? battleMeaningfulForms(species.varieties) : <PokemonVariety>[];
     final cosmeticVarietyForms = species != null
         ? species.varieties
-            .where((v) => kCosmeticVarietyNames.contains(v.name))
+            .where((v) => PokemonDataRegistry.instance.cosmeticVarietyNames.contains(v.name))
             .toList()
         : <PokemonVariety>[];
     final baseFormLabel = species != null
@@ -112,13 +113,13 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         final suffix = v.name.startsWith('$sn-')
             ? v.name.substring(sn.length + 1)
             : v.name;
-        return (v.name, kCosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix),
-            kCosmeticFormHomeUrlOverrides[v.name]);
+        return (v.name, PokemonDataRegistry.instance.cosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix),
+            PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[v.name]);
       }),
       ...cosmeticFormEntries.map((f) => (
         f.name,
-        kCosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
-        kCosmeticFormHomeUrlOverrides[f.name] ??
+        PokemonDataRegistry.instance.cosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
+        PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[f.name] ??
             (f.formName == 'female' ? '${_kBase}female/${widget.pokemon.id}.png' : f.spriteUrl),
       )),
     ];
@@ -315,7 +316,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
     if (_selectedFormName != null) {
       if (cosmeticEntry != null) {
         if (widget.imageType == PokedexImageType.artwork) {
-          final override = kCosmeticFormHomeUrlOverrides[cosmeticEntry.name];
+          final override = PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[cosmeticEntry.name];
           if (override != null) return override;
           if (cosmeticEntry.formName == 'female') {
             return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${widget.pokemon.id}.png';
@@ -334,7 +335,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
       if (formEntry != null) {
         if (widget.imageType == PokedexImageType.artwork) {
           final homeOverride = _selectedFormName != null
-              ? kCosmeticFormHomeUrlOverrides[_selectedFormName!]
+              ? PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[_selectedFormName!]
               : null;
           return homeOverride ??
               formEntry.officialArtworkUrl ??
