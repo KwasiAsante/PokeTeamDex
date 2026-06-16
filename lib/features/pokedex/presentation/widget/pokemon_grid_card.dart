@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
 import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
+import 'package:poke_team_dex/features/pokedex/models/pokedex_filter.dart';
 import 'package:poke_team_dex/features/pokedex/models/pokedex_image_type.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
@@ -144,7 +145,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
       imageType: widget.imageType,
       formEntry: formEntry,
       cosmeticEntry: selectedCosmeticEntry,
-      filter: null,
+      filter: const PokedexFilter(),
     );
 
     final baseDisplayName = basePokemon?.displaySpeciesName ??
