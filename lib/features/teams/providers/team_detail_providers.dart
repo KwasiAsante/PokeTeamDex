@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
-import 'package:poke_team_dex/features/teams/data/form_filter.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 
@@ -119,7 +119,7 @@ final linkableSlotsProvider =
 
     final candidatePokemonId = s.pokemonId;
     final candidateFormName = s.formName;
-    final isMutable = kMutableFormSpeciesIds.contains(originSpeciesId);
+    final isMutable = PokemonDataRegistry.instance.mutableFormSpeciesIds.contains(originSpeciesId);
 
     if (candidatePokemonId <= 10000) {
       // Standard-form slot: speciesId == pokemonId.

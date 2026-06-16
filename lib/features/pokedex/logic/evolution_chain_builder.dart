@@ -1,3 +1,4 @@
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 
@@ -29,7 +30,7 @@ bool isRegionalVariety(PokemonVariety variety) {
 
 String? regionalSuffixOf(String varietyName) {
   // Specific form overrides (e.g. "basculin-white-striped" is Hisuian-exclusive).
-  final override = kBaseFormSuffixOverrides[varietyName];
+  final override = PokemonDataRegistry.instance.baseFormSuffixOverrides[varietyName];
   if (override != null) return override;
 
   // Exact suffix (e.g. "zigzagoon-galar" → "galar").
@@ -112,7 +113,7 @@ DisplayNode buildFormChain(
   // e.g. Alolan Vulpix root: displayId=10103, speciesId=37 → formName="vulpix-alola"
   if (formSuffix != null && rootDisplayId != root.speciesId) {
     final simpleName = '${root.speciesName}-$formSuffix';
-    final lookupName = kRegionalFormLookup[simpleName];
+    final lookupName = PokemonDataRegistry.instance.regionalFormLookup[simpleName];
     final compoundName = '$simpleName-standard';
     node.formName = (lookupName != null && formIds.containsKey(lookupName))
         ? lookupName
@@ -146,7 +147,8 @@ DisplayNode _buildNode(
     bool matchesSuffix(EvolutionDetail d) =>
         d.baseForm?.name.endsWith('-$formSuffix') == true ||
         d.region?.name == formSuffix ||
-        (d.baseForm != null && kBaseFormSuffixOverrides[d.baseForm!.name] == formSuffix);
+        (d.baseForm != null &&
+            PokemonDataRegistry.instance.baseFormSuffixOverrides[d.baseForm!.name] == formSuffix);
 
     final hasFormSpecific = node.evolvesTo.any((c) => c.details.any(matchesSuffix));
 
@@ -218,7 +220,7 @@ String? _resolveChildFormName(EvolutionNode child, String? suffix, Map<String, i
   final simpleName = '${child.speciesName}-$suffix';
   if (formIds.containsKey(simpleName)) {
     // Prefer a specific lookup override (e.g. "basculin-hisui" → "basculin-white-striped").
-    final lookupName = kRegionalFormLookup[simpleName];
+    final lookupName = PokemonDataRegistry.instance.regionalFormLookup[simpleName];
     if (lookupName != null && formIds.containsKey(lookupName)) return lookupName;
     // Prefer compound form name (e.g. "darmanitan-galar-standard" over "darmanitan-galar").
     final compoundName = '$simpleName-standard';
@@ -227,152 +229,6 @@ String? _resolveChildFormName(EvolutionNode child, String? suffix, Map<String, i
   }
   return null;
 }
-
-/// Override labels for the base/default form of specific species where the
-/// default form has its own name rather than just "Base".
-/// Key: PokéAPI species name. Value: display label for the default form.
-const kBaseFormNameOverrides = <String, String>{
-  'lycanroc-midday':           'Midday',
-  'urshifu-single-strike':     'Single Strike',
-  'basculin-red-striped':      'Red-Striped',
-  'oricorio-baile':            'Baile',
-  'toxtricity-amped':          'Amped',
-  // Gender-differentiated Pokémon where the base default is the male form.
-  'frillish-male':             'Male',
-  'jellicent-male':            'Male',
-  'zacian':                    'Hero',
-  'zamazenta':                 'Hero',
-  'palafin-zero':              'Zero',
-  // Battle-form species where the default variety name includes a form suffix.
-  'deoxys-normal':             'Normal',
-  'giratina-altered':          'Altered',
-  'tornadus-incarnate':        'Incarnate',
-  'thundurus-incarnate':       'Incarnate',
-  'landorus-incarnate':        'Incarnate',
-  'enamorus-incarnate':        'Incarnate',
-  'aegislash-shield':          'Shield',
-  'gimmighoul-chest':          'Chest',
-  'ogerpon':                   'Teal Mask',
-  // Battle-form species where the default variety has no suffix but a specific
-  // form name is clearer than the generic "Base" fallback.
-  'shaymin':                   'Land',
-  'kyurem':                    'Standard',
-  'meloetta':                  'Aria',
-  'hoopa':                     'Confined',
-  'wishiwashi':                'Solo',
-  'zygarde':                   '50%',
-  // Form-based cosmetic species — default form label so the base chip reads
-  // meaningfully instead of falling through to "Normal".
-  // Labels match cosmeticFormLabel(defaultFormName) for the default form entry.
-  // Gender-diff species whose default form is male (female added via cosmeticFormsProvider
-  // or kCosmeticGenderDiffPokemon synthesis).
-  'frillish':      'Male',
-  'jellicent':     'Male',
-  'unfezant':      'Male',
-  // Seasonal forms — default is Spring.
-  'deerling':      'Spring',
-  'sawsbuck':      'Spring',
-  // Plate/drive forms — default is the no-item form.
-  'arceus':        'Normal',
-  'shellos':       'West Sea',
-  'gastrodon':     'West Sea',
-  'cherrim':       'Overcast',
-  'burmy':         'Plant Cloak',
-  'castform':      'Normal',
-  'unown':         'A',
-  'furfrou':       'Natural',
-  'pumpkaboo':     'Average',
-  'gourgeist':     'Average',
-  'genesect':      'Normal',
-  'vivillon':      'Meadow',
-  'xerneas':       'Active',
-  'flabebe':       'Red Flower',
-  'florges':       'Red Flower',
-  // Variety-based cosmetic forms
-  'wormadam-plant':            'Plant',
-  'squawkabilly-green-plumage':'Green Plumage',
-  'tatsugiri-curly':           'Curly',
-  'dudunsparce-two-segment':   'Two Segment',
-  'floette':                   'Red Flower',
-  'morpeko-full-belly':        'Full Belly',
-  'mimikyu-disguised':         'Disguised',
-  'minior-red-meteor':         'Meteor',
-  'eiscue-ice':                'Ice Face',
-  'maushold-family-of-four':   'Family of Four',
-  'keldeo-ordinary':           'Ordinary',
-};
-
-/// Override labels for specific cosmetic form chips where the PokéAPI form name
-/// would produce a misleading or incorrect label.
-/// Key: PokéAPI variety/form name. Value: display label for the chip.
-const kCosmeticFormLabels = <String, String>{
-  // Xerneas: the official artwork at pokemon/716 shows the Active form, so the
-  // non-default form chip should be labeled "Neutral" (the resting pose).
-  'xerneas-active': 'Neutral',
-  // Minior: fallback produces "Minior Red" etc. — override to just the colour
-  // so 7 core chips are visually distinct at a glance.
-  'minior-red':    'Red',
-  'minior-orange': 'Orange',
-  'minior-yellow': 'Yellow',
-  'minior-green':  'Green',
-  'minior-blue':   'Blue',
-  'minior-indigo': 'Indigo',
-  'minior-violet': 'Violet',
-  // Eiscue: official form name is "Noice Face" — "Eiscue Noice" would be confusing.
-  'eiscue-noice':         'Noice Face',
-  // Magearna: official name is "Original Color Magearna" — shorten for chip.
-  'magearna-original':    'Original Color',
-};
-
-/// Override HOME artwork URLs for cosmetic form chips where the default URL
-/// derivation would show the wrong visual.
-/// Key: PokéAPI form/variety name. Value: full HOME artwork URL.
-const kCosmeticFormHomeUrlOverrides = <String, String>{
-  // xerneas-active is relabeled "Neutral" — show the neutral (resting) form
-  // HOME artwork so the chip actually displays the neutral appearance.
-  'xerneas-active':
-      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/716-neutral.png',
-  // mimikyu-busted has no officialArtworkUrl in PokéAPI (variety ID 10143);
-  // provide the HOME sprite directly so the chip shows artwork instead of the
-  // low-res front_default pixel sprite.
-  'mimikyu-busted':
-      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/10143.png',
-};
-
-/// Same as [kCosmeticFormHomeUrlOverrides] but for shiny HOME artwork.
-const kCosmeticFormHomeShinyUrlOverrides = <String, String>{
-  'xerneas-active':
-      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/716-neutral.png',
-  'mimikyu-busted':
-      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/10143.png',
-};
-
-/// HOME artwork to use for the BASE form display when the default official
-/// artwork doesn't match the expected canonical form (e.g. Unown's official
-/// artwork shows form-F but the canonical default is form-A).
-/// Also used as the first tile in the cosmetic form picker sheet.
-/// Key: basePokemon.name. Value: (homeUrl, shinyHomeUrl).
-const kBaseFormCosmeticHomeUrls = <String, (String homeUrl, String shinyUrl)>{
-  'unown': (
-    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/201-a.png',
-    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/201-a.png',
-  ),
-};
-
-/// Maps specific base_form names (as they appear in PokéAPI evolution_details)
-/// to their effective regional suffix. Used for forms that are regionally
-/// exclusive but don't follow the simple "{name}-{suffix}" naming convention.
-const kBaseFormSuffixOverrides = <String, String>{
-  'basculin-white-striped': 'hisui',
-};
-
-/// Maps "{speciesName}-{suffix}" to the actual PokéAPI Pokémon name when the
-/// true form name doesn't follow the "{name}-{suffix}" convention.
-/// Used by _EvolutionsTab to pre-resolve form IDs and by _resolveChildFormName
-/// to produce correct navigation targets.
-const kRegionalFormLookup = <String, String>{
-  'basculin-hisui': 'basculin-white-striped',
-};
 
 const _kSuffixLabel = {
   'galar': 'Galarian Form', 'alola': 'Alolan Form',
@@ -438,7 +294,7 @@ const _kSpecificFormLabels = <String, String>{
 /// 1. All non-default forms end in `-female` → base is male → "Male"
 /// 2. At least one non-default form is regional → return regional adjective
 ///    for [generationName] (e.g. "Hoennian", "Galarian")
-/// 3. [pokemonName] has a [kBaseFormNameOverrides] entry → return that label
+/// 3. [pokemonName] has a [baseFormNameOverrides] entry → return that label
 /// 4. There are non-default battle forms but no regional or override → "Base"
 /// 5. No non-default battle forms → "Normal"
 ///    (Generation adjective is never used here — it only makes sense when the
@@ -455,7 +311,7 @@ String computeBaseFormLabel(
       ? 'Male'
       : hasRegionalForm
           ? shortBaseFormLabel(generationName)
-          : kBaseFormNameOverrides[pokemonName] ??
+          : PokemonDataRegistry.instance.baseFormNameOverrides[pokemonName] ??
             (battleForms.isNotEmpty ? 'Base' : 'Normal');
 }
 

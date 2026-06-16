@@ -27,6 +27,7 @@ import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/stat_bar.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
 import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
@@ -163,7 +164,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         );
         // Filter out phantom cosmetic forms for species that inherit irrelevant
         // form names (e.g. Mothim gets Sandy/Trash from Burmy but looks identical).
-        final rawCosmeticForms = kNoCosmeticFormsPokemon.contains(basePokemon.name)
+        final rawCosmeticForms = PokemonDataRegistry.instance.noCosmeticFormsPokemon.contains(basePokemon.name)
             ? const <PokemonFormEntry>[]
             : (cosmeticFormsAsync?.asData?.value ?? const <PokemonFormEntry>[]);
         // Patch gender forms whose /pokemon-form endpoint returns null for
@@ -186,7 +187,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
           }
           return f;
         }).toList();
-        final cosmeticFormsLoading = !kNoCosmeticFormsPokemon.contains(basePokemon.name) &&
+        final cosmeticFormsLoading = !PokemonDataRegistry.instance.noCosmeticFormsPokemon.contains(basePokemon.name) &&
             cosmeticFormsAsync != null &&
             cosmeticFormsAsync.isLoading;
 
@@ -197,7 +198,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         if (species != null && _selectedFormName == null) {
           for (final variety in species.varieties) {
             if (variety.isDefault) continue;
-            if (!kCosmeticVarietyNames.contains(variety.name)) continue;
+            if (!PokemonDataRegistry.instance.cosmeticVarietyNames.contains(variety.name)) continue;
             final vAsync = ref.watch(pokemonByNameProvider(variety.name));
             final vData = vAsync.asData?.value;
             if (vData == null) continue;
@@ -223,7 +224,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
 
         // Synthesise a female cosmetic chip for species with gender-diff sprites
         // but no separate pokemon-form resource in PokéAPI (e.g. Unfezant).
-        if (kCosmeticGenderDiffPokemon.contains(basePokemon.name) && _selectedFormName == null) {
+        if (PokemonDataRegistry.instance.cosmeticGenderDiffPokemon.contains(basePokemon.name) && _selectedFormName == null) {
           final baseId = basePokemon.id;
           varietyCosmeticForms.add(PokemonFormEntry(
             id: baseId,
@@ -313,7 +314,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     String? cosmeticHomeUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
       if (form.officialArtworkUrl != null) return form.officialArtworkUrl;
-      final override = kCosmeticFormHomeUrlOverrides[form.name];
+      final override = PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[form.name];
       if (override != null) return override;
       if (form.formName == 'female') {
         return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${basePokemon.id}.png';
@@ -341,13 +342,13 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         ? (_shiny ? (wideSelectedCosmetic.spriteShinyUrl ?? wideSelectedCosmetic.spriteUrl) : wideSelectedCosmetic.spriteUrl)
         : null;
     final wideBaseOverride = wideSelectedCosmetic == null
-        ? kBaseFormCosmeticHomeUrls[basePokemon.name]
+        ? PokemonDataRegistry.instance.baseFormCosmeticHomeUrls[basePokemon.name]
         : null;
     final wideDisplayUrl = wideHomeUrl
-        ?? (_shiny ? null : wideBaseOverride?.$1)
+        ?? (_shiny ? null : wideBaseOverride?.homeUrl)
         ?? effectivePokemon.officialArtworkUrl;
     final wideShinyUrl = wideHomeShiny
-        ?? (_shiny ? wideBaseOverride?.$2 : null)
+        ?? (_shiny ? wideBaseOverride?.shinyUrl : null)
         ?? effectivePokemon.officialArtworkShinyUrl;
 
     return Scaffold(
@@ -439,9 +440,9 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                           shiny: _shiny,
                           onSelect: (name) => setState(() => _selectedCosmeticFormName = name),
                           baseHomeUrl: _shiny
-                              ? kBaseFormCosmeticHomeUrls[basePokemon.name]?.$2
-                              : kBaseFormCosmeticHomeUrls[basePokemon.name]?.$1,
-                          baseLabel: kBaseFormNameOverrides[basePokemon.name],
+                              ? PokemonDataRegistry.instance.baseFormCosmeticHomeUrls[basePokemon.name]?.shinyUrl
+                              : PokemonDataRegistry.instance.baseFormCosmeticHomeUrls[basePokemon.name]?.homeUrl,
+                          baseLabel: PokemonDataRegistry.instance.baseFormNameOverrides[basePokemon.name],
                         ),
                       ],
                     ],
@@ -563,7 +564,7 @@ class _DetailSliverAppBar extends StatelessWidget {
       // Variety-based forms have their own official artwork URL.
       if (form.officialArtworkUrl != null) return form.officialArtworkUrl;
       // Specific URL overrides (e.g. xerneas-active → show neutral form).
-      final override = kCosmeticFormHomeUrlOverrides[form.name];
+      final override = PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[form.name];
       if (override != null) return override;
       // Gender forms: check formName directly so it works even when basePokemon.name
       // includes a suffix (e.g. "frillish-male" → "frillish-female" prefix check fails).
@@ -579,7 +580,7 @@ class _DetailSliverAppBar extends StatelessWidget {
     String? cosmeticShinyUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
       if (form.officialArtworkShinyUrl != null) return form.officialArtworkShinyUrl;
-      final shinyOverride = kCosmeticFormHomeShinyUrlOverrides[form.name];
+      final shinyOverride = PokemonDataRegistry.instance.cosmeticFormHomeShinyUrlOverrides[form.name];
       if (shinyOverride != null) return shinyOverride;
       if (form.formName == 'female') {
         return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/female/${basePokemon.id}.png';
@@ -600,13 +601,13 @@ class _DetailSliverAppBar extends StatelessWidget {
     // When no cosmetic form is selected and there's a base HOME override
     // (e.g. Unown shows form-A HOME artwork instead of official-artwork form-F).
     final baseHomeOverride = selectedCosmetic == null
-        ? kBaseFormCosmeticHomeUrls[basePokemon.name]
+        ? PokemonDataRegistry.instance.baseFormCosmeticHomeUrls[basePokemon.name]
         : null;
     final displayDefaultUrl = cosmeticHomeUrl
-        ?? (shiny ? null : baseHomeOverride?.$1)
+        ?? (shiny ? null : baseHomeOverride?.homeUrl)
         ?? effectivePokemon.officialArtworkUrl;
     final displayShinyUrl = cosmeticHomeShiny
-        ?? (shiny ? baseHomeOverride?.$2 : null)
+        ?? (shiny ? baseHomeOverride?.shinyUrl : null)
         ?? effectivePokemon.officialArtworkShinyUrl;
 
     // Expand header height when cosmetic chips are present.
@@ -680,9 +681,9 @@ class _DetailSliverAppBar extends StatelessWidget {
                   shiny: shiny,
                   onSelect: onCosmeticFormSelect,
                   baseHomeUrl: shiny
-                      ? kBaseFormCosmeticHomeUrls[basePokemon.name]?.$2
-                      : kBaseFormCosmeticHomeUrls[basePokemon.name]?.$1,
-                  baseLabel: kBaseFormNameOverrides[basePokemon.name],
+                      ? PokemonDataRegistry.instance.baseFormCosmeticHomeUrls[basePokemon.name]?.shinyUrl
+                      : PokemonDataRegistry.instance.baseFormCosmeticHomeUrls[basePokemon.name]?.homeUrl,
+                  baseLabel: PokemonDataRegistry.instance.baseFormNameOverrides[basePokemon.name],
                 ),
               ],
               // Bottom spacer keeps content clear of the pinned TabBar (~48 dp).
@@ -1756,9 +1757,9 @@ class _EvolutionsTab extends ConsumerWidget {
                     formIds['$name-$s'] = stdId;
                     formIds['$name-$s-standard'] = stdId;
                   } else {
-                    // Try kRegionalFormLookup for forms with non-standard naming
+                    // Try regionalFormLookup for forms with non-standard naming
                     // (e.g. basculin-hisui → basculin-white-striped).
-                    final lookupName = kRegionalFormLookup['$name-$s'];
+                    final lookupName = PokemonDataRegistry.instance.regionalFormLookup['$name-$s'];
                     if (lookupName != null) {
                       final lookupAsync = ref.watch(pokemonByNameProvider(lookupName));
                       final lookupId = lookupAsync.asData?.value.id;
@@ -1976,7 +1977,7 @@ class _FormsTab extends ConsumerWidget {
           if (v.isDefault) return false;
           if (switcherFormNames.contains(v.name)) return false;
           // Also exclude variety-based cosmetic forms — they appear as header chips.
-          if (kCosmeticVarietyNames.contains(v.name)) return false;
+          if (PokemonDataRegistry.instance.cosmeticVarietyNames.contains(v.name)) return false;
           if (selectedFormName != null && megaSuffixes.any((s) => v.name.endsWith(s))) return false;
           return true;
         }).toList();
@@ -3252,7 +3253,7 @@ class _CosmeticFormChip extends StatelessWidget {
               const SizedBox(width: 28, height: 28),
             const SizedBox(width: 4),
             Text(
-              kCosmeticFormLabels[form.name] ?? cosmeticFormLabel(form.formName),
+              PokemonDataRegistry.instance.cosmeticFormLabels[form.name] ?? cosmeticFormLabel(form.formName),
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 11,
@@ -3367,7 +3368,7 @@ class _CosmeticFormPickerSheet extends StatelessWidget {
                                 color: Colors.grey)),
                       const SizedBox(height: 4),
                       Text(
-                        kCosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
+                        PokemonDataRegistry.instance.cosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
                         textAlign: TextAlign.center,
                         style:
                             Theme.of(context).textTheme.labelSmall?.copyWith(

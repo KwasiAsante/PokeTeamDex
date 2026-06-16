@@ -18,7 +18,7 @@ import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
-import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
     show teamSlotsProvider;
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
@@ -1264,7 +1264,7 @@ class _SlotSprite extends ConsumerWidget {
       final item = slot.heldItemName;
       if (mechanics.hasMegaStone && slot.isMegaEvolved && item != null) {
         // Mega Evolution: derive form name from the held Mega Stone.
-        final megaEntry = kMegaStoneMap[item];
+        final megaEntry = PokemonDataRegistry.instance.megaStoneMap[item];
         if (megaEntry != null) transformFormName = megaEntry.megaForm;
       } else if ((mechanics.gen == 6 || mechanics.gen == 7) && item != null) {
         // Primal Reversion: only applies in Gen 6/7 via orb.

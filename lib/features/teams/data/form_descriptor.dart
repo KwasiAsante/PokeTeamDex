@@ -1,5 +1,4 @@
-import 'package:poke_team_dex/features/teams/data/form_data.dart';
-import 'package:poke_team_dex/features/teams/data/mega_forms_data.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 
 /// Overrides the sprite resolver needs for a form's sprite paths.
 /// All fields are null for non-cosmetic forms — the resolver uses pokemonId as stem.
@@ -98,7 +97,7 @@ class FormDescriptor {
   /// Pass [heldItem] to resolve the mega form name when [isMegaEvolved] is true.
   String effectiveApiName(String baseSpecies, String? heldItem) {
     if (isMegaEvolved && heldItem != null) {
-      final entry = kMegaStoneMap[heldItem];
+      final entry = PokemonDataRegistry.instance.megaStoneMap[heldItem];
       if (entry != null) return entry.megaForm;
     }
     if (formName != null) return formName!;
@@ -110,7 +109,7 @@ class FormDescriptor {
   /// the resolver use the fetched Pokemon's numeric ID as the sprite stem.
   SpriteHint spriteHint(String baseSpecies, int baseSpeciesId) {
     if (formName != null) {
-      final cosmeticStems = kCosmeticSpriteStems[baseSpecies];
+      final cosmeticStems = PokemonDataRegistry.instance.cosmeticSpriteStems[baseSpecies];
       if (cosmeticStems != null && cosmeticStems.containsKey(formName)) {
         final stem = cosmeticStems[formName]!;
         final suffix = stem.split('-').last;

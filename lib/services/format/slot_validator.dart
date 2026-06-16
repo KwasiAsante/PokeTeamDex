@@ -1,3 +1,4 @@
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_service.dart';
@@ -230,7 +231,7 @@ Set<String> _buildLearnset(
   // is left to the validation layer which shows warning badges separately.
   final allAcceptedGroups = <String>{};
   for (int g = 1; g <= format.gen; g++) {
-    allAcceptedGroups.addAll(kGenToVersionGroups[g] ?? []);
+    allAcceptedGroups.addAll(PokemonDataRegistry.instance.genToVersionGroups[g] ?? []);
   }
 
   if (allAcceptedGroups.isEmpty) {

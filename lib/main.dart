@@ -23,6 +23,7 @@ import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:poke_team_dex/services/firebase/fcm_service.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/services/update/update_provider.dart';
 import 'package:poke_team_dex/services/tray/tray_service.dart';
 import 'package:poke_team_dex/shared/theme/app_theme.dart';
@@ -142,6 +143,7 @@ void main() async {
 
   await Hive.initFlutter();
   await Hive.openBox('pokeapi_cache');
+  await PokemonDataRegistry.initialize();
 
   // Load stored auth token before first frame
   final token = await loadStoredToken();

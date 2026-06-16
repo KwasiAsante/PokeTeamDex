@@ -1,36 +1,10 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/teams/data/form_descriptor.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 
 const _versionsBase = 'https://raw.githubusercontent.com/PokeAPI/sprites/'
     'master/sprites/pokemon/versions';
-
-// Maps format game id → PokeAPI versions path.
-// Uses raw.githubusercontent.com (CORS-safe) instead of play.pokemonshowdown.com
-// which blocks browser requests from Flutter Web.
-const _gameIdToVersionPath = <String, String>{
-  'rb':       'generation-i/red-blue',
-  'yellow':   'generation-i/yellow',
-  'gs':       'generation-ii/gold',
-  'crystal':  'generation-ii/crystal',
-  'rs':       'generation-iii/ruby-sapphire',
-  'emerald':  'generation-iii/emerald',
-  'frlg':     'generation-iii/firered-leafgreen',
-  'dp':       'generation-iv/diamond-pearl',
-  'platinum': 'generation-iv/platinum',
-  'hgss':     'generation-iv/heartgold-soulsilver',
-  'bw':       'generation-v/black-white',
-  'b2w2':     'generation-v/black-white',
-};
-
-// For general gen formats — use the most complete game in that gen.
-const _genToDefaultGameId = <int, String>{
-  1: 'yellow',
-  2: 'crystal',
-  3: 'emerald',
-  4: 'hgss',
-  5: 'bw',
-};
 
 // Gen 1-2 sprites in PokeAPI have colored backgrounds in their base folder.
 // PokeAPI provides a /transparent/ subfolder where the backgrounds have been
@@ -74,12 +48,13 @@ bool _needsTransparentSubfolder(int gen) => gen <= 2;
     return _homeOrArtwork(sprites, rawDefault, rawShiny, hint: hint);
   }
 
+  final registry = PokemonDataRegistry.instance;
   final gameId = format.type == FormatType.game
       ? format.id
-      : _genToDefaultGameId[format.gen];
+      : registry.genToDefaultGameId[format.gen];
 
   if (gameId != null) {
-    final versionPath = _gameIdToVersionPath[gameId];
+    final versionPath = registry.gameIdToVersionPath[gameId];
     if (versionPath != null) {
       final gen        = format.gen;
       // Gen 5 BW has animated GIF sprites.

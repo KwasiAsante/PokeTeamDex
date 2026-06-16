@@ -8,6 +8,8 @@
 // 3. Item-gated: form chip shown only when one of the required items is held.
 // 4. Everything else: shown freely as a chip.
 
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
+
 // ── Always-exclude patterns ────────────────────────────────────────────────
 
 /// Form name suffixes that should never appear as chips.
@@ -18,7 +20,7 @@
 /// and unavoidably whenever Primal Groudon/Kyogre enters battle holding its
 /// orb. That makes it mechanically identical to Giratina's Origin Forme —
 /// an automatic, item-bound form change — so it's gated the same way, via
-/// [kItemGatingRules] below.
+/// the item gating rules in the registry.
 const Set<String> kExcludeFormSuffixes = {
   '-mega', '-mega-x', '-mega-y', '-mega-z',
   '-gmax',
@@ -31,140 +33,6 @@ const Set<String> kAlwaysExcludeForms = {
   'indeedee-female',
   'basculegion-female',
   'oinkologne-female',
-};
-
-// ── Mutable-form species ──────────────────────────────────────────────────
-
-/// Species whose forms can change on the same individual (in or out of battle,
-/// seasonally, or via item/ability). Slots of these species may be linked
-/// across different form selections.
-///
-/// Excludes: regional variants, gender forms, size forms, and any form that
-/// is permanently determined at evolution or birth — those require an exact
-/// form match to link.
-///
-/// Mega Evolution and Gigantamax forms are excluded from the form chip selector
-/// entirely and handled via separate toggles, so they are not listed here.
-const Set<int> kMutableFormSpeciesIds = {
-  // Ability-gated battle forms (form switches automatically in battle)
-  421,  // Cherrim          – Overcast ↔ Sunshine
-  555,  // Darmanitan       – Standard ↔ Zen Mode (also Galarian)
-  676,  // Furfrou          – all groomed haircuts
-  681,  // Aegislash        – Shield ↔ Blade
-  746,  // Wishiwashi       – Solo ↔ School
-  773,  // Silvally         – all memory-type forms
-  774,  // Minior           – Meteor ↔ Core (any colour)
-  778,  // Mimikyu          – Disguised ↔ Busted
-  875,  // Eiscue           – Ice Face ↔ No-Ice Face
-  877,  // Morpeko          – Full Belly ↔ Hangry
-  964,  // Palafin          – Zero ↔ Hero
-
-  // Item-bound form changes (form switches when holding a specific item)
-  382,  // Kyogre           – Primal Reversion
-  383,  // Groudon          – Primal Reversion
-  483,  // Dialga           – Origin Forme (Adamant Crystal)
-  484,  // Palkia           – Origin Forme (Lustrous Globe)
-  487,  // Giratina         – Altered ↔ Origin (Griseous Orb/Core)
-  493,  // Arceus           – all 18 type-plate forms
-  888,  // Zacian           – Hero ↔ Crowned Sword
-  889,  // Zamazenta        – Hero ↔ Crowned Shield
-  898,  // Calyrex          – solo ↔ Ice Rider / Shadow Rider
-
-  // Seasonal / cosmetic-changeable forms
-  585,  // Deerling         – Spring / Summer / Autumn / Winter
-  586,  // Sawsbuck         – Spring / Summer / Autumn / Winter
-};
-
-// ── Typed gating rule classes ──────────────────────────────────────────────
-
-/// A form chip that is shown only when a specific ability is active.
-class AbilityGatingRule {
-  final String requiredAbility;
-  const AbilityGatingRule(this.requiredAbility);
-}
-
-/// A form chip that is shown only when one of [requiredItems] is held.
-/// Uses a Set to support forms that can be triggered by multiple items
-/// (e.g. Giratina-Origin works with both Griseous Orb and Griseous Core).
-class ItemGatingRule {
-  final Set<String> requiredItems;
-  const ItemGatingRule(this.requiredItems);
-}
-
-// ── Ability-gated forms ────────────────────────────────────────────────────
-
-/// Form chip is shown only when the mapped ability is selected.
-const Map<String, AbilityGatingRule> kAbilityGatingRules = {
-  'aegislash-blade':        AbilityGatingRule('stance-change'),
-  'darmanitan-zen':         AbilityGatingRule('zen-mode'),
-  'darmanitan-galar-zen':   AbilityGatingRule('zen-mode'),
-  'wishiwashi-school':      AbilityGatingRule('schooling'),
-  'cherrim-sunshine':       AbilityGatingRule('flower-gift'),
-  'morpeko-hangry':         AbilityGatingRule('hunger-switch'),
-  'mimikyu-busted':         AbilityGatingRule('disguise'),
-  'minior-red-core':        AbilityGatingRule('shields-down'),
-  'minior-orange-core':     AbilityGatingRule('shields-down'),
-  'minior-yellow-core':     AbilityGatingRule('shields-down'),
-  'minior-green-core':      AbilityGatingRule('shields-down'),
-  'minior-blue-core':       AbilityGatingRule('shields-down'),
-  'minior-indigo-core':     AbilityGatingRule('shields-down'),
-  'minior-violet-core':     AbilityGatingRule('shields-down'),
-  'eiscue-noice':           AbilityGatingRule('ice-face'),
-  'palafin-hero':           AbilityGatingRule('zero-to-hero'),
-};
-
-// ── Item-gated forms ──────────────────────────────────────────────────────
-
-/// Form chip shown only when one of the required held items is selected.
-/// Covers legendary item-bound forms, Primal Reversion, Arceus plates,
-/// and Silvally memories — all unified under one map.
-const Map<String, ItemGatingRule> kItemGatingRules = {
-  // Legendary / item-bound forms
-  'giratina-origin':       ItemGatingRule({'griseous-orb', 'griseous-core'}),
-  'zacian-crowned':        ItemGatingRule({'rusted-sword'}),
-  'zamazenta-crowned':     ItemGatingRule({'rusted-shield'}),
-  'calyrex-ice-rider':     ItemGatingRule({'reins-of-unity'}),
-  'calyrex-shadow-rider':  ItemGatingRule({'reins-of-unity'}),
-  'dialga-origin':         ItemGatingRule({'adamant-crystal'}),
-  'palkia-origin':         ItemGatingRule({'lustrous-globe'}),
-  'groudon-primal':        ItemGatingRule({'red-orb'}),
-  'kyogre-primal':         ItemGatingRule({'blue-orb'}),
-  // Arceus plate forms
-  'arceus-fighting': ItemGatingRule({'fist-plate'}),
-  'arceus-flying':   ItemGatingRule({'sky-plate'}),
-  'arceus-poison':   ItemGatingRule({'toxic-plate'}),
-  'arceus-ground':   ItemGatingRule({'earth-plate'}),
-  'arceus-rock':     ItemGatingRule({'stone-plate'}),
-  'arceus-bug':      ItemGatingRule({'insect-plate'}),
-  'arceus-ghost':    ItemGatingRule({'spooky-plate'}),
-  'arceus-steel':    ItemGatingRule({'iron-plate'}),
-  'arceus-fire':     ItemGatingRule({'flame-plate'}),
-  'arceus-water':    ItemGatingRule({'splash-plate'}),
-  'arceus-grass':    ItemGatingRule({'meadow-plate'}),
-  'arceus-electric': ItemGatingRule({'zap-plate'}),
-  'arceus-psychic':  ItemGatingRule({'mind-plate'}),
-  'arceus-ice':      ItemGatingRule({'icicle-plate'}),
-  'arceus-dragon':   ItemGatingRule({'draco-plate'}),
-  'arceus-dark':     ItemGatingRule({'dread-plate'}),
-  'arceus-fairy':    ItemGatingRule({'pixie-plate'}),
-  // Silvally memory forms
-  'silvally-fighting': ItemGatingRule({'fighting-memory'}),
-  'silvally-flying':   ItemGatingRule({'flying-memory'}),
-  'silvally-poison':   ItemGatingRule({'poison-memory'}),
-  'silvally-ground':   ItemGatingRule({'ground-memory'}),
-  'silvally-rock':     ItemGatingRule({'rock-memory'}),
-  'silvally-bug':      ItemGatingRule({'bug-memory'}),
-  'silvally-ghost':    ItemGatingRule({'ghost-memory'}),
-  'silvally-steel':    ItemGatingRule({'steel-memory'}),
-  'silvally-fire':     ItemGatingRule({'fire-memory'}),
-  'silvally-water':    ItemGatingRule({'water-memory'}),
-  'silvally-grass':    ItemGatingRule({'grass-memory'}),
-  'silvally-electric': ItemGatingRule({'electric-memory'}),
-  'silvally-psychic':  ItemGatingRule({'psychic-memory'}),
-  'silvally-ice':      ItemGatingRule({'ice-memory'}),
-  'silvally-dragon':   ItemGatingRule({'dragon-memory'}),
-  'silvally-dark':     ItemGatingRule({'dark-memory'}),
-  'silvally-fairy':    ItemGatingRule({'fairy-memory'}),
 };
 
 // ── Generation-gated forms ────────────────────────────────────────────────
@@ -216,6 +84,7 @@ List<String> filterFormChips({
 
   final item    = heldItem?.toLowerCase() ?? '';
   final ability = abilityName?.toLowerCase() ?? '';
+  final registry = PokemonDataRegistry.instance;
 
   return candidates.where((form) {
     // 1. Always exclude by suffix
@@ -236,12 +105,12 @@ List<String> filterFormChips({
     }
 
     // 3. Ability-gated
-    final abilityRule = kAbilityGatingRules[form];
-    if (abilityRule != null) return ability == abilityRule.requiredAbility;
+    final requiredAbility = registry.abilityGatingRules[form];
+    if (requiredAbility != null) return ability == requiredAbility;
 
     // 4. Item-gated (covers legendary, primal, Arceus plates, Silvally memories)
-    final itemRule = kItemGatingRules[form];
-    if (itemRule != null) return itemRule.requiredItems.contains(item);
+    final requiredItems = registry.itemGatingRules[form];
+    if (requiredItems != null) return requiredItems.contains(item);
 
     // 5. Free chip
     return true;
