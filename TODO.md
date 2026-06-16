@@ -292,6 +292,12 @@
 ## Investigations
 
 - [ ] **Unified Pokémon data resolution layer** — cross-source gaps (PokéAPI / Showdown / Smogon), scattered override maps, and unresiolved form data are recomputed on every request with no single cached result; investigate a unified model that does gap-filling once and caches the resolved output *(#201)*
+  - [x] **Task A** — Consolidate override maps into JSON asset and `PokemonDataRegistry` singleton *(#234)*
+  - [ ] **Task B** — Unified sprite resolver (`PokemonDataResolver`) replacing 4 divergent sprite URL implementations *(#235)*
+  - [ ] **Task C** — `resolvedPokemonProvider` with `keepAlive` caching to eliminate per-scroll provider rebuilds *(#236)*
+  - [ ] **Task D** — Backend `GET /pokemon/{id}/resolved` endpoint with Showdown + Smogon aggregation and PostgreSQL caching *(#237)*
+  - [ ] **Task E** — Flutter hybrid integration: `resolvedPokemonProvider` → backend first, Hive offline fallback *(#238)*
+  - [ ] **Task F** *(optional)* — Frontend lazy-loading and provider hygiene audit post-B+C *(#239)*
 
 ---
 
