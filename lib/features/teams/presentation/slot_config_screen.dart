@@ -12,12 +12,11 @@ import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
     show teamByIdProvider, teamSlotsProvider;
-import 'package:poke_team_dex/features/teams/data/form_descriptor.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/services/format/format_service.dart';
 import 'package:poke_team_dex/services/format/slot_validator.dart';
-import 'package:poke_team_dex/services/format/sprite_resolver.dart';
+import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
@@ -648,13 +647,14 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         // Sprite resolution
         final useFormatSprites =
             ref.watch(useFormatSpritesProvider).asData?.value ?? true;
-        final spriteUrls = resolveSprite(
+        final spriteUrls = PokemonDataResolver.resolveFormSprite(
           sprites: pokemon.sprites,
           pokemonId: slot.pokemonId,
           pokemonName: pokemon.name,
+          baseSpecies: pokemon.name,
+          formName: null,
           format: format,
           useFormatSprites: useFormatSprites,
-          hint: const SpriteHint(),
         );
 
         // ── Mega Evolution ─────────────────────────────────────────────────
@@ -911,18 +911,15 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         // like the default form does.
         final cosmeticFormSuffix =
             cosmeticForm?.name.substring(pokemon.name.length + 1);
-        final cosmeticFormSpriteUrls = cosmeticFormSuffix != null
-            ? resolveSprite(
+        final cosmeticFormSpriteUrls = cosmeticForm != null
+            ? PokemonDataResolver.resolveFormSprite(
                 sprites: null,
                 pokemonId: pokemon.id,
-                pokemonName: cosmeticForm!.name,
+                pokemonName: cosmeticForm.name,
+                baseSpecies: pokemon.name,
+                formName: cosmeticForm.name,
                 format: format,
                 useFormatSprites: useFormatSprites,
-                hint: SpriteHint(
-                  stem: '${pokemon.id}-$cosmeticFormSuffix',
-                  homeUrl: cosmeticFormHomeUrl(pokemon.id, cosmeticFormSuffix),
-                  homeShinyUrl: cosmeticFormHomeShinyUrl(pokemon.id, cosmeticFormSuffix),
-                ),
               )
             : null;
         final formHomeUrl = formPokemon != null
