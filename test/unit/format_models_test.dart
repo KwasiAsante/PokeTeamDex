@@ -1,7 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 
 void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    await PokemonDataRegistry.initialize();
+  });
+
   group('GenerationMechanics.forGen', () {
     test('gen 1 — no items, no abilities, no shiny, DVs, statMax 15, uncapped EVs', () {
       final m = GenerationMechanics.forGen(1);

@@ -1,8 +1,14 @@
 // test/unit/ps_form_resolver_test.dart
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/teams/logic/ps_form_resolver.dart';
 
 void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    await PokemonDataRegistry.initialize();
+  });
+
   group('resolveFormFromVarieties — exact match', () {
     test('returns exact variety name when present', () {
       expect(
