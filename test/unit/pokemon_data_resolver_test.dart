@@ -4,6 +4,8 @@ import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/features/pokedex/models/pokedex_image_type.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 
 void main() {
   setUpAll(() async {
@@ -195,6 +197,181 @@ void main() {
     });
   });
 
-  // ── resolvePokedexImageUrl ────────────────────────────────────────────────
-  // (added in Task 4)
+  // ── resolvePokedexImageUrl ─────────────────────────────────────────────────
+
+  group('resolvePokedexImageUrl — no form selected', () {
+    test('artwork mode: returns official-artwork URL', () {
+      final url = PokemonDataResolver.resolvePokedexImageUrl(
+        pokemonId: 6,
+        baseSpecies: 'charizard',
+        selectedFormName: null,
+        imageType: PokedexImageType.artwork,
+        formEntry: null,
+        cosmeticEntry: null,
+        filter: null,
+      );
+      expect(url, contains('other/official-artwork/6.png'));
+    });
+
+    test('compact mode (null imageType): returns gen-8 icon URL', () {
+      final url = PokemonDataResolver.resolvePokedexImageUrl(
+        pokemonId: 6,
+        baseSpecies: 'charizard',
+        selectedFormName: null,
+        imageType: null,
+        formEntry: null,
+        cosmeticEntry: null,
+        filter: null,
+      );
+      expect(url, contains('generation-viii/icons/6.png'));
+    });
+  });
+
+  group('resolvePokedexImageUrl — cosmetic form selected', () {
+    test('artwork: female cosmetic returns home/female/{id}.png path', () {
+      final url = PokemonDataResolver.resolvePokedexImageUrl(
+        pokemonId: 592,
+        baseSpecies: 'frillish',
+        selectedFormName: 'frillish-female',
+        imageType: PokedexImageType.artwork,
+        formEntry: null,
+        cosmeticEntry: _makeCosmeticEntry(
+          name: 'frillish-female',
+          formName: 'female',
+          spriteUrl: null,
+        ),
+        filter: null,
+      );
+      expect(url, contains('home/female/592.png'));
+      expect(url, isNot(contains('592-female.png')));
+    });
+
+    test('artwork: suffix-based cosmetic returns home/{id}-{suffix}.png', () {
+      final url = PokemonDataResolver.resolvePokedexImageUrl(
+        pokemonId: 422,
+        baseSpecies: 'shellos',
+        selectedFormName: 'shellos-east',
+        imageType: PokedexImageType.artwork,
+        formEntry: null,
+        cosmeticEntry: _makeCosmeticEntry(
+          name: 'shellos-east',
+          formName: 'east',
+          spriteUrl: 'https://example.com/shellos-east.png',
+        ),
+        filter: null,
+      );
+      expect(url, contains('home/422-east.png'));
+    });
+
+    test('sprite mode: female cosmetic returns female/{id}.png sprite path', () {
+      final url = PokemonDataResolver.resolvePokedexImageUrl(
+        pokemonId: 592,
+        baseSpecies: 'frillish',
+        selectedFormName: 'frillish-female',
+        imageType: PokedexImageType.sprite,
+        formEntry: null,
+        cosmeticEntry: _makeCosmeticEntry(
+          name: 'frillish-female',
+          formName: 'female',
+          spriteUrl: null,
+        ),
+        filter: null,
+      );
+      expect(url, contains('female/592.png'));
+    });
+
+    test('sprite mode: cosmetic entry returns spriteUrl when present', () {
+      final url = PokemonDataResolver.resolvePokedexImageUrl(
+        pokemonId: 422,
+        baseSpecies: 'shellos',
+        selectedFormName: 'shellos-east',
+        imageType: PokedexImageType.sprite,
+        formEntry: null,
+        cosmeticEntry: _makeCosmeticEntry(
+          name: 'shellos-east',
+          formName: 'east',
+          spriteUrl: 'https://example.com/shellos-east.png',
+        ),
+        filter: null,
+      );
+      expect(url, 'https://example.com/shellos-east.png');
+    });
+  });
+
+  group('resolvePokedexImageUrl — variety form selected', () {
+    test('artwork: uses officialArtworkUrl from formEntry', () {
+      final entry = _makePokemonEntry(
+        id: 10001,
+        artworkUrl: 'https://example.com/10001.png',
+      );
+      final url = PokemonDataResolver.resolvePokedexImageUrl(
+        pokemonId: 250,
+        baseSpecies: 'ho-oh',
+        selectedFormName: 'ho-oh',
+        imageType: PokedexImageType.artwork,
+        formEntry: entry,
+        cosmeticEntry: null,
+        filter: null,
+      );
+      expect(url, 'https://example.com/10001.png');
+    });
+
+    test('sprite mode: uses front_default from formEntry sprites', () {
+      final entry = _makePokemonEntry(
+        id: 10001,
+        artworkUrl: null,
+        frontDefault: 'https://example.com/sprite.png',
+      );
+      final url = PokemonDataResolver.resolvePokedexImageUrl(
+        pokemonId: 250,
+        baseSpecies: 'ho-oh',
+        selectedFormName: 'ho-oh',
+        imageType: PokedexImageType.sprite,
+        formEntry: entry,
+        cosmeticEntry: null,
+        filter: null,
+      );
+      expect(url, 'https://example.com/sprite.png');
+    });
+
+    test('compact mode: uses gen-8 icon URL with formEntry.id', () {
+      final entry = _makePokemonEntry(id: 10143, artworkUrl: null);
+      final url = PokemonDataResolver.resolvePokedexImageUrl(
+        pokemonId: 778,
+        baseSpecies: 'mimikyu',
+        selectedFormName: 'mimikyu-busted',
+        imageType: null,
+        formEntry: entry,
+        cosmeticEntry: null,
+        filter: null,
+      );
+      expect(url, contains('generation-viii/icons/10143.png'));
+    });
+  });
 }
+
+PokemonFormEntry _makeCosmeticEntry({
+  required String name,
+  required String formName,
+  required String? spriteUrl,
+}) => PokemonFormEntry(
+  id: 99999,
+  name: name,
+  formName: formName,
+  isDefault: false,
+  spriteUrl: spriteUrl,
+);
+
+PokemonEntry _makePokemonEntry({
+  required int id,
+  required String? artworkUrl,
+  String? frontDefault,
+}) => PokemonEntry(
+  id: id,
+  name: 'test-pokemon',
+  height: 1,
+  weight: 1,
+  types: const {},
+  officialArtworkUrl: artworkUrl,
+  sprites: frontDefault != null ? {'front_default': frontDefault} : null,
+);
