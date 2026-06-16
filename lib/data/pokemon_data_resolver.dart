@@ -25,6 +25,15 @@ class PokemonDataResolver {
   /// Pass [baseSpecies] + [formName] instead of a SpriteHint.
   /// For Gen 1–5 the full versioned URL set is returned.
   /// For Gen 6+ (or useFormatSprites false) HOME/official-artwork is used.
+  ///
+  /// [fallbackUrl] and [fallbackUrl2] are only non-null for the Crystal game
+  /// format: they hold the Gold and Silver paths for the Crystal → Gold → Silver
+  /// fallback chain (Crystal's transparent/ subfolder lacks some form-variant
+  /// sprites, e.g. Unown letter forms).
+  ///
+  /// [femaleUrl] and [femaleShinyUrl] are non-null for Gen 4+ versioned formats
+  /// where female-specific sprites exist in the PokeAPI sprites repository.
+  /// They are null for Gen 1–3 versioned formats and for the HOME/artwork path.
   static ({
     String? defaultUrl,
     String? shinyUrl,
@@ -84,7 +93,7 @@ class PokemonDataResolver {
         final animSeg = isAnimated ? 'animated/' : '';
 
         final defaultUrl =
-            '$_versionsBase/$versionPath/$animSeg$transparent$stem$ext';
+            _versionedDefaultUrl(versionPath, animSeg, transparent, stem, ext);
         final shinyUrl = _versionedShinyUrl(
             versionPath, gen, animSeg, transparent, stem, ext, pokemonName);
         final (femaleUrl, femaleShinyUrl) =
@@ -93,10 +102,10 @@ class PokemonDataResolver {
         String? fallbackUrl;
         String? fallbackUrl2;
         if (gameId == 'crystal') {
-          fallbackUrl =
-              '$_versionsBase/generation-ii/gold/$animSeg$transparent$stem$ext';
-          fallbackUrl2 =
-              '$_versionsBase/generation-ii/silver/$animSeg$transparent$stem$ext';
+          fallbackUrl = _versionedDefaultUrl(
+              'generation-ii/gold', animSeg, transparent, stem, ext);
+          fallbackUrl2 = _versionedDefaultUrl(
+              'generation-ii/silver', animSeg, transparent, stem, ext);
         }
 
         return (
@@ -187,9 +196,16 @@ class PokemonDataResolver {
       }
     }
 
+    assert(
+      imageType != PokedexImageType.sprite || filter != null,
+      'filter must be non-null when imageType is PokedexImageType.sprite',
+    );
     return switch (imageType) {
       PokedexImageType.artwork =>
         '${_spritesBase}other/official-artwork/$pokemonId.png',
+      // sprite: filter-aware icon (same as _compactIconUrl in list tile).
+      // Grid card sprite mode also uses this path — with the default filter
+      // the subpath is null, so this degrades to the plain pokemonId.png fallback.
       PokedexImageType.sprite => compactIconUrl(pokemonId, filter!),
       null => '${_spritesBase}versions/generation-viii/icons/$pokemonId.png',
     };
@@ -210,88 +226,97 @@ class PokemonDataResolver {
     }
     return '$_spritesBase$pokemonId.png';
   }
-}
 
-// ── Private helpers ──────────────────────────────────────────────────────────
+  // ── Private helpers ────────────────────────────────────────────────────────
 
-({
-  String? defaultUrl,
-  String? shinyUrl,
-  String? femaleUrl,
-  String? femaleShinyUrl,
-  String? fallbackUrl,
-  String? fallbackUrl2,
-}) _homeOrArtwork(
-  Map<String, dynamic>? sprites,
-  String rawDefault,
-  String rawShiny, {
-  String? cosmeticHome,
-  String? cosmeticHomeShiny,
-}) {
-  final home =
-      sprites == null ? null : _nav(sprites['other'], ['home']);
-  final artwork =
-      sprites == null ? null : _nav(sprites['other'], ['official-artwork']);
-  return (
-    defaultUrl: cosmeticHome ??
-        home?['front_default'] as String? ??
-        artwork?['front_default'] as String? ??
-        rawDefault,
-    shinyUrl: cosmeticHomeShiny ??
-        home?['front_shiny'] as String? ??
-        artwork?['front_shiny'] as String? ??
-        rawShiny,
-    femaleUrl: home?['front_female'] as String?,
-    femaleShinyUrl: home?['front_shiny_female'] as String?,
-    fallbackUrl: null,
-    fallbackUrl2: null,
-  );
-}
+  static String _versionedDefaultUrl(
+    String versionPath,
+    String animSeg,
+    String transparent,
+    String stem,
+    String ext,
+  ) =>
+      '$_versionsBase/$versionPath/$animSeg$transparent$stem$ext';
 
-String _versionedShinyUrl(
-  String versionPath,
-  int gen,
-  String animSeg,
-  String transparent,
-  String stem,
-  String ext,
-  String pokemonName,
-) {
-  if (gen == 1) {
-    return '$_versionsBase/$versionPath/$animSeg$transparent$stem$ext';
+  static ({
+    String? defaultUrl,
+    String? shinyUrl,
+    String? femaleUrl,
+    String? femaleShinyUrl,
+    String? fallbackUrl,
+    String? fallbackUrl2,
+  }) _homeOrArtwork(
+    Map<String, dynamic>? sprites,
+    String rawDefault,
+    String rawShiny, {
+    String? cosmeticHome,
+    String? cosmeticHomeShiny,
+  }) {
+    final home =
+        sprites == null ? null : _nav(sprites['other'], ['home']);
+    final artwork =
+        sprites == null ? null : _nav(sprites['other'], ['official-artwork']);
+    return (
+      defaultUrl: cosmeticHome ??
+          home?['front_default'] as String? ??
+          artwork?['front_default'] as String? ??
+          rawDefault,
+      shinyUrl: cosmeticHomeShiny ??
+          home?['front_shiny'] as String? ??
+          artwork?['front_shiny'] as String? ??
+          rawShiny,
+      femaleUrl: home?['front_female'] as String?,
+      femaleShinyUrl: home?['front_shiny_female'] as String?,
+      fallbackUrl: null,
+      fallbackUrl2: null,
+    );
   }
-  if (animSeg.isNotEmpty) {
-    return '$_versionsBase/$versionPath/${animSeg}shiny/$stem$ext';
-  }
-  if (transparent.isNotEmpty) {
-    // No transparent/shiny subfolder in Gen 2. Use Pokémon Showdown on native;
-    // fall back to non-transparent PokeAPI shiny on web (CORS restriction).
-    return kIsWeb
-        ? '$_versionsBase/$versionPath/shiny/$stem$ext'
-        : 'https://play.pokemonshowdown.com/sprites/gen2-shiny/$pokemonName.png';
-  }
-  return '$_versionsBase/$versionPath/shiny/$stem$ext';
-}
 
-(String? femaleUrl, String? femaleShinyUrl) _versionedFemaleUrls(
-  String versionPath,
-  int gen,
-  String animSeg,
-  String stem,
-  String ext,
-) {
-  if (gen < 4) return (null, null);
-  return (
-    '$_versionsBase/$versionPath/${animSeg}female/$stem$ext',
-    '$_versionsBase/$versionPath/${animSeg}shiny/female/$stem$ext',
-  );
-}
-
-Map<String, dynamic>? _nav(dynamic root, List<String> path) {
-  dynamic cur = root;
-  for (final key in path) {
-    if (cur is! Map) return null;
-    cur = cur[key];
+  static String _versionedShinyUrl(
+    String versionPath,
+    int gen,
+    String animSeg,
+    String transparent,
+    String stem,
+    String ext,
+    String pokemonName,
+  ) {
+    if (gen == 1) {
+      return _versionedDefaultUrl(versionPath, animSeg, transparent, stem, ext);
+    }
+    if (animSeg.isNotEmpty) {
+      return '$_versionsBase/$versionPath/${animSeg}shiny/$stem$ext';
+    }
+    if (transparent.isNotEmpty) {
+      // No transparent/shiny subfolder in Gen 2. Use Pokémon Showdown on native;
+      // fall back to non-transparent PokeAPI shiny on web (CORS restriction).
+      return kIsWeb
+          ? '$_versionsBase/$versionPath/shiny/$stem$ext'
+          : 'https://play.pokemonshowdown.com/sprites/gen2-shiny/$pokemonName.png';
+    }
+    return '$_versionsBase/$versionPath/shiny/$stem$ext';
   }
-  return cur is Map ? cur.cast<String, dynamic>() : null;
+
+  static (String? femaleUrl, String? femaleShinyUrl) _versionedFemaleUrls(
+    String versionPath,
+    int gen,
+    String animSeg,
+    String stem,
+    String ext,
+  ) {
+    if (gen < 4) return (null, null);
+    return (
+      '$_versionsBase/$versionPath/${animSeg}female/$stem$ext',
+      '$_versionsBase/$versionPath/${animSeg}shiny/female/$stem$ext',
+    );
+  }
+
+  static Map<String, dynamic>? _nav(dynamic root, List<String> path) {
+    dynamic cur = root;
+    for (final key in path) {
+      if (cur is! Map) return null;
+      cur = cur[key];
+    }
+    return cur is Map ? cur.cast<String, dynamic>() : null;
+  }
 }
