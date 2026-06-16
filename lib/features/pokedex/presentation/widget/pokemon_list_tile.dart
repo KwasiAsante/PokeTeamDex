@@ -4,15 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
 import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
-import 'package:poke_team_dex/features/pokedex/models/pokedex_filter.dart';
 import 'package:poke_team_dex/features/pokedex/models/pokedex_image_type.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
-import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
-import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart' show cosmeticFormHomeUrl;
+import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -21,19 +19,6 @@ import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 
 const _kBase =
     'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
-
-String _compactIconUrl(int pokemonId, PokedexFilter filter) {
-  final registry = PokemonDataRegistry.instance;
-  String? vg;
-  if (filter.game != null) {
-    vg = registry.formatToVersionGroup[filter.game];
-  } else if (filter.generation != null) {
-    vg = registry.genToLastVg[filter.generation];
-  }
-  final subpath = vg != null ? registry.vgToSubpath[vg] : null;
-  if (subpath == null) return '$_kBase$pokemonId.png';
-  return '$_kBase$subpath/$pokemonId.png';
-}
 
 class PokemonListTile extends ConsumerStatefulWidget {
   final PokemonListEntry pokemon;
@@ -179,8 +164,22 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
         : colorScheme.surfaceContainerLow;
 
     // Image URL
-    final imageUrl = _buildImageUrl(formEntry, selectedCosmeticEntry, filter, basePokemon);
-    final fallbackUrl = _buildFallbackUrl(formEntry, selectedCosmeticEntry);
+    final imageUrl = PokemonDataResolver.resolvePokedexImageUrl(
+      pokemonId: widget.pokemon.id,
+      baseSpecies: basePokemon?.speciesName ?? widget.pokemon.name,
+      selectedFormName: _selectedFormName,
+      imageType: widget.imageType,
+      formEntry: formEntry,
+      cosmeticEntry: selectedCosmeticEntry,
+      filter: filter,
+    );
+    final fallbackUrl = PokemonDataResolver.resolvePokedexFallbackUrl(
+      pokemonId: widget.pokemon.id,
+      imageType: widget.imageType,
+      selectedFormName: _selectedFormName,
+      formEntry: formEntry,
+      cosmeticEntry: selectedCosmeticEntry,
+    );
 
     // Display name
     final baseDisplayName = basePokemon?.displaySpeciesName ??
@@ -384,73 +383,4 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
     );
   }
 
-  String _buildImageUrl(
-    PokemonEntry? formEntry,
-    PokemonFormEntry? cosmeticEntry,
-    PokedexFilter filter,
-    PokemonEntry? base,
-  ) {
-    if (_selectedFormName != null) {
-      if (cosmeticEntry != null) {
-        if (widget.imageType == PokedexImageType.artwork) {
-          // Explicit override first (e.g. xerneas-active → 716-neutral.png).
-          final override = PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[cosmeticEntry.name];
-          if (override != null) return override;
-          // Female HOME artwork lives under home/female/{id}.png — a different
-          // path from the {id}-{suffix}.png pattern used for other cosmetics.
-          if (cosmeticEntry.formName == 'female') {
-            return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${widget.pokemon.id}.png';
-          }
-          // Pattern-based HOME artwork (e.g. shellos → 422-east-sea.png).
-          final sn = base?.speciesName ?? widget.pokemon.name;
-          if (cosmeticEntry.name.startsWith('$sn-')) {
-            final suffix = cosmeticEntry.name.substring(sn.length + 1);
-            return cosmeticFormHomeUrl(widget.pokemon.id, suffix);
-          }
-        }
-        // Female sprites live under pokemon/female/{id}.png, not the standard path.
-        if (cosmeticEntry.formName == 'female') {
-          return '${_kBase}female/${widget.pokemon.id}.png';
-        }
-        return cosmeticEntry.spriteUrl ?? '$_kBase${widget.pokemon.id}.png';
-      }
-      if (formEntry != null) {
-        if (widget.imageType == PokedexImageType.artwork) {
-          // HOME artwork override takes priority (e.g. mimikyu-busted has no
-          // officialArtworkUrl in PokéAPI but has a HOME sprite at 10143.png).
-          final homeOverride = _selectedFormName != null
-              ? PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[_selectedFormName!]
-              : null;
-          return homeOverride ??
-              formEntry.officialArtworkUrl ??
-              '${_kBase}other/official-artwork/${widget.pokemon.id}.png';
-        }
-        if (widget.imageType == PokedexImageType.sprite) {
-          return (formEntry.sprites?['front_default'] as String?) ??
-              '$_kBase${widget.pokemon.id}.png';
-        }
-        return '${_kBase}versions/generation-viii/icons/${formEntry.id}.png';
-      }
-    }
-    return switch (widget.imageType) {
-      PokedexImageType.artwork =>
-        '${_kBase}other/official-artwork/${widget.pokemon.id}.png',
-      PokedexImageType.sprite => _compactIconUrl(widget.pokemon.id, filter),
-      null =>
-        '${_kBase}versions/generation-viii/icons/${widget.pokemon.id}.png',
-    };
-  }
-
-  String _buildFallbackUrl(
-    PokemonEntry? formEntry,
-    PokemonFormEntry? cosmeticEntry,
-  ) {
-    if (widget.imageType == null && _selectedFormName != null) {
-      // Compact + form selected: fallback is the form's front_default sprite.
-      final formSprite = cosmeticEntry?.spriteUrl ??
-          (formEntry?.sprites?['front_default'] as String?);
-      if (formSprite != null) return formSprite;
-    }
-    return '$_kBase${widget.pokemon.id}.png';
-  }
 }
