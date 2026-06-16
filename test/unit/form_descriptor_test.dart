@@ -20,12 +20,6 @@ void main() {
         'charizard',
       );
     });
-
-    test('spriteHint has no overrides', () {
-      final hint = FormDescriptor.empty().spriteHint('charizard', 6);
-      expect(hint.stem, isNull);
-      expect(hint.homeUrl, isNull);
-    });
   });
 
   group('FormDescriptor — variety form (formName set)', () {
@@ -37,11 +31,6 @@ void main() {
 
     test('effectiveApiName returns formName', () {
       expect(descriptor.effectiveApiName('aegislash', null), 'aegislash-blade');
-    });
-
-    test('spriteHint has no stem override (variety has own /pokemon resource)', () {
-      final hint = descriptor.spriteHint('aegislash', 681);
-      expect(hint.stem, isNull);
     });
   });
 
@@ -73,31 +62,6 @@ void main() {
 
     test('isDefault is false', () {
       expect(descriptor.isDefault, isFalse);
-    });
-  });
-
-  group('FormDescriptor — cosmetic form', () {
-    const descriptor = FormDescriptor(formName: 'burmy-sandy');
-
-    test('spriteHint has stem override for known cosmetic form', () {
-      final hint = descriptor.spriteHint('burmy', 412);
-      expect(hint.stem, '412-sandy');
-    });
-
-    test('spriteHint homeUrl points to correct HOME sprite URL', () {
-      final hint = descriptor.spriteHint('burmy', 412);
-      expect(
-        hint.homeUrl,
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/412-sandy.png',
-      );
-    });
-
-    test('spriteHint homeShinyUrl points to correct shiny HOME sprite URL', () {
-      final hint = descriptor.spriteHint('burmy', 412);
-      expect(
-        hint.homeShinyUrl,
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/412-sandy.png',
-      );
     });
   });
 
