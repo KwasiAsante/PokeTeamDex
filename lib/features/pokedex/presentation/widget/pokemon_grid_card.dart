@@ -5,19 +5,18 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
 import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
+import 'package:poke_team_dex/features/pokedex/models/pokedex_filter.dart';
+import 'package:poke_team_dex/features/pokedex/models/pokedex_image_type.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
-import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
-import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart' show cosmeticFormHomeUrl;
+import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 
 const _kBase = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
-
-enum PokedexImageType { artwork, sprite }
 
 class PokemonGridCard extends ConsumerStatefulWidget {
   final PokemonListEntry pokemon;
@@ -139,7 +138,15 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         ? (PokemonTypeColors.colors[primaryType] ?? colorScheme.primary)
         : colorScheme.surfaceContainerHighest;
 
-    final imageUrl = _buildImageUrl(formEntry, selectedCosmeticEntry, basePokemon);
+    final imageUrl = PokemonDataResolver.resolvePokedexImageUrl(
+      pokemonId: widget.pokemon.id,
+      baseSpecies: basePokemon?.speciesName ?? widget.pokemon.name,
+      selectedFormName: _selectedFormName,
+      imageType: widget.imageType,
+      formEntry: formEntry,
+      cosmeticEntry: selectedCosmeticEntry,
+      filter: const PokedexFilter(),
+    );
 
     final baseDisplayName = basePokemon?.displaySpeciesName ??
         widget.pokemon.name
@@ -312,43 +319,4 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
     );
   }
 
-  String _buildImageUrl(PokemonEntry? formEntry, PokemonFormEntry? cosmeticEntry, PokemonEntry? base) {
-    if (_selectedFormName != null) {
-      if (cosmeticEntry != null) {
-        if (widget.imageType == PokedexImageType.artwork) {
-          final override = PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[cosmeticEntry.name];
-          if (override != null) return override;
-          if (cosmeticEntry.formName == 'female') {
-            return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${widget.pokemon.id}.png';
-          }
-          final sn = base?.speciesName ?? widget.pokemon.name;
-          if (cosmeticEntry.name.startsWith('$sn-')) {
-            final suffix = cosmeticEntry.name.substring(sn.length + 1);
-            return cosmeticFormHomeUrl(widget.pokemon.id, suffix);
-          }
-        }
-        if (cosmeticEntry.formName == 'female') {
-          return '${_kBase}female/${widget.pokemon.id}.png';
-        }
-        return cosmeticEntry.spriteUrl ?? '$_kBase${widget.pokemon.id}.png';
-      }
-      if (formEntry != null) {
-        if (widget.imageType == PokedexImageType.artwork) {
-          final homeOverride = _selectedFormName != null
-              ? PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[_selectedFormName!]
-              : null;
-          return homeOverride ??
-              formEntry.officialArtworkUrl ??
-              '${_kBase}other/official-artwork/${widget.pokemon.id}.png';
-        }
-        return (formEntry.sprites?['front_default'] as String?) ??
-            '$_kBase${widget.pokemon.id}.png';
-      }
-    }
-    return switch (widget.imageType) {
-      PokedexImageType.artwork =>
-        '${_kBase}other/official-artwork/${widget.pokemon.id}.png',
-      PokedexImageType.sprite => '$_kBase${widget.pokemon.id}.png',
-    };
-  }
 }

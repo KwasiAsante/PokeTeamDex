@@ -36,7 +36,7 @@ The format engine — the most complex service. Validates team slots against Pok
 | `format_models.dart` | `GameFormat`, `GenerationMechanics`, `PsMoveEntry`, `PsItemEntry`, `PsAbilityEntry` |
 | `format_providers.dart` | Riverpod: `allFormatsProvider`, `generalFormatsProvider`, `gameFormatsProvider`, `learnsetProvider`, `itemsForGenProvider`, `abilitiesForGenProvider`, `slotValidationProvider` |
 | `slot_validator.dart` | `validateSlot()` → `SlotValidation` (per-move/item/ability legality flags) |
-| `sprite_resolver.dart` | `resolveSprite(sprites, pokemonId, pokemonName, format, …, hint: SpriteHint)` → `SpriteUrls` |
+| `sprite_resolver.dart` | Thin wrapper; sprite resolution has moved to `PokemonDataResolver.resolveFormSprite()` in `lib/data/pokemon_data_resolver.dart` |
 
 ### FormatService data loading flow
 

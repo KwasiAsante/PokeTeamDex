@@ -1,20 +1,5 @@
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 
-/// Overrides the sprite resolver needs for a form's sprite paths.
-/// All fields are null for non-cosmetic forms — the resolver uses pokemonId as stem.
-class SpriteHint {
-  /// File stem override, used only for cosmetic forms sharing a base /pokemon resource.
-  /// e.g. "412-sandy" for Burmy Sandy Cloak.
-  final String? stem;
-
-  /// Explicit HOME art URL. Set when the base species sprites JSON won't contain
-  /// an entry for this form's HOME artwork (cosmetic forms only).
-  final String? homeUrl;
-  final String? homeShinyUrl;
-
-  const SpriteHint({this.stem, this.homeUrl, this.homeShinyUrl});
-}
-
 /// Wraps all form-state columns from [TeamSlotsData] into a single value object.
 /// No I/O — constructed from a DB row, passed to widgets and resolvers.
 class FormDescriptor {
@@ -104,28 +89,4 @@ class FormDescriptor {
     return baseSpecies;
   }
 
-  /// Override data for the sprite resolver.
-  /// Returns non-null fields only for cosmetic forms — all other forms let
-  /// the resolver use the fetched Pokemon's numeric ID as the sprite stem.
-  SpriteHint spriteHint(String baseSpecies, int baseSpeciesId) {
-    if (formName != null) {
-      final cosmeticStems = PokemonDataRegistry.instance.cosmeticSpriteStems[baseSpecies];
-      if (cosmeticStems != null && cosmeticStems.containsKey(formName)) {
-        final stem = cosmeticStems[formName]!;
-        final suffix = stem.split('-').last;
-        return SpriteHint(
-          stem: stem,
-          homeUrl: _cosmeticHomeUrl(baseSpeciesId, suffix),
-          homeShinyUrl: _cosmeticHomeShinyUrl(baseSpeciesId, suffix),
-        );
-      }
-    }
-    return const SpriteHint();
-  }
 }
-
-String _cosmeticHomeUrl(int id, String suffix) =>
-    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/$id-$suffix.png';
-
-String _cosmeticHomeShinyUrl(int id, String suffix) =>
-    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/$id-$suffix.png';

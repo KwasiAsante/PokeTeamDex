@@ -18,7 +18,7 @@ import 'package:poke_team_dex/features/teams/presentation/slot_config_screen.dar
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
-import 'package:poke_team_dex/services/format/sprite_resolver.dart';
+import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/features/teams/presentation/move_copy_slot_sheet.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
 import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
@@ -969,18 +969,15 @@ class _FilledSlotCard extends ConsumerWidget {
         // selected format, just like the default form does.
         final cosmeticFormChangeSuffix =
             cosmeticFormChange?.name.substring(pokemon.name.length + 1);
-        final cosmeticFormChangeSpriteUrls = cosmeticFormChangeSuffix != null
-            ? resolveSprite(
+        final cosmeticFormChangeSpriteUrls = cosmeticFormChange != null
+            ? PokemonDataResolver.resolveFormSprite(
                 sprites: null,
                 pokemonId: pokemon.id,
-                pokemonName: cosmeticFormChange!.name,
+                pokemonName: cosmeticFormChange.name,
+                baseSpecies: pokemon.name,
+                formName: cosmeticFormChange.name,
                 format: format,
                 useFormatSprites: useFormatSprites,
-                hint: SpriteHint(
-                  stem: '${pokemon.id}-$cosmeticFormChangeSuffix',
-                  homeUrl: cosmeticFormHomeUrl(pokemon.id, cosmeticFormChangeSuffix),
-                  homeShinyUrl: cosmeticFormHomeShinyUrl(pokemon.id, cosmeticFormChangeSuffix),
-                ),
               )
             : null;
         final formHomeUrl = formChangePokemon != null
@@ -1065,13 +1062,14 @@ class _FilledSlotCard extends ConsumerWidget {
         // Item detail (for sprite)
         final itemEntry = itemAsync?.whenOrNull(data: (e) => e);
 
-        final spriteUrls = resolveSprite(
+        final spriteUrls = PokemonDataResolver.resolveFormSprite(
           sprites: pokemon.sprites,
           pokemonId: slot.pokemonId,
           pokemonName: pokemon.name,
+          baseSpecies: pokemon.name,
+          formName: descriptor.formName,
           format: format,
           useFormatSprites: useFormatSprites,
-          hint: descriptor.spriteHint(pokemon.name, pokemon.id),
         );
 
         // Slot validation against format (Layer 1)

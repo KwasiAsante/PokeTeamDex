@@ -1,0 +1,1 @@
+enum PokedexImageType { artwork, sprite }

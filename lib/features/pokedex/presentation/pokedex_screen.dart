@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/features/pokedex/models/pokedex_filter.dart';
+import 'package:poke_team_dex/features/pokedex/models/pokedex_image_type.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
