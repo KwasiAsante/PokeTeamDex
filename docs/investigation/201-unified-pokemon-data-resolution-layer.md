@@ -231,7 +231,11 @@ Six tasks, each independently shippable. Tasks A–C are pure Flutter refactors 
 
 ## 4. Sprite Hosting (Deferred)
 
-The issue mentions self-hosting sprite assets on the backend (cloning `smogon/sprites` and `PokeAPI/sprites` into the FastAPI container). This is tracked as a separate follow-up task and is **not** part of this implementation plan. The main blocker resolved by self-hosting is the Pokémon Showdown CORS restriction on Flutter Web for Gen 2 shiny sprites — `sprite_resolver.dart` already has a `kIsWeb` branch to work around this. Self-hosting would make that branch unnecessary and reduce dependency on GitHub raw URL availability.
+The issue mentions self-hosting sprite assets on the backend (cloning `smogon/sprites` and `PokeAPI/sprites` into the FastAPI container). This is **not** part of this implementation plan.
+
+The main blocker resolved by self-hosting is the Pokémon Showdown CORS restriction on Flutter Web for Gen 2 shiny sprites — `sprite_resolver.dart` already has a `kIsWeb` branch to work around this. Self-hosting would make that branch unnecessary and reduce dependency on GitHub raw URL availability.
+
+**Follow-up:** Once all sub-issues of #201 are closed, open a new `investigation` issue for sprite hosting. That investigation should cover: storage cost of cloning `smogon/sprites` + `PokeAPI/sprites` into the backend container, serving strategy (static files via FastAPI vs. a dedicated CDN), cache-busting when upstream repos update, and whether the unified resolver from Task B makes the migration straightforward.
 
 ---
 
