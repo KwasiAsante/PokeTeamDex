@@ -19,10 +19,10 @@ class PokemonDataResolver {
 
   /// Resolves all sprite URLs for a Pokémon form.
   ///
-  /// Replaces `resolveSprite()` from `sprite_resolver.dart` and absorbs
-  /// cosmetic-form hint building from `FormDescriptor.spriteHint()`.
+  /// Replaces `resolveSprite()` from `sprite_resolver.dart`.
   ///
-  /// Pass [baseSpecies] + [formName] instead of a SpriteHint.
+  /// Pass [baseSpecies] + [formName] instead of constructing a SpriteHint —
+  /// this method handles the registry lookup internally.
   /// For Gen 1–5 the full versioned URL set is returned.
   /// For Gen 6+ (or useFormatSprites false) HOME/official-artwork is used.
   ///
@@ -59,9 +59,18 @@ class PokemonDataResolver {
     if (formName != null) {
       final stems = registry.cosmeticSpriteStems[baseSpecies];
       if (stems != null && stems.containsKey(formName)) {
+        // Registry entry: stem may differ from id-suffix pattern (e.g. unown letters).
         final s = stems[formName]!;
         final suffix = s.split('-').last;
         cosmeticStem = s;
+        cosmeticHome = cosmeticFormHomeUrl(pokemonId, suffix);
+        cosmeticHomeShiny = cosmeticFormHomeShinyUrl(pokemonId, suffix);
+      } else if (formName.startsWith('$baseSpecies-')) {
+        // Fallback for cosmetic species not in the registry (cherrim, frillish, etc.).
+        // The sprite naming convention is "{baseSpeciesId}-{suffix}" for all cosmetic
+        // forms, so we can derive the stem directly from the form name.
+        final suffix = formName.substring(baseSpecies.length + 1);
+        cosmeticStem = '$pokemonId-$suffix';
         cosmeticHome = cosmeticFormHomeUrl(pokemonId, suffix);
         cosmeticHomeShiny = cosmeticFormHomeShinyUrl(pokemonId, suffix);
       }

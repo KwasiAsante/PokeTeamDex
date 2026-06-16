@@ -75,6 +75,22 @@ void main() {
           'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/412-sandy.png');
     });
 
+    test('cosmetic form not in registry but name follows baseSpecies-suffix pattern: uses suffix-based HOME url', () {
+      // cherrim-sunshine is NOT in cosmeticSpriteStems (only 7 species are),
+      // but its name starts with 'cherrim-' so the fallback must kick in.
+      final result = PokemonDataResolver.resolveFormSprite(
+        sprites: null,
+        pokemonId: 421,
+        pokemonName: 'cherrim-sunshine',
+        baseSpecies: 'cherrim',
+        formName: 'cherrim-sunshine',
+        format: null,
+        useFormatSprites: false,
+      );
+      expect(result.defaultUrl,
+          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/421-sunshine.png');
+    });
+
     test('no sprites and no cosmetic match: raw front sprite fallback', () {
       final result = PokemonDataResolver.resolveFormSprite(
         sprites: null,
