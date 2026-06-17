@@ -49,8 +49,14 @@ class SmogonSet(BaseModel):
 
 
 class SmogonFormatData(BaseModel):
+    """One competitive format's data from Smogon.
+
+    Slim (default / no includes=smogon): format_id only — no sets.
+    Full (?includes[]=smogon or /pokemon/smogon/{id}): sets populated.
+    """
+
     format_id: str
-    sets: dict[str, SmogonSet]
+    sets: dict[str, SmogonSet] | None = None  # None in slim response
 
 
 class SpriteUrls(BaseModel):
@@ -112,6 +118,15 @@ class FormData(BaseModel):
     sprite_urls: SpriteUrlsFull | None = None
 
 
+class SmogonResponse(BaseModel):
+    """Full Smogon analyses for a single Pokémon, across all loaded formats."""
+
+    pokemon_id: int
+    gen: int
+    name: str
+    smogon_analyses: list[SmogonFormatData] | None  # null while background load runs
+
+
 class VarietiesResponse(BaseModel):
     """All non-default varieties of a base Pokémon species, always fully expanded."""
 
@@ -150,7 +165,8 @@ class PokemonResolvedResponse(BaseModel):
     base_stats: dict[str, int]
     abilities: dict[str, str]
     supplement_moves: list[EventMove]
-    smogon_analyses: list[SmogonFormatData] | None
+    smogon_analyses: list[SmogonFormatData] | None  # slim: format_ids only; full: sets included
+    smogon_url: str          # /pokemon/{pokemon_id}/smogon — always fetch full smogon data here
     varieties: list[VarietyData]
     varieties_url: str   # /pokemon/{pokemon_id}/varieties — fetch full variety list
     forms: list[FormData]

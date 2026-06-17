@@ -27,6 +27,7 @@ from app.schemas.pokemon_resolved import (
     FormData,
     PokemonResolvedResponse,
     SmogonFormatData,
+    SmogonResponse,
     SmogonSet,
     SpriteUrlsFull,
     VarietyData,
@@ -608,6 +609,13 @@ class PokemonResolverService:
                     for f in response.forms
                 ]
             })
+        if "smogon" not in includes and response.smogon_analyses is not None:
+            response = response.model_copy(update={
+                "smogon_analyses": [
+                    SmogonFormatData(format_id=f.format_id)  # strip sets, keep format id
+                    for f in response.smogon_analyses
+                ]
+            })
         return response
 
     # ------------------------------------------------------------------
@@ -699,6 +707,7 @@ class PokemonResolverService:
             abilities=abilities,
             supplement_moves=supplement_moves,
             smogon_analyses=smogon_analyses,
+            smogon_url=f"/pokemon/{pokemon_id}/smogon",
             varieties=varieties,
             varieties_url=f"/pokemon/{pokemon_id}/varieties",
             forms=forms,
@@ -785,6 +794,37 @@ class PokemonResolverService:
             gen=gen,
             name=full.name,
             varieties=full.varieties,
+        )
+
+    async def resolve_smogon(
+        self, name_or_id: str, gen: int, db: AsyncSession
+    ) -> SmogonResponse:
+        pokemon_id = await self._resolve_name_or_id(name_or_id)
+
+        result = await db.execute(
+            select(PokemonResolved).where(
+                PokemonResolved.pokemon_id == pokemon_id,
+                PokemonResolved.gen == gen,
+                PokemonResolved.resolved_at
+                + text("(ttl_days * interval '1 day')")
+                > func.now(),
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row:
+            return SmogonResponse(
+                pokemon_id=pokemon_id,
+                gen=gen,
+                name=row.data.get("name", ""),
+                smogon_analyses=row.data.get("smogon_analyses"),
+            )
+
+        full = await self.resolve(pokemon_id, gen, ["smogon"], db)
+        return SmogonResponse(
+            pokemon_id=pokemon_id,
+            gen=gen,
+            name=full.name,
+            smogon_analyses=full.smogon_analyses,
         )
 
     async def resolve_forms(

@@ -4,6 +4,7 @@ from app.core.deps import DB
 from app.schemas.pokemon_resolved import (
     FormsResponse,
     PokemonResolvedResponse,
+    SmogonResponse,
     VarietiesResponse,
 )
 from app.services.pokemon_resolver import pokemon_resolver_service
@@ -59,6 +60,29 @@ async def get_pokemon_forms(
     if not 1 <= gen <= 9:
         raise HTTPException(status_code=400, detail="gen must be between 1 and 9")
     return await pokemon_resolver_service.resolve_forms(name_or_id, gen, db)
+
+
+@router.get("/smogon/{name_or_id}", response_model=SmogonResponse)
+async def get_pokemon_smogon(
+    name_or_id: str,
+    db: DB,
+    gen: int = 9,
+) -> SmogonResponse:
+    """
+    Return full Smogon competitive analyses for a Pokémon across all loaded formats.
+
+    - **name_or_id**: Base Pokémon name ("venusaur") or numeric ID (3).
+    - **gen**: Generation to resolve for (1–9, default 9).
+
+    `smogon_analyses` is null while the background format preload is in progress
+    (~15 s after cold start). Each entry includes full set details (moves, ability,
+    item, nature, EVs, teratypes, descriptions).
+
+    Results are cached alongside the full resolved data (7-day TTL).
+    """
+    if not 1 <= gen <= 9:
+        raise HTTPException(status_code=400, detail="gen must be between 1 and 9")
+    return await pokemon_resolver_service.resolve_smogon(name_or_id, gen, db)
 
 
 @router.get("/{name_or_id}/resolved", response_model=PokemonResolvedResponse)

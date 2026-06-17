@@ -432,6 +432,49 @@ class TestSmogonSetTeratypes:
         assert s.teratypes is None
 
 
+class TestSmogonSlimTrim:
+    """When smogon not in includes, sets are stripped but format_ids are kept."""
+
+    _SETS = {
+        "gen9ou": {
+            "Venusaur": {
+                "Sun Sweeper": {"moves": ["Growth"], "ability": "Chlorophyll"}
+            }
+        },
+        "gen9uu": {
+            "Venusaur": {
+                "Bulky": {"moves": ["Giga Drain"], "ability": "Chlorophyll"}
+            }
+        },
+    }
+    _ANALYSES = {"gen9ou": {"Venusaur": {"sets": {"Sun Sweeper": {}}}}, "gen9uu": {}}
+
+    def _full_analyses(self):
+        from app.schemas.pokemon_resolved import SmogonFormatData, SmogonSet
+        return [
+            SmogonFormatData(
+                format_id="gen9ou",
+                sets={"Sun Sweeper": SmogonSet(moves=["Growth"], ability="Chlorophyll")},
+            ),
+            SmogonFormatData(format_id="gen9uu", sets={"Bulky": SmogonSet(moves=["Giga Drain"])}),
+        ]
+
+    def test_slim_strips_sets_keeps_format_ids(self):
+        from app.schemas.pokemon_resolved import SmogonFormatData
+        full = self._full_analyses()
+        slim = [SmogonFormatData(format_id=f.format_id) for f in full]
+        assert len(slim) == 2
+        assert slim[0].format_id == "gen9ou"
+        assert slim[0].sets is None
+        assert slim[1].format_id == "gen9uu"
+        assert slim[1].sets is None
+
+    def test_full_preserves_sets(self):
+        full = self._full_analyses()
+        assert full[0].sets is not None
+        assert "Sun Sweeper" in full[0].sets
+
+
 class TestGetSmogonAnalyses:
     _SETS = {
         "gen9ou": {
