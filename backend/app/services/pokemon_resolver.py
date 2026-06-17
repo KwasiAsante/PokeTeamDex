@@ -460,7 +460,7 @@ class PokemonResolverService:
     # ------------------------------------------------------------------
 
     async def _fetch_varieties(
-        self, varieties: list[dict], species_name: str, gen: int
+        self, varieties: list[dict], species_name: str, gen: int, base_url: str = ""
     ) -> list[VarietyData]:
         """Parallel fetch /pokemon/{id} for each non-default variety.
 
@@ -495,7 +495,7 @@ class PokemonResolverService:
                     name=variety_name,
                     pokemon_id=variety_id,
                     is_default=False,
-                    resolved_url=f"/pokemon/{variety_id}/resolved",
+                    resolved_url=f"{base_url}/pokemon/{variety_id}/resolved",
                 ))
                 continue
 
@@ -623,7 +623,8 @@ class PokemonResolverService:
     # ------------------------------------------------------------------
 
     async def resolve(
-        self, pokemon_id: int, gen: int, includes: list[str], db: AsyncSession
+        self, pokemon_id: int, gen: int, includes: list[str], db: AsyncSession,
+        base_url: str = "",
     ) -> PokemonResolvedResponse:
         # 1. Cache hit (full data always stored)
         result = await db.execute(
@@ -690,7 +691,7 @@ class PokemonResolverService:
 
         # 8. Varieties (always fetched on cache miss, trimmed at response time)
         raw_varieties = species_info["varieties"]
-        varieties = await self._fetch_varieties(raw_varieties, species_name, gen)
+        varieties = await self._fetch_varieties(raw_varieties, species_name, gen, base_url)
 
         # 9. Forms (form-entry cosmetics)
         form_names = [f["name"] for f in pokemon_data.get("forms", [])]
@@ -707,11 +708,11 @@ class PokemonResolverService:
             abilities=abilities,
             supplement_moves=supplement_moves,
             smogon_analyses=smogon_analyses,
-            smogon_url=f"/pokemon/{pokemon_id}/smogon",
+            smogon_url=f"{base_url}/pokemon/{pokemon_id}/smogon",
             varieties=varieties,
-            varieties_url=f"/pokemon/{pokemon_id}/varieties",
+            varieties_url=f"{base_url}/pokemon/{pokemon_id}/varieties",
             forms=forms,
-            forms_url=f"/pokemon/{pokemon_id}/forms",
+            forms_url=f"{base_url}/pokemon/{pokemon_id}/forms",
             sprite_urls=sprite_urls,
             resolved_at=now,
         )
@@ -763,12 +764,11 @@ class PokemonResolverService:
             raise HTTPException(503, detail="PokéAPI is unavailable; try again later")
 
     async def resolve_varieties(
-        self, name_or_id: str, gen: int, db: AsyncSession
+        self, name_or_id: str, gen: int, db: AsyncSession, base_url: str = ""
     ) -> "VarietiesResponse":
         from app.schemas.pokemon_resolved import VarietiesResponse
         pokemon_id = await self._resolve_name_or_id(name_or_id)
 
-        # Cache hit — extract varieties directly from stored full data
         result = await db.execute(
             select(PokemonResolved).where(
                 PokemonResolved.pokemon_id == pokemon_id,
@@ -787,8 +787,7 @@ class PokemonResolverService:
                 varieties=row.data.get("varieties", []),
             )
 
-        # Cache miss — do full resolution (warms cache as a side effect)
-        full = await self.resolve(pokemon_id, gen, ["varieties", "forms"], db)
+        full = await self.resolve(pokemon_id, gen, ["varieties", "forms"], db, base_url)
         return VarietiesResponse(
             pokemon_id=pokemon_id,
             gen=gen,
@@ -797,7 +796,7 @@ class PokemonResolverService:
         )
 
     async def resolve_smogon(
-        self, name_or_id: str, gen: int, db: AsyncSession
+        self, name_or_id: str, gen: int, db: AsyncSession, base_url: str = ""
     ) -> SmogonResponse:
         pokemon_id = await self._resolve_name_or_id(name_or_id)
 
@@ -819,7 +818,7 @@ class PokemonResolverService:
                 smogon_analyses=row.data.get("smogon_analyses"),
             )
 
-        full = await self.resolve(pokemon_id, gen, ["smogon"], db)
+        full = await self.resolve(pokemon_id, gen, ["smogon"], db, base_url)
         return SmogonResponse(
             pokemon_id=pokemon_id,
             gen=gen,
@@ -828,7 +827,7 @@ class PokemonResolverService:
         )
 
     async def resolve_forms(
-        self, name_or_id: str, gen: int, db: AsyncSession
+        self, name_or_id: str, gen: int, db: AsyncSession, base_url: str = ""
     ) -> "FormsResponse":
         from app.schemas.pokemon_resolved import FormsResponse
         pokemon_id = await self._resolve_name_or_id(name_or_id)
@@ -851,7 +850,7 @@ class PokemonResolverService:
                 forms=row.data.get("forms", []),
             )
 
-        full = await self.resolve(pokemon_id, gen, ["varieties", "forms"], db)
+        full = await self.resolve(pokemon_id, gen, ["varieties", "forms"], db, base_url)
         return FormsResponse(
             pokemon_id=pokemon_id,
             gen=gen,

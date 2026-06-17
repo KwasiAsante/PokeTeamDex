@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.core.deps import DB
 from app.schemas.pokemon_resolved import (
@@ -12,12 +12,20 @@ from app.services.pokemon_resolver import pokemon_resolver_service
 router = APIRouter(prefix="/pokemon", tags=["pokemon"])
 
 # IMPORTANT: literal-segment routes must be declared before the parameterised
-# /{name_or_id}/resolved route so FastAPI doesn't swallow "varieties" or "forms"
-# as the name_or_id param value.
+# /{name_or_id}/resolved route so FastAPI doesn't swallow "varieties", "forms",
+# or "smogon" as the name_or_id param value.
+
+
+def _base_url(request: Request) -> str:
+    """Return the scheme+host base URL with no trailing slash.
+    e.g. http://localhost:8000 or https://poketeamdex.duckdns.org
+    """
+    return str(request.base_url).rstrip("/")
 
 
 @router.get("/varieties/{name_or_id}", response_model=VarietiesResponse)
 async def get_pokemon_varieties(
+    request: Request,
     name_or_id: str,
     db: DB,
     gen: int = 9,
@@ -36,11 +44,12 @@ async def get_pokemon_varieties(
     """
     if not 1 <= gen <= 9:
         raise HTTPException(status_code=400, detail="gen must be between 1 and 9")
-    return await pokemon_resolver_service.resolve_varieties(name_or_id, gen, db)
+    return await pokemon_resolver_service.resolve_varieties(name_or_id, gen, db, _base_url(request))
 
 
 @router.get("/forms/{name_or_id}", response_model=FormsResponse)
 async def get_pokemon_forms(
+    request: Request,
     name_or_id: str,
     db: DB,
     gen: int = 9,
@@ -59,11 +68,12 @@ async def get_pokemon_forms(
     """
     if not 1 <= gen <= 9:
         raise HTTPException(status_code=400, detail="gen must be between 1 and 9")
-    return await pokemon_resolver_service.resolve_forms(name_or_id, gen, db)
+    return await pokemon_resolver_service.resolve_forms(name_or_id, gen, db, _base_url(request))
 
 
 @router.get("/smogon/{name_or_id}", response_model=SmogonResponse)
 async def get_pokemon_smogon(
+    request: Request,
     name_or_id: str,
     db: DB,
     gen: int = 9,
@@ -82,11 +92,12 @@ async def get_pokemon_smogon(
     """
     if not 1 <= gen <= 9:
         raise HTTPException(status_code=400, detail="gen must be between 1 and 9")
-    return await pokemon_resolver_service.resolve_smogon(name_or_id, gen, db)
+    return await pokemon_resolver_service.resolve_smogon(name_or_id, gen, db, _base_url(request))
 
 
 @router.get("/{name_or_id}/resolved", response_model=PokemonResolvedResponse)
 async def get_resolved_pokemon(
+    request: Request,
     name_or_id: str,
     db: DB,
     gen: int = 9,
@@ -104,11 +115,11 @@ async def get_resolved_pokemon(
     - **includes**: Comma-separated list of fields to expand.
       - `varieties` — embed types, base_stats, abilities, sprite_urls per variety
       - `forms` — embed sprite_urls per cosmetic form
-      Default (omitted): slim entries with name + id only; no extra API calls.
+      - `smogon` — embed full competitive sets (moves, EVs, items, etc.)
+      Default (omitted): slim entries; no extra API calls.
 
-    `smogon_analyses` is null while the background format preload is in
-    progress (typically < 15 s after cold start) or when the Pokémon has
-    no data in any loaded competitive format.
+    Navigation URLs (`smogon_url`, `varieties_url`, `forms_url`) are absolute
+    so the client can follow them directly without constructing paths.
     """
     if not 1 <= gen <= 9:
         raise HTTPException(status_code=400, detail="gen must be between 1 and 9")
@@ -116,4 +127,4 @@ async def get_resolved_pokemon(
     normalised = []
     for item in includes:
         normalised.extend(i.strip() for i in item.split(",") if i.strip())
-    return await pokemon_resolver_service.resolve(pokemon_id, gen, normalised, db)
+    return await pokemon_resolver_service.resolve(pokemon_id, gen, normalised, db, _base_url(request))
