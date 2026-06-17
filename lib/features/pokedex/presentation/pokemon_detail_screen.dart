@@ -7,6 +7,7 @@ import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart'
     show teamRepositoryProvider, teamSlotRepositoryProvider;
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
     show teamSlotsProvider;
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
@@ -120,18 +121,13 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    final pokemonAsync = ref.watch(pokemonDetailProvider(widget.pokemonId));
-    final speciesAsync = ref.watch(pokemonSpeciesProvider(widget.pokemonId));
+    final resolvedAsync = ref.watch(resolvedPokemonProvider(widget.pokemonId));
     final formAsync = _selectedFormName != null
         ? ref.watch(pokemonByNameProvider(_selectedFormName!))
         : null;
-    final cosmPokemonName = pokemonAsync.asData?.value.name;
-    final cosmeticFormsAsync = cosmPokemonName != null
-        ? ref.watch(cosmeticFormsProvider(cosmPokemonName))
-        : null;
     final isWide = MediaQuery.sizeOf(context).width > 840;
 
-    return pokemonAsync.when(
+    return resolvedAsync.when(
       loading: () => Scaffold(
         appBar: AppBar(leading: BackButton(onPressed: () => context.pop())),
         body: const LoadingState(),
@@ -140,62 +136,40 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         appBar: AppBar(leading: BackButton(onPressed: () => context.pop())),
         body: ErrorState(
           error: e,
-          onRetry: () => ref.invalidate(pokemonDetailProvider(widget.pokemonId)),
+          onRetry: () => ref.invalidate(resolvedPokemonProvider(widget.pokemonId)),
         ),
       ),
-      data: (basePokemon) {
+      data: (resolved) {
+        final basePokemon = resolved.detail;
+        // Wrap species so child widgets that accept AsyncValue<PokemonSpeciesEntry>
+        // receive it in the data state — the whole resolved provider is already done.
+        final speciesAsync = AsyncData<PokemonSpeciesEntry>(resolved.species);
         final effectivePokemon = formAsync?.asData?.value ?? basePokemon;
         final primaryType =
             effectivePokemon.types[1] ?? effectivePokemon.types.values.first;
         final headerColor =
             PokemonTypeColors.colors[primaryType] ?? Theme.of(context).colorScheme.primary;
-        final species = speciesAsync.asData?.value;
-        final battleForms = species != null
-            ? battleMeaningfulForms(species.varieties)
-            : <PokemonVariety>[];
+        final species = resolved.species;
+        final battleForms = battleMeaningfulForms(species.varieties);
         // Derive the correct base form label:
         // • Gender-split species (all forms end in -female) → "Male"
         // • Species with regional forms (any form has a regional suffix) → regional adjective
         // • Non-regional non-gender form variants (Rotom appliances, Lycanroc, Urshifu…) → "Base"
         final baseFormLabel = computeBaseFormLabel(
           basePokemon.name,
-          species?.generationName,
+          species.generationName,
           battleForms,
         );
-        // Filter out phantom cosmetic forms for species that inherit irrelevant
-        // form names (e.g. Mothim gets Sandy/Trash from Burmy but looks identical).
-        final rawCosmeticForms = PokemonDataRegistry.instance.noCosmeticFormsPokemon.contains(basePokemon.name)
-            ? const <PokemonFormEntry>[]
-            : (cosmeticFormsAsync?.asData?.value ?? const <PokemonFormEntry>[]);
-        // Patch gender forms whose /pokemon-form endpoint returns null for
-        // front_default (e.g. frillish-female, jellicent-female) — use the
-        // pokemon/female/{id}.png sprite instead.
-        final cosmeticFormsBase = rawCosmeticForms.map((f) {
-          if (f.spriteUrl == null && f.formName == 'female') {
-            return PokemonFormEntry(
-              id: f.id,
-              name: f.name,
-              formName: f.formName,
-              isDefault: f.isDefault,
-              spriteUrl:
-                  'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/female/${basePokemon.id}.png',
-              spriteShinyUrl:
-                  'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/female/${basePokemon.id}.png',
-              officialArtworkUrl: f.officialArtworkUrl,
-              officialArtworkShinyUrl: f.officialArtworkShinyUrl,
-            );
-          }
-          return f;
-        }).toList();
-        final cosmeticFormsLoading = !PokemonDataRegistry.instance.noCosmeticFormsPokemon.contains(basePokemon.name) &&
-            cosmeticFormsAsync != null &&
-            cosmeticFormsAsync.isLoading;
+        // Cosmetic forms are already fetched, patched, and filtered by
+        // resolvedPokemonProvider — no further processing needed here.
+        final cosmeticFormsBase = resolved.cosmeticForms;
+        const cosmeticFormsLoading = false;
 
         // Variety-based cosmetic chips are only shown for the BASE form.
         // When a regional battle form is selected (e.g. Hisuian Basculin),
         // Unovan cosmetic variants (Blue-Striped) are not relevant.
         final varietyCosmeticForms = <PokemonFormEntry>[];
-        if (species != null && _selectedFormName == null) {
+        if (_selectedFormName == null) {
           for (final variety in species.varieties) {
             if (variety.isDefault) continue;
             if (!PokemonDataRegistry.instance.cosmeticVarietyNames.contains(variety.name)) continue;
@@ -222,22 +196,8 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
           }
         }
 
-        // Synthesise a female cosmetic chip for species with gender-diff sprites
-        // but no separate pokemon-form resource in PokéAPI (e.g. Unfezant).
-        if (PokemonDataRegistry.instance.cosmeticGenderDiffPokemon.contains(basePokemon.name) && _selectedFormName == null) {
-          final baseId = basePokemon.id;
-          varietyCosmeticForms.add(PokemonFormEntry(
-            id: baseId,
-            name: '${basePokemon.name}-female',
-            formName: 'female',
-            isDefault: false,
-            spriteUrl:
-                'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/female/$baseId.png',
-            spriteShinyUrl:
-                'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/female/$baseId.png',
-          ));
-        }
-
+        // cosmeticFormsBase (from resolvedPokemonProvider) already contains the
+        // synthetic female entry for cosmeticGenderDiffPokemon species.
         final cosmeticForms = [...cosmeticFormsBase, ...varietyCosmeticForms];
 
         return isWide

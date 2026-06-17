@@ -9,6 +9,7 @@ import 'package:poke_team_dex/features/pokedex/models/pokedex_filter.dart';
 import 'package:poke_team_dex/features/pokedex/models/pokedex_image_type.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
@@ -40,46 +41,10 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final detailAsync = ref.watch(pokemonDetailProvider(widget.pokemon.id));
-    final speciesAsync = ref.watch(pokemonSpeciesProvider(widget.pokemon.id));
-
-    final basePokemon = detailAsync.asData?.value;
-
-    // Form-based cosmetics — gated on formNames.length > 1
-    final shouldFetchCosmetic = basePokemon != null &&
-        basePokemon.formNames.length > 1 &&
-        !PokemonDataRegistry.instance.noCosmeticFormsPokemon.contains(basePokemon.name);
-    final cosmeticFormsAsync = shouldFetchCosmetic
-        ? ref.watch(cosmeticFormsProvider(basePokemon.name))
-        : null;
-
-    final rawEntries =
-        cosmeticFormsAsync?.asData?.value ?? const <PokemonFormEntry>[];
-    final cosmeticFormEntries = <PokemonFormEntry>[
-      ...rawEntries.map((f) {
-        if (f.spriteUrl == null && f.formName == 'female' && basePokemon != null) {
-          return PokemonFormEntry(
-            id: f.id,
-            name: f.name,
-            formName: f.formName,
-            isDefault: f.isDefault,
-            spriteUrl: '${_kBase}female/${basePokemon.id}.png',
-            spriteShinyUrl: '${_kBase}shiny/female/${basePokemon.id}.png',
-          );
-        }
-        return f;
-      }),
-      if (basePokemon != null &&
-          PokemonDataRegistry.instance.cosmeticGenderDiffPokemon.contains(basePokemon.name))
-        PokemonFormEntry(
-          id: basePokemon.id,
-          name: '${basePokemon.name}-female',
-          formName: 'female',
-          isDefault: false,
-          spriteUrl: '${_kBase}female/${basePokemon.id}.png',
-          spriteShinyUrl: '${_kBase}shiny/female/${basePokemon.id}.png',
-        ),
-    ];
+    final resolvedAsync = ref.watch(resolvedPokemonProvider(widget.pokemon.id));
+    final resolved = resolvedAsync.asData?.value;
+    final basePokemon = resolved?.detail;
+    final cosmeticFormEntries = resolved?.cosmeticForms ?? const <PokemonFormEntry>[];
 
     final selectedCosmeticEntry = _selectedFormName != null
         ? cosmeticFormEntries
@@ -91,7 +56,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         : null;
 
     // Form list
-    final species = speciesAsync.asData?.value;
+    final species = resolved?.species;
     final battleForms =
         species != null ? battleMeaningfulForms(species.varieties) : <PokemonVariety>[];
     final cosmeticVarietyForms = species != null
@@ -128,8 +93,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
     final formEntry = formAsync?.asData?.value;
     final isFormLoading = formAsync != null && formAsync.isLoading;
 
-    final effectiveTypes = formEntry?.types ??
-        detailAsync.whenOrNull(data: (p) => p.types);
+    final effectiveTypes = formEntry?.types ?? basePokemon?.types;
     final primaryType =
         effectiveTypes?[1] ?? effectiveTypes?.values.firstOrNull;
     final types = effectiveTypes?.values.toList() ?? const <String>[];
