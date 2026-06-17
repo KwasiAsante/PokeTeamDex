@@ -75,7 +75,42 @@ _SHOWDOWN_GEN_SHINY_DIRS: dict[int, str] = {
 _ROMAN = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5,
           "vi": 6, "vii": 7, "viii": 8, "ix": 9}
 
+_GEN_RANGES = [(151, 1), (251, 2), (386, 3), (493, 4), (649, 5),
+               (721, 6), (809, 7), (905, 8), (10000, 9)]
+
+
+def _num_to_gen(num: int) -> int:
+    for limit, gen in _GEN_RANGES:
+        if num <= limit:
+            return gen
+    return 9
+
 _SOURCE_METHOD = {"S": "event", "E": "egg", "T": "tutor", "L": "level", "M": "machine"}
+
+# Name-pattern → introduction gen for variety forms.
+# Patterns are checked in order; first match wins.
+# Battle-state and origin forms (zen, blade, origin, etc.) fall through
+# to the base pokemon's gen via _num_to_gen().
+_VARIETY_GEN_PATTERNS: list[tuple[str, int]] = [
+    ("-mega", 6), ("-primal", 6),
+    ("-alola", 7), ("-totem", 7),
+    ("-galar", 8), ("-gmax", 8), ("-eternamax", 8), ("-hisui", 8),
+    ("-paldea", 9),
+]
+
+
+def _variety_intro_gen(variety_name: str, base_num: int | None) -> int:
+    """Return the generation a variety was introduced.
+
+    Uses name patterns for form types with known introduction gens (megas in
+    gen 6, Alolan forms in gen 7, etc.).  Falls back to the base species'
+    gen (via _num_to_gen) for battle-state forms that were introduced
+    alongside the base pokemon (Zen Darmanitan gen 5, Aegislash-Blade gen 6).
+    """
+    for pattern, gen in _VARIETY_GEN_PATTERNS:
+        if pattern in variety_name:
+            return gen
+    return _num_to_gen(base_num or 0)
 
 
 def _gen_from_name(generation_name: str) -> int:
@@ -426,8 +461,19 @@ class PokemonResolverService:
     async def _fetch_varieties(
         self, varieties: list[dict], species_name: str, gen: int
     ) -> list[VarietyData]:
-        """Parallel fetch /pokemon/{id} for each non-default variety."""
-        non_defaults = [v for v in varieties if not v.get("is_default", True)]
+        """Parallel fetch /pokemon/{id} for each non-default variety.
+
+        Varieties introduced after the requested gen are excluded.
+        """
+        # Get base pokemon's dex number for battle-state form gen fallback
+        base_ps_id = species_name.replace("-", "").lower()
+        base_num: int | None = self._ps_pokedex.get(base_ps_id, {}).get("num")
+
+        non_defaults = [
+            v for v in varieties
+            if not v.get("is_default", True)
+            and _variety_intro_gen(v["pokemon"]["name"], base_num) <= gen
+        ]
         if not non_defaults:
             return []
 

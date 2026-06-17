@@ -14,6 +14,7 @@ from app.services.pokemon_resolver import (
     _build_pokeapi_sprite_url,
     _build_showdown_sprite_url,
     _extract_form_suffix,
+    _variety_intro_gen,
 )
 from app.schemas.pokemon_resolved import SpriteUrlsFull
 
@@ -47,6 +48,47 @@ def _make_service(
 # ---------------------------------------------------------------------------
 # _to_showdown_name
 # ---------------------------------------------------------------------------
+
+class TestVarietyIntroGen:
+    def test_mega_is_gen6(self):
+        assert _variety_intro_gen("charizard-mega-x", 6) == 6
+        assert _variety_intro_gen("venusaur-mega", 3) == 6
+
+    def test_alolan_is_gen7(self):
+        assert _variety_intro_gen("meowth-alola", 52) == 7
+        assert _variety_intro_gen("raichu-alola", 26) == 7
+
+    def test_galarian_is_gen8(self):
+        assert _variety_intro_gen("meowth-galar", 52) == 8
+
+    def test_gmax_is_gen8(self):
+        assert _variety_intro_gen("charizard-gmax", 6) == 8
+
+    def test_hisuian_is_gen8(self):
+        assert _variety_intro_gen("zorua-hisui", 570) == 8
+
+    def test_paldean_is_gen9(self):
+        assert _variety_intro_gen("tauros-paldea-combat", 128) == 9
+
+    def test_battle_state_form_inherits_base_gen(self):
+        # Darmanitan-Zen is gen 5 (same as base Darmanitan, num=555)
+        assert _variety_intro_gen("darmanitan-zen", 555) == 5
+        # Aegislash-Blade is gen 6 (same as base Aegislash, num=681)
+        assert _variety_intro_gen("aegislash-blade", 681) == 6
+
+    def test_origin_form_inherits_base_gen(self):
+        # Giratina-Origin gen 4 (num=487)
+        assert _variety_intro_gen("giratina-origin", 487) == 4
+
+    def test_kyurem_fusion_inherits_base_gen(self):
+        # Kyurem-Black gen 5 (num=646)
+        assert _variety_intro_gen("kyurem-black", 646) == 5
+
+    def test_none_num_fallback(self):
+        # No base num — defaults to gen 9
+        result = _variety_intro_gen("someunknown", None)
+        assert isinstance(result, int)
+
 
 class TestToShowdownName:
     def test_simple(self):
