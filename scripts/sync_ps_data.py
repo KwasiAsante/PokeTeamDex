@@ -222,7 +222,8 @@ def transform_moves(raw: dict) -> dict:
             "category": d.get("category", "Status"),
             "base_power": d.get("basePower") or 0,
             # PS uses True (bool) for moves that always hit; normalise to None.
-            "accuracy": d.get("accuracy") if isinstance(d.get("accuracy"), int) else None,
+            # Must check bool first — bool is a subclass of int in Python.
+            "accuracy": d.get("accuracy") if isinstance(d.get("accuracy"), int) and not isinstance(d.get("accuracy"), bool) else None,
             "pp": d.get("pp", 0),
             "is_z_move": bool(d.get("isZ")),
             "is_max_move": bool(d.get("isMax")),
