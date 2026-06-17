@@ -95,7 +95,7 @@ class VarietyData(BaseModel):
     name: str
     pokemon_id: int
     is_default: bool
-    resolved_url: str  # always set: /pokemon/{pokemon_id}/resolved
+    resolved_url: str | None = None  # /pokemon/{pokemon_id}/resolved (None in stale cached rows)
     types: list[str] | None = None
     base_stats: dict[str, int] | None = None
     abilities: dict[str, str] | None = None
@@ -166,10 +166,10 @@ class PokemonResolvedResponse(BaseModel):
     abilities: dict[str, str]
     supplement_moves: list[EventMove]
     smogon_analyses: list[SmogonFormatData] | None  # slim: format_ids only; full: sets included
-    smogon_url: str          # /pokemon/{pokemon_id}/smogon — always fetch full smogon data here
+    smogon_url: str | None = None      # /pokemon/{pokemon_id}/smogon
     varieties: list[VarietyData]
-    varieties_url: str   # /pokemon/{pokemon_id}/varieties — fetch full variety list
+    varieties_url: str | None = None   # /pokemon/{pokemon_id}/varieties
     forms: list[FormData]
-    forms_url: str       # /pokemon/{pokemon_id}/forms — fetch full form list with sprites
+    forms_url: str | None = None       # /pokemon/{pokemon_id}/forms
     sprite_urls: SpriteUrlsFull
     resolved_at: datetime
