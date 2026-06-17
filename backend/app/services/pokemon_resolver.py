@@ -651,6 +651,95 @@ class PokemonResolverService:
         # 12. Trim and return
         return self._trim_response(response, includes)
 
+    # ------------------------------------------------------------------
+    # Name-or-ID resolution + convenience endpoints
+    # ------------------------------------------------------------------
+
+    async def _resolve_name_or_id(self, name_or_id: str) -> int:
+        """Resolve a pokemon name or numeric string to a PokéAPI pokemon ID.
+
+        "6" → 6 (numeric, no network call)
+        "charizard-mega-x" → 10034 (name lookup via PokéAPI)
+        """
+        if name_or_id.isdigit():
+            return int(name_or_id)
+        try:
+            r = await self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon/{name_or_id}")
+            r.raise_for_status()
+            return r.json()["id"]
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                raise HTTPException(404, detail=f"Pokémon '{name_or_id}' not found")
+            raise
+        except httpx.TimeoutException:
+            raise HTTPException(503, detail="PokéAPI is unavailable; try again later")
+
+    async def resolve_varieties(
+        self, name_or_id: str, gen: int, db: AsyncSession
+    ) -> "VarietiesResponse":
+        from app.schemas.pokemon_resolved import VarietiesResponse
+        pokemon_id = await self._resolve_name_or_id(name_or_id)
+
+        # Cache hit — extract varieties directly from stored full data
+        result = await db.execute(
+            select(PokemonResolved).where(
+                PokemonResolved.pokemon_id == pokemon_id,
+                PokemonResolved.gen == gen,
+                PokemonResolved.resolved_at
+                + text("(ttl_days * interval '1 day')")
+                > func.now(),
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row:
+            return VarietiesResponse(
+                pokemon_id=pokemon_id,
+                gen=gen,
+                name=row.data.get("name", ""),
+                varieties=row.data.get("varieties", []),
+            )
+
+        # Cache miss — do full resolution (warms cache as a side effect)
+        full = await self.resolve(pokemon_id, gen, ["varieties", "forms"], db)
+        return VarietiesResponse(
+            pokemon_id=pokemon_id,
+            gen=gen,
+            name=full.name,
+            varieties=full.varieties,
+        )
+
+    async def resolve_forms(
+        self, name_or_id: str, gen: int, db: AsyncSession
+    ) -> "FormsResponse":
+        from app.schemas.pokemon_resolved import FormsResponse
+        pokemon_id = await self._resolve_name_or_id(name_or_id)
+
+        result = await db.execute(
+            select(PokemonResolved).where(
+                PokemonResolved.pokemon_id == pokemon_id,
+                PokemonResolved.gen == gen,
+                PokemonResolved.resolved_at
+                + text("(ttl_days * interval '1 day')")
+                > func.now(),
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row:
+            return FormsResponse(
+                pokemon_id=pokemon_id,
+                gen=gen,
+                name=row.data.get("name", ""),
+                forms=row.data.get("forms", []),
+            )
+
+        full = await self.resolve(pokemon_id, gen, ["varieties", "forms"], db)
+        return FormsResponse(
+            pokemon_id=pokemon_id,
+            gen=gen,
+            name=full.name,
+            forms=full.forms,
+        )
+
     async def _fetch_pokeapi(self, pokemon_id: int) -> tuple[dict, dict]:
         pokemon_r = await self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon/{pokemon_id}")
         pokemon_r.raise_for_status()

@@ -104,6 +104,24 @@ class FormData(BaseModel):
     sprite_urls: SpriteUrlsFull | None = None
 
 
+class VarietiesResponse(BaseModel):
+    """All non-default varieties of a base Pokémon species, always fully expanded."""
+
+    pokemon_id: int
+    gen: int
+    name: str
+    varieties: list[VarietyData]
+
+
+class FormsResponse(BaseModel):
+    """All cosmetic form-entries of a base Pokémon, always fully expanded with sprites."""
+
+    pokemon_id: int
+    gen: int
+    name: str
+    forms: list[FormData]
+
+
 class PokemonResolvedResponse(BaseModel):
     """Aggregated Pokémon data from PokéAPI + Showdown + Smogon.
 
