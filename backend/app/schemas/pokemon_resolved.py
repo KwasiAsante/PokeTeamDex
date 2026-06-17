@@ -79,13 +79,17 @@ class SpriteUrlsFull(BaseModel):
 class VarietyData(BaseModel):
     """A species variant with its own /pokemon resource (Mega, regional, Gmax, etc.).
 
-    Slim (default): name + pokemon_id + is_default only — no extra API calls.
+    Slim (default): name, pokemon_id, is_default, resolved_url.
     Full (?includes[]=varieties): adds types, base_stats, abilities, sprite_urls.
+
+    resolved_url is always present — it points to the variety's own resolved
+    endpoint so the client can fetch full data without knowing the numeric ID.
     """
 
     name: str
     pokemon_id: int
     is_default: bool
+    resolved_url: str  # always set: /pokemon/{pokemon_id}/resolved
     types: list[str] | None = None
     base_stats: dict[str, int] | None = None
     abilities: dict[str, str] | None = None
@@ -96,11 +100,15 @@ class FormData(BaseModel):
     """A cosmetic form-entry variant — no separate /pokemon resource.
     Same types/stats/abilities as the base; only sprites differ.
 
-    Slim (default): name only.
-    Full (?includes[]=forms): adds sprite_urls.
+    Slim (default): name + front_sprite_url (constructed without an API call).
+    Full (?includes[]=forms): adds the complete sprite_urls set.
+
+    front_sprite_url is always present so the client can render a form chip
+    without requesting the full forms endpoint.
     """
 
     name: str
+    front_sprite_url: str | None = None  # always set from sprites.front_default
     sprite_urls: SpriteUrlsFull | None = None
 
 
@@ -144,6 +152,8 @@ class PokemonResolvedResponse(BaseModel):
     supplement_moves: list[EventMove]
     smogon_analyses: list[SmogonFormatData] | None
     varieties: list[VarietyData]
+    varieties_url: str   # /pokemon/{pokemon_id}/varieties — fetch full variety list
     forms: list[FormData]
+    forms_url: str       # /pokemon/{pokemon_id}/forms — fetch full form list with sprites
     sprite_urls: SpriteUrlsFull
     resolved_at: datetime

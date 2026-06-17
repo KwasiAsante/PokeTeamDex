@@ -490,7 +490,12 @@ class PokemonResolverService:
                 # Still include slim entry
                 url = variety_meta["pokemon"]["url"]
                 variety_id = int(url.rstrip("/").split("/")[-1])
-                result.append(VarietyData(name=variety_name, pokemon_id=variety_id, is_default=False))
+                result.append(VarietyData(
+                    name=variety_name,
+                    pokemon_id=variety_id,
+                    is_default=False,
+                    resolved_url=f"/pokemon/{variety_id}/resolved",
+                ))
                 continue
 
             data = resp.json()
@@ -518,6 +523,7 @@ class PokemonResolverService:
                 name=variety_name,
                 pokemon_id=variety_id,
                 is_default=False,
+                resolved_url=f"/pokemon/{variety_id}/resolved",
                 types=types,
                 base_stats=base_stats,
                 abilities=abilities,
@@ -534,27 +540,40 @@ class PokemonResolverService:
         if not non_defaults:
             non_defaults = form_names[1:] if len(form_names) > 1 else []
 
+        _base_sprite = f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{base_id}.png"
+
         if not non_defaults:
-            return [FormData(name=n) for n in form_names]
+            return [FormData(name=n, front_sprite_url=_base_sprite) for n in form_names]
 
         responses = await asyncio.gather(
             *[self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon-form/{n}") for n in non_defaults],
             return_exceptions=True,
         )
 
-        # Include the default form as a slim entry first
-        result: list[FormData] = [FormData(name=form_names[0])]
+        # Default form: front sprite is just the base pokemon sprite
+        result: list[FormData] = [FormData(name=form_names[0], front_sprite_url=_base_sprite)]
         for form_name, resp in zip(non_defaults, responses):
             ps_name = _to_showdown_name(form_name, self._ps_exceptions)
+            # Construct the front sprite URL from the base_id + suffix pattern
+            suffix = _extract_form_suffix(form_name, species_name)
+            sprite_id = f"{base_id}-{suffix}" if suffix else str(base_id)
+            front_sprite = f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{sprite_id}.png"
+
             if isinstance(resp, Exception) or resp.status_code != 200:
                 logger.warning("Failed to fetch form %s: %s", form_name, resp)
-                result.append(FormData(name=form_name))
+                result.append(FormData(name=form_name, front_sprite_url=front_sprite))
                 continue
 
+            # Use the API response's front_default if available (more authoritative)
+            api_front = (resp.json().get("sprites") or {}).get("front_default") or front_sprite
             sprite_urls = self._build_form_sprite_urls(
                 form_name, base_id, species_name, ps_name, gen
             )
-            result.append(FormData(name=form_name, sprite_urls=sprite_urls))
+            result.append(FormData(
+                name=form_name,
+                front_sprite_url=api_front,
+                sprite_urls=sprite_urls,
+            ))
         return result
 
     # ------------------------------------------------------------------
@@ -565,17 +584,29 @@ class PokemonResolverService:
     def _trim_response(
         response: "PokemonResolvedResponse", includes: list[str]
     ) -> "PokemonResolvedResponse":
-        """Strip expanded fields not requested via includes."""
+        """Strip expanded fields not requested via includes.
+
+        resolved_url on VarietyData and front_sprite_url on FormData are
+        always preserved — they exist specifically to support the slim response.
+        """
         if "varieties" not in includes:
             response = response.model_copy(update={
                 "varieties": [
-                    VarietyData(name=v.name, pokemon_id=v.pokemon_id, is_default=v.is_default)
+                    VarietyData(
+                        name=v.name,
+                        pokemon_id=v.pokemon_id,
+                        is_default=v.is_default,
+                        resolved_url=v.resolved_url,
+                    )
                     for v in response.varieties
                 ]
             })
         if "forms" not in includes:
             response = response.model_copy(update={
-                "forms": [FormData(name=f.name) for f in response.forms]
+                "forms": [
+                    FormData(name=f.name, front_sprite_url=f.front_sprite_url)
+                    for f in response.forms
+                ]
             })
         return response
 
@@ -669,7 +700,9 @@ class PokemonResolverService:
             supplement_moves=supplement_moves,
             smogon_analyses=smogon_analyses,
             varieties=varieties,
+            varieties_url=f"/pokemon/{pokemon_id}/varieties",
             forms=forms,
+            forms_url=f"/pokemon/{pokemon_id}/forms",
             sprite_urls=sprite_urls,
             resolved_at=now,
         )

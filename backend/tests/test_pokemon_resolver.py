@@ -621,6 +621,45 @@ class TestBuildShowdownSpriteUrl:
         assert "dex-shiny/charizard.png" in url
 
 
+class TestVarietyDataResolvedUrl:
+    """resolved_url is always present on VarietyData — even in slim response."""
+
+    def test_resolved_url_format(self):
+        from app.schemas.pokemon_resolved import VarietyData
+        v = VarietyData(
+            name="charizard-mega-x",
+            pokemon_id=10034,
+            is_default=False,
+            resolved_url="/pokemon/10034/resolved",
+        )
+        assert v.resolved_url == "/pokemon/10034/resolved"
+
+    def test_resolved_url_contains_variety_id(self):
+        from app.schemas.pokemon_resolved import VarietyData
+        v = VarietyData(
+            name="meowth-alola",
+            pokemon_id=10107,
+            is_default=False,
+            resolved_url="/pokemon/10107/resolved",
+        )
+        assert "10107" in v.resolved_url
+
+
+class TestFormDataFrontSprite:
+    """front_sprite_url is always present on FormData — even in slim response."""
+
+    def test_front_sprite_url_preserved_in_slim(self):
+        from app.schemas.pokemon_resolved import FormData
+        f = FormData(name="unown-b", front_sprite_url="https://example.com/201-b.png")
+        assert f.front_sprite_url == "https://example.com/201-b.png"
+        assert f.sprite_urls is None  # full set not present in slim
+
+    def test_none_front_sprite_allowed(self):
+        from app.schemas.pokemon_resolved import FormData
+        f = FormData(name="unown-b")
+        assert f.front_sprite_url is None
+
+
 class TestBuildVarietySpriteUrls:
     _SPRITES = {
         "other": {
