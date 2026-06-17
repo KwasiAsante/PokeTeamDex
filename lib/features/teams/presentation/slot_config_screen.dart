@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
     show teamByIdProvider, teamSlotsProvider;
 import 'package:poke_team_dex/services/format/format_models.dart';
@@ -605,15 +606,16 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   Widget _buildWithPokemon(TeamSlot slot) {
     ref.watch(allFormatsProvider); // ensures PS data is loaded; triggers rebuild when ready
-    final pokemonAsync = ref.watch(pokemonDetailProvider(slot.pokemonId));
-    return pokemonAsync.when(
+    final resolvedAsync = ref.watch(resolvedPokemonProvider(slot.pokemonId));
+    return resolvedAsync.when(
       loading: () => widget.embedded
           ? const Center(child: CircularProgressIndicator())
           : Scaffold(appBar: AppBar(), body: const Center(child: CircularProgressIndicator())),
       error: (e, _) => widget.embedded
           ? Center(child: Text('$e'))
           : Scaffold(appBar: AppBar(), body: Center(child: Text('$e'))),
-      data: (pokemon) {
+      data: (resolved) {
+        final pokemon = resolved.detail;
         final speciesName = pokemon.displaySpeciesName;
 
         final abilities = pokemon.abilities.map((a) => (
@@ -699,23 +701,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
 
         // ── Form change ────────────────────────────────────────────────────
-        // pokemon.formNames only lists the current form. Use the species
-        // endpoint (varieties) to get ALL forms for this species.
-        final speciesAsync = ref.watch(pokemonSpeciesProvider(slot.pokemonId));
-        final allVarieties = speciesAsync.asData?.value.varieties
-                .map((v) => v.name)
-                .toList() ??
-            <String>[];
-        // Cosmetic forms (e.g. Burmy's cloaks, Shellos' seas, Cherrim's
-        // Sunshine Form) share the base species' single `/pokemon` resource
-        // and exist only as `pokemon-form` entries, differing solely by
-        // sprite. The provider resolves the full set (already filtered to
-        // non-default — see its doc comment for why name-equality with
-        // `pokemon.name` is NOT a reliable way to spot the default form) and
-        // returns `[]` for species without them, so it's safe to watch always.
-        final cosmeticFormsAsync = ref.watch(cosmeticFormsProvider(pokemon.name));
-        final cosmeticFormEntries =
-            cosmeticFormsAsync.asData?.value ?? const <PokemonFormEntry>[];
+        // Use the resolved species varieties to get ALL forms for this species.
+        final allVarieties = resolved.species.varieties
+            .map((v) => v.name)
+            .toList();
+        // Cosmetic forms already fetched and patched by resolvedPokemonProvider.
+        final cosmeticFormEntries = resolved.cosmeticForms;
         final cosmeticForms = cosmeticFormEntries.map((f) => f.name).toList();
         // Primal Reversion (Red/Blue Orb) only existed in Gen 6 (Omega
         // Ruby/Alpha Sapphire) and Gen 7 (Sun/Moon era, via Pokémon Bank
@@ -995,8 +986,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   megaArtworkUrl: effectiveMegaArtworkUrl,
                   megaFallbackUrl: cosmeticFormSpriteUrls?.fallbackUrl ?? effectiveMegaFallbackUrl,
                   megaFallbackUrl2: cosmeticFormSpriteUrls?.fallbackUrl2,
-                  isFormLoading: (formPokemonAsync?.isLoading ?? false) ||
-                      (isCosmeticFormSelected && cosmeticFormsAsync.isLoading)),
+                  isFormLoading: formPokemonAsync?.isLoading ?? false),
               // ── Form selector (when Pokémon has multiple forms) ──
               if (hasMultipleForms) ...[
                 const SizedBox(height: 16),
@@ -1005,7 +995,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     speciesName: pokemon.speciesName ?? pokemon.name),
               ],
               const SizedBox(height: 24),
-              _buildBasics(mechanics, speciesAsync.asData?.value.genderRate),
+              _buildBasics(mechanics, resolved.species.genderRate),
               // ── Ability (Gen 3+) ──
               if (mechanics == null || mechanics.hasAbilities) ...[
                 const SizedBox(height: 24),
