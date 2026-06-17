@@ -524,7 +524,7 @@ class PokemonResolverService:
                 name=variety_name,
                 pokemon_id=variety_id,
                 is_default=False,
-                resolved_url=f"/pokemon/{variety_id}/resolved",
+                resolved_url=f"{base_url}/pokemon/{variety_id}/resolved",
                 types=types,
                 base_stats=base_stats,
                 abilities=abilities,
