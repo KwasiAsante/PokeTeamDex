@@ -1,10 +1,13 @@
 {
-  "generated_at": "2026-06-07T16:08:26.025897+00:00",
+  "generated_at": "2026-06-17T15:45:34.881420+00:00",
   "sha": {
     "learnsets": "8a78eea662ea4275",
     "moves": "1924cd51722d9edb",
     "items": "d5fe346feed56409",
     "abilities": "39777c1f50412c81",
-    "event_learnsets": "da488657e84bc72a"
+    "event_learnsets": "3bf0af7fe49eb3c2",
+    "pokedex": "1d03903595edaaf1",
+    "pokedex_gen_overrides": "a399d8aa16d194fb",
+    "formats_data": "381be75b6f6e20cb"
   }
 }

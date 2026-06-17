@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 
@@ -9,7 +10,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.routers import admin, auth, folders, instances, logs, ps_data, sync, teams
+from app.routers.pokemon import router as pokemon_router
 from app.routers.teams import slots_router
+from app.services.pokemon_resolver import pokemon_resolver_service
 
 setup_logging(settings.loki_url)
 logger = logging.getLogger(__name__)
@@ -40,6 +43,7 @@ app.include_router(sync.router)
 app.include_router(ps_data.router)
 app.include_router(admin.router)
 app.include_router(logs.router)
+app.include_router(pokemon_router)
 
 
 @app.middleware("http")
@@ -58,6 +62,8 @@ async def _log_requests(request: Request, call_next):
 @app.on_event("startup")
 async def _on_startup():
     logger.info("PokeTeamDex backend started (version=%s)", settings.app_version)
+    pokemon_resolver_service.load_ps_data()
+    asyncio.create_task(pokemon_resolver_service.load_smogon_data())
 
 
 @app.on_event("shutdown")
