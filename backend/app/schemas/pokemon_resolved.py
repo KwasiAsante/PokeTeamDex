@@ -17,12 +17,16 @@ _StrOrList = Annotated[list[str] | None, BeforeValidator(_coerce_to_list)]
 
 
 class EventMove(BaseModel):
-    """A move the Pokémon can learn only via an in-game event/distribution.
-    PokéAPI has no record of these; they are sourced from Showdown's learnsets."""
+    """A move absent from PokéAPI's learnset that Showdown's data supplies.
+
+    Covers event distributions (S), but also egg moves (E) and tutor moves (T)
+    that PokéAPI is missing for older generations.
+    """
 
     name: str
     display_name: str
     generations: list[int]
+    methods: list[str]  # e.g. ["event"], ["egg"], ["tutor"], ["level", "event"]
 
 
 class SmogonSet(BaseModel):
@@ -50,23 +54,67 @@ class SmogonFormatData(BaseModel):
 
 
 class SpriteUrls(BaseModel):
+    """Slim sprite set — returned in the base pokemon response always."""
+
+    official_artwork: str | None = None
+    home: str | None = None
+
+
+class SpriteUrlsFull(BaseModel):
+    """Full sprite set — returned for varieties/forms when included,
+    and always for the base pokemon."""
+
     official_artwork: str | None = None
     official_artwork_shiny: str | None = None
     home: str | None = None
     home_shiny: str | None = None
     home_female: str | None = None
-    battle_front: str | None = None
-    battle_front_shiny: str | None = None
+    home_female_shiny: str | None = None
+    game_front: str | None = None
+    game_front_shiny: str | None = None
+    game_front_female: str | None = None
+    game_front_female_shiny: str | None = None
+
+
+class VarietyData(BaseModel):
+    """A species variant with its own /pokemon resource (Mega, regional, Gmax, etc.).
+
+    Slim (default): name + pokemon_id + is_default only — no extra API calls.
+    Full (?includes[]=varieties): adds types, base_stats, abilities, sprite_urls.
+    """
+
+    name: str
+    pokemon_id: int
+    is_default: bool
+    types: list[str] | None = None
+    base_stats: dict[str, int] | None = None
+    abilities: dict[str, str] | None = None
+    sprite_urls: SpriteUrlsFull | None = None
+
+
+class FormData(BaseModel):
+    """A cosmetic form-entry variant — no separate /pokemon resource.
+    Same types/stats/abilities as the base; only sprites differ.
+
+    Slim (default): name only.
+    Full (?includes[]=forms): adds sprite_urls.
+    """
+
+    name: str
+    sprite_urls: SpriteUrlsFull | None = None
 
 
 class PokemonResolvedResponse(BaseModel):
-    """Aggregated Pokémon data from PokéAPI + Showdown event learnsets + Smogon.
+    """Aggregated Pokémon data from PokéAPI + Showdown + Smogon.
 
     `gen` reflects the generation the data was resolved for.
     `types` and `base_stats` are gen-accurate (e.g. Clefairy is Normal in gen ≤ 5).
-    `event_moves` supplements PokéAPI's move list with event-only distributions.
+    `supplement_moves` fills PokéAPI gaps: event distributions, plus egg/tutor moves
+    missing for older gens.
     `smogon_analyses` is null while the background load is in progress or when
     no Smogon data exists for this Pokémon.
+    `varieties` and `forms` are slim by default; use ?includes[]=varieties,forms
+    for full embedded data.
     """
 
     pokemon_id: int
@@ -75,8 +123,9 @@ class PokemonResolvedResponse(BaseModel):
     types: list[str]
     base_stats: dict[str, int]
     abilities: dict[str, str]
-    event_moves: list[EventMove]
+    supplement_moves: list[EventMove]
     smogon_analyses: list[SmogonFormatData] | None
-    forms: list[str]
-    sprite_urls: SpriteUrls
+    varieties: list[VarietyData]
+    forms: list[FormData]
+    sprite_urls: SpriteUrlsFull
     resolved_at: datetime

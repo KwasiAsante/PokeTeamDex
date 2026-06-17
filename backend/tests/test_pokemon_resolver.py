@@ -9,10 +9,13 @@ import pytest
 
 from app.services.pokemon_resolver import (
     PokemonResolverService,
-    _ps_name,
+    _to_showdown_name,
     _smogon_display_name,
+    _build_pokeapi_sprite_url,
+    _build_showdown_sprite_url,
+    _extract_form_suffix,
 )
-from app.schemas.pokemon_resolved import SpriteUrls
+from app.schemas.pokemon_resolved import SpriteUrlsFull
 
 
 # ---------------------------------------------------------------------------
@@ -27,6 +30,7 @@ def _make_service(
     smogon_sets: dict | None = None,
     smogon_analyses: dict | None = None,
     smogon_loaded: bool = True,
+    ps_exceptions: dict | None = None,
 ) -> PokemonResolverService:
     svc = PokemonResolverService()
     svc._ps_pokedex = pokedex or {}
@@ -36,25 +40,37 @@ def _make_service(
     svc._smogon_sets = smogon_sets or {}
     svc._smogon_analyses = smogon_analyses or {}
     svc._smogon_loaded = smogon_loaded
+    svc._ps_exceptions = ps_exceptions or {}
     return svc
 
 
 # ---------------------------------------------------------------------------
-# _ps_name
+# _to_showdown_name
 # ---------------------------------------------------------------------------
 
-class TestPsName:
+class TestToShowdownName:
     def test_simple(self):
-        assert _ps_name("venusaur") == "venusaur"
+        assert _to_showdown_name("venusaur", {}) == "venusaur"
 
-    def test_strips_hyphens(self):
-        assert _ps_name("giratina-origin") == "giratinaorigin"
+    def test_hyphenated_passes_through(self):
+        # Showdown dex/ accepts hyphenated slugs for most forms
+        assert _to_showdown_name("giratina-origin", {}) == "giratina-origin"
 
-    def test_mr_mime(self):
-        assert _ps_name("mr-mime") == "mrmime"
+    def test_mega_x_collapses(self):
+        assert _to_showdown_name("charizard-mega-x", {}) == "charizard-megax"
 
-    def test_tapu_koko(self):
-        assert _ps_name("tapu-koko") == "tapukoko"
+    def test_mega_y_collapses(self):
+        assert _to_showdown_name("charizard-mega-y", {}) == "charizard-megay"
+
+    def test_single_mega_unchanged(self):
+        assert _to_showdown_name("venusaur-mega", {}) == "venusaur-mega"
+
+    def test_ps_exception_overrides(self):
+        exceptions = {"ogerpon-teal": "ogerpon-teal-mask"}
+        assert _to_showdown_name("ogerpon-teal", exceptions) == "ogerpon-teal-mask"
+
+    def test_regional_form_passes_through(self):
+        assert _to_showdown_name("meowth-alola", {}) == "meowth-alola"
 
 
 # ---------------------------------------------------------------------------
@@ -212,10 +228,10 @@ class TestApplyGenOverrides:
 
 
 # ---------------------------------------------------------------------------
-# _get_event_moves
+# _get_supplement_moves  (renamed from _get_event_moves; now covers egg/tutor too)
 # ---------------------------------------------------------------------------
 
-class TestGetEventMoves:
+class TestGetSupplementMoves:
     _EVENT_LEARNSETS = {
         "dratini": {
             "learnset": {
@@ -223,92 +239,130 @@ class TestGetEventMoves:
                 "extremespeed": ["2S1"],
                 # wrap is in PokéAPI's normal learnset
                 "wrap": ["1L1", "2L1"],
-                # bind appears only via normal methods
+                # bind appears only via normal level-up methods
                 "bind": ["3L20", "4L20"],
+                # eggmove is an egg move PokéAPI is missing
+                "eggmove": ["4E"],
+                # tutormove is a tutor move PokéAPI is missing
+                "tutormove": ["5T"],
             }
         }
     }
     _MOVES_INDEX = {
         "extremespeed": {"name": "Extreme Speed", "gen": 1},
         "wrap": {"name": "Wrap", "gen": 1},
+        "eggmove": {"name": "Egg Move", "gen": 4},
+        "tutormove": {"name": "Tutor Move", "gen": 5},
     }
 
-    def test_extremespeed_returned_as_event_move(self):
+    def test_event_move_returned(self):
         svc = _make_service(
             event_learnsets=self._EVENT_LEARNSETS,
             moves_index=self._MOVES_INDEX,
         )
-        # PokéAPI knows about wrap but not extremespeed
-        result = svc._get_event_moves("dratini", {"wrap", "bind"})
+        result = svc._get_supplement_moves("dratini", {"wrap", "bind"})
         names = [m.name for m in result]
         assert "extremespeed" in names
+
+    def test_egg_move_returned_when_not_in_pokeapi(self):
+        svc = _make_service(
+            event_learnsets=self._EVENT_LEARNSETS,
+            moves_index=self._MOVES_INDEX,
+        )
+        result = svc._get_supplement_moves("dratini", set())
+        names = [m.name for m in result]
+        assert "eggmove" in names
+
+    def test_tutor_move_returned_when_not_in_pokeapi(self):
+        svc = _make_service(
+            event_learnsets=self._EVENT_LEARNSETS,
+            moves_index=self._MOVES_INDEX,
+        )
+        result = svc._get_supplement_moves("dratini", set())
+        names = [m.name for m in result]
+        assert "tutormove" in names
 
     def test_wrap_excluded_because_pokeapi_has_it(self):
         svc = _make_service(
             event_learnsets=self._EVENT_LEARNSETS,
             moves_index=self._MOVES_INDEX,
         )
-        result = svc._get_event_moves("dratini", {"wrap"})
+        result = svc._get_supplement_moves("dratini", {"wrap"})
         names = [m.name for m in result]
         assert "wrap" not in names
 
-    def test_bind_excluded_because_no_s_source(self):
-        """bind has level-up sources but no S (event) source — must be excluded."""
+    def test_bind_included_when_absent_from_pokeapi(self):
+        """bind has only level-up sources, but if PokéAPI doesn't list it, we include it.
+        The supplement includes ALL moves Showdown has that PokéAPI is missing."""
         svc = _make_service(
             event_learnsets=self._EVENT_LEARNSETS,
             moves_index=self._MOVES_INDEX,
         )
-        result = svc._get_event_moves("dratini", set())
+        result = svc._get_supplement_moves("dratini", set())
+        names = [m.name for m in result]
+        assert "bind" in names
+
+    def test_bind_excluded_when_pokeapi_has_it(self):
+        """If PokéAPI already lists bind, don't include it in supplement."""
+        svc = _make_service(
+            event_learnsets=self._EVENT_LEARNSETS,
+            moves_index=self._MOVES_INDEX,
+        )
+        result = svc._get_supplement_moves("dratini", {"bind"})
         names = [m.name for m in result]
         assert "bind" not in names
 
-    def test_event_move_generations_extracted(self):
+    def test_event_move_has_event_method(self):
         svc = _make_service(
             event_learnsets=self._EVENT_LEARNSETS,
             moves_index=self._MOVES_INDEX,
         )
-        result = svc._get_event_moves("dratini", set())
+        result = svc._get_supplement_moves("dratini", set())
         extremespeed = next(m for m in result if m.name == "extremespeed")
+        assert "event" in extremespeed.methods
         assert extremespeed.generations == [2]
+
+    def test_egg_move_has_egg_method(self):
+        svc = _make_service(
+            event_learnsets=self._EVENT_LEARNSETS,
+            moves_index=self._MOVES_INDEX,
+        )
+        result = svc._get_supplement_moves("dratini", set())
+        eggmove = next(m for m in result if m.name == "eggmove")
+        assert "egg" in eggmove.methods
+
+    def test_tutor_move_has_tutor_method(self):
+        svc = _make_service(
+            event_learnsets=self._EVENT_LEARNSETS,
+            moves_index=self._MOVES_INDEX,
+        )
+        result = svc._get_supplement_moves("dratini", set())
+        tutormove = next(m for m in result if m.name == "tutormove")
+        assert "tutor" in tutormove.methods
 
     def test_display_name_from_moves_index(self):
         svc = _make_service(
             event_learnsets=self._EVENT_LEARNSETS,
             moves_index=self._MOVES_INDEX,
         )
-        result = svc._get_event_moves("dratini", set())
+        result = svc._get_supplement_moves("dratini", set())
         extremespeed = next(m for m in result if m.name == "extremespeed")
         assert extremespeed.display_name == "Extreme Speed"
 
     def test_pokeapi_slug_with_hyphen_excluded_correctly(self):
-        """PokéAPI uses hyphens (acid-spray); Showdown uses acidspray.
-        The service must strip hyphens before comparing."""
-        learnsets = {
-            "bulbasaur": {
-                "learnset": {
-                    "acidspray": ["5S0"],  # event only
-                }
-            }
-        }
+        learnsets = {"bulbasaur": {"learnset": {"acidspray": ["5S0"]}}}
         svc = _make_service(event_learnsets=learnsets)
-        # PokéAPI gives us "acid-spray"; should match "acidspray" and exclude it
-        result = svc._get_event_moves("bulbasaur", {"acid-spray"})
+        result = svc._get_supplement_moves("bulbasaur", {"acid-spray"})
         assert result == []
 
     def test_returns_empty_for_unknown_pokemon(self):
         svc = _make_service(event_learnsets=self._EVENT_LEARNSETS)
-        assert svc._get_event_moves("unknownmon", set()) == []
+        assert svc._get_supplement_moves("unknownmon", set()) == []
 
     def test_multi_gen_event_move(self):
-        learnsets = {
-            "mew": {
-                "learnset": {
-                    "transform": ["1S0", "3S1", "7S2"],
-                }
-            }
-        }
+        learnsets = {"mew": {"learnset": {"transform": ["1S0", "3S1", "7S2"]}}}
         svc = _make_service(event_learnsets=learnsets)
-        result = svc._get_event_moves("mew", set())
+        result = svc._get_supplement_moves("mew", set())
         assert len(result) == 1
         assert sorted(result[0].generations) == [1, 3, 7]
 
@@ -411,36 +465,197 @@ class TestGetSmogonAnalyses:
 
 
 # ---------------------------------------------------------------------------
-# _build_sprite_urls
+# Sprite URL helpers
 # ---------------------------------------------------------------------------
 
-class TestBuildSpriteUrls:
-    def test_full_sprites_object(self):
-        sprites = {
-            "other": {
-                "official-artwork": {
-                    "front_default": "https://example.com/artwork/3.png",
-                    "front_shiny": "https://example.com/artwork/shiny/3.png",
-                },
-                "home": {
-                    "front_default": "https://example.com/home/3.png",
-                    "front_shiny": "https://example.com/home/shiny/3.png",
-                    "front_female": None,
-                },
-            }
-        }
-        result = PokemonResolverService._build_sprite_urls(sprites)
-        assert result.official_artwork == "https://example.com/artwork/3.png"
-        assert result.official_artwork_shiny == "https://example.com/artwork/shiny/3.png"
-        assert result.home == "https://example.com/home/3.png"
-        assert result.home_shiny == "https://example.com/home/shiny/3.png"
-        assert result.home_female is None
+class TestToShowdownNameSprites:
+    """Showdown name conversion specifically for sprite paths."""
 
-    def test_empty_sprites_returns_all_none(self):
-        result = PokemonResolverService._build_sprite_urls({})
+    def test_mega_x_collapses_hyphen(self):
+        assert _to_showdown_name("charizard-mega-x", {}) == "charizard-megax"
+
+    def test_mega_y_collapses_hyphen(self):
+        assert _to_showdown_name("charizard-mega-y", {}) == "charizard-megay"
+
+    def test_single_mega_unchanged(self):
+        assert _to_showdown_name("venusaur-mega", {}) == "venusaur-mega"
+
+    def test_regional_form_unchanged(self):
+        assert _to_showdown_name("meowth-alola", {}) == "meowth-alola"
+
+
+class TestExtractFormSuffix:
+    def test_unown_b(self):
+        assert _extract_form_suffix("unown-b", "unown") == "b"
+
+    def test_shellos_east(self):
+        assert _extract_form_suffix("shellos-east", "shellos") == "east"
+
+    def test_burmy_sandy(self):
+        assert _extract_form_suffix("burmy-sandy", "burmy") == "sandy"
+
+    def test_no_prefix_match(self):
+        assert _extract_form_suffix("pikachu", "pikachu") is None
+
+
+class TestBuildPokeapiSpriteUrl:
+    def test_gen5_bw_animated(self):
+        url = _build_pokeapi_sprite_url("6", 5)
+        assert url is not None
+        assert "generation-v/black-white/animated/6.gif" in url
+
+    def test_gen5_shiny_animated(self):
+        url = _build_pokeapi_sprite_url("6", 5, shiny=True)
+        assert url is not None
+        assert "animated/shiny/6.gif" in url
+
+    def test_gen1_transparent(self):
+        url = _build_pokeapi_sprite_url("6", 1)
+        assert url is not None
+        assert "generation-i/yellow/transparent/6.png" in url
+
+    def test_gen1_no_shiny(self):
+        assert _build_pokeapi_sprite_url("6", 1, shiny=True) is None
+
+    def test_gen2_crystal_animated(self):
+        url = _build_pokeapi_sprite_url("6", 2)
+        assert url is not None
+        assert "generation-ii/crystal/animated/6.gif" in url
+
+    def test_gen2_crystal_animated_shiny(self):
+        url = _build_pokeapi_sprite_url("6", 2, shiny=True)
+        assert url is not None
+        assert "animated/shiny/6.gif" in url
+
+    def test_gen4_png(self):
+        url = _build_pokeapi_sprite_url("6", 4)
+        assert url is not None
+        assert "generation-iv/heartgold-soulsilver/6.png" in url
+
+    def test_gen4_shiny(self):
+        url = _build_pokeapi_sprite_url("6", 4, shiny=True)
+        assert url is not None
+        assert "shiny/6.png" in url
+
+    def test_form_sprite_id(self):
+        url = _build_pokeapi_sprite_url("201-b", 2)
+        assert url is not None
+        assert "201-b.gif" in url
+
+    def test_gen6_returns_none(self):
+        assert _build_pokeapi_sprite_url("6", 6) is None
+
+    def test_gen9_returns_none(self):
+        assert _build_pokeapi_sprite_url("6", 9) is None
+
+
+class TestBuildShowdownSpriteUrl:
+    def test_gen1(self):
+        url = _build_showdown_sprite_url("charizard", 1)
+        assert "gen1/charizard.png" in url
+
+    def test_gen5(self):
+        url = _build_showdown_sprite_url("charizard", 5)
+        assert "gen5/charizard.png" in url
+
+    def test_gen5_shiny(self):
+        url = _build_showdown_sprite_url("charizard", 5, shiny=True)
+        assert "gen5-shiny/charizard.png" in url
+
+    def test_gen1_shiny_returns_none(self):
+        # Gen 1 has no shinies — return None, not a fallback to dex-shiny
+        assert _build_showdown_sprite_url("charizard", 1, shiny=True) is None
+
+    def test_gen6(self):
+        url = _build_showdown_sprite_url("charizard", 6)
+        assert "gen6/charizard.png" in url
+
+    def test_gen9_uses_dex(self):
+        url = _build_showdown_sprite_url("charizard", 9)
+        assert "dex/charizard.png" in url
+
+    def test_gen9_shiny_uses_dex_shiny(self):
+        url = _build_showdown_sprite_url("charizard", 9, shiny=True)
+        assert "dex-shiny/charizard.png" in url
+
+
+class TestBuildVarietySpriteUrls:
+    _SPRITES = {
+        "other": {
+            "official-artwork": {
+                "front_default": "https://pokeapi/artwork/6.png",
+                "front_shiny": "https://pokeapi/artwork/shiny/6.png",
+            },
+            "home": {
+                "front_default": "https://pokeapi/home/6.png",
+                "front_shiny": "https://pokeapi/home/shiny/6.png",
+                "front_female": None,
+            },
+        }
+    }
+
+    def _svc(self):
+        return _make_service()
+
+    def test_official_artwork_extracted(self):
+        svc = self._svc()
+        result = svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
+        assert result.official_artwork == "https://pokeapi/artwork/6.png"
+        assert result.official_artwork_shiny == "https://pokeapi/artwork/shiny/6.png"
+
+    def test_home_extracted(self):
+        svc = self._svc()
+        result = svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
+        assert result.home == "https://pokeapi/home/6.png"
+
+    def test_gen9_uses_showdown_dex(self):
+        svc = self._svc()
+        result = svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
+        assert result.game_front is not None
+        assert "dex/charizard.png" in result.game_front
+
+    def test_gen5_uses_pokeapi_animated(self):
+        svc = self._svc()
+        result = svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 5)
+        assert result.game_front is not None
+        assert "animated/6.gif" in result.game_front
+
+    def test_gen1_no_shiny(self):
+        svc = self._svc()
+        result = svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 1)
+        assert result.game_front_shiny is None
+
+    def test_empty_sprites(self):
+        svc = self._svc()
+        result = svc._build_variety_sprite_urls({}, "charizard", 6, 9)
         assert result.official_artwork is None
         assert result.home is None
 
-    def test_missing_other_key(self):
-        result = PokemonResolverService._build_sprite_urls({"front_default": "x.png"})
+
+class TestBuildFormSpriteUrls:
+    def _svc(self):
+        return _make_service()
+
+    def test_no_official_artwork(self):
+        svc = self._svc()
+        result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 9)
         assert result.official_artwork is None
+
+    def test_home_uses_showdown(self):
+        svc = self._svc()
+        result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 9)
+        assert result.home is not None
+        assert "home/unown-b.png" in result.home
+
+    def test_gen2_game_front_uses_pokeapi_sprites(self):
+        svc = self._svc()
+        result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 2)
+        assert result.game_front is not None
+        # Should use PokeAPI/sprites path with 201-b
+        assert "201-b" in result.game_front
+
+    def test_gen9_game_front_uses_showdown_dex(self):
+        svc = self._svc()
+        result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 9)
+        assert result.game_front is not None
+        assert "dex/unown-b.png" in result.game_front
