@@ -92,7 +92,14 @@ class PokemonResolverService:
         self._smogon_sets: dict[str, dict] = {}
         self._smogon_analyses: dict[str, dict] = {}
         self._smogon_loaded = False
-        self._http = httpx.AsyncClient(timeout=10.0, limits=httpx.Limits(max_connections=10))
+        # Two separate clients so the Smogon bulk preload (88 concurrent requests)
+        # can never starve the per-request PokéAPI calls.
+        self._pokeapi_http = httpx.AsyncClient(
+            timeout=10.0, limits=httpx.Limits(max_connections=10)
+        )
+        self._smogon_http = httpx.AsyncClient(
+            timeout=30.0, limits=httpx.Limits(max_connections=20)
+        )
 
     # ------------------------------------------------------------------
     # Startup loading
@@ -131,8 +138,8 @@ class PokemonResolverService:
             analyses_url = f"{_SMOGON_BASE}/analyses/{fmt}.json"
             try:
                 sets_r, analyses_r = await asyncio.gather(
-                    self._http.get(sets_url),
-                    self._http.get(analyses_url),
+                    self._smogon_http.get(sets_url),
+                    self._smogon_http.get(analyses_url),
                     return_exceptions=True,
                 )
                 sets = sets_r.json() if not isinstance(sets_r, Exception) and sets_r.status_code == 200 else {}
@@ -391,12 +398,12 @@ class PokemonResolverService:
 
     async def _fetch_pokeapi(self, pokemon_id: int) -> tuple[dict, dict]:
         """Fetch /pokemon/{id} and /pokemon-species/{species_id} in parallel."""
-        pokemon_r = await self._http.get(f"{_POKEAPI_BASE}/pokemon/{pokemon_id}")
+        pokemon_r = await self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon/{pokemon_id}")
         pokemon_r.raise_for_status()
         pokemon_data = pokemon_r.json()
 
         species_url: str = pokemon_data["species"]["url"]
-        species_r = await self._http.get(species_url)
+        species_r = await self._pokeapi_http.get(species_url)
         species_r.raise_for_status()
         species_data = species_r.json()
 

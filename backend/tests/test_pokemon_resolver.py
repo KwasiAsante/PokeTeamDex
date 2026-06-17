@@ -317,6 +317,25 @@ class TestGetEventMoves:
 # _get_smogon_analyses
 # ---------------------------------------------------------------------------
 
+class TestSmogonSetTeratypes:
+    """Smogon sometimes sends teratypes as a bare string instead of a list."""
+
+    def test_bare_string_coerced_to_list(self):
+        from app.schemas.pokemon_resolved import SmogonSet
+        s = SmogonSet(moves=["Tackle"], teratypes="Fire")
+        assert s.teratypes == ["Fire"]
+
+    def test_list_passes_through(self):
+        from app.schemas.pokemon_resolved import SmogonSet
+        s = SmogonSet(moves=["Tackle"], teratypes=["Fire", "Ground"])
+        assert s.teratypes == ["Fire", "Ground"]
+
+    def test_none_remains_none(self):
+        from app.schemas.pokemon_resolved import SmogonSet
+        s = SmogonSet(moves=["Tackle"], teratypes=None)
+        assert s.teratypes is None
+
+
 class TestGetSmogonAnalyses:
     _SETS = {
         "gen9ou": {

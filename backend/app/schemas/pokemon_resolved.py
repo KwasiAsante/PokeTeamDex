@@ -1,6 +1,19 @@
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel
+from pydantic import BaseModel, BeforeValidator
+
+
+def _coerce_to_list(v: object) -> object:
+    """Smogon sometimes sends a bare string where a list is expected (e.g.
+    teratypes: "Fire" instead of ["Fire"]).  Wrap it so Pydantic validation
+    passes without raising."""
+    if isinstance(v, str):
+        return [v]
+    return v
+
+
+_StrOrList = Annotated[list[str] | None, BeforeValidator(_coerce_to_list)]
 
 
 class EventMove(BaseModel):
@@ -26,7 +39,7 @@ class SmogonSet(BaseModel):
     nature: str | list[str] | None = None
     evs: dict[str, int] | list[dict[str, int]] | None = None
     ivs: dict[str, int] | None = None
-    teratypes: list[str] | None = None
+    teratypes: _StrOrList = None
     level: int | list[int] | None = None
     description: str | None = None
 
