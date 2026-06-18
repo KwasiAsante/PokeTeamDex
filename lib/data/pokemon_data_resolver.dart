@@ -210,7 +210,7 @@ class PokemonDataResolver {
       'filter must be non-null when imageType is PokedexImageType.sprite',
     );
     final baseHomeOverride = PokemonDataRegistry.instance
-        .baseFormCosmeticHomeUrls[basePokemon?.speciesName ?? basePokemon?.name ?? ''];
+        .baseFormCosmeticHomeUrls[baseSpecies];
     return switch (imageType) {
       PokedexImageType.artwork =>
         baseHomeOverride?.homeUrl ??
