@@ -470,11 +470,29 @@ class PokemonResolverService:
     ) -> SpriteUrlsFull:
         """Build full sprite URLs for the base pokemon.
 
-        gen_sprite_id overrides the ID used for gen-specific versioned sprites.
-        Use this when the Pokémon's default form has a suffix in the sprite repo
-        (e.g. Unown's default form is "unown-a" so the Crystal sprite is
-        "201-a.gif" not "201.gif").  Home and official artwork always use the
-        plain pokemon_id regardless.
+        gen_sprite_id overrides the ID used for gen-specific versioned sprites
+        only.  Pass it when the Pokémon's default form has a suffix in the
+        PokeAPI/sprites repo so that the correct versioned file is used.
+
+        Unown (201) is the canonical example.  Its default form in PokéAPI is
+        "unown-a" (suffix "a"), and the PokeAPI/sprites versioned directories
+        are inconsistent about whether "201" or "201-a" is the right filename:
+
+          Gen 2 Crystal animated  → 201.gif does NOT exist; 201-a.gif MUST be used
+          Gen 2-4 static          → both 201.png and 201-a.png exist (either works)
+          Gen 5 BW animated       → both 201.gif and 201-a.gif exist
+          Gen 5 BW static         → only 201.png exists (201-a.png is missing)
+          HOME / official artwork → only 201.png exists
+
+        Our _GEN_SPRITE_CONFIG prefers the animated/ subdir for Gen 2 and Gen 5,
+        so the gen_sprite_id="201-a" is correct for those paths (animated/201-a.gif
+        exists in both Crystal and BW).  HOME and official artwork are extracted
+        from the PokéAPI sprites object directly (always 201.png) and are not
+        affected by gen_sprite_id.
+
+        If a Pokémon with a similar pattern is added in future, check the
+        PokeAPI/sprites repo to confirm which ID exists in the animated/ subdir
+        for the gens supported by _GEN_SPRITE_CONFIG before passing an override.
         """
         return self._build_variety_sprite_urls(
             sprites, ps_name, pokemon_id, gen,
@@ -755,8 +773,11 @@ class PokemonResolverService:
         smogon_analyses = self._get_smogon_analyses(display_name)
 
         # 7. Sprite URLs for base pokemon
-        # When the default form has a suffix (e.g. "unown-a"), the gen-specific
-        # versioned sprite uses "{id}-{suffix}" (e.g. "201-a.gif"), not just "{id}".
+        # Derive the gen-specific sprite ID from the first form name suffix.
+        # When the default form has a suffix (e.g. PokéAPI names Unown's base
+        # form "unown-a"), the versioned sprite dirs use "{id}-{suffix}" not
+        # just "{id}" — Gen 2 Crystal animated has 201-a.gif but no 201.gif.
+        # See _build_base_sprite_urls docstring for the full compatibility matrix.
         ps_sprite_name = _to_showdown_name(pokemon_name, self._ps_exceptions)
         first_form = (pokemon_data.get("forms") or [{}])[0].get("name", "")
         first_form_suffix = _extract_form_suffix(first_form, species_name) if first_form else None
