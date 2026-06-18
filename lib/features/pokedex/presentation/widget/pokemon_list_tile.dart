@@ -179,7 +179,8 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
           builder: (ctx) => FormPickerSheet(
             allForms: allForms,
             baseSpriteUrl: basePokemon?.sprites?['front_default'] as String?
-                ?? resolved?.spriteUrls.gameFront,
+                ?? resolved?.spriteUrls.officialArtwork
+                ?? resolved?.spriteUrls.home,
             selectedFormName: _selectedFormName,
             shiny: false,
             onSelect: (name) {
