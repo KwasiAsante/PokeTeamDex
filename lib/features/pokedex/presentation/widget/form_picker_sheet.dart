@@ -139,7 +139,16 @@ class FormOptionTile extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (spriteUrl != null)
-              CachedNetworkImage(imageUrl: spriteUrl, height: 56, width: 56)
+              CachedNetworkImage(
+                imageUrl: spriteUrl,
+                height: 56,
+                width: 56,
+                errorWidget: (_, _, _) => const SizedBox(
+                  height: 56,
+                  width: 56,
+                  child: Icon(Icons.catching_pokemon, color: Colors.grey),
+                ),
+              )
             else
               const SizedBox(
                 height: 56,
