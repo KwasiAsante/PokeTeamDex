@@ -240,7 +240,7 @@ class PokemonResolvedBackendResponse {
       pokemonId: json['pokemon_id'] as int,
       gen: json['gen'] as int,
       name: json['name'] as String,
-      types: List<String>.from(json['types'] as List),
+      types: (json['types'] as List).map((t) => (t as String).toLowerCase()).toList(),
       baseStats: Map<String, int>.from(
         (json['base_stats'] as Map).map((k, v) => MapEntry(k as String, v as int)),
       ),
@@ -370,8 +370,12 @@ class PokemonResolvedBackendResponse {
       );
 
   List<PokemonFormEntry> toCosmeticForms() {
+    // The base form always has the same name as the pokemon slug.
+    // Filter by name rather than is_default to handle stale cache rows
+    // where is_default was not yet stored (defaults to false for all forms).
+    final baseName = speciesName ?? name;
     return forms
-        .where((f) => !f.isDefault)
+        .where((f) => !f.isDefault && f.name != baseName)
         .map((f) => PokemonFormEntry(
               id: f.formId ?? pokemonId,
               name: f.name,
