@@ -296,7 +296,7 @@
   - [x] **Task A** — Consolidate override maps into JSON asset and `PokemonDataRegistry` singleton *(#234)*
   - [x] **Task B** — Unified sprite resolver (`PokemonDataResolver`) replacing 4 divergent sprite URL implementations *(#235)*
   - [x] **Task C** — `resolvedPokemonProvider` with `keepAlive` caching to eliminate per-scroll provider rebuilds *(#236)*
-  - [ ] **Task D** — Backend `GET /pokemon/{id}/resolved` endpoint with Showdown + Smogon aggregation and PostgreSQL caching *(#237)* — PR #243 open
+  - [x] **Task D** — Backend `GET /pokemon/{id}/resolved` endpoint with Showdown + Smogon aggregation and PostgreSQL caching *(#237)*
   - [ ] **Task E** — Flutter hybrid integration: `resolvedPokemonProvider` → backend first, Hive offline fallback *(#238)*
   - [ ] **Task F** *(optional)* — Frontend lazy-loading and provider hygiene audit post-B+C *(#239)*
   - [ ] **Sprite consolidation investigation** — single backend resolver for icons, battle sprites (all gens), HOME artwork, official artwork across all form variants *(#244)*
