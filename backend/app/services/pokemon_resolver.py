@@ -198,21 +198,6 @@ def _extract_form_suffix(form_name: str, species_name: str) -> str | None:
     return None
 
 
-def _patch_stale_forms(data: dict) -> dict:
-    """Patch cached rows written before `is_default` was added to FormData.
-
-    `_fetch_forms` always places the default form at index 0. Rows cached
-    before `is_default` was introduced have the field absent in JSONB, so
-    Pydantic defaults it to False for all forms. Fix by setting forms[0]
-    is_default=True when it is missing or False in the raw dict.
-    """
-    forms = data.get("forms")
-    if forms and isinstance(forms, list) and len(forms) > 0:
-        first = forms[0]
-        if isinstance(first, dict) and not first.get("is_default", False):
-            data = {**data, "forms": [{**first, "is_default": True}, *forms[1:]]}
-    return data
-
 
 class PokemonResolverService:
     def __init__(self) -> None:
@@ -625,55 +610,25 @@ class PokemonResolverService:
     async def _fetch_forms(
         self, form_names: list[str], base_id: int, species_name: str, gen: int
     ) -> list[FormData]:
-        """Parallel fetch /pokemon-form/{name} for each non-default form."""
-        # Determine which form is the default (usually has same name as species or is index 0)
+        """Fetch /pokemon-form/{name} for each non-default cosmetic form.
+
+        The default form (index 0 / species name) is always excluded — it is the
+        base Pokémon itself and is already represented by the top-level response.
+        Returns [] for Pokémon with no cosmetic variants.
+        """
         non_defaults = [n for n in form_names if n != species_name and n != form_names[0]]
         if not non_defaults:
             non_defaults = form_names[1:] if len(form_names) > 1 else []
 
-        # The default form (index 0) IS the base Pokémon, so its sprites live under
-        # the base name/ID — never under a suffixed path.
-        # The default form IS the base Pokémon, so its static/HOME/dex sprites live
-        # under the base ID/name — NOT the suffixed path (see _build_form_sprite_urls
-        # docstring for the full explanation and the Unown-A edge case).
-        # is_default_form=True makes _build_form_sprite_urls use species_name for HOME/dex
-        # Showdown paths while still using the suffixed sprite_id for versioned PokeAPI
-        # paths (e.g. crystal/animated/201-a.gif is correct and must keep the suffix).
-        default_form_name = form_names[0]
-        default_ps_name = _to_showdown_name(default_form_name, self._ps_exceptions)
-        default_front_sprite = (
-            f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{base_id}.png"
-        )
-        default_sprite_urls = self._build_form_sprite_urls(
-            default_form_name, base_id, species_name, default_ps_name, gen,
-            is_default_form=True,
-        )
-
         if not non_defaults:
-            return [
-                FormData(
-                    name=n,
-                    form_id=base_id,
-                    is_default=(n == default_form_name),
-                    front_sprite_url=default_front_sprite,
-                    sprite_urls=default_sprite_urls,
-                )
-                for n in form_names
-            ]
+            return []
 
         responses = await asyncio.gather(
             *[self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon-form/{n}") for n in non_defaults],
             return_exceptions=True,
         )
 
-        # Default form gets the same full sprite treatment as non-defaults
-        result: list[FormData] = [FormData(
-            name=default_form_name,
-            form_id=base_id,
-            is_default=True,
-            front_sprite_url=default_front_sprite,
-            sprite_urls=default_sprite_urls,
-        )]
+        result: list[FormData] = []
         for form_name, resp in zip(non_defaults, responses):
             ps_name = _to_showdown_name(form_name, self._ps_exceptions)
             # Construct the front sprite URL from the base_id + suffix pattern
@@ -789,8 +744,7 @@ class PokemonResolverService:
         )
         row = result.scalar_one_or_none()
         if row:
-            data = _patch_stale_forms(dict(row.data))
-            response = PokemonResolvedResponse(**data, resolved_at=row.resolved_at)
+            response = PokemonResolvedResponse(**row.data, resolved_at=row.resolved_at)
             return self._trim_response(response, includes, gen)
 
         # 2. Fetch from PokéAPI
@@ -1106,12 +1060,11 @@ class PokemonResolverService:
         )
         row = result.scalar_one_or_none()
         if row:
-            forms = _patch_stale_forms({"forms": row.data.get("forms", [])})["forms"]
             return FormsResponse(
                 pokemon_id=pokemon_id,
                 gen=gen,
                 name=row.data.get("name", ""),
-                forms=forms,
+                forms=row.data.get("forms", []),
             )
 
         full = await self.resolve(pokemon_id, gen, ["varieties", "forms"], db, base_url)
