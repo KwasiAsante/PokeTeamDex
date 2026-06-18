@@ -5,6 +5,7 @@ import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
+import 'package:poke_team_dex/utils/app_logger.dart';
 
 const _kBase =
     'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
@@ -32,17 +33,21 @@ final resolvedPokemonProvider =
   // 1. Hive cache hit
   final cached = cache.getIfValid('resolved_$id');
   if (cached != null) {
+    AppLogger().d('[resolved] Hive cache hit id=$id');
     final response = PokemonResolvedBackendResponse.fromJson(cached);
     return _fromBackendResponse(response);
   }
 
   // 2. Backend fetch (returns fast on Postgres hit)
   try {
+    AppLogger().d('[resolved] fetching from backend id=$id');
     final repo = ref.read(pokemonBackendRepositoryProvider);
     final response = await repo.fetchResolved(id);
+    AppLogger().d('[resolved] backend ok id=$id name=${response.name}');
     cache.putWithTTL('resolved_$id', response.toJson(), const Duration(days: 7));
     return _fromBackendResponse(response);
-  } catch (_) {
+  } catch (e) {
+    AppLogger().w('[resolved] backend failed id=$id, falling back to PokéAPI', error: e);
     // 3. Offline fallback — Task C behavior
   }
 

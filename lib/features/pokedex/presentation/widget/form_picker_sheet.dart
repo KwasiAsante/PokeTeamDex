@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/utils/app_logger.dart';
 
 /// Bottom-sheet form picker.
 ///
@@ -109,6 +110,12 @@ class FormOptionTile extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     // Skip the provider call when an override is already available — avoids
     // a failing fetch for form names that have no /pokemon endpoint.
+    if (formName != null && overrideSpriteUrl == null) {
+      AppLogger().w(
+        '[FormOptionTile] no sprite override for "$formName" — '
+        'falling back to pokemonByNameProvider (may 404 for form-entry cosmetics)',
+      );
+    }
     final pokemonAsync = (formName != null && overrideSpriteUrl == null)
         ? ref.watch(pokemonByNameProvider(formName!))
         : null;
