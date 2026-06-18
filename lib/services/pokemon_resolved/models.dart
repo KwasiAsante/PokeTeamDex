@@ -127,6 +127,13 @@ class SpriteUrlsFull {
   final String? gameFrontShiny;
   final String? gameFrontFemale;
   final String? gameFrontFemaleShiny;
+  // Gen-specific icon sprite.
+  // gen 8+: generation-viii/icons/{id}.png
+  // gen 7:  generation-vii/icons/{id}.png
+  // gen ≤ 6: plain front sprite (no icon directories exist)
+  final String? icon;
+  // Shiny icon — uses game_front_shiny since no dedicated shiny icon sprites exist.
+  final String? iconShiny;
 
   const SpriteUrlsFull({
     this.officialArtwork,
@@ -139,6 +146,8 @@ class SpriteUrlsFull {
     this.gameFrontShiny,
     this.gameFrontFemale,
     this.gameFrontFemaleShiny,
+    this.icon,
+    this.iconShiny,
   });
 
   factory SpriteUrlsFull.fromJson(Map<String, dynamic> json) => SpriteUrlsFull(
@@ -152,6 +161,8 @@ class SpriteUrlsFull {
         gameFrontShiny: json['game_front_shiny'] as String?,
         gameFrontFemale: json['game_front_female'] as String?,
         gameFrontFemaleShiny: json['game_front_female_shiny'] as String?,
+        icon: json['icon'] as String?,
+        iconShiny: json['icon_shiny'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -165,6 +176,8 @@ class SpriteUrlsFull {
         'game_front_shiny': gameFrontShiny,
         'game_front_female': gameFrontFemale,
         'game_front_female_shiny': gameFrontFemaleShiny,
+        'icon': icon,
+        'icon_shiny': iconShiny,
       };
 }
 

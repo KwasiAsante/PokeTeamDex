@@ -58,6 +58,7 @@ _SMOGON_BASE = "https://pkmn.github.io/smogon/data"
 _POKEAPI_BASE = "https://pokeapi.co/api/v2"
 _SHOWDOWN_CDN = "https://play.pokemonshowdown.com/sprites"
 _POKEAPI_SPRITES = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions"
+_POKEAPI_PLAIN_SPRITES = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon"
 
 # PokeAPI/sprites: preferred subdir and extension per gen game
 # (gen number → (game_path, subdir, ext, shiny_subdir))
@@ -183,6 +184,22 @@ def _build_showdown_sprite_url(
     else:
         dir_name = "dex-shiny" if shiny else "dex"
         return f"{_SHOWDOWN_CDN}/{dir_name}/{ps_name}.png"
+
+
+def _build_icon_url(pokemon_id: int, gen: int) -> str:
+    """Gen-specific icon sprite URL.
+
+    Fallback chain:
+      gen >= 8  → generation-viii/icons/{id}.png
+      gen == 7  → generation-vii/icons/{id}.png
+      gen <= 6  → plain front sprite (no icon directories exist for these gens)
+    """
+    if gen >= 8:
+        return f"{_POKEAPI_SPRITES}/generation-viii/icons/{pokemon_id}.png"
+    elif gen >= 7:
+        return f"{_POKEAPI_SPRITES}/generation-vii/icons/{pokemon_id}.png"
+    else:
+        return f"{_POKEAPI_PLAIN_SPRITES}/{pokemon_id}.png"
 
 
 def _extract_form_suffix(form_name: str, species_name: str) -> str | None:
@@ -431,8 +448,10 @@ class PokemonResolverService:
             home_female_shiny=home.get("front_female_shiny") or home.get("front_shiny_female"),
             game_front=game_front,
             game_front_shiny=game_front_shiny,
-            game_front_female=None,        # derivable but out of scope for now
+            game_front_female=None,
             game_front_female_shiny=None,
+            icon=_build_icon_url(variety_id, gen),
+            icon_shiny=game_front_shiny,
         )
 
     def _build_form_sprite_urls(
@@ -489,6 +508,8 @@ class PokemonResolverService:
             game_front_shiny=game_front_shiny,
             game_front_female=None,
             game_front_female_shiny=None,
+            icon=_build_icon_url(base_id, gen),
+            icon_shiny=game_front_shiny,
         )
 
     def _build_base_sprite_urls(
