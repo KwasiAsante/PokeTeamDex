@@ -83,6 +83,23 @@ _SHOWDOWN_GEN_SHINY_DIRS: dict[int, str] = {
 _ROMAN = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5,
           "vi": 6, "vii": 7, "viii": 8, "ix": 9}
 
+# PokéAPI form name suffix → PokeAPI/sprites repo suffix.
+# The sprites repo uses shorter names for some forms whose PokéAPI slug is longer.
+# e.g. "shellos-east-sea" → sprites use "422-east.png", not "422-east-sea.png".
+_SPRITE_SUFFIX_REMAP: dict[str, str] = {
+    "east-sea":      "east",
+    "blue-flower":   "blue",
+    "orange-flower": "orange",
+    "red-flower":    "red",
+    "white-flower":  "white",
+    "yellow-flower": "yellow",
+    "blue-petal":    "blue",
+    "orange-petal":  "orange",
+    "red-petal":     "red",
+    "white-petal":   "white",
+    "yellow-petal":  "yellow",
+}
+
 _GEN_RANGES = [(151, 1), (251, 2), (386, 3), (493, 4), (649, 5),
                (721, 6), (809, 7), (905, 8), (10000, 9)]
 
@@ -494,7 +511,10 @@ class PokemonResolverService:
         work consistently across all directories for those.
         """
         suffix = _extract_form_suffix(form_name, species_name)
-        sprite_id = f"{base_id}-{suffix}" if suffix else str(base_id)
+        # Use the remapped suffix for PokeAPI sprites repo paths (icons, versioned
+        # game sprites). The sprites repo uses shorter names for some forms.
+        repo_suffix = _SPRITE_SUFFIX_REMAP.get(suffix, suffix)
+        sprite_id = f"{base_id}-{repo_suffix}" if repo_suffix else str(base_id)
 
         # HOME and dex Showdown paths: default form uses base species name.
         home_ps_name = species_name if is_default_form else ps_name
@@ -665,7 +685,8 @@ class PokemonResolverService:
 
         def _form_home_id(fn: str) -> str:
             sfx = _extract_form_suffix(fn, species_name)
-            return f"{base_id}-{sfx}" if sfx else str(base_id)
+            mapped = _SPRITE_SUFFIX_REMAP.get(sfx, sfx)
+            return f"{base_id}-{mapped}" if mapped else str(base_id)
 
         # Batch: form-data fetches + PokeAPI sprite CDN probes (home, home_shiny,
         # official-artwork). All run in parallel; probes are HEAD-only, cheap.
