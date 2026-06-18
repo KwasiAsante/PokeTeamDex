@@ -126,6 +126,7 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
       formEntry: formEntry,
       cosmeticEntry: selectedCosmeticEntry,
       filter: filter,
+      spriteUrls: resolved?.spriteUrls,
     );
     final fallbackUrl = PokemonDataResolver.resolvePokedexFallbackUrl(
       pokemonId: widget.pokemon.id,

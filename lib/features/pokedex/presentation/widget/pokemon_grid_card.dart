@@ -111,6 +111,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
       formEntry: formEntry,
       cosmeticEntry: selectedCosmeticEntry,
       filter: const PokedexFilter(),
+      spriteUrls: resolved?.spriteUrls,
     );
 
     final baseDisplayName = basePokemon?.displaySpeciesName ??

@@ -6,6 +6,7 @@ import 'package:poke_team_dex/features/pokedex/models/pokedex_image_type.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show SpriteUrlsFull;
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart'
     show cosmeticFormHomeUrl, cosmeticFormHomeShinyUrl, pokemonHomeFemaleUrl;
 
@@ -163,6 +164,7 @@ class PokemonDataResolver {
     required PokemonEntry? formEntry,
     required PokemonFormEntry? cosmeticEntry,
     required PokedexFilter? filter,
+    SpriteUrlsFull? spriteUrls,
   }) {
     final registry = PokemonDataRegistry.instance;
 
@@ -215,11 +217,20 @@ class PokemonDataResolver {
       PokedexImageType.artwork =>
         baseHomeOverride?.homeUrl ??
         '${_spritesBase}other/official-artwork/$pokemonId.png',
-      // sprite: filter-aware icon (same as _compactIconUrl in list tile).
-      // Grid card sprite mode also uses this path — with the default filter
-      // the subpath is null, so this degrades to the plain pokemonId.png fallback.
-      PokedexImageType.sprite => compactIconUrl(pokemonId, filter!),
-      null => '${_spritesBase}versions/generation-viii/icons/$pokemonId.png',
+      // sprite: filter-aware icon. When no gen/game filter is active,
+      // compactIconUrl returns the plain front sprite — use spriteUrls.icon
+      // (gen-8 icon) as a better compact representation when available.
+      PokedexImageType.sprite => (() {
+        final genIcon = compactIconUrl(pokemonId, filter!);
+        // compactIconUrl falls back to plain sprite when there's no subpath;
+        // prefer the gen-aware icon from the backend in that case.
+        if (!genIcon.contains('/versions/') && spriteUrls?.icon != null) {
+          return spriteUrls!.icon!;
+        }
+        return genIcon;
+      })(),
+      null => spriteUrls?.icon ??
+          '${_spritesBase}versions/generation-viii/icons/$pokemonId.png',
     };
   }
 
