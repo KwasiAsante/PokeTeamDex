@@ -211,14 +211,14 @@ class PokemonResolvedResponse(BaseModel):
     species_name: str | None = None
     form_names: list[str] = []            # derived from forms[].name for convenience
     moves: list[MoveSummary] = []         # slim: []; full via ?includes[]=moves
-    moves_url: str | None = None
+    moves_url: str | None = None          # /pokemon/moves/{pokemon_id}
     supplement_moves: list[EventMove]
     smogon_analyses: list[SmogonFormatData] | None
-    smogon_url: str | None = None
+    smogon_url: str | None = None          # /pokemon/smogon/{pokemon_id}
     varieties: list[VarietyData]
-    varieties_url: str | None = None
+    varieties_url: str | None = None       # /pokemon/varieties/{pokemon_id}
     forms: list[FormData]
-    forms_url: str | None = None
+    forms_url: str | None = None           # /pokemon/forms/{pokemon_id}
     sprite_urls: SpriteUrlsFull
     resolved_at: datetime
     # species detail
@@ -231,7 +231,7 @@ class PokemonResolvedResponse(BaseModel):
     growth_rate: str | None = None
     egg_groups: list[str] = []
     flavor_text_entries: list[FlavorTextEntry] = []  # slim: []; full via ?includes[]=flavor
-    flavor_text_url: str | None = None
+    flavor_text_url: str | None = None     # /pokemon/flavor-text/{pokemon_id}
     is_baby: bool = False
     is_legendary: bool = False
     is_mythical: bool = False

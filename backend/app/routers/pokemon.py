@@ -2,7 +2,9 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.core.deps import DB
 from app.schemas.pokemon_resolved import (
+    FlavorTextResponse,
     FormsResponse,
+    MovesResponse,
     PokemonResolvedResponse,
     SmogonResponse,
     VarietiesResponse,
@@ -92,6 +94,38 @@ async def get_pokemon_smogon(
     if gen is not None and not 1 <= gen <= 9:
         raise HTTPException(status_code=400, detail="gen must be between 1 and 9")
     return await pokemon_resolver_service.resolve_smogon(name_or_id, gen, db, _base_url(request))
+
+
+@router.get("/moves/{name_or_id}", response_model=MovesResponse)
+async def get_pokemon_moves(
+    request: Request,
+    name_or_id: str,
+    db: DB,
+) -> MovesResponse:
+    """
+    Return the full moves list for a Pokémon (all version groups).
+    Served from PostgreSQL cache when available; triggers a full resolve on miss.
+    """
+    return await pokemon_resolver_service.resolve_moves(
+        name_or_id, db, _base_url(request)
+    )
+
+
+@router.get("/flavor-text/{name_or_id}", response_model=FlavorTextResponse)
+async def get_pokemon_flavor_text(
+    request: Request,
+    name_or_id: str,
+    db: DB,
+    lang: str | None = None,
+) -> FlavorTextResponse:
+    """
+    Return Pokédex flavor text entries for a Pokémon.
+    - **lang**: Optional language code (e.g. "en"). Omit for all languages.
+    Served from PostgreSQL cache when available.
+    """
+    return await pokemon_resolver_service.resolve_flavor_text(
+        name_or_id, lang, db, _base_url(request)
+    )
 
 
 @router.get("/{name_or_id}/resolved", response_model=PokemonResolvedResponse)

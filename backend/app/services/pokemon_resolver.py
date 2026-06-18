@@ -23,8 +23,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.pokemon_resolved import PokemonResolved
 from app.schemas.pokemon_resolved import (
+    AbilityInfo,
     EventMove,
+    FlavorTextEntry,
     FormData,
+    MoveLearnDetail,
+    MoveSummary,
     PokemonResolvedResponse,
     SmogonFormatData,
     SmogonResponse,
@@ -633,6 +637,8 @@ class PokemonResolverService:
             return [
                 FormData(
                     name=n,
+                    form_id=base_id,
+                    is_default=(n == default_form_name),
                     front_sprite_url=default_front_sprite,
                     sprite_urls=default_sprite_urls,
                 )
@@ -647,6 +653,8 @@ class PokemonResolverService:
         # Default form gets the same full sprite treatment as non-defaults
         result: list[FormData] = [FormData(
             name=default_form_name,
+            form_id=base_id,
+            is_default=True,
             front_sprite_url=default_front_sprite,
             sprite_urls=default_sprite_urls,
         )]
@@ -659,16 +667,20 @@ class PokemonResolverService:
 
             if isinstance(resp, Exception) or resp.status_code != 200:
                 logger.warning("Failed to fetch form %s: %s", form_name, resp)
-                result.append(FormData(name=form_name, front_sprite_url=front_sprite))
+                result.append(FormData(name=form_name, form_id=base_id, is_default=False, front_sprite_url=front_sprite))
                 continue
 
             # Use the API response's front_default if available (more authoritative)
-            api_front = (resp.json().get("sprites") or {}).get("front_default") or front_sprite
+            form_data_json = resp.json()
+            api_front = (form_data_json.get("sprites") or {}).get("front_default") or front_sprite
+            form_id = form_data_json.get("id", base_id)
             sprite_urls = self._build_form_sprite_urls(
                 form_name, base_id, species_name, ps_name, gen
             )
             result.append(FormData(
                 name=form_name,
+                form_id=form_id,
+                is_default=False,
                 front_sprite_url=api_front,
                 sprite_urls=sprite_urls,
             ))
@@ -735,6 +747,10 @@ class PokemonResolverService:
         elif filtered is not response.smogon_analyses:
             # smogon IS in includes but gen filtering changed the list
             response = response.model_copy(update={"smogon_analyses": filtered})
+        if "moves" not in includes:
+            response = response.model_copy(update={"moves": []})
+        if "flavor" not in includes:
+            response = response.model_copy(update={"flavor_text_entries": []})
         return response
 
     # ------------------------------------------------------------------
@@ -762,7 +778,7 @@ class PokemonResolverService:
 
         # 2. Fetch from PokéAPI
         try:
-            pokemon_data, species_info = await self._fetch_pokeapi(pokemon_id)
+            pokemon_data, species_data, species_info = await self._fetch_pokeapi(pokemon_id)
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 404:
                 raise HTTPException(404, detail=f"Pokémon {pokemon_id} not found in PokéAPI")
@@ -794,6 +810,65 @@ class PokemonResolverService:
         ps_abilities = ps_abilities_raw if ps_abilities_raw else raw_abilities
         types, base_stats, abilities = self._apply_gen_overrides(ps_id, ps_types, ps_stats, ps_abilities, gen)
 
+        # --- New fields ---
+        # abilities as typed list
+        abilities_list = [
+            AbilityInfo(
+                name=a["ability"]["name"],
+                is_hidden=a.get("is_hidden", False),
+                slot=a.get("slot", 1),
+            )
+            for a in pokemon_data.get("abilities", [])
+        ]
+
+        # moves (always built; trimmed to [] at response time unless "moves" in includes)
+        moves_list = [
+            MoveSummary(
+                name=m["move"]["name"],
+                learn_details=[
+                    MoveLearnDetail(
+                        version_group=d["version_group"]["name"],
+                        method=d["move_learn_method"]["name"],
+                        level=d.get("level_learned_at", 0),
+                    )
+                    for d in m.get("version_group_details", [])
+                ],
+            )
+            for m in pokemon_data.get("moves", [])
+        ]
+
+        # species detail fields
+        genus = next(
+            (g["genus"] for g in species_data.get("genera", []) if g["language"]["name"] == "en"),
+            None,
+        )
+        generation_name = species_data.get("generation", {}).get("name", "generation-ix")
+        gender_rate = species_data.get("gender_rate")
+        capture_rate = species_data.get("capture_rate")
+        base_happiness = species_data.get("base_happiness")
+        hatch_counter = species_data.get("hatch_counter")
+        growth_rate_obj = species_data.get("growth_rate")
+        growth_rate = growth_rate_obj.get("name") if growth_rate_obj else None
+        egg_groups = [e["name"] for e in species_data.get("egg_groups", [])]
+        flavor_text_entries_list = [
+            FlavorTextEntry(
+                text=e["flavor_text"].replace("\n", " ").replace("\f", " "),
+                language=e["language"]["name"],
+                version=e["version"]["name"],
+            )
+            for e in species_data.get("flavor_text_entries", [])
+        ]
+        is_baby = species_data.get("is_baby", False)
+        is_legendary = species_data.get("is_legendary", False)
+        is_mythical = species_data.get("is_mythical", False)
+        chain_url = (species_data.get("evolution_chain") or {}).get("url")
+        evolution_chain_id: int | None = None
+        if chain_url:
+            try:
+                evolution_chain_id = int(chain_url.rstrip("/").split("/")[-1])
+            except (ValueError, IndexError):
+                pass
+
         # 5. Move supplementation
         move_slugs: set[str] = {m["move"]["name"] for m in pokemon_data.get("moves", [])}
         supplement_moves = self._get_supplement_moves(ps_id, move_slugs)
@@ -818,7 +893,7 @@ class PokemonResolverService:
         )
 
         # 8. Varieties (always fetched on cache miss, trimmed at response time)
-        raw_varieties = species_info["varieties"]
+        raw_varieties = species_data.get("varieties", [])
         varieties = await self._fetch_varieties(raw_varieties, species_name, gen, base_url)
 
         # 9. Forms (form-entry cosmetics)
@@ -833,7 +908,13 @@ class PokemonResolverService:
             name=pokemon_name,
             types=types,
             base_stats=base_stats,
-            abilities=abilities,
+            abilities=abilities_list,                         # changed: list[AbilityInfo]
+            height=pokemon_data.get("height", 0),             # new
+            weight=pokemon_data.get("weight", 0),             # new
+            base_experience=pokemon_data.get("base_experience"),  # new
+            species_name=species_data.get("name"),            # new
+            moves=moves_list,                                 # new (trimmed to [] by _trim_response)
+            moves_url=f"{base_url}/pokemon/{pokemon_id}/moves",  # new
             supplement_moves=supplement_moves,
             smogon_analyses=smogon_analyses,
             smogon_url=f"{base_url}/pokemon/{pokemon_id}/smogon",
@@ -843,6 +924,20 @@ class PokemonResolverService:
             forms_url=f"{base_url}/pokemon/{pokemon_id}/forms",
             sprite_urls=sprite_urls,
             resolved_at=now,
+            genus=genus,                                      # new
+            generation_name=generation_name,                  # new
+            gender_rate=gender_rate,                          # new
+            capture_rate=capture_rate,                        # new
+            base_happiness=base_happiness,                    # new
+            hatch_counter=hatch_counter,                      # new
+            growth_rate=growth_rate,                          # new
+            egg_groups=egg_groups,                            # new
+            flavor_text_entries=flavor_text_entries_list,     # new (trimmed to [] by _trim_response)
+            flavor_text_url=f"{base_url}/pokemon/{pokemon_id}/flavor-text",  # new
+            is_baby=is_baby,                                  # new
+            is_legendary=is_legendary,                        # new
+            is_mythical=is_mythical,                          # new
+            evolution_chain_id=evolution_chain_id,            # new
         )
 
         # 11. Upsert full data to cache
@@ -999,7 +1094,69 @@ class PokemonResolverService:
             forms=full.forms,
         )
 
-    async def _fetch_pokeapi(self, pokemon_id: int) -> tuple[dict, dict]:
+    async def resolve_moves(
+        self, name_or_id: str, db: AsyncSession, base_url: str = ""
+    ) -> "MovesResponse":
+        from app.schemas.pokemon_resolved import MovesResponse
+        pokemon_id = await self._resolve_name_or_id(name_or_id)
+
+        result = await db.execute(
+            select(PokemonResolved).where(
+                PokemonResolved.pokemon_id == pokemon_id,
+                PokemonResolved.gen == 9,
+                PokemonResolved.resolved_at
+                + text("(ttl_days * interval '1 day')")
+                > func.now(),
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row and row.data.get("moves"):
+            return MovesResponse(
+                pokemon_id=pokemon_id,
+                name=row.data.get("name", ""),
+                moves=row.data["moves"],
+            )
+
+        full = await self.resolve(pokemon_id, 9, ["moves"], db, base_url)
+        return MovesResponse(pokemon_id=pokemon_id, name=full.name, moves=full.moves)
+
+    async def resolve_flavor_text(
+        self, name_or_id: str, lang: str | None, db: AsyncSession, base_url: str = ""
+    ) -> "FlavorTextResponse":
+        from app.schemas.pokemon_resolved import FlavorTextResponse
+        pokemon_id = await self._resolve_name_or_id(name_or_id)
+
+        result = await db.execute(
+            select(PokemonResolved).where(
+                PokemonResolved.pokemon_id == pokemon_id,
+                PokemonResolved.gen == 9,
+                PokemonResolved.resolved_at
+                + text("(ttl_days * interval '1 day')")
+                > func.now(),
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row and row.data.get("flavor_text_entries"):
+            entries = row.data["flavor_text_entries"]
+            if lang:
+                entries = [e for e in entries if e.get("language") == lang]
+            return FlavorTextResponse(
+                pokemon_id=pokemon_id,
+                name=row.data.get("name", ""),
+                flavor_text_entries=entries,
+            )
+
+        full = await self.resolve(pokemon_id, 9, ["flavor"], db, base_url)
+        filtered = (
+            [e for e in full.flavor_text_entries if e.language == lang]
+            if lang else full.flavor_text_entries
+        )
+        return FlavorTextResponse(
+            pokemon_id=pokemon_id, name=full.name, flavor_text_entries=filtered
+        )
+
+    async def _fetch_pokeapi(self, pokemon_id: int) -> tuple[dict, dict, dict]:
+        """Returns (pokemon_data, species_data, meta) where meta = {english_name, gen, species_name}."""
         pokemon_r = await self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon/{pokemon_id}")
         pokemon_r.raise_for_status()
         pokemon_data = pokemon_r.json()
@@ -1017,11 +1174,10 @@ class PokemonResolverService:
         gen_num = _ROMAN.get(gen_suffix, 9)
         species_name: str = species_data["name"]
 
-        return pokemon_data, {
+        return pokemon_data, species_data, {
             "english_name": english_name,
             "gen": gen_num,
             "species_name": species_name,
-            "varieties": species_data.get("varieties", []),
         }
 
 
