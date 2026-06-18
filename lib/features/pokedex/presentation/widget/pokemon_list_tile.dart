@@ -9,9 +9,12 @@ import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_s
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart'
+    show FormBackendData, VarietyBackendData;
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
     show pokemonFormsProvider, pokemonVarietiesProvider;
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart' show PokemonEntry;
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
@@ -33,6 +36,51 @@ class PokemonListTile extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<PokemonListTile> createState() => _PokemonListTileState();
+}
+
+List<(String?, String, String?)> _buildAllForms({
+  required List<PokemonFormEntry> cosmeticFormEntries,
+  required List<PokemonVariety> battleForms,
+  required List<PokemonVariety> cosmeticVarietyForms,
+  required PokemonEntry? basePokemon,
+  required String baseFormLabel,
+  required List<FormBackendData>? formsData,
+  required List<VarietyBackendData>? varietiesData,
+}) {
+  return <(String?, String, String?)>[
+    (null, baseFormLabel, null),
+    ...battleForms.map((v) {
+      final full = varietiesData?.where((vd) => vd.name == v.name).firstOrNull;
+      final spriteUrl = full?.spriteUrls?.officialArtwork ?? full?.spriteUrls?.home;
+      return (v.name, shortFormLabel(v.name), spriteUrl);
+    }),
+    ...cosmeticVarietyForms.map((v) {
+      final sn = basePokemon?.speciesName ?? v.name;
+      final suffix = v.name.startsWith('$sn-')
+          ? v.name.substring(sn.length + 1)
+          : v.name;
+      final full = varietiesData?.where((vd) => vd.name == v.name).firstOrNull;
+      final spriteUrl =
+          PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[v.name] ??
+          full?.spriteUrls?.officialArtwork ??
+          full?.spriteUrls?.home;
+      return (
+        v.name,
+        PokemonDataRegistry.instance.cosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix),
+        spriteUrl,
+      );
+    }),
+    ...cosmeticFormEntries.map((f) => (
+      f.name,
+      PokemonDataRegistry.instance.cosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
+      PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[f.name] ??
+          (() {
+            final full = formsData?.where((fd) => fd.name == f.name).firstOrNull;
+            return full?.spriteUrls?.officialArtwork ?? full?.spriteUrls?.home;
+          })() ??
+          f.spriteUrl,
+    )),
+  ];
 }
 
 class _PokemonListTileState extends ConsumerState<PokemonListTile> {
@@ -82,43 +130,15 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
             widget.pokemon.name, species.generationName, battleForms)
         : 'Base';
 
-    final allForms = <(String?, String, String?)>[
-      (null, baseFormLabel, null),
-      ...battleForms.map((v) {
-        final full = varietiesData?.where((vd) => vd.name == v.name).firstOrNull;
-        final spriteUrl = full?.spriteUrls?.officialArtwork ?? full?.spriteUrls?.home;
-        return (v.name, shortFormLabel(v.name), spriteUrl);
-      }),
-      ...cosmeticVarietyForms.map((v) {
-        final sn = basePokemon?.speciesName ?? widget.pokemon.name;
-        final suffix = v.name.startsWith('$sn-')
-            ? v.name.substring(sn.length + 1)
-            : v.name;
-        final full = varietiesData?.where((vd) => vd.name == v.name).firstOrNull;
-        final spriteUrl =
-            PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[v.name] ??
-            full?.spriteUrls?.officialArtwork ??
-            full?.spriteUrls?.home;
-        return (v.name, PokemonDataRegistry.instance.cosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix),
-            spriteUrl);
-      }),
-      // Form-entry cosmetics: carry sprite so FormOptionTile doesn't call
-      // pokemonByNameProvider with a form name that has no /pokemon endpoint.
-      // PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides takes priority (e.g. xerneas-active shows
-      // the neutral pose image, not the active-pose sprite).
-      ...cosmeticFormEntries.map((f) => (
-        f.name,
-        PokemonDataRegistry.instance.cosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
-        // official → home → sprite using full form data from pokemonFormsProvider.
-        // Falls back to front_sprite_url while forms are loading or offline.
-        PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[f.name] ??
-            (() {
-              final full = formsData?.where((fd) => fd.name == f.name).firstOrNull;
-              return full?.spriteUrls?.officialArtwork ?? full?.spriteUrls?.home;
-            })() ??
-            f.spriteUrl,
-      )),
-    ];
+    final allForms = _buildAllForms(
+      cosmeticFormEntries: cosmeticFormEntries,
+      battleForms: battleForms,
+      cosmeticVarietyForms: cosmeticVarietyForms,
+      basePokemon: basePokemon,
+      baseFormLabel: baseFormLabel,
+      formsData: formsData,
+      varietiesData: varietiesData,
+    );
     final hasFormChip = allForms.length > 1;
 
     // Effective type/color — cosmetic form entries keep base types unchanged.
@@ -195,15 +215,30 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
-          builder: (ctx) => FormPickerSheet(
-            allForms: allForms,
-            baseSpriteUrl: basePokemon?.officialArtworkUrl
-                ?? resolved?.spriteUrls.home,
-            selectedFormName: _selectedFormName,
-            shiny: false,
-            onSelect: (name) {
-              setState(() => _selectedFormName = name);
-              Navigator.pop(ctx);
+          builder: (ctx) => Consumer(
+            builder: (ctx, liveRef, _) {
+              final liveFormsData = liveRef.watch(pokemonFormsProvider(widget.pokemon.id)).asData?.value;
+              final liveVarietiesData = liveRef.watch(pokemonVarietiesProvider(widget.pokemon.id)).asData?.value;
+              final liveAllForms = _buildAllForms(
+                cosmeticFormEntries: cosmeticFormEntries,
+                battleForms: battleForms,
+                cosmeticVarietyForms: cosmeticVarietyForms,
+                basePokemon: basePokemon,
+                baseFormLabel: baseFormLabel,
+                formsData: liveFormsData,
+                varietiesData: liveVarietiesData,
+              );
+              return FormPickerSheet(
+                allForms: liveAllForms,
+                baseSpriteUrl: basePokemon?.officialArtworkUrl
+                    ?? resolved?.spriteUrls.home,
+                selectedFormName: _selectedFormName,
+                shiny: false,
+                onSelect: (name) {
+                  setState(() => _selectedFormName = name);
+                  Navigator.pop(ctx);
+                },
+              );
             },
           ),
         ),

@@ -10,8 +10,11 @@ import 'package:poke_team_dex/features/pokedex/models/pokedex_image_type.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart'
+    show FormBackendData, VarietyBackendData;
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
     show pokemonFormsProvider, pokemonVarietiesProvider;
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart' show PokemonEntry;
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
@@ -19,6 +22,53 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 
+
+List<(String?, String, String?)> _buildAllFormsGrid({
+  required List<PokemonFormEntry> cosmeticFormEntries,
+  required List<PokemonVariety> battleForms,
+  required List<PokemonVariety> cosmeticVarietyForms,
+  required PokemonEntry? basePokemon,
+  required String baseFormLabel,
+  required List<FormBackendData>? formsData,
+  required List<VarietyBackendData>? varietiesData,
+  required String? homeFemale,
+}) {
+  return <(String?, String, String?)>[
+    (null, baseFormLabel, null),
+    ...battleForms.map((v) {
+      final full = varietiesData?.where((vd) => vd.name == v.name).firstOrNull;
+      final spriteUrl = full?.spriteUrls?.officialArtwork ?? full?.spriteUrls?.home;
+      return (v.name, shortFormLabel(v.name), spriteUrl);
+    }),
+    ...cosmeticVarietyForms.map((v) {
+      final sn = basePokemon?.speciesName ?? v.name;
+      final suffix = v.name.startsWith('$sn-')
+          ? v.name.substring(sn.length + 1)
+          : v.name;
+      final full = varietiesData?.where((vd) => vd.name == v.name).firstOrNull;
+      final spriteUrl =
+          PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[v.name] ??
+          full?.spriteUrls?.officialArtwork ??
+          full?.spriteUrls?.home;
+      return (
+        v.name,
+        PokemonDataRegistry.instance.cosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix),
+        spriteUrl,
+      );
+    }),
+    ...cosmeticFormEntries.map((f) => (
+      f.name,
+      PokemonDataRegistry.instance.cosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
+      PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[f.name] ??
+          (() {
+            final full = formsData?.where((fd) => fd.name == f.name).firstOrNull;
+            return full?.spriteUrls?.officialArtwork ?? full?.spriteUrls?.home;
+          })() ??
+          (f.formName == 'female' ? homeFemale : null) ??
+          f.spriteUrl,
+    )),
+  ];
+}
 
 class PokemonGridCard extends ConsumerStatefulWidget {
   final PokemonListEntry pokemon;
@@ -72,38 +122,16 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
             widget.pokemon.name, species.generationName, battleForms)
         : 'Base';
 
-    final allForms = <(String?, String, String?)>[
-      (null, baseFormLabel, null),
-      ...battleForms.map((v) {
-        final full = varietiesData?.where((vd) => vd.name == v.name).firstOrNull;
-        final spriteUrl = full?.spriteUrls?.officialArtwork ?? full?.spriteUrls?.home;
-        return (v.name, shortFormLabel(v.name), spriteUrl);
-      }),
-      ...cosmeticVarietyForms.map((v) {
-        final sn = basePokemon?.speciesName ?? widget.pokemon.name;
-        final suffix = v.name.startsWith('$sn-')
-            ? v.name.substring(sn.length + 1)
-            : v.name;
-        final full = varietiesData?.where((vd) => vd.name == v.name).firstOrNull;
-        final spriteUrl =
-            PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[v.name] ??
-            full?.spriteUrls?.officialArtwork ??
-            full?.spriteUrls?.home;
-        return (v.name, PokemonDataRegistry.instance.cosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix),
-            spriteUrl);
-      }),
-      ...cosmeticFormEntries.map((f) => (
-        f.name,
-        PokemonDataRegistry.instance.cosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
-        PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[f.name] ??
-            (() {
-              final full = formsData?.where((fd) => fd.name == f.name).firstOrNull;
-              return full?.spriteUrls?.officialArtwork ?? full?.spriteUrls?.home;
-            })() ??
-            (f.formName == 'female' ? resolved?.spriteUrls.homeFemale : null) ??
-            f.spriteUrl,
-      )),
-    ];
+    final allForms = _buildAllFormsGrid(
+      cosmeticFormEntries: cosmeticFormEntries,
+      battleForms: battleForms,
+      cosmeticVarietyForms: cosmeticVarietyForms,
+      basePokemon: basePokemon,
+      baseFormLabel: baseFormLabel,
+      formsData: formsData,
+      varietiesData: varietiesData,
+      homeFemale: resolved?.spriteUrls.homeFemale,
+    );
     final hasFormChip = allForms.length > 1;
 
     // Cosmetic form entries keep base types — no gradient change needed.
@@ -223,15 +251,31 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
                             borderRadius:
                                 BorderRadius.vertical(top: Radius.circular(16)),
                           ),
-                          builder: (ctx) => FormPickerSheet(
-                            allForms: allForms,
-                            baseSpriteUrl: basePokemon
-                                ?.sprites?['front_default'] as String?,
-                            selectedFormName: _selectedFormName,
-                            shiny: false,
-                            onSelect: (name) {
-                              setState(() => _selectedFormName = name);
-                              Navigator.pop(ctx);
+                          builder: (ctx) => Consumer(
+                            builder: (ctx, liveRef, _) {
+                              final liveFormsData = liveRef.watch(pokemonFormsProvider(widget.pokemon.id)).asData?.value;
+                              final liveVarietiesData = liveRef.watch(pokemonVarietiesProvider(widget.pokemon.id)).asData?.value;
+                              final liveAllForms = _buildAllFormsGrid(
+                                cosmeticFormEntries: cosmeticFormEntries,
+                                battleForms: battleForms,
+                                cosmeticVarietyForms: cosmeticVarietyForms,
+                                basePokemon: basePokemon,
+                                baseFormLabel: baseFormLabel,
+                                formsData: liveFormsData,
+                                varietiesData: liveVarietiesData,
+                                homeFemale: resolved?.spriteUrls.homeFemale,
+                              );
+                              return FormPickerSheet(
+                                allForms: liveAllForms,
+                                baseSpriteUrl: basePokemon?.officialArtworkUrl
+                                    ?? resolved?.spriteUrls.home,
+                                selectedFormName: _selectedFormName,
+                                shiny: false,
+                                onSelect: (name) {
+                                  setState(() => _selectedFormName = name);
+                                  Navigator.pop(ctx);
+                                },
+                              );
                             },
                           ),
                         ),
