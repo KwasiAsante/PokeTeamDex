@@ -20,10 +20,26 @@ class ResolvedPokemon {
   /// via [pokemonByNameProvider].
   final List<PokemonFormEntry> cosmeticForms;
 
+  /// Full sprite URL set from the backend response.
+  /// On the offline fallback path, only [SpriteUrlsFull.officialArtwork] is
+  /// populated (derived from [PokemonEntry.officialArtworkUrl]).
+  final SpriteUrlsFull spriteUrls;
+
+  /// Additional moves sourced from the backend (Smogon / supplement data).
+  /// Empty on the offline fallback path.
+  final List<MoveSummary> supplementMoves;
+
+  /// Smogon analysis data returned by the backend, if available.
+  /// Null on the offline fallback path.
+  final List<Map<String, dynamic>>? smogonAnalyses;
+
   const ResolvedPokemon({
     required this.detail,
     required this.species,
     required this.cosmeticForms,
+    required this.spriteUrls,
+    this.supplementMoves = const [],
+    this.smogonAnalyses,
   });
 
   int get id => detail.id;

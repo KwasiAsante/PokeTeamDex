@@ -21,8 +21,13 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_backend_repository.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_cache.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 
 class _MockRepo extends Mock implements PokeApiRepository {}
+class _MockBackendRepo extends Mock implements PokemonBackendRepository {}
+class _MockCache extends Mock implements PokemonResolvedCache {}
 
 // ── Fixture helpers ────────────────────────────────────────────────────────
 
@@ -57,10 +62,23 @@ PokemonFormEntry _form(String name, String formName,
       spriteUrl: spriteUrl,
     );
 
-/// Builds a [ProviderContainer] with the mock repository wired in.
-ProviderContainer _container(_MockRepo repo) => ProviderContainer(
-      overrides: [pokeApiRepositoryProvider.overrideWithValue(repo)],
-    );
+/// Builds a [ProviderContainer] with the mock repositories wired in.
+/// The cache always returns null (miss) and the backend always throws,
+/// so these tests exercise the PokéAPI offline fallback path.
+ProviderContainer _container(_MockRepo repo) {
+  final backendRepo = _MockBackendRepo();
+  final cache = _MockCache();
+  when(() => cache.getIfValid(any())).thenReturn(null);
+  when(() => backendRepo.fetchResolved(any()))
+      .thenThrow(Exception('test: backend disabled'));
+  return ProviderContainer(
+    overrides: [
+      pokeApiRepositoryProvider.overrideWithValue(repo),
+      pokemonBackendRepositoryProvider.overrideWithValue(backendRepo),
+      pokemonResolvedCacheProvider.overrideWithValue(cache),
+    ],
+  );
+}
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
@@ -68,6 +86,8 @@ void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     await PokemonDataRegistry.initialize();
+    registerFallbackValue('');
+    registerFallbackValue(0);
   });
 
   group('resolvedPokemonProvider', () {
