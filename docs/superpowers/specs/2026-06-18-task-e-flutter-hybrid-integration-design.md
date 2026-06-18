@@ -248,13 +248,18 @@ class PokemonResolvedCache {
 }
 ```
 
-**`models.dart`** — Dart models for the new backend response fields:
+**`models.dart`** — Dart models for the new typed fields. Each has `fromJson` / `toJson`
+for Hive serialisation and `fromPokeApi` for parsing the raw PokéAPI format in the
+offline path:
 
 ```dart
 class AbilityInfo {
   final String name;
   final bool isHidden;
   final int slot;
+
+  // fromJson: parses backend response {"name","is_hidden","slot"}
+  // fromPokeApi: parses PokéAPI format {"ability":{"name"}, "is_hidden", "slot"}
 }
 
 class MoveLearnDetail {
@@ -266,14 +271,27 @@ class MoveLearnDetail {
 class MoveSummary {
   final String name;
   final List<MoveLearnDetail> learnDetails;
+
+  // fromJson: parses backend response {"name","learn_details":[...]}
+  // fromPokeApi: parses PokéAPI format {"move":{"name"}, "version_group_details":[...]}
 }
 
-class FlavorTextEntry {
-  final String text;
-  final String language;
-  final String version;
+class SpriteUrlsFull {
+  final String? officialArtwork;
+  final String? officialArtworkShiny;
+  final String? home;
+  final String? homeShiny;
+  final String? homeFemale;
+  final String? homeFemaleShiny;
+  final String? gameFront;
+  final String? gameFrontShiny;
+  final String? gameFrontFemale;
+  final String? gameFrontFemaleShiny;
 }
 ```
+
+`FlavorTextEntry` already exists in `lib/services/pokeapi/models/pokemon_species_entry.dart`
+and has the same shape as the backend model — reuse it, do not duplicate.
 
 **`pokemon_backend_repository.dart`** — calls the backend:
 
@@ -308,51 +326,53 @@ final pokemonFlavorTextProvider =
 Both `pokemonMovesProvider` and `pokemonFlavorTextProvider` check their own Hive
 entries before calling the backend, and fall back to `PokeApiRepository` when offline.
 
-### 4.3 `ResolvedPokemon` model changes
+### 4.3 `PokemonEntry` field type changes
 
-Add two new fields for data that has no existing Flutter equivalent:
+These fields move from raw maps to typed models. `fromJson` (offline PokéAPI path)
+and the online backend mapping both produce the same typed output:
+
+| Field | Before | After |
+|---|---|---|
+| `types` | `Map<int, String>` (slot-keyed) | `List<String>` (ordered, index 0 = primary) |
+| `stats` | `List<Map<String, dynamic>>` | `Map<String, int>` (e.g. `{"hp": 45, "attack": 49}`) |
+| `abilities` | `List<Map<String, dynamic>>` | `List<AbilityInfo>` |
+| `moves` | `List<Map<String, dynamic>>` | `List<MoveSummary>` |
+
+`PokemonEntry.fromJson` is updated to parse each field into its new type from the
+raw PokéAPI response format. No separate "mapping layer" or backward-compat conversion
+needed — both paths produce the same typed fields.
+
+`PokemonEntry.sprites: Map<String, dynamic>?` and `officialArtworkUrl: String?` are
+kept as-is for now. Consumers that need the richer sprite set access
+`resolved.spriteUrls` (a new top-level field on `ResolvedPokemon`) instead.
+
+### 4.4 `ResolvedPokemon` model changes
 
 ```dart
 class ResolvedPokemon {
-  // existing — unchanged
+  // existing — types unchanged, PokemonEntry/PokemonSpeciesEntry now have typed fields
   final PokemonEntry detail;
   final PokemonSpeciesEntry species;
   final List<PokemonFormEntry> cosmeticForms;
 
-  // new — backend-only data, no PokéAPI equivalent
-  final List<MoveSummary> supplementMoves; // event/egg/tutor moves missing from PokéAPI
+  // new — richer sprite set from backend (replaces detail.officialArtworkUrl for consumers)
+  final SpriteUrlsFull spriteUrls;
+
+  // new — backend-only supplement data
+  final List<MoveSummary> supplementMoves;
   final List<Map<String, dynamic>>? smogonAnalyses; // raw JSON; typed model deferred to Smogon UI task
 }
 ```
 
-`detail` and `species` remain the primary typed models. The online path constructs
-them from the backend response fields using the mapping layer described in §4.4.
+The online path constructs `detail` and `species` from the backend response fields.
 The offline path constructs them from PokéAPI via `PokeApiRepository` as before.
-
-`detail.abilities`, `detail.moves`, `detail.types`, `detail.stats` field types are
-unchanged (raw maps) — consumer refactoring is deferred to Task F.
+Both paths produce the same `ResolvedPokemon` type.
 
 `detail.moves` and `species.flavorTextEntries` are no longer read by the Moves tab
 or Overview tab — those consumers switch to `pokemonMovesProvider` and
-`pokemonFlavorTextProvider`. The fields remain on `PokemonEntry` / `PokemonSpeciesEntry`
-for the offline path.
+`pokemonFlavorTextProvider`.
 
-**Mapping layer** — when constructing `PokemonEntry` from the backend response
-(online path), `AbilityInfo` objects are converted back to the raw map format that
-existing consumers expect:
-
-```dart
-// AbilityInfo → raw map for PokemonEntry.abilities backward compat
-final abilitiesMaps = response.abilities.map((a) => {
-  'ability': {'name': a.name, 'url': ''},
-  'is_hidden': a.isHidden,
-  'slot': a.slot,
-}).toList();
-```
-
-This keeps all existing ability consumers working without changes.
-
-### 4.4 `resolvedPokemonProvider` changes
+### 4.5 `resolvedPokemonProvider` changes
 
 ```
 1. Check pokemon_resolved_cache (Hive) for key "resolved_{id}"
@@ -373,17 +393,40 @@ This keeps all existing ability consumers working without changes.
 
 Backend call runs in parallel with the Hive check to minimise latency on first load.
 
-### 4.5 Consumer updates
+### 4.6 Consumer updates
 
-**`pokemon_detail_screen.dart`**
-- Moves tab: switch from `resolved.detail.moves` → `ref.watch(pokemonMovesProvider(id))`
-- Overview tab (flavor text): switch from `resolved.species.flavorTextEntries` → `ref.watch(pokemonFlavorTextProvider(id))`
+**Field type changes** — all consumers of the four changed `PokemonEntry` fields
+need access pattern updates. These are mechanical find-and-replace across the codebase:
 
-**`slot_config_screen.dart`**
-- Move picker: switch from `resolved.detail.moves` → `ref.watch(pokemonMovesProvider(id))`
+| Old access pattern | New access pattern |
+|---|---|
+| `pokemon.types[1]` (primary type by slot) | `pokemon.types.isNotEmpty ? pokemon.types[0] : null` |
+| `pokemon.types.values` | `pokemon.types` |
+| `stat['base_stat'] as int` / `stat['stat']['name'] as String` | `pokemon.stats['hp']` etc. |
+| `ability['ability']['name'] as String` | `ability.name` |
+| `ability['is_hidden'] as bool` | `ability.isHidden` |
+| `move['move']['name'] as String` | `move.name` |
+| `move['version_group_details']` iteration | `move.learnDetails` iteration |
+| `detail['move_learn_method']['name']` | `detail.method` |
+| `detail['version_group']['name']` | `detail.versionGroup` |
+| `detail['level_learned_at']` | `detail.level` |
 
-**`pokemon_list_tile.dart`, `pokemon_grid_card.dart`**
-- No changes — these never read moves or flavor text from `resolvedPokemonProvider`
+Files affected: `pokemon_detail_screen.dart`, `slot_config_screen.dart`,
+`format_service.dart` (learnset logic), any other file that walks raw ability/stat/move maps.
+
+**Lazy-loaded provider switches:**
+
+`pokemon_detail_screen.dart`
+- Moves tab: `resolved.detail.moves` → `ref.watch(pokemonMovesProvider(id))`
+- Overview tab (flavor text): `resolved.species.flavorTextEntries` → `ref.watch(pokemonFlavorTextProvider(id))`
+- Sprite URLs: `resolved.detail.officialArtworkUrl` → `resolved.spriteUrls.officialArtwork`
+
+`slot_config_screen.dart`
+- Move picker: `resolved.detail.moves` → `ref.watch(pokemonMovesProvider(id))`
+
+`pokemon_list_tile.dart`, `pokemon_grid_card.dart`
+- No provider switches needed — these never read moves or flavor text
+- Type/stat access patterns updated per table above
 
 ---
 
@@ -436,9 +479,6 @@ Offline
 
 ## 7. Out of Scope
 
-- Refactoring `PokemonEntry.types`, `PokemonEntry.stats`, `PokemonEntry.abilities`,
-  `PokemonEntry.moves` to typed models — consumers use raw maps today; clean migration
-  is Task F territory
 - Smogon UI rendering — `smogonAnalyses` is stored on `ResolvedPokemon` but not displayed yet
 - Sprite self-hosting (#244)
 - Format-sync and custom-formats (deferred post-release)
