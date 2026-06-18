@@ -438,3 +438,62 @@ class FormBackendData {
         'sprite_urls': spriteUrls?.toJson(),
       };
 }
+
+/// Full variety data returned by [GET /pokemon/varieties/{id}].
+///
+/// Slim [resolvedPokemonProvider] varieties only carry [name], [pokemonId],
+/// [isDefault], and [resolvedUrl]. This model adds [types], [baseStats],
+/// [abilities], and [spriteUrls] for use in form picker chips and variety
+/// form display.
+class VarietyBackendData {
+  final String name;
+  final int pokemonId;
+  final bool isDefault;
+  final String? resolvedUrl;
+  final List<String>? types;
+  final Map<String, int>? baseStats;
+  // PS ability format: {"0": "blaze", "1": "fire-spin", "H": "solar-power"}
+  final Map<String, String>? abilities;
+  final SpriteUrlsFull? spriteUrls;
+
+  const VarietyBackendData({
+    required this.name,
+    required this.pokemonId,
+    required this.isDefault,
+    this.resolvedUrl,
+    this.types,
+    this.baseStats,
+    this.abilities,
+    this.spriteUrls,
+  });
+
+  factory VarietyBackendData.fromJson(Map<String, dynamic> json) =>
+      VarietyBackendData(
+        name: json['name'] as String,
+        pokemonId: (json['pokemon_id'] as num).toInt(),
+        isDefault: json['is_default'] as bool? ?? false,
+        resolvedUrl: json['resolved_url'] as String?,
+        types: (json['types'] as List<dynamic>?)
+            ?.map((t) => t as String)
+            .toList(),
+        baseStats: (json['base_stats'] as Map<String, dynamic>?)
+            ?.map((k, v) => MapEntry(k, (v as num).toInt())),
+        abilities: (json['abilities'] as Map<String, dynamic>?)
+            ?.map((k, v) => MapEntry(k, v as String)),
+        spriteUrls: json['sprite_urls'] != null
+            ? SpriteUrlsFull.fromJson(
+                json['sprite_urls'] as Map<String, dynamic>)
+            : null,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'pokemon_id': pokemonId,
+        'is_default': isDefault,
+        'resolved_url': resolvedUrl,
+        'types': types,
+        'base_stats': baseStats,
+        'abilities': abilities,
+        'sprite_urls': spriteUrls?.toJson(),
+      };
+}

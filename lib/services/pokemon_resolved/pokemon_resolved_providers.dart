@@ -42,6 +42,38 @@ final pokemonMovesProvider =
   }
 });
 
+/// Lazy-loaded full variety data (types, base_stats, abilities, sprite_urls per variety).
+///
+/// Slim [resolvedPokemonProvider] varieties only carry name + pokemon_id.
+/// This provider fetches [GET /pokemon/varieties/{id}] which returns full
+/// [SpriteUrlsFull] and stat/type data for every non-default variety.
+///
+/// Used by form picker chips to show artwork for Mega, regional, and other
+/// battle-meaningful variety forms.
+final pokemonVarietiesProvider =
+    FutureProvider.family<List<VarietyBackendData>, int>((ref, id) async {
+  final cache = ref.read(pokemonResolvedCacheProvider);
+  final cached = cache.getIfValid('varieties_$id');
+  if (cached != null) {
+    return (cached['varieties'] as List<dynamic>)
+        .map((v) => VarietyBackendData.fromJson(v as Map<String, dynamic>))
+        .toList();
+  }
+
+  try {
+    final repo = ref.read(pokemonBackendRepositoryProvider);
+    final varieties = await repo.fetchVarieties(id);
+    cache.putWithTTL(
+      'varieties_$id',
+      {'varieties': varieties.map((v) => v.toJson()).toList()},
+      const Duration(days: 7),
+    );
+    return varieties;
+  } catch (_) {
+    return const [];
+  }
+});
+
 /// Lazy-loaded full form sprite data (official_artwork, home, game_front per form).
 ///
 /// Slim [resolvedPokemonProvider] only carries [FormBackendData.frontSpriteUrl]

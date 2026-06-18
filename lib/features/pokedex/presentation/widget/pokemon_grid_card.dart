@@ -10,7 +10,8 @@ import 'package:poke_team_dex/features/pokedex/models/pokedex_image_type.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
-import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
+    show pokemonFormsProvider, pokemonVarietiesProvider;
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
@@ -46,6 +47,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
     final basePokemon = resolved?.detail;
     final cosmeticFormEntries = resolved?.cosmeticForms ?? const <PokemonFormEntry>[];
     final formsData = ref.watch(pokemonFormsProvider(widget.pokemon.id)).asData?.value;
+    final varietiesData = ref.watch(pokemonVarietiesProvider(widget.pokemon.id)).asData?.value;
 
     final selectedCosmeticEntry = _selectedFormName != null
         ? cosmeticFormEntries
@@ -72,7 +74,11 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
 
     final allForms = <(String?, String, String?)>[
       (null, baseFormLabel, null),
-      ...battleForms.map((v) => (v.name, shortFormLabel(v.name), null as String?)),
+      ...battleForms.map((v) {
+        final full = varietiesData?.where((vd) => vd.name == v.name).firstOrNull;
+        final spriteUrl = full?.spriteUrls?.officialArtwork ?? full?.spriteUrls?.home;
+        return (v.name, shortFormLabel(v.name), spriteUrl);
+      }),
       ...cosmeticVarietyForms.map((v) {
         final sn = basePokemon?.speciesName ?? widget.pokemon.name;
         final suffix = v.name.startsWith('$sn-')

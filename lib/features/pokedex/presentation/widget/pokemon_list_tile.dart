@@ -9,7 +9,8 @@ import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_s
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
-import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
+    show pokemonFormsProvider, pokemonVarietiesProvider;
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
@@ -51,6 +52,8 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
 
     // Full form sprite data (official → home → sprite) — loaded lazily from backend.
     final formsData = ref.watch(pokemonFormsProvider(widget.pokemon.id)).asData?.value;
+    // Full variety sprite data for battle-form chips (Mega, regional, etc.).
+    final varietiesData = ref.watch(pokemonVarietiesProvider(widget.pokemon.id)).asData?.value;
 
     // Check if the currently selected form is a cosmetic form entry.
     // Cosmetic form entries share the base Pokémon's types — no provider call
@@ -81,7 +84,11 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
 
     final allForms = <(String?, String, String?)>[
       (null, baseFormLabel, null),
-      ...battleForms.map((v) => (v.name, shortFormLabel(v.name), null as String?)),
+      ...battleForms.map((v) {
+        final full = varietiesData?.where((vd) => vd.name == v.name).firstOrNull;
+        final spriteUrl = full?.spriteUrls?.officialArtwork ?? full?.spriteUrls?.home;
+        return (v.name, shortFormLabel(v.name), spriteUrl);
+      }),
       ...cosmeticVarietyForms.map((v) {
         final sn = basePokemon?.speciesName ?? widget.pokemon.name;
         final suffix = v.name.startsWith('$sn-')

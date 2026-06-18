@@ -26,6 +26,17 @@ class PokemonBackendRepository {
         .toList();
   }
 
+  Future<List<VarietyBackendData>> fetchVarieties(int id) async {
+    final response = await _apiClient.dio.get<dynamic>('/pokemon/varieties/$id');
+    if (response.statusCode != 200) {
+      throw Exception('Backend varieties fetch failed for id=$id: ${response.statusCode}');
+    }
+    final data = Map<String, dynamic>.from(response.data as Map);
+    return (data['varieties'] as List<dynamic>)
+        .map((v) => VarietyBackendData.fromJson(v as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<FormBackendData>> fetchForms(int id) async {
     final response = await _apiClient.dio.get<dynamic>('/pokemon/forms/$id');
     if (response.statusCode != 200) {
