@@ -209,8 +209,11 @@ class PokemonDataResolver {
       imageType != PokedexImageType.sprite || filter != null,
       'filter must be non-null when imageType is PokedexImageType.sprite',
     );
+    final baseHomeOverride = PokemonDataRegistry.instance
+        .baseFormCosmeticHomeUrls[basePokemon?.speciesName ?? basePokemon?.name ?? ''];
     return switch (imageType) {
       PokedexImageType.artwork =>
+        baseHomeOverride?.homeUrl ??
         '${_spritesBase}other/official-artwork/$pokemonId.png',
       // sprite: filter-aware icon (same as _compactIconUrl in list tile).
       // Grid card sprite mode also uses this path — with the default filter
