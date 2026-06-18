@@ -388,15 +388,26 @@ class PokemonResolverService:
     # ------------------------------------------------------------------
 
     def _build_variety_sprite_urls(
-        self, sprites: dict, ps_name: str, variety_id: int, gen: int
+        self,
+        sprites: dict,
+        ps_name: str,
+        variety_id: int,
+        gen: int,
+        gen_sprite_id_override: str | None = None,
     ) -> SpriteUrlsFull:
-        """Build full sprite URLs for a variety (has its own /pokemon resource)."""
+        """Build full sprite URLs for a variety (has its own /pokemon resource).
+
+        gen_sprite_id_override replaces the numeric ID in the versioned sprite
+        path only — home and official artwork still use variety_id.  Use this
+        when the Pokémon's default form has a suffix (e.g. Unown "unown-a"
+        → "201-a" instead of "201" for Gen 2 Crystal sprites).
+        """
         other = sprites.get("other") or {}
         artwork = other.get("official-artwork") or {}
         home = other.get("home") or {}
 
         # Gen-specific game sprite: PokeAPI/sprites versioned (primary) or Showdown (fallback)
-        sprite_id = str(variety_id)
+        sprite_id = gen_sprite_id_override or str(variety_id)
         game_front = (
             _build_pokeapi_sprite_url(sprite_id, gen)
             or _build_showdown_sprite_url(ps_name, gen)
@@ -450,10 +461,25 @@ class PokemonResolverService:
         )
 
     def _build_base_sprite_urls(
-        self, sprites: dict, ps_name: str, pokemon_id: int, gen: int
+        self,
+        sprites: dict,
+        ps_name: str,
+        pokemon_id: int,
+        gen: int,
+        gen_sprite_id: str | None = None,
     ) -> SpriteUrlsFull:
-        """Build full sprite URLs for the base pokemon."""
-        return self._build_variety_sprite_urls(sprites, ps_name, pokemon_id, gen)
+        """Build full sprite URLs for the base pokemon.
+
+        gen_sprite_id overrides the ID used for gen-specific versioned sprites.
+        Use this when the Pokémon's default form has a suffix in the sprite repo
+        (e.g. Unown's default form is "unown-a" so the Crystal sprite is
+        "201-a.gif" not "201.gif").  Home and official artwork always use the
+        plain pokemon_id regardless.
+        """
+        return self._build_variety_sprite_urls(
+            sprites, ps_name, pokemon_id, gen,
+            gen_sprite_id_override=gen_sprite_id,
+        )
 
     # ------------------------------------------------------------------
     # Variety + form fetching
@@ -541,18 +567,41 @@ class PokemonResolverService:
         if not non_defaults:
             non_defaults = form_names[1:] if len(form_names) > 1 else []
 
-        _base_sprite = f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{base_id}.png"
+        # Build sprite data for the default form (index 0) the same way as non-defaults.
+        # The default form may have a suffix (e.g. "unown-a") — its gen sprite is
+        # "201-a.gif" not "201.gif".
+        default_form_name = form_names[0]
+        default_ps_name = _to_showdown_name(default_form_name, self._ps_exceptions)
+        default_suffix = _extract_form_suffix(default_form_name, species_name)
+        default_sprite_id = f"{base_id}-{default_suffix}" if default_suffix else str(base_id)
+        default_front_sprite = (
+            f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{default_sprite_id}.png"
+        )
+        default_sprite_urls = self._build_form_sprite_urls(
+            default_form_name, base_id, species_name, default_ps_name, gen
+        )
 
         if not non_defaults:
-            return [FormData(name=n, front_sprite_url=_base_sprite) for n in form_names]
+            return [
+                FormData(
+                    name=n,
+                    front_sprite_url=default_front_sprite,
+                    sprite_urls=default_sprite_urls,
+                )
+                for n in form_names
+            ]
 
         responses = await asyncio.gather(
             *[self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon-form/{n}") for n in non_defaults],
             return_exceptions=True,
         )
 
-        # Default form: front sprite is just the base pokemon sprite
-        result: list[FormData] = [FormData(name=form_names[0], front_sprite_url=_base_sprite)]
+        # Default form gets the same full sprite treatment as non-defaults
+        result: list[FormData] = [FormData(
+            name=default_form_name,
+            front_sprite_url=default_front_sprite,
+            sprite_urls=default_sprite_urls,
+        )]
         for form_name, resp in zip(non_defaults, responses):
             ps_name = _to_showdown_name(form_name, self._ps_exceptions)
             # Construct the front sprite URL from the base_id + suffix pattern
@@ -706,9 +755,15 @@ class PokemonResolverService:
         smogon_analyses = self._get_smogon_analyses(display_name)
 
         # 7. Sprite URLs for base pokemon
+        # When the default form has a suffix (e.g. "unown-a"), the gen-specific
+        # versioned sprite uses "{id}-{suffix}" (e.g. "201-a.gif"), not just "{id}".
         ps_sprite_name = _to_showdown_name(pokemon_name, self._ps_exceptions)
+        first_form = (pokemon_data.get("forms") or [{}])[0].get("name", "")
+        first_form_suffix = _extract_form_suffix(first_form, species_name) if first_form else None
+        gen_sprite_id = f"{pokemon_id}-{first_form_suffix}" if first_form_suffix else None
         sprite_urls = self._build_base_sprite_urls(
-            pokemon_data.get("sprites") or {}, ps_sprite_name, pokemon_id, gen
+            pokemon_data.get("sprites") or {}, ps_sprite_name, pokemon_id, gen,
+            gen_sprite_id=gen_sprite_id,
         )
 
         # 8. Varieties (always fetched on cache miss, trimmed at response time)
