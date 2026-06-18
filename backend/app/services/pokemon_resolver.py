@@ -811,19 +811,25 @@ class PokemonResolverService:
         types, base_stats, abilities = self._apply_gen_overrides(ps_id, ps_types, ps_stats, ps_abilities, gen)
 
         # --- New fields ---
-        # abilities as typed list — use gen-overridden names, keep is_hidden from PokéAPI
+        # abilities as typed list — use gen-overridden names, keep is_hidden from PokéAPI.
+        # PS ability keys use "0"/"1"/"H" (0-indexed + hidden marker); PokéAPI uses "1"/"2"/"3".
+        # _apply_gen_overrides preserves whichever format was passed in, so handle both.
+        _PS_TO_SLOT = {"0": 1, "1": 2, "H": 3}
         pokeapi_ability_map = {
             str(a["slot"]): {"is_hidden": a.get("is_hidden", False)}
             for a in pokemon_data.get("abilities", [])
         }
-        abilities_list = [
-            AbilityInfo(
-                name=ability_name,
-                is_hidden=pokeapi_ability_map.get(slot_str, {}).get("is_hidden", False),
-                slot=int(slot_str),
-            )
-            for slot_str, ability_name in sorted(abilities.items(), key=lambda x: int(x[0]))
-        ]
+        abilities_list = []
+        for key, ability_name in abilities.items():
+            if key in _PS_TO_SLOT:
+                pokeapi_slot = _PS_TO_SLOT[key]
+            elif key.isdigit():
+                pokeapi_slot = int(key)
+            else:
+                continue
+            is_hidden = pokeapi_ability_map.get(str(pokeapi_slot), {}).get("is_hidden", key == "H")
+            abilities_list.append(AbilityInfo(name=ability_name, is_hidden=is_hidden, slot=pokeapi_slot))
+        abilities_list.sort(key=lambda a: a.slot)
 
         # moves (always built; trimmed to [] at response time unless "moves" in includes)
         moves_list = [
