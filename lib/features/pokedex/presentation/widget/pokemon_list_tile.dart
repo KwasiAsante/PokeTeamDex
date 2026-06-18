@@ -97,8 +97,15 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
       ...cosmeticFormEntries.map((f) => (
         f.name,
         PokemonDataRegistry.instance.cosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
+        // official → home → sprite fallback for form picker chips.
         PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[f.name] ??
-            (f.formName == 'female' ? '${_kBase}female/${widget.pokemon.id}.png' : f.spriteUrl),
+            f.officialArtworkUrl ??
+            (f.formName == 'female'
+                ? '${_kBase}other/home/female/${widget.pokemon.id}.png'
+                : (f.formName.isNotEmpty
+                    ? '${_kBase}other/home/${widget.pokemon.id}-${f.formName}.png'
+                    : null)) ??
+            f.spriteUrl,
       )),
     ];
     final hasFormChip = allForms.length > 1;
