@@ -176,6 +176,15 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   StreamSubscription<bool>? _minimizeToTraySub;
   final _navigatorKey = GlobalKey<NavigatorState>();
 
+  // The router must be built exactly once. Rebuilding it (e.g. inside
+  // build() whenever authTokenProvider changes) recreates the GoRouter,
+  // which re-applies initialLocation and causes a second, visible
+  // navigation to /pokedex right after startup. Login/logout still update
+  // the redirect logic live via _tokenNotifier + refreshListenable.
+  late final _tokenNotifier = ValueNotifier<String?>(widget.initialToken);
+  late final _router =
+      buildAppRouter(_tokenNotifier, navigatorKey: _navigatorKey);
+
   @override
   void initState() {
     super.initState();
@@ -263,6 +272,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     _periodicSync?.cancel();
     _trayService?.dispose();
     WidgetsBinding.instance.removeObserver(this);
+    _tokenNotifier.dispose();
     super.dispose();
   }
 
@@ -310,8 +320,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // Rebuild router when auth state changes so redirect logic re-evaluates
-    final token = ref.watch(authTokenProvider);
+    // Forward auth state into the router's refreshListenable instead of
+    // watching it here — watching would rebuild this widget and recreate
+    // the GoRouter on every token change (see _router above).
+    ref.listen<String?>(authTokenProvider, (_, next) {
+      _tokenNotifier.value = next;
+    });
     final seedValue = ref.watch(seedColorProvider).when(
           data: (v) => v,
           loading: () => kDefaultSeedColor,
@@ -328,7 +342,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       theme: AppTheme.light(seed),
       darkTheme: AppTheme.dark(seed),
       themeMode: themeMode,
-      routerConfig: buildAppRouter(token, navigatorKey: _navigatorKey),
+      routerConfig: _router,
       // Cap text scaling at 1.3× to prevent overflow in fixed-height
       // list tiles and grid cells throughout the app.
       builder: (context, child) => MediaQuery.withClampedTextScaling(

@@ -181,6 +181,7 @@
 
 ### Bug Fixes & Polish Needed
 
+- [ ] **Double navigation on startup** — main screen navigated to the Pokédex screen twice on app start/reload; root cause was `GoRouter` being rebuilt on every `authTokenProvider` change instead of once per app lifetime (#232)
 - [x] **Unsaved changes guard** — when leaving slot config with unsaved changes, show a dialog offering "Discard" or "Save" before navigating away; works in both narrow (PopScope on Scaffold) and wide layout (back button on team detail intercepted via canCloseNotifier)
 - [x] **Sync failure feedback** — push failures are now surfaced; pull still runs on push failure but sync reports error instead of success
 - [x] **Connectivity button → login shortcut** — Account row in the connectivity sheet is tappable when not signed in and navigates to the login screen

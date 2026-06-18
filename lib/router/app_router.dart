@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/shared/widgets/update_banner.dart';
@@ -23,19 +24,27 @@ import 'package:poke_team_dex/features/settings/presentation/settings_screen.dar
 import 'package:poke_team_dex/features/settings/presentation/sync_monitor_screen.dart';
 import 'package:poke_team_dex/features/types/presentation/types_screen.dart';
 
+// `tokenListenable` is read live on every redirect and also passed as
+// `refreshListenable` so login/logout re-evaluates the redirect in place.
+// The router must be built exactly once per app lifetime — rebuilding it
+// (e.g. from a ConsumerWidget.build() that watches the token) recreates the
+// GoRouter, which re-applies `initialLocation` and produces a second,
+// visible navigation to /pokedex on startup.
 GoRouter buildAppRouter(
-  String? initialToken, {
+  ValueListenable<String?> tokenListenable, {
   GlobalKey<NavigatorState>? navigatorKey,
 }) {
   return GoRouter(
     navigatorKey: navigatorKey,
     initialLocation: '/pokedex',
+    refreshListenable: tokenListenable,
     redirect: (context, state) {
       // Teams are local-first and always accessible without auth.
       // Auth is only required to sync — the sync button handles that check.
       // The only redirect we keep: don't send already-logged-in users back
       // to the auth screens.
-      final loggedIn = initialToken != null && initialToken.isNotEmpty;
+      final token = tokenListenable.value;
+      final loggedIn = token != null && token.isNotEmpty;
       final goingToAuth = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register';
 
@@ -194,7 +203,7 @@ GoRouter buildAppRouter(
 
 // Keep a top-level reference so existing code that imports `appRouter` still works.
 // main.dart will call buildAppRouter(token) and use that instance instead.
-final appRouter = buildAppRouter(null);
+final appRouter = buildAppRouter(ValueNotifier<String?>(null));
 
 // ── Navigation destinations shared across all layout variants ─────────────────
 
