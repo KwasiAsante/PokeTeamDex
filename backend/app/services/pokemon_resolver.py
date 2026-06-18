@@ -723,7 +723,15 @@ class PokemonResolverService:
         if "forms" not in includes:
             response = response.model_copy(update={
                 "forms": [
-                    FormData(name=f.name, form_id=f.form_id, front_sprite_url=f.front_sprite_url)
+                    FormData(
+                        name=f.name,
+                        form_id=f.form_id,
+                        # Prefer HOME art over pixel front sprite for form picker chips.
+                        front_sprite_url=(
+                            (f.sprite_urls.home if f.sprite_urls else None)
+                            or f.front_sprite_url
+                        ),
+                    )
                     for f in response.forms
                 ]
             })
