@@ -119,10 +119,13 @@ class FormData(BaseModel):
 
 
 class SmogonResponse(BaseModel):
-    """Full Smogon analyses for a single Pokémon, across all loaded formats."""
+    """Full Smogon analyses for a single Pokémon, across all loaded formats.
+
+    gen is null when no generation filter was applied (all formats returned).
+    """
 
     pokemon_id: int
-    gen: int
+    gen: int | None  # null = all generations; int = filtered to that gen
     name: str
     smogon_analyses: list[SmogonFormatData] | None  # null while background load runs
 
