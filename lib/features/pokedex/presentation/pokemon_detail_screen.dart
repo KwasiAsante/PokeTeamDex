@@ -18,6 +18,8 @@ import 'package:poke_team_dex/services/pokeapi/models/encounter_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show MoveSummary;
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
+    show pokemonMovesProvider, pokemonFlavorTextProvider;
 import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -110,10 +112,10 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     PokemonEntry effectivePokemon,
     AsyncValue<PokemonSpeciesEntry> speciesAsync,
   ) => [
-    _OverviewTab(pokemon: effectivePokemon, speciesAsync: speciesAsync),
+    _OverviewTab(pokemon: effectivePokemon, speciesAsync: speciesAsync, pokemonId: effectivePokemon.id),
     _StatsTab(pokemon: effectivePokemon),
     _AbilitiesTab(pokemon: effectivePokemon),
-    _MovesTab(pokemon: effectivePokemon),
+    _MovesTab(pokemon: effectivePokemon, pokemonId: effectivePokemon.id),
     _EvolutionsTab(speciesAsync: speciesAsync, selectedFormName: _selectedFormName),
     _FormsTab(speciesAsync: speciesAsync, selectedFormName: _selectedFormName),
     _LocationsTab(pokemonId: effectivePokemon.id),
@@ -670,14 +672,18 @@ class _DetailSliverAppBar extends StatelessWidget {
 
 // ── Overview Tab ──────────────────────────────────────────────────────────────
 
-class _OverviewTab extends StatelessWidget {
+class _OverviewTab extends ConsumerWidget {
   final PokemonEntry pokemon;
   final AsyncValue<PokemonSpeciesEntry> speciesAsync;
+  final int pokemonId;
 
-  const _OverviewTab({required this.pokemon, required this.speciesAsync});
+  const _OverviewTab({required this.pokemon, required this.speciesAsync, required this.pokemonId});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final flavorAsync = ref.watch(pokemonFlavorTextProvider(pokemonId));
+    final flavorEntries = flavorAsync.asData?.value;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -708,7 +714,7 @@ class _OverviewTab extends StatelessWidget {
           speciesAsync.when(
             loading: () => const LoadingState(message: 'Loading species data…'),
             error: (e, _) => ErrorState(error: e),
-            data: (species) => _SpeciesSection(species: species),
+            data: (species) => _SpeciesSection(species: species, flavorEntries: flavorEntries),
           ),
         ],
       ),
@@ -718,13 +724,19 @@ class _OverviewTab extends StatelessWidget {
 
 class _SpeciesSection extends StatelessWidget {
   final PokemonSpeciesEntry species;
-  const _SpeciesSection({required this.species});
+  /// Pre-fetched English flavor text entries from [pokemonFlavorTextProvider].
+  /// When provided, these replace [species.flavorTextEntries] so that flavor
+  /// text is loaded lazily from the backend rather than from the slim resolved
+  /// response. When null (still loading), falls back to species entries.
+  final List<FlavorTextEntry>? flavorEntries;
+  const _SpeciesSection({required this.species, this.flavorEntries});
 
   @override
   Widget build(BuildContext context) {
-    final englishEntries = species.flavorTextEntries
-        .where((f) => f.language == 'en')
-        .toList();
+    final englishEntries = flavorEntries ??
+        species.flavorTextEntries
+            .where((f) => f.language == 'en')
+            .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -992,7 +1004,8 @@ class _StatRangeTable extends StatelessWidget {
 /// version-group filter. Move details are fetched lazily per row.
 class _MovesTab extends ConsumerStatefulWidget {
   final PokemonEntry pokemon;
-  const _MovesTab({required this.pokemon});
+  final int pokemonId;
+  const _MovesTab({required this.pokemon, required this.pokemonId});
 
   @override
   ConsumerState<_MovesTab> createState() => _MovesTabState();
@@ -1040,9 +1053,9 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
   ];
 
   /// All unique version-group names found in the moves list, sorted by release date.
-  List<String> get _versions {
+  List<String> _versions(List<MoveSummary> moves) {
     final seen = <String>{};
-    for (final m in widget.pokemon.moves) {
+    for (final m in moves) {
       for (final vgd in m.learnDetails) {
         seen.add(vgd.versionGroup);
       }
@@ -1068,13 +1081,14 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
   /// [formatService] are the generation/service to query — both null when the
   /// service isn't ready yet or the selected version has no known generation.
   Map<String, List<_MoveRow>> _grouped(
-    String? version, {
+    String? version,
+    List<MoveSummary> moves, {
     required Map<String, String> psIdToName,
     int? gen,
     FormatService? formatService,
   }) {
     final groups = <String, List<_MoveRow>>{};
-    for (final m in widget.pokemon.moves) {
+    for (final m in moves) {
       final moveName = m.name;
       for (final vgd in m.learnDetails) {
         final vg = vgd.versionGroup;
@@ -1163,6 +1177,7 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
   /// [psIdToName], [gen] and [formatService] mirror [_grouped]'s parameters.
   List<({String speciesName, List<_MoveRow> rows})> _buildPriorEvoGroups(
     String? selectedVg,
+    List<MoveSummary> moves,
     List<({String speciesName, List<MoveSummary> moves})> ancestorSets, {
     required Map<String, String> psIdToName,
     int? gen,
@@ -1176,7 +1191,7 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     // "exclusive to an ancestor" just because PokéAPI's version-group data
     // doesn't carry them either.
     final currentInVg = <String>{};
-    for (final m in widget.pokemon.moves) {
+    for (final m in moves) {
       final moveName = m.name;
       for (final vgd in m.learnDetails) {
         final vg = vgd.versionGroup;
@@ -1231,7 +1246,12 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final versions = _versions;
+    // Watch the lazy-loaded moves from the backend provider; fall back to the
+    // moves already embedded in the resolved PokemonEntry while loading.
+    final movesAsync = ref.watch(pokemonMovesProvider(widget.pokemonId));
+    final moves = movesAsync.asData?.value ?? widget.pokemon.moves;
+
+    final versions = _versions(moves);
     _selectedVersion ??= versions.isNotEmpty ? versions.first : null;
 
     // FormatService gates on `initialize()` resolving — `allFormatsProvider`
@@ -1246,10 +1266,11 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
 
     final priorEvoAsync = ref.watch(priorEvoMoveSetsProvider(widget.pokemon.id));
     final ancestorSets = priorEvoAsync.whenOrNull(data: (sets) => sets) ?? const [];
-    final psIdToName = _psIdToNameMap(widget.pokemon.moves, ancestorSets);
+    final psIdToName = _psIdToNameMap(moves, ancestorSets);
 
     final grouped = _grouped(
       _selectedVersion,
+      moves,
       psIdToName: psIdToName,
       gen: gen,
       formatService: formatService,
@@ -1257,7 +1278,7 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
 
     final priorEvoGroups = priorEvoAsync.whenOrNull(
       data: (sets) => _buildPriorEvoGroups(
-        _selectedVersion, sets,
+        _selectedVersion, moves, sets,
         psIdToName: psIdToName,
         gen: gen,
         formatService: formatService,

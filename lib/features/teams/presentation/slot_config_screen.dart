@@ -22,6 +22,8 @@ import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show AbilityInfo, MoveSummary;
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
+    show pokemonMovesProvider;
 import 'package:poke_team_dex/services/pokeapi/models/type_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
@@ -634,7 +636,10 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final mechanics = format != null
             ? GenerationMechanics.forGen(format.gen)
             : null;
-        final pokemonMoves = pokemon.moves;
+        // Watch the lazy-loaded moves from the backend provider; fall back to
+        // the moves embedded in the resolved PokemonEntry while loading.
+        final pokemonMovesAsync = ref.watch(pokemonMovesProvider(slot.pokemonId));
+        final pokemonMoves = pokemonMovesAsync.asData?.value ?? pokemon.moves;
 
         // Learnable moves filtered by format version groups.
         // No format → show everything the Pokémon can ever learn.
