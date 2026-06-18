@@ -18,6 +18,7 @@ import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
     show teamSlotsProvider;
@@ -1302,13 +1303,16 @@ class _SlotSprite extends ConsumerWidget {
       id = slot.pokemonId;
     }
 
-    const versionsBase =
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions';
-    const spriteBase =
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
-    final iconGen8    = '$versionsBase/generation-viii/icons/$id.png';
-    final iconGen7    = '$versionsBase/generation-vii/icons/$id.png';
-    final spriteFallback = '$spriteBase/$id.png';
+    // Use resolved sprite URLs — icon → gameFront fallback.
+    // Base species resolved data covers all form variants at icon size.
+    final resolvedSprites = ref
+        .watch(resolvedPokemonProvider(slot.pokemonId))
+        .asData
+        ?.value
+        .spriteUrls;
+    final iconUrl      = resolvedSprites?.icon;
+    final spriteFallback = resolvedSprites?.gameFront ??
+        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$id.png';
 
     final placeholder = SizedBox(
       width: width,
@@ -1328,7 +1332,7 @@ class _SlotSprite extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(right: 2),
       child: CachedNetworkImage(
-        imageUrl: iconGen8,
+        imageUrl: iconUrl ?? spriteFallback,
         width: width,
         height: height,
         fit: BoxFit.contain,
@@ -1336,26 +1340,17 @@ class _SlotSprite extends ConsumerWidget {
         memCacheHeight: cacheHeight,
         placeholder: (_, _) => placeholder,
         errorWidget: (_, _, _) => CachedNetworkImage(
-          imageUrl: iconGen7,
+          imageUrl: spriteFallback,
           width: width,
           height: height,
           fit: BoxFit.contain,
           memCacheWidth: cacheWidth,
           memCacheHeight: cacheHeight,
           placeholder: (_, _) => placeholder,
-          errorWidget: (_, _, _) => CachedNetworkImage(
-            imageUrl: spriteFallback,
-            width: width,
-            height: height,
-            fit: BoxFit.contain,
-            memCacheWidth: cacheWidth,
-            memCacheHeight: cacheHeight,
-            placeholder: (_, _) => placeholder,
-            errorWidget: (_, _, _) => Icon(
-              Icons.catching_pokemon,
-              size: 60,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-            ),
+          errorWidget: (_, _, _) => Icon(
+            Icons.catching_pokemon,
+            size: 60,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
           ),
         ),
       ),

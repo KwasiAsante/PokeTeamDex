@@ -10,6 +10,7 @@ import 'package:poke_team_dex/features/pokedex/models/pokedex_image_type.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
@@ -17,7 +18,6 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 
-const _kBase = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
 
 class PokemonGridCard extends ConsumerStatefulWidget {
   final PokemonListEntry pokemon;
@@ -45,6 +45,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
     final resolved = resolvedAsync.asData?.value;
     final basePokemon = resolved?.detail;
     final cosmeticFormEntries = resolved?.cosmeticForms ?? const <PokemonFormEntry>[];
+    final formsData = ref.watch(pokemonFormsProvider(widget.pokemon.id)).asData?.value;
 
     final selectedCosmeticEntry = _selectedFormName != null
         ? cosmeticFormEntries
@@ -84,7 +85,12 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         f.name,
         PokemonDataRegistry.instance.cosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
         PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[f.name] ??
-            (f.formName == 'female' ? '${_kBase}female/${widget.pokemon.id}.png' : f.spriteUrl),
+            (() {
+              final full = formsData?.where((fd) => fd.name == f.name).firstOrNull;
+              return full?.spriteUrls?.officialArtwork ?? full?.spriteUrls?.home;
+            })() ??
+            (f.formName == 'female' ? resolved?.spriteUrls.homeFemale : null) ??
+            f.spriteUrl,
       )),
     ];
     final hasFormChip = allForms.length > 1;

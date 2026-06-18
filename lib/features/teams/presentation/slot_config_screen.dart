@@ -23,7 +23,7 @@ import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show AbilityInfo, MoveSummary;
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
-    show pokemonMovesProvider;
+    show pokemonFormsProvider, pokemonMovesProvider;
 import 'package:poke_team_dex/services/pokeapi/models/type_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
@@ -610,6 +610,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   Widget _buildWithPokemon(TeamSlot slot) {
     ref.watch(allFormatsProvider); // ensures PS data is loaded; triggers rebuild when ready
     final resolvedAsync = ref.watch(resolvedPokemonProvider(slot.pokemonId));
+    final formsData = ref.watch(pokemonFormsProvider(slot.pokemonId)).asData?.value;
     return resolvedAsync.when(
       loading: () => widget.embedded
           ? const Center(child: CircularProgressIndicator())
@@ -913,13 +914,16 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     ? cosmeticFormSpriteUrls.shinyUrl
                     : cosmeticFormSpriteUrls.defaultUrl)
                 : null;
-        // Raw sprite used as last-resort fallback for cosmetic forms that have
-        // no HOME artwork and a null spriteUrl from the form resource (e.g.
-        // Polteageist-Antique whose HOME path 854-antique.png doesn't exist).
-        final cosmeticRawSprite = cosmeticFormSuffix != null
-            ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-                'sprites/pokemon/${pokemon.id}-$cosmeticFormSuffix.png'
+        // Full form sprite data from backend (official → home → front sprite).
+        final _cosmeticFormRef = cosmeticForm;
+        final cosmeticFullSprite = _cosmeticFormRef != null
+            ? formsData?.where((fd) => fd.name == _cosmeticFormRef.name).firstOrNull
             : null;
+        final cosmeticRawSprite =
+            cosmeticFullSprite?.spriteUrls?.officialArtwork ??
+            cosmeticFullSprite?.spriteUrls?.home ??
+            cosmeticFullSprite?.frontSpriteUrl ??
+            cosmeticForm?.spriteUrl;
         final formFallbackUrl = formPokemon != null
             ? (_isShiny
                 ? (formPokemon.officialArtworkShinyUrl ??

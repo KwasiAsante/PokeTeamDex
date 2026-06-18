@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/items/providers/items_provider.dart';
+import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
@@ -371,28 +372,30 @@ class _HeldByListState extends State<_HeldByList> {
   }
 }
 
-class _HeldByTile extends StatefulWidget {
+class _HeldByTile extends ConsumerStatefulWidget {
   final ItemHeldByPokemon heldBy;
   const _HeldByTile({required this.heldBy});
 
   @override
-  State<_HeldByTile> createState() => _HeldByTileState();
+  ConsumerState<_HeldByTile> createState() => _HeldByTileState();
 }
 
-class _HeldByTileState extends State<_HeldByTile> {
+class _HeldByTileState extends ConsumerState<_HeldByTile> {
   bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
-    final iconUrl =
+    final sprites = ref
+        .watch(resolvedPokemonProvider(widget.heldBy.pokemonId))
+        .asData
+        ?.value
+        .spriteUrls;
+    final iconUrl = sprites?.icon ?? sprites?.gameFront ??
         'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
         'sprites/pokemon/versions/generation-viii/icons/'
         '${widget.heldBy.pokemonId}.png';
-    final fallbackUrl =
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-        'sprites/pokemon/${widget.heldBy.pokemonId}.png';
 
     final maxRarity = widget.heldBy.versionDetails.isEmpty
         ? 0
@@ -411,16 +414,10 @@ class _HeldByTileState extends State<_HeldByTile> {
             width: 40,
             height: 30,
             fit: BoxFit.contain,
-            errorWidget: (_, _, _) => CachedNetworkImage(
-              imageUrl: fallbackUrl,
-              width: 40,
-              height: 30,
-              fit: BoxFit.contain,
-              errorWidget: (_, _, _) => Icon(Icons.catching_pokemon,
-                  size: 28,
-                  color: colorScheme.onSurfaceVariant
-                      .withValues(alpha: 0.4)),
-            ),
+            errorWidget: (_, _, _) => Icon(Icons.catching_pokemon,
+                size: 28,
+                color: colorScheme.onSurfaceVariant
+                    .withValues(alpha: 0.4)),
           ),
           title: Text(widget.heldBy.displayName),
           subtitle: maxRarity > 0

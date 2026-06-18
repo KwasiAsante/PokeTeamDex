@@ -9,6 +9,8 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/features/teams/data/dynamax_data.dart';
 import 'package:poke_team_dex/features/teams/data/form_descriptor.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
@@ -799,6 +801,7 @@ class _FilledSlotCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pokemonAsync = ref.watch(pokemonDetailProvider(slot.pokemonId));
+    final formsData = ref.watch(pokemonFormsProvider(slot.pokemonId)).asData?.value;
     final itemAsync = slot.heldItemName != null
         ? ref.watch(slotItemDetailProvider(slot.heldItemName!))
         : null;
@@ -979,10 +982,14 @@ class _FilledSlotCard extends ConsumerWidget {
                     ? cosmeticFormChangeSpriteUrls.shinyUrl
                     : cosmeticFormChangeSpriteUrls.defaultUrl)
                 : null;
-        final cosmeticRawSprite = cosmeticFormChangeSuffix != null
-            ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-                'sprites/pokemon/${pokemon.id}-$cosmeticFormChangeSuffix.png'
+        final cosmeticFullSprite = cosmeticFormChange != null
+            ? formsData?.where((fd) => fd.name == cosmeticFormChange!.name).firstOrNull
             : null;
+        final cosmeticRawSprite =
+            cosmeticFullSprite?.spriteUrls?.officialArtwork ??
+            cosmeticFullSprite?.spriteUrls?.home ??
+            cosmeticFullSprite?.frontSpriteUrl ??
+            cosmeticFormChange?.spriteUrl;
         final formOfficialUrl = formChangePokemon != null
             ? (descriptor.isShiny
                 ? (formChangePokemon.officialArtworkShinyUrl ??
