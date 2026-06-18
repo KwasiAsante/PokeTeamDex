@@ -32,7 +32,7 @@ PokemonEntry _detail(int id, String name, {List<String>? formNames}) =>
       name: name,
       height: 10,
       weight: 100,
-      types: {1: 'water'},
+      types: ['water'],
       formNames: formNames ?? [name],
     );
 

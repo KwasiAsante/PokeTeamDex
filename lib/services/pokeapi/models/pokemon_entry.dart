@@ -1,6 +1,9 @@
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart';
+
 class PokemonEntry {
   final int id;
   final String name;
+
   /// The bare species name from the `species` field of the `/pokemon` response
   /// (e.g. `"wormadam"` when `name` is `"wormadam-plant"`).  Null for entries
   /// fetched from older cached responses that pre-date this field.
@@ -8,12 +11,13 @@ class PokemonEntry {
   final int height;
   final int weight;
   final int? baseExperience;
-  final Map<int, String> types;
+  final List<String> types; // was Map<int, String>
   final String? officialArtworkUrl;
   final Map<String, dynamic>? sprites;
-  final List<Map<String, dynamic>> stats;
-  final List<Map<String, dynamic>> abilities;
-  final List<Map<String, dynamic>> moves;
+  final Map<String, int> stats; // was List<Map<String, dynamic>>
+  final List<AbilityInfo> abilities; // was List<Map<String, dynamic>>
+  final List<MoveSummary> moves; // was List<Map<String, dynamic>>
+
   /// Alternative form names for this Pokémon (e.g. ["aegislash-shield","aegislash-blade"]).
   final List<String> formNames;
 
@@ -27,7 +31,7 @@ class PokemonEntry {
     required this.types,
     this.officialArtworkUrl,
     this.sprites,
-    this.stats = const [],
+    this.stats = const {},
     this.abilities = const [],
     this.moves = const [],
     this.formNames = const [],
@@ -35,6 +39,10 @@ class PokemonEntry {
 
   factory PokemonEntry.fromJson(Map<String, dynamic> json) {
     final sprites = json['sprites'] as Map<String, dynamic>?;
+    final rawTypes = json['types'] as List<dynamic>? ?? [];
+    final sortedTypes = List.of(rawTypes)
+      ..sort((a, b) => (a['slot'] as int).compareTo(b['slot'] as int));
+
     return PokemonEntry(
       id: json['id'] as int,
       name: json['name'] as String,
@@ -42,30 +50,27 @@ class PokemonEntry {
       height: json['height'] as int,
       weight: json['weight'] as int,
       baseExperience: json['base_experience'] as int?,
-      types: Map.fromEntries(
-        (json['types'] as List<dynamic>).map(
-          (t) => MapEntry(t['slot'] as int, t['type']['name'] as String),
-        ),
-      ),
+      types: sortedTypes.map((t) => t['type']['name'] as String).toList(),
       sprites: sprites,
       officialArtworkUrl:
           sprites?['other']?['official-artwork']?['front_default'] as String?,
-      stats: (json['stats'] as List?)
-              ?.map((s) => Map<String, dynamic>.from(s as Map))
-              .toList() ??
-          [],
-      abilities: (json['abilities'] as List?)
-              ?.map((a) => Map<String, dynamic>.from(a as Map))
-              .toList() ??
-          [],
-      moves: (json['moves'] as List?)
-              ?.map((m) => Map<String, dynamic>.from(m as Map))
-              .toList() ??
-          [],
-      formNames: (json['forms'] as List?)
-              ?.map((f) => (f as Map)['name'] as String)
-              .toList() ??
-          [],
+      stats: Map.fromEntries(
+        (json['stats'] as List<dynamic>? ?? []).map(
+          (s) => MapEntry(
+            (s as Map<String, dynamic>)['stat']['name'] as String,
+            s['base_stat'] as int,
+          ),
+        ),
+      ),
+      abilities: (json['abilities'] as List<dynamic>? ?? [])
+          .map((a) => AbilityInfo.fromPokeApi(a as Map<String, dynamic>))
+          .toList(),
+      moves: (json['moves'] as List<dynamic>? ?? [])
+          .map((m) => MoveSummary.fromPokeApi(m as Map<String, dynamic>))
+          .toList(),
+      formNames: (json['forms'] as List<dynamic>? ?? [])
+          .map((f) => (f as Map)['name'] as String)
+          .toList(),
     );
   }
 
@@ -78,8 +83,8 @@ class PokemonEntry {
         'types': types,
         'sprites': sprites,
         'stats': stats,
-        'abilities': abilities,
-        'moves': moves,
+        'abilities': abilities.map((a) => a.toJson()).toList(),
+        'moves': moves.map((m) => m.toJson()).toList(),
       };
 
   String displayId() => '#${id.toString().padLeft(3, '0')}';

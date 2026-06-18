@@ -2,6 +2,7 @@ import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_service.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show MoveSummary;
 
 /// The result of validating one slot against a format.
 /// [violations] maps field name → human-readable reason so the slot config
@@ -30,7 +31,7 @@ class SlotValidation {
 Future<SlotValidation> validateSlot(
   TeamSlot slot,
   String pokemonName,
-  List<Map<String, dynamic>> pokemonMoves,
+  List<MoveSummary> pokemonMoves,
   GameFormat format,
   FormatService service,
 ) async {
@@ -103,7 +104,7 @@ SlotValidation validateSlotSync(
   String? heldItemName,
   List<String?> moves,
   String pokemonName,
-  List<Map<String, dynamic>> pokemonMoves,
+  List<MoveSummary> pokemonMoves,
   GameFormat format,
   FormatService service,
 ) {
@@ -159,7 +160,7 @@ SlotValidation validateSlotSync(
 /// in the PS learnset for [format.gen] is included regardless of PokéAPI's
 /// version-group data.
 Set<String> buildLearnsetForFormat(
-  List<Map<String, dynamic>> pokemonMoves,
+  List<MoveSummary> pokemonMoves,
   GameFormat format, {
   String? pokemonName,
   FormatService? formatService,
@@ -182,7 +183,7 @@ Set<String> buildLearnsetForFormat(
     final matchedPsIds = <String>{};
     if (regularPsIds.isNotEmpty || eventPsIds.isNotEmpty) {
       for (final moveData in pokemonMoves) {
-        final moveName = (moveData['move'] as Map)['name'] as String;
+        final moveName = moveData.name;
         // Convert PokéAPI name to PS id (strip hyphens) for comparison.
         final psId = _toPsId(moveName);
         if (regularPsIds.contains(psId) || eventPsIds.contains(psId)) {
@@ -218,7 +219,7 @@ String _apiSlugForPsName(String name) =>
     name.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
 
 Set<String> _buildLearnset(
-  List<Map<String, dynamic>> pokemonMoves,
+  List<MoveSummary> pokemonMoves,
   GameFormat format,
 ) {
   // For the move PICKER we accept any move the Pokémon could ever have learned
@@ -236,16 +237,14 @@ Set<String> _buildLearnset(
 
   if (allAcceptedGroups.isEmpty) {
     // Unknown generation — fall back to accepting everything.
-    return pokemonMoves.map((m) => m['move']['name'] as String).toSet();
+    return pokemonMoves.map((m) => m.name).toSet();
   }
 
   final result = <String>{};
   for (final moveData in pokemonMoves) {
-    final moveName = (moveData['move'] as Map)['name'] as String;
-    final details = moveData['version_group_details'] as List;
-    final learnable = details.any((d) {
-      final vg = ((d as Map)['version_group'] as Map)['name'] as String;
-      return allAcceptedGroups.contains(vg);
+    final moveName = moveData.name;
+    final learnable = moveData.learnDetails.any((d) {
+      return allAcceptedGroups.contains(d.versionGroup);
     });
     if (learnable) result.add(moveName);
   }
@@ -270,8 +269,8 @@ Set<String> _buildLearnset(
 /// the full movepool plus a PS supplementary pass, so callers that also need
 /// that exact set elsewhere (e.g. the move picker) shouldn't pay for it twice.
 Set<String> buildPriorEvoExclusiveMoveNames({
-  required List<Map<String, dynamic>> currentMoves,
-  required List<({String speciesName, List<Map<String, dynamic>> moves})> ancestorMoveSets,
+  required List<MoveSummary> currentMoves,
+  required List<({String speciesName, List<MoveSummary> moves})> ancestorMoveSets,
   required GameFormat format,
   String? pokemonName,
   FormatService? formatService,

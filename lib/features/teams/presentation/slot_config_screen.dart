@@ -21,6 +21,7 @@ import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show AbilityInfo, MoveSummary;
 import 'package:poke_team_dex/services/pokeapi/models/type_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
@@ -345,7 +346,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     FormatService service,
     GameFormat format,
     String pokemonName,
-    List<Map<String, dynamic>> pokemonMoves,
+    List<MoveSummary> pokemonMoves,
   ) {
     if (!service.isInitialized) return {};
     return validateSlotSync(
@@ -618,17 +619,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final pokemon = resolved.detail;
         final speciesName = pokemon.displaySpeciesName;
 
-        final abilities = pokemon.abilities.map((a) => (
-          name: a['ability']['name'] as String,
-          isHidden: a['is_hidden'] as bool,
-          abilitySlot: a['slot'] as int,
-        )).toList()
+        final abilities = pokemon.abilities
+            .map((a) => (name: a.name, isHidden: a.isHidden, abilitySlot: a.slot))
+            .toList()
           ..sort((a, b) => a.abilitySlot.compareTo(b.abilitySlot));
 
-        final baseStats = <String, int>{
-          for (final s in pokemon.stats)
-            s['stat']['name'] as String: s['base_stat'] as int,
-        };
+        final baseStats = pokemon.stats;
 
         // Format + mechanics + validation
         final team = ref.watch(teamByIdProvider(widget.teamId)).asData?.value;
@@ -638,7 +634,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final mechanics = format != null
             ? GenerationMechanics.forGen(format.gen)
             : null;
-        final pokemonMoves = pokemon.moves.cast<Map<String, dynamic>>();
+        final pokemonMoves = pokemon.moves;
 
         // Learnable moves filtered by format version groups.
         // No format → show everything the Pokémon can ever learn.
@@ -683,10 +679,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
         // Use mega form for stats and artwork when evolved.
         final effectiveBaseStats = megaPokemon != null
-            ? <String, int>{
-                for (final s in megaPokemon.stats)
-                  s['stat']['name'] as String: s['base_stat'] as int,
-              }
+            ? megaPokemon.stats
             : baseStats;
         // Prefer HOME artwork (higher quality); fall back to official artwork.
         // Use shiny variants when the slot is shiny (mirrors form-change handling
@@ -759,17 +752,15 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         // form's data so the picker and validation reflect the correct options.
         final effectiveAbilities = (formPokemon != null &&
                 formPokemon.abilities.isNotEmpty)
-            ? (formPokemon.abilities.map((a) => (
-                  name: a['ability']['name'] as String,
-                  isHidden: a['is_hidden'] as bool,
-                  abilitySlot: a['slot'] as int,
-                )).toList()
-              ..sort((a, b) => a.abilitySlot.compareTo(b.abilitySlot)))
+            ? (formPokemon.abilities
+                    .map((a) => (name: a.name, isHidden: a.isHidden, abilitySlot: a.slot))
+                    .toList()
+                  ..sort((a, b) => a.abilitySlot.compareTo(b.abilitySlot)))
             : abilities;
 
         final effectivePokemonMoves = formPokemon != null &&
                 formPokemon.moves.isNotEmpty
-            ? formPokemon.moves.cast<Map<String, dynamic>>()
+            ? formPokemon.moves
             : pokemonMoves;
 
         // Genuine event/gift-Pokémon-exclusive moves (e.g. Pokémon Crystal's
@@ -795,9 +786,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 pokemonName: formPokemon?.name ?? pokemon.name,
                 formatService: formatService,
               )
-            : effectivePokemonMoves
-                .map((m) => m['move']['name'] as String)
-                .toSet();
+            : effectivePokemonMoves.map((m) => m.name).toSet();
         final effectiveLearnableMoves = effectiveLearnableMoveSet.toList()
           ..sort();
 
@@ -812,7 +801,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             final ancestorAll = <String>{};
             for (final ancestor in sets) {
               for (final m in ancestor.moves) {
-                ancestorAll.add((m['move'] as Map)['name'] as String);
+                ancestorAll.add(m.name);
               }
             }
             return ancestorAll.difference(effectiveLearnableMoveSet);
@@ -863,10 +852,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
         // Form stats take highest priority (form > mega > base).
         final finalBaseStats = formPokemon != null
-            ? <String, int>{
-                for (final s in formPokemon.stats)
-                  s['stat']['name'] as String: s['base_stat'] as int,
-              }
+            ? formPokemon.stats
             : effectiveBaseStats;
 
         // ── Gigantamax / Dynamax ────────────────────────────────────────────
@@ -2344,11 +2330,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // ── Mega ability info row ─────────────────────────────────────────────────
 
-  Widget _buildMegaAbilityInfo(List<dynamic> megaAbilities) {
+  Widget _buildMegaAbilityInfo(List<AbilityInfo> megaAbilities) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final abilityName = (megaAbilities.first['ability'] as Map)['name'] as String;
+    final abilityName = megaAbilities.first.name;
     final displayName = abilityName
         .split('-')
         .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')

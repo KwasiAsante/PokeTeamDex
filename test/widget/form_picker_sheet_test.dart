@@ -14,7 +14,7 @@ PokemonEntry _entry(String name) => PokemonEntry(
       name: name,
       height: 69,
       weight: 7500,
-      types: {1: 'ghost', 2: 'dragon'},
+      types: ['ghost', 'dragon'],
     );
 
 const _giratinaForms = [

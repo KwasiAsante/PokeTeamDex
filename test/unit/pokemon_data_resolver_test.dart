@@ -387,7 +387,7 @@ PokemonEntry _makePokemonEntry({
   name: 'test-pokemon',
   height: 1,
   weight: 1,
-  types: const {},
+  types: const [],
   officialArtworkUrl: artworkUrl,
   sprites: frontDefault != null ? {'front_default': frontDefault} : null,
 );

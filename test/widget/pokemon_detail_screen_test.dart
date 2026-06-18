@@ -16,15 +16,15 @@ PokemonEntry _testEntry() => PokemonEntry(
       name: 'pikachu',
       height: 4,
       weight: 60,
-      types: {1: 'electric'},
-      stats: [
-        {'base_stat': 35, 'stat': {'name': 'hp'}},
-        {'base_stat': 55, 'stat': {'name': 'attack'}},
-        {'base_stat': 40, 'stat': {'name': 'defense'}},
-        {'base_stat': 50, 'stat': {'name': 'special-attack'}},
-        {'base_stat': 50, 'stat': {'name': 'special-defense'}},
-        {'base_stat': 90, 'stat': {'name': 'speed'}},
-      ],
+      types: ['electric'],
+      stats: {
+        'hp': 35,
+        'attack': 55,
+        'defense': 40,
+        'special-attack': 50,
+        'special-defense': 50,
+        'speed': 90,
+      },
     );
 
 const _testSpecies = PokemonSpeciesEntry(

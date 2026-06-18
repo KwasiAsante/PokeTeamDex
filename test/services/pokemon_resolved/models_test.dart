@@ -110,17 +110,13 @@ void main() {
       final r = PokemonResolvedBackendResponse.fromJson(_minimalResolvedJson());
       final entry = r.toPokemonEntry();
       expect(entry.id, 6);
-      // types is Map<int, String> in current PokemonEntry (slot → name)
-      expect(entry.types[1], 'Fire');
-      expect(entry.types[2], 'Flying');
-      // stats is List<Map<String, dynamic>> matching PokéAPI shape
-      final hpStat = entry.stats.firstWhere(
-        (s) => s['stat']['name'] == 'hp',
-        orElse: () => {},
-      );
-      expect(hpStat['base_stat'], 78);
-      // abilities is List<Map<String, dynamic>> matching PokéAPI shape
-      expect(entry.abilities[0]['ability']['name'], 'blaze');
+      // types is now List<String>
+      expect(entry.types[0], 'Fire');
+      expect(entry.types[1], 'Flying');
+      // stats is now Map<String, int>
+      expect(entry.stats['hp'], 78);
+      // abilities is now List<AbilityInfo>
+      expect(entry.abilities[0].name, 'blaze');
       expect(entry.formNames, ['charizard']);
     });
 

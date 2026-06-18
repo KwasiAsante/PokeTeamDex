@@ -17,6 +17,7 @@ import 'package:poke_team_dex/services/format/format_service.dart';
 import 'package:poke_team_dex/services/pokeapi/models/encounter_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show MoveSummary;
 import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -145,8 +146,9 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         // receive it in the data state — the whole resolved provider is already done.
         final speciesAsync = AsyncData<PokemonSpeciesEntry>(resolved.species);
         final effectivePokemon = formAsync?.asData?.value ?? basePokemon;
-        final primaryType =
-            effectivePokemon.types[1] ?? effectivePokemon.types.values.first;
+        final primaryType = effectivePokemon.types.isNotEmpty
+            ? effectivePokemon.types[0]
+            : 'normal';
         final headerColor =
             PokemonTypeColors.colors[primaryType] ?? Theme.of(context).colorScheme.primary;
         final species = resolved.species;
@@ -388,7 +390,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                       Wrap(
                         spacing: 6,
                         alignment: WrapAlignment.center,
-                        children: effectivePokemon.types.values
+                        children: effectivePokemon.types
                             .map((t) => TypeBadge(type: t))
                             .toList(),
                       ),
@@ -684,7 +686,7 @@ class _OverviewTab extends StatelessWidget {
           // Types
           Row(
             children: [
-              ...pokemon.types.values.map(
+              ...pokemon.types.map(
                 (t) => Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: TypeBadge(type: t),
@@ -844,14 +846,7 @@ class _StatsTab extends StatelessWidget {
     ('speed', 'Spe'),
   ];
 
-  int _base(String statName) {
-    for (final s in pokemon.stats) {
-      if ((s['stat'] as Map)['name'] == statName) {
-        return s['base_stat'] as int;
-      }
-    }
-    return 0;
-  }
+  int _base(String statName) => pokemon.stats[statName] ?? 0;
 
   @override
   Widget build(BuildContext context) {
@@ -1048,8 +1043,8 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
   List<String> get _versions {
     final seen = <String>{};
     for (final m in widget.pokemon.moves) {
-      for (final vgd in (m['version_group_details'] as List)) {
-        seen.add((vgd as Map)['version_group']['name'] as String);
+      for (final vgd in m.learnDetails) {
+        seen.add(vgd.versionGroup);
       }
     }
     return seen.toList()
@@ -1080,12 +1075,12 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
   }) {
     final groups = <String, List<_MoveRow>>{};
     for (final m in widget.pokemon.moves) {
-      final moveName = (m['move'] as Map)['name'] as String;
-      for (final vgd in (m['version_group_details'] as List)) {
-        final vg = (vgd as Map)['version_group']['name'] as String;
+      final moveName = m.name;
+      for (final vgd in m.learnDetails) {
+        final vg = vgd.versionGroup;
         if (version != null && vg != version) continue;
-        final method = vgd['move_learn_method']['name'] as String;
-        final level = vgd['level_learned_at'] as int? ?? 0;
+        final method = vgd.method;
+        final level = vgd.level;
         groups.putIfAbsent(method, () => []);
         // Avoid duplicates within same method
         if (!groups[method]!.any((r) => r.moveName == moveName)) {
@@ -1122,18 +1117,16 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
   /// appear in PokéAPI's data (just attributed to a different generation or
   /// method there), so this reverse-lookup virtually always resolves.
   static Map<String, String> _psIdToNameMap(
-    List<Map<String, dynamic>> current,
-    List<({String speciesName, List<Map<String, dynamic>> moves})> ancestorSets,
+    List<MoveSummary> current,
+    List<({String speciesName, List<MoveSummary> moves})> ancestorSets,
   ) {
     final map = <String, String>{};
     for (final m in current) {
-      final name = (m['move'] as Map)['name'] as String;
-      map.putIfAbsent(_toPsId(name), () => name);
+      map.putIfAbsent(_toPsId(m.name), () => m.name);
     }
     for (final ancestor in ancestorSets) {
       for (final m in ancestor.moves) {
-        final name = (m['move'] as Map)['name'] as String;
-        map.putIfAbsent(_toPsId(name), () => name);
+        map.putIfAbsent(_toPsId(m.name), () => m.name);
       }
     }
     return map;
@@ -1170,7 +1163,7 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
   /// [psIdToName], [gen] and [formatService] mirror [_grouped]'s parameters.
   List<({String speciesName, List<_MoveRow> rows})> _buildPriorEvoGroups(
     String? selectedVg,
-    List<({String speciesName, List<Map<String, dynamic>> moves})> ancestorSets, {
+    List<({String speciesName, List<MoveSummary> moves})> ancestorSets, {
     required Map<String, String> psIdToName,
     int? gen,
     FormatService? formatService,
@@ -1184,9 +1177,9 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     // doesn't carry them either.
     final currentInVg = <String>{};
     for (final m in widget.pokemon.moves) {
-      final moveName = (m['move'] as Map)['name'] as String;
-      for (final vgd in m['version_group_details'] as List) {
-        final vg = ((vgd as Map)['version_group'] as Map)['name'] as String;
+      final moveName = m.name;
+      for (final vgd in m.learnDetails) {
+        final vg = vgd.versionGroup;
         if (selectedVg == null || vg == selectedVg) {
           currentInVg.add(moveName);
           break;
@@ -1204,12 +1197,12 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     for (final ancestor in ancestorSets) {
       final rows = <_MoveRow>[];
       for (final m in ancestor.moves) {
-        final moveName = (m['move'] as Map)['name'] as String;
+        final moveName = m.name;
         if (currentInVg.contains(moveName)) continue;
-        for (final vgd in m['version_group_details'] as List) {
-          final vg = ((vgd as Map)['version_group'] as Map)['name'] as String;
+        for (final vgd in m.learnDetails) {
+          final vg = vgd.versionGroup;
           if (selectedVg != null && vg != selectedVg) continue;
-          final level = vgd['level_learned_at'] as int? ?? 0;
+          final level = vgd.level;
           if (!rows.any((r) => r.moveName == moveName)) {
             rows.add(_MoveRow(moveName: moveName, level: level));
           }
@@ -1569,9 +1562,9 @@ class _AbilitiesTab extends ConsumerWidget {
       itemCount: abilities.length,
       separatorBuilder: (_, _) => const Divider(height: 24),
       itemBuilder: (context, i) {
-        final slot = abilities[i];
-        final name = (slot['ability'] as Map)['name'] as String;
-        final isHidden = slot['is_hidden'] as bool? ?? false;
+        final ability = abilities[i];
+        final name = ability.name;
+        final isHidden = ability.isHidden;
         return _AbilityCard(name: name, isHidden: isHidden, ref: ref);
       },
     );
@@ -2004,7 +1997,7 @@ class _FormCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Row(
-                        children: pokemon.types.values
+                        children: pokemon.types
                             .map((t) => Padding(
                                   padding: const EdgeInsets.only(right: 4),
                                   child: TypeBadge(type: t),
@@ -2018,11 +2011,11 @@ class _FormCard extends ConsumerWidget {
             ),
             if (pokemon.stats.isNotEmpty) ...[
               const SizedBox(height: 12),
-              ...pokemon.stats.indexed.map((entry) {
+              ...pokemon.stats.entries.indexed.map((entry) {
                 final i = entry.$1;
-                final s = entry.$2;
-                final statName = (s['stat'] as Map)['name'] as String;
-                final value = s['base_stat'] as int;
+                final e = entry.$2;
+                final statName = e.key;
+                final value = e.value;
                 final label = _shortStatLabel(statName);
                 return StatBar(
                   label: label,
@@ -2698,8 +2691,7 @@ class _SlotPicker extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef widgetRef) {
     final slotsAsync = widgetRef.watch(teamSlotsProvider(team.id));
     final colorScheme = Theme.of(context).colorScheme;
-    final primaryType =
-        pokemon.types[1] ?? pokemon.types.values.first;
+    final primaryType = pokemon.types.isNotEmpty ? pokemon.types[0] : 'normal';
     final typeColor =
         PokemonTypeColors.colors[primaryType] ?? colorScheme.primary;
 
@@ -2843,7 +2835,7 @@ class _AddToTeamTabState extends State<_AddToTeamTab> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final pokemon = widget.pokemon;
-    final primaryType = pokemon.types[1] ?? pokemon.types.values.first;
+    final primaryType = pokemon.types.isNotEmpty ? pokemon.types[0] : 'normal';
     final typeColor = PokemonTypeColors.colors[primaryType] ?? colorScheme.primary;
 
     return SingleChildScrollView(
@@ -2879,7 +2871,7 @@ class _AddToTeamTabState extends State<_AddToTeamTab> {
                         ),
                         const SizedBox(height: 6),
                         Row(
-                          children: pokemon.types.values
+                          children: pokemon.types
                               .map((t) => Padding(
                                     padding: const EdgeInsets.only(right: 6),
                                     child: TypeBadge(type: t),

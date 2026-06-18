@@ -65,7 +65,7 @@ final slotValidationProvider = FutureProvider.autoDispose
   if (format == null) return const SlotValidation({});
   final pokemon = await ref.watch(
       pokemonDetailProvider(args.slot.pokemonId).future);
-  final moves = pokemon.moves.cast<Map<String, dynamic>>();
+  final moves = pokemon.moves;
   final base = await validateSlot(args.slot, pokemon.name, moves, format, svc);
   if (base.isValid) return base;
 

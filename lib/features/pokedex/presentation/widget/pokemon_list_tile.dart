@@ -108,9 +108,10 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
     final isFormLoading = formAsync != null && formAsync.isLoading;
 
     final effectiveTypes = formEntry?.types ?? basePokemon?.types;
-    final primaryType =
-        effectiveTypes?[1] ?? effectiveTypes?.values.firstOrNull;
-    final types = effectiveTypes?.values.toList() ?? const <String>[];
+    final primaryType = effectiveTypes != null && effectiveTypes.isNotEmpty
+        ? effectiveTypes[0]
+        : null;
+    final types = effectiveTypes ?? const <String>[];
 
     final typeColor = primaryType != null
         ? (PokemonTypeColors.colors[primaryType] ?? colorScheme.primary)

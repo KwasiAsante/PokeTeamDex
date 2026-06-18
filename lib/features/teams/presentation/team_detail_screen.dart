@@ -837,10 +837,7 @@ class _FilledSlotCard extends ConsumerWidget {
         // is resolved below and drive all type display in the slot card.
 
         // Base stats map
-        final baseStats = <String, int>{
-          for (final s in pokemon.stats)
-            s['stat']['name'] as String: s['base_stat'] as int,
-        };
+        final baseStats = pokemon.stats;
 
         // ── Mega Evolution support (must come before calcStats) ────────────
         // Rayquaza is the sole exception to the "needs a Mega Stone" rule —
@@ -870,10 +867,7 @@ class _FilledSlotCard extends ConsumerWidget {
         // We use a late override pattern: compute tentative stats from mega/base
         // first, then override with form stats in calcStats below.
         final effectiveBaseStats = megaPokemon != null
-            ? <String, int>{
-                for (final s in megaPokemon.stats)
-                  s['stat']['name'] as String: s['base_stat'] as int,
-              }
+            ? megaPokemon.stats
             : baseStats;
         // Prefer HOME artwork; fall back to official artwork.
         // Use shiny variants when the slot is shiny (mirrors form-change handling
@@ -929,18 +923,14 @@ class _FilledSlotCard extends ConsumerWidget {
                 formChangePokemon.types.isNotEmpty)
             ? formChangePokemon.types
             : pokemon.types;
-        final effectivePrimaryType =
-            effectiveTypes[1] ?? effectiveTypes.values.firstOrNull ?? 'normal';
+        final effectivePrimaryType = effectiveTypes.isNotEmpty
+            ? effectiveTypes[0]
+            : 'normal';
         final effectiveTypeColor =
             PokemonTypeColors.colors[effectivePrimaryType] ?? colorScheme.primary;
 
         // Form-specific base stats (overrides mega stats too if both active).
-        final formEffectiveStats = formChangePokemon != null
-            ? <String, int>{
-                for (final s in formChangePokemon.stats)
-                  s['stat']['name'] as String: s['base_stat'] as int,
-              }
-            : null;
+        final formEffectiveStats = formChangePokemon?.stats;
 
         // Sprite resolution — use format-aware sprites when setting is on.
         // Computed here (ahead of `spriteUrls` below) because the cosmetic
@@ -1243,7 +1233,7 @@ class _FilledSlotCard extends ConsumerWidget {
                             Wrap(
                               spacing: 4,
                               runSpacing: 2,
-                              children: effectiveTypes.values
+                              children: effectiveTypes
                                   .map((t) => TypeBadge(type: t))
                                   .toList(),
                             ),
@@ -1291,8 +1281,7 @@ class _FilledSlotCard extends ConsumerWidget {
                               final abilityName = (isMegaApplicable &&
                                       megaPokemon != null &&
                                       megaPokemon.abilities.isNotEmpty)
-                                  ? (megaPokemon.abilities.first['ability']
-                                          as Map)['name'] as String
+                                  ? megaPokemon.abilities.first.name
                                   : slot.abilityName;
                               if (abilityName == null) return const SizedBox.shrink();
                               return Text(

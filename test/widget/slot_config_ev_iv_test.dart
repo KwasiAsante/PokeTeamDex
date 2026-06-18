@@ -9,6 +9,7 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show AbilityInfo;
 import '../helpers/test_app.dart';
 import '../helpers/test_database.dart';
 
@@ -19,17 +20,17 @@ PokemonEntry _entry() => PokemonEntry(
       name: 'charizard',
       height: 17,
       weight: 905,
-      types: {1: 'fire', 2: 'flying'},
-      stats: [
-        {'base_stat': 78, 'stat': {'name': 'hp'}},
-        {'base_stat': 84, 'stat': {'name': 'attack'}},
-        {'base_stat': 78, 'stat': {'name': 'defense'}},
-        {'base_stat': 109, 'stat': {'name': 'special-attack'}},
-        {'base_stat': 85, 'stat': {'name': 'special-defense'}},
-        {'base_stat': 100, 'stat': {'name': 'speed'}},
-      ],
+      types: ['fire', 'flying'],
+      stats: {
+        'hp': 78,
+        'attack': 84,
+        'defense': 78,
+        'special-attack': 109,
+        'special-defense': 85,
+        'speed': 100,
+      },
       abilities: [
-        {'ability': {'name': 'blaze'}, 'is_hidden': false, 'slot': 1},
+        const AbilityInfo(name: 'blaze', isHidden: false, slot: 1),
       ],
     );
 

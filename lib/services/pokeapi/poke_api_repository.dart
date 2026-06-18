@@ -10,6 +10,7 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_cache.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_client.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show MoveSummary;
 
 class PokeApiRepository {
   PokeApiRepository(this._pokeApiClient, this._pokeApiCache);
@@ -403,10 +404,10 @@ class PokeApiRepository {
     return ids;
   }
 
-  /// Returns each ancestor Pokémon's display name and raw moves list, in chain
+  /// Returns each ancestor Pokémon's display name and moves list, in chain
   /// order (oldest first). Returns an empty list if [pokemonId] has no prior
   /// evolutions (e.g. unevolved or a baby with no pre-baby).
-  Future<List<({String speciesName, List<Map<String, dynamic>> moves})>>
+  Future<List<({String speciesName, List<MoveSummary> moves})>>
       fetchPriorEvoMoveSets(int pokemonId) async {
     final speciesId = await _getSpeciesIdForPokemon(pokemonId);
     final species = await fetchPokemonSpecies(speciesId);
@@ -417,7 +418,7 @@ class PokeApiRepository {
     if (path == null || path.length <= 1) return [];
     // All species IDs that precede the current one in the evolution path.
     final ancestorIds = path.sublist(0, path.length - 1);
-    final result = <({String speciesName, List<Map<String, dynamic>> moves})>[];
+    final result = <({String speciesName, List<MoveSummary> moves})>[];
     for (final ancestorId in ancestorIds) {
       final pokemon = await fetchPokemon(ancestorId);
       result.add((speciesName: pokemon.name, moves: pokemon.moves));

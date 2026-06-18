@@ -296,54 +296,10 @@ class PokemonResolvedBackendResponse {
 
   /// Constructs a [PokemonEntry] from this backend response.
   ///
-  /// Converts backend-typed fields into the formats currently expected by
-  /// [PokemonEntry]:
-  /// - [types]: `Map<int, String>` (1-based slot → type name)
-  /// - [stats]: `List<Map<String, dynamic>>` matching PokéAPI `stats` shape
-  /// - [abilities]: `List<Map<String, dynamic>>` matching PokéAPI `abilities` shape
-  /// - [moves]: `List<Map<String, dynamic>>` matching PokéAPI `moves` shape
-  ///
-  /// Task 4 will update [PokemonEntry] to use the richer typed fields, at
-  /// which point this method will be simplified.
+  /// Passes typed fields directly — [PokemonEntry] now uses the same typed
+  /// representations ([List<String>] types, [Map<String, int>] stats,
+  /// [List<AbilityInfo>] abilities, [List<MoveSummary>] moves).
   PokemonEntry toPokemonEntry() {
-    // Convert List<String> types → Map<int, String> (slot: 1-based index)
-    final typesMap = <int, String>{};
-    for (var i = 0; i < types.length; i++) {
-      typesMap[i + 1] = types[i];
-    }
-
-    // Convert Map<String, int> baseStats → List<Map> matching PokéAPI shape
-    final statsList = baseStats.entries
-        .map((e) => <String, dynamic>{
-              'base_stat': e.value,
-              'effort': 0,
-              'stat': {'name': e.key, 'url': ''},
-            })
-        .toList();
-
-    // Convert List<AbilityInfo> → List<Map> matching PokéAPI shape
-    final abilitiesList = abilities
-        .map((a) => <String, dynamic>{
-              'ability': {'name': a.name, 'url': ''},
-              'is_hidden': a.isHidden,
-              'slot': a.slot,
-            })
-        .toList();
-
-    // Convert List<MoveSummary> → List<Map> matching PokéAPI shape
-    final movesList = moves
-        .map((m) => <String, dynamic>{
-              'move': {'name': m.name, 'url': ''},
-              'version_group_details': m.learnDetails
-                  .map((d) => <String, dynamic>{
-                        'level_learned_at': d.level,
-                        'move_learn_method': {'name': d.method, 'url': ''},
-                        'version_group': {'name': d.versionGroup, 'url': ''},
-                      })
-                  .toList(),
-            })
-        .toList();
-
     return PokemonEntry(
       id: pokemonId,
       name: name,
@@ -351,12 +307,12 @@ class PokemonResolvedBackendResponse {
       height: height,
       weight: weight,
       baseExperience: baseExperience,
-      types: typesMap,
+      types: types,
       officialArtworkUrl: spriteUrls.officialArtwork,
       sprites: null,
-      stats: statsList,
-      abilities: abilitiesList,
-      moves: movesList,
+      stats: baseStats,
+      abilities: abilities,
+      moves: moves,
       formNames: forms.map((f) => f.name).toList(),
     );
   }
