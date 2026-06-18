@@ -220,7 +220,7 @@ class PokemonDataResolver {
     };
   }
 
-  /// Fallback URL for list tile compact mode.
+  /// Fallback URL used when the primary image URL fails to load.
   static String resolvePokedexFallbackUrl({
     required int pokemonId,
     required PokedexImageType? imageType,
@@ -228,7 +228,7 @@ class PokemonDataResolver {
     required PokemonEntry? formEntry,
     required PokemonFormEntry? cosmeticEntry,
   }) {
-    if (imageType == null && selectedFormName != null) {
+    if (selectedFormName != null) {
       final formSprite = cosmeticEntry?.spriteUrl ??
           (formEntry?.sprites?['front_default'] as String?);
       if (formSprite != null) return formSprite;

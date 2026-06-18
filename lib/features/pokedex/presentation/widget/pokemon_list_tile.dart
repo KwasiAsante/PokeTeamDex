@@ -265,25 +265,18 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
                               key: ValueKey(imageUrl),
                               imageUrl: imageUrl,
                               fit: BoxFit.contain,
-                              errorWidget: (_, _, _) => widget.imageType == null
-                                  ? CachedNetworkImage(
-                                      imageUrl: fallbackUrl,
-                                      width: imageSize,
-                                      height: imageSize,
-                                      fit: BoxFit.contain,
-                                      errorWidget: (_, _, _) => Icon(
-                                        Icons.catching_pokemon,
-                                        size: imageSize,
-                                        color: colorScheme.onSurfaceVariant
-                                            .withValues(alpha: 0.4),
-                                      ),
-                                    )
-                                  : Icon(
-                                      Icons.catching_pokemon,
-                                      size: imageSize,
-                                      color: colorScheme.onSurfaceVariant
-                                          .withValues(alpha: 0.4),
-                                    ),
+                              errorWidget: (_, _, _) => CachedNetworkImage(
+                                  imageUrl: fallbackUrl,
+                                  width: imageSize,
+                                  height: imageSize,
+                                  fit: BoxFit.contain,
+                                  errorWidget: (_, _, _) => Icon(
+                                    Icons.catching_pokemon,
+                                    size: imageSize,
+                                    color: colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.4),
+                                  ),
+                                ),
                             ),
                           ),
                   ),
