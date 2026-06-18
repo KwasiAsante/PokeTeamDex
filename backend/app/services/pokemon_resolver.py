@@ -59,6 +59,8 @@ _POKEAPI_BASE = "https://pokeapi.co/api/v2"
 _SHOWDOWN_CDN = "https://play.pokemonshowdown.com/sprites"
 _POKEAPI_SPRITES = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions"
 _POKEAPI_PLAIN_SPRITES = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon"
+_POKEAPI_HOME = f"{_POKEAPI_PLAIN_SPRITES}/other/home"
+_POKEAPI_OA = f"{_POKEAPI_PLAIN_SPRITES}/other/official-artwork"
 
 # PokeAPI/sprites: preferred subdir and extension per gen game
 # (gen number → (game_path, subdir, ext, shiny_subdir))
@@ -214,6 +216,15 @@ def _extract_form_suffix(form_name: str, species_name: str) -> str | None:
         return form_name[len(prefix):]
     return None
 
+
+
+async def _probe_url(client: httpx.AsyncClient, url: str) -> str | None:
+    """HEAD-check a URL. Returns the URL on 200, None otherwise."""
+    try:
+        r = await client.head(url, follow_redirects=True, timeout=5.0)
+        return url if r.status_code == 200 else None
+    except Exception:
+        return None
 
 
 class PokemonResolverService:
@@ -462,6 +473,9 @@ class PokemonResolverService:
         ps_name: str,
         gen: int,
         is_default_form: bool = False,
+        pokeapi_home: str | None = None,
+        pokeapi_home_shiny: str | None = None,
+        pokeapi_oa: str | None = None,
     ) -> SpriteUrlsFull:
         """Build full sprite URLs for a cosmetic form-entry (no /pokemon resource).
 
@@ -497,11 +511,16 @@ class PokemonResolverService:
             or _build_showdown_sprite_url(home_ps_name, gen, shiny=True)
         )
 
+        # Prefer PokeAPI CDN (no CORS on web). Fall back to Showdown (works on
+        # mobile/desktop but blocked by CORS policy in browsers).
+        home_url = pokeapi_home or f"{_SHOWDOWN_CDN}/home/{home_ps_name}.png"
+        home_shiny_url = pokeapi_home_shiny or f"{_SHOWDOWN_CDN}/home-shiny/{home_ps_name}.png"
+
         return SpriteUrlsFull(
-            official_artwork=None,
+            official_artwork=pokeapi_oa,
             official_artwork_shiny=None,
-            home=f"{_SHOWDOWN_CDN}/home/{home_ps_name}.png",
-            home_shiny=f"{_SHOWDOWN_CDN}/home-shiny/{home_ps_name}.png",
+            home=home_url,
+            home_shiny=home_shiny_url,
             home_female=None,
             home_female_shiny=None,
             game_front=game_front,
@@ -644,30 +663,66 @@ class PokemonResolverService:
         if not non_defaults:
             return []
 
-        responses = await asyncio.gather(
-            *[self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon-form/{n}") for n in non_defaults],
+        def _form_home_id(fn: str) -> str:
+            sfx = _extract_form_suffix(fn, species_name)
+            return f"{base_id}-{sfx}" if sfx else str(base_id)
+
+        # Batch: form-data fetches + PokeAPI sprite CDN probes (home, home_shiny,
+        # official-artwork). All run in parallel; probes are HEAD-only, cheap.
+        form_tasks = [self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon-form/{n}") for n in non_defaults]
+        home_tasks = [_probe_url(self._pokeapi_http, f"{_POKEAPI_HOME}/{_form_home_id(n)}.png") for n in non_defaults]
+        home_shiny_tasks = [_probe_url(self._pokeapi_http, f"{_POKEAPI_HOME}/shiny/{_form_home_id(n)}.png") for n in non_defaults]
+        oa_tasks = [_probe_url(self._pokeapi_http, f"{_POKEAPI_OA}/{_form_home_id(n)}.png") for n in non_defaults]
+
+        all_results = await asyncio.gather(
+            *form_tasks, *home_tasks, *home_shiny_tasks, *oa_tasks,
             return_exceptions=True,
         )
 
+        _n = len(non_defaults)
+        form_responses = all_results[:_n]
+        home_results = all_results[_n:2 * _n]
+        home_shiny_results = all_results[2 * _n:3 * _n]
+        oa_results = all_results[3 * _n:]
+
         result: list[FormData] = []
-        for form_name, resp in zip(non_defaults, responses):
+        for i, form_name in enumerate(non_defaults):
+            resp = form_responses[i]
             ps_name = _to_showdown_name(form_name, self._ps_exceptions)
-            # Construct the front sprite URL from the base_id + suffix pattern
             suffix = _extract_form_suffix(form_name, species_name)
             sprite_id = f"{base_id}-{suffix}" if suffix else str(base_id)
-            front_sprite = f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{sprite_id}.png"
+            # front_sprite_url: prefer PokeAPI form API front_default, fall back to
+            # PokeAPI home (which exists for most forms), then constructed sprite path.
+            fallback_front = f"{_POKEAPI_PLAIN_SPRITES}/{sprite_id}.png"
+
+            pokeapi_home = home_results[i] if not isinstance(home_results[i], Exception) else None
+            pokeapi_home_shiny = home_shiny_results[i] if not isinstance(home_shiny_results[i], Exception) else None
+            pokeapi_oa = oa_results[i] if not isinstance(oa_results[i], Exception) else None
 
             if isinstance(resp, Exception) or resp.status_code != 200:
                 logger.warning("Failed to fetch form %s: %s", form_name, resp)
-                result.append(FormData(name=form_name, form_id=base_id, is_default=False, front_sprite_url=front_sprite))
+                # Even without form-API data we may have probed home sprites successfully.
+                sprite_urls = self._build_form_sprite_urls(
+                    form_name, base_id, species_name, ps_name, gen,
+                    pokeapi_home=pokeapi_home,
+                    pokeapi_home_shiny=pokeapi_home_shiny,
+                    pokeapi_oa=pokeapi_oa,
+                )
+                result.append(FormData(
+                    name=form_name, form_id=base_id, is_default=False,
+                    front_sprite_url=pokeapi_home or fallback_front,
+                    sprite_urls=sprite_urls,
+                ))
                 continue
 
-            # Use the API response's front_default if available (more authoritative)
             form_data_json = resp.json()
-            api_front = (form_data_json.get("sprites") or {}).get("front_default") or front_sprite
+            api_front = (form_data_json.get("sprites") or {}).get("front_default") or pokeapi_home or fallback_front
             form_id = form_data_json.get("id", base_id)
             sprite_urls = self._build_form_sprite_urls(
-                form_name, base_id, species_name, ps_name, gen
+                form_name, base_id, species_name, ps_name, gen,
+                pokeapi_home=pokeapi_home,
+                pokeapi_home_shiny=pokeapi_home_shiny,
+                pokeapi_oa=pokeapi_oa,
             )
             result.append(FormData(
                 name=form_name,
