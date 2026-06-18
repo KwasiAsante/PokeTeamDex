@@ -582,13 +582,30 @@ class PokemonResolverService:
     # ------------------------------------------------------------------
 
     @staticmethod
+    def _filter_smogon_by_gen(
+        analyses: "list[SmogonFormatData] | None", gen: int | None
+    ) -> "list[SmogonFormatData] | None":
+        """Filter Smogon analyses to only the formats for a specific gen.
+
+        gen=None returns all formats.
+        Format IDs are all prefixed with gen{N} (e.g. "gen5ou", "gen9doublesou").
+        """
+        if analyses is None or gen is None:
+            return analyses
+        prefix = f"gen{gen}"
+        return [f for f in analyses if f.format_id.startswith(prefix)] or None
+
+    @staticmethod
     def _trim_response(
-        response: "PokemonResolvedResponse", includes: list[str]
+        response: "PokemonResolvedResponse", includes: list[str], gen: int | None = None
     ) -> "PokemonResolvedResponse":
-        """Strip expanded fields not requested via includes.
+        """Strip expanded fields not requested via includes, and gen-gate smogon.
 
         resolved_url on VarietyData and front_sprite_url on FormData are
         always preserved — they exist specifically to support the slim response.
+
+        smogon_analyses is always filtered to the requested gen (even slim
+        format-id-only entries). Pass gen=None to skip filtering.
         """
         if "varieties" not in includes:
             response = response.model_copy(update={
@@ -609,13 +626,18 @@ class PokemonResolverService:
                     for f in response.forms
                 ]
             })
-        if "smogon" not in includes and response.smogon_analyses is not None:
+        # Gen-filter smogon first, then strip sets if not in includes
+        filtered = PokemonResolverService._filter_smogon_by_gen(response.smogon_analyses, gen)
+        if "smogon" not in includes and filtered is not None:
             response = response.model_copy(update={
                 "smogon_analyses": [
-                    SmogonFormatData(format_id=f.format_id)  # strip sets, keep format id
-                    for f in response.smogon_analyses
+                    SmogonFormatData(format_id=f.format_id)
+                    for f in filtered
                 ]
             })
+        elif filtered is not response.smogon_analyses:
+            # smogon IS in includes but gen filtering changed the list
+            response = response.model_copy(update={"smogon_analyses": filtered})
         return response
 
     # ------------------------------------------------------------------
@@ -639,7 +661,7 @@ class PokemonResolverService:
         row = result.scalar_one_or_none()
         if row:
             response = PokemonResolvedResponse(**row.data, resolved_at=row.resolved_at)
-            return self._trim_response(response, includes)
+            return self._trim_response(response, includes, gen)
 
         # 2. Fetch from PokéAPI
         try:
@@ -796,14 +818,24 @@ class PokemonResolverService:
         )
 
     async def resolve_smogon(
-        self, name_or_id: str, gen: int, db: AsyncSession, base_url: str = ""
+        self, name_or_id: str, gen: int | None, db: AsyncSession, base_url: str = ""
     ) -> SmogonResponse:
+        """Return Smogon analyses, optionally filtered to a single generation.
+
+        gen=None → all formats returned.
+        gen=N   → only formats whose ID starts with "gen{N}" (e.g. gen5ou).
+
+        The DB cache is keyed by (pokemon_id, resolved_gen=9) for the all-formats
+        case.  When gen is specified we look up the cache for that gen.
+        """
+        # Resolve the gen for DB lookup: None → use gen 9 row (stores all formats)
+        db_gen = gen if gen is not None else 9
         pokemon_id = await self._resolve_name_or_id(name_or_id)
 
         result = await db.execute(
             select(PokemonResolved).where(
                 PokemonResolved.pokemon_id == pokemon_id,
-                PokemonResolved.gen == gen,
+                PokemonResolved.gen == db_gen,
                 PokemonResolved.resolved_at
                 + text("(ttl_days * interval '1 day')")
                 > func.now(),
@@ -811,19 +843,22 @@ class PokemonResolverService:
         )
         row = result.scalar_one_or_none()
         if row:
+            all_analyses = row.data.get("smogon_analyses")
+            filtered = self._filter_smogon_by_gen(all_analyses, gen)
             return SmogonResponse(
                 pokemon_id=pokemon_id,
                 gen=gen,
                 name=row.data.get("name", ""),
-                smogon_analyses=row.data.get("smogon_analyses"),
+                smogon_analyses=filtered,
             )
 
-        full = await self.resolve(pokemon_id, gen, ["smogon"], db, base_url)
+        full = await self.resolve(pokemon_id, db_gen, ["smogon"], db, base_url)
+        filtered = self._filter_smogon_by_gen(full.smogon_analyses, gen)
         return SmogonResponse(
             pokemon_id=pokemon_id,
             gen=gen,
             name=full.name,
-            smogon_analyses=full.smogon_analyses,
+            smogon_analyses=filtered,
         )
 
     async def resolve_forms(

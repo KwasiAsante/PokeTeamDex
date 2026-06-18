@@ -76,21 +76,20 @@ async def get_pokemon_smogon(
     request: Request,
     name_or_id: str,
     db: DB,
-    gen: int = 9,
+    gen: int | None = None,
 ) -> SmogonResponse:
     """
-    Return full Smogon competitive analyses for a Pokémon across all loaded formats.
+    Return Smogon competitive analyses for a Pokémon.
 
-    - **name_or_id**: Base Pokémon name ("venusaur") or numeric ID (3).
-    - **gen**: Generation to resolve for (1–9, default 9).
+    - **name_or_id**: Pokémon name ("venusaur") or numeric ID (3).
+    - **gen**: When omitted, returns all formats across every generation.
+      When specified (1–9), returns only formats for that generation
+      (e.g. gen=5 returns gen5ou, gen5uu, gen5ubers, etc.).
 
-    `smogon_analyses` is null while the background format preload is in progress
-    (~15 s after cold start). Each entry includes full set details (moves, ability,
-    item, nature, EVs, teratypes, descriptions).
-
-    Results are cached alongside the full resolved data (7-day TTL).
+    `smogon_analyses` is null while the background format preload is in
+    progress (~15 s after cold start).
     """
-    if not 1 <= gen <= 9:
+    if gen is not None and not 1 <= gen <= 9:
         raise HTTPException(status_code=400, detail="gen must be between 1 and 9")
     return await pokemon_resolver_service.resolve_smogon(name_or_id, gen, db, _base_url(request))
 

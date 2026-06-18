@@ -432,6 +432,45 @@ class TestSmogonSetTeratypes:
         assert s.teratypes is None
 
 
+class TestFilterSmogonByGen:
+    def _analyses(self):
+        from app.schemas.pokemon_resolved import SmogonFormatData
+        return [
+            SmogonFormatData(format_id="gen5ou"),
+            SmogonFormatData(format_id="gen5uu"),
+            SmogonFormatData(format_id="gen9ou"),
+            SmogonFormatData(format_id="gen9doublesou"),
+        ]
+
+    def test_none_gen_returns_all(self):
+        from app.services.pokemon_resolver import PokemonResolverService
+        result = PokemonResolverService._filter_smogon_by_gen(self._analyses(), None)
+        assert len(result) == 4
+
+    def test_gen5_filters_to_gen5(self):
+        from app.services.pokemon_resolver import PokemonResolverService
+        result = PokemonResolverService._filter_smogon_by_gen(self._analyses(), 5)
+        assert len(result) == 2
+        assert all(f.format_id.startswith("gen5") for f in result)
+
+    def test_gen9_filters_to_gen9(self):
+        from app.services.pokemon_resolver import PokemonResolverService
+        result = PokemonResolverService._filter_smogon_by_gen(self._analyses(), 9)
+        ids = [f.format_id for f in result]
+        assert "gen9ou" in ids
+        assert "gen9doublesou" in ids
+        assert "gen5ou" not in ids
+
+    def test_gen_with_no_data_returns_none(self):
+        from app.services.pokemon_resolver import PokemonResolverService
+        result = PokemonResolverService._filter_smogon_by_gen(self._analyses(), 3)
+        assert result is None
+
+    def test_none_analyses_returns_none(self):
+        from app.services.pokemon_resolver import PokemonResolverService
+        assert PokemonResolverService._filter_smogon_by_gen(None, 5) is None
+
+
 class TestSmogonSlimTrim:
     """When smogon not in includes, sets are stripped but format_ids are kept."""
 
