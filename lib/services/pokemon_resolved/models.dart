@@ -197,7 +197,7 @@ class PokemonResolvedBackendResponse {
   final List<SupplementMove> supplementMoves;
   final List<Map<String, dynamic>>? smogonAnalyses;
   final List<Map<String, dynamic>> varieties;
-  final List<_FormBackendData> forms;
+  final List<FormBackendData> forms;
   final SpriteUrlsFull spriteUrls;
   final String? genus;
   final String generationName;
@@ -278,7 +278,7 @@ class PokemonResolvedBackendResponse {
           .map((v) => Map<String, dynamic>.from(v as Map))
           .toList(),
       forms: (json['forms'] as List<dynamic>? ?? [])
-          .map((f) => _FormBackendData.fromJson(f as Map<String, dynamic>))
+          .map((f) => FormBackendData.fromJson(f as Map<String, dynamic>))
           .toList(),
       spriteUrls: SpriteUrlsFull.fromJson(
           json['sprite_urls'] as Map<String, dynamic>? ?? {}),
@@ -405,14 +405,14 @@ class PokemonResolvedBackendResponse {
   }
 }
 
-class _FormBackendData {
+class FormBackendData {
   final String name;
   final int? formId;
   final bool isDefault;
   final String? frontSpriteUrl;
   final SpriteUrlsFull? spriteUrls;
 
-  const _FormBackendData({
+  const FormBackendData({
     required this.name,
     this.formId,
     required this.isDefault,
@@ -420,7 +420,7 @@ class _FormBackendData {
     this.spriteUrls,
   });
 
-  factory _FormBackendData.fromJson(Map<String, dynamic> json) => _FormBackendData(
+  factory FormBackendData.fromJson(Map<String, dynamic> json) => FormBackendData(
         name: json['name'] as String,
         formId: (json['form_id'] as num?)?.toInt(),
         isDefault: json['is_default'] as bool? ?? false,

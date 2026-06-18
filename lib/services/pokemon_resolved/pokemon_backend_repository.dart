@@ -26,6 +26,17 @@ class PokemonBackendRepository {
         .toList();
   }
 
+  Future<List<FormBackendData>> fetchForms(int id) async {
+    final response = await _apiClient.dio.get<dynamic>('/pokemon/forms/$id');
+    if (response.statusCode != 200) {
+      throw Exception('Backend forms fetch failed for id=$id: ${response.statusCode}');
+    }
+    final data = Map<String, dynamic>.from(response.data as Map);
+    return (data['forms'] as List<dynamic>)
+        .map((f) => FormBackendData.fromJson(f as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<FlavorTextEntry>> fetchFlavorText(int id, {String? lang}) async {
     final response = await _apiClient.dio.get<dynamic>(
       '/pokemon/flavor-text/$id',

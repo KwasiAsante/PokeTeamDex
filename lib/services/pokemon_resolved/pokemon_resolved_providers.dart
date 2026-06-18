@@ -42,6 +42,37 @@ final pokemonMovesProvider =
   }
 });
 
+/// Lazy-loaded full form sprite data (official_artwork, home, game_front per form).
+///
+/// Slim [resolvedPokemonProvider] only carries [FormBackendData.frontSpriteUrl]
+/// (pixel sprite). This provider fetches [GET /pokemon/forms/{id}] which returns
+/// the full [SpriteUrlsFull] for every cosmetic form.
+///
+/// Used by form picker chips to show official → home → sprite quality images.
+final pokemonFormsProvider =
+    FutureProvider.family<List<FormBackendData>, int>((ref, id) async {
+  final cache = ref.read(pokemonResolvedCacheProvider);
+  final cached = cache.getIfValid('forms_$id');
+  if (cached != null) {
+    return (cached['forms'] as List<dynamic>)
+        .map((f) => FormBackendData.fromJson(f as Map<String, dynamic>))
+        .toList();
+  }
+
+  try {
+    final repo = ref.read(pokemonBackendRepositoryProvider);
+    final forms = await repo.fetchForms(id);
+    cache.putWithTTL(
+      'forms_$id',
+      {'forms': forms.map((f) => f.toJson()).toList()},
+      const Duration(days: 7),
+    );
+    return forms;
+  } catch (_) {
+    return const [];
+  }
+});
+
 /// Lazy-loaded English flavor text entries.
 final pokemonFlavorTextProvider =
     FutureProvider.family<List<FlavorTextEntry>, int>((ref, id) async {

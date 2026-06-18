@@ -9,6 +9,7 @@ import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_s
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
@@ -18,8 +19,6 @@ import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
 
-const _kBase =
-    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
 
 class PokemonListTile extends ConsumerStatefulWidget {
   final PokemonListEntry pokemon;
@@ -49,6 +48,9 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
     final resolved = resolvedAsync.asData?.value;
     final basePokemon = resolved?.detail;
     final cosmeticFormEntries = resolved?.cosmeticForms ?? const <PokemonFormEntry>[];
+
+    // Full form sprite data (official → home → sprite) — loaded lazily from backend.
+    final formsData = ref.watch(pokemonFormsProvider(widget.pokemon.id)).asData?.value;
 
     // Check if the currently selected form is a cosmetic form entry.
     // Cosmetic form entries share the base Pokémon's types — no provider call
@@ -97,14 +99,13 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
       ...cosmeticFormEntries.map((f) => (
         f.name,
         PokemonDataRegistry.instance.cosmeticFormLabels[f.name] ?? cosmeticFormLabel(f.formName),
-        // official → home → sprite fallback for form picker chips.
+        // official → home → sprite using full form data from pokemonFormsProvider.
+        // Falls back to front_sprite_url while forms are loading or offline.
         PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[f.name] ??
-            f.officialArtworkUrl ??
-            (f.formName == 'female'
-                ? '${_kBase}other/home/female/${widget.pokemon.id}.png'
-                : (f.formName.isNotEmpty
-                    ? '${_kBase}other/home/${widget.pokemon.id}-${f.formName}.png'
-                    : null)) ??
+            (() {
+              final full = formsData?.where((fd) => fd.name == f.name).firstOrNull;
+              return full?.spriteUrls?.officialArtwork ?? full?.spriteUrls?.home;
+            })() ??
             f.spriteUrl,
       )),
     ];
