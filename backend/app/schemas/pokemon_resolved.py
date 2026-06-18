@@ -16,6 +16,41 @@ def _coerce_to_list(v: object) -> object:
 _StrOrList = Annotated[list[str] | None, BeforeValidator(_coerce_to_list)]
 
 
+class AbilityInfo(BaseModel):
+    name: str
+    is_hidden: bool
+    slot: int
+
+
+class MoveLearnDetail(BaseModel):
+    version_group: str
+    method: str   # "level-up", "machine", "egg", "tutor"
+    level: int    # 0 for non-level-up methods
+
+
+class MoveSummary(BaseModel):
+    name: str
+    learn_details: list[MoveLearnDetail]
+
+
+class FlavorTextEntry(BaseModel):
+    text: str
+    language: str
+    version: str
+
+
+class MovesResponse(BaseModel):
+    pokemon_id: int
+    name: str
+    moves: list[MoveSummary]
+
+
+class FlavorTextResponse(BaseModel):
+    pokemon_id: int
+    name: str
+    flavor_text_entries: list[FlavorTextEntry]
+
+
 class EventMove(BaseModel):
     """A move absent from PokéAPI's learnset that Showdown's data supplies.
 
@@ -114,6 +149,8 @@ class FormData(BaseModel):
     """
 
     name: str
+    form_id: int | None = None
+    is_default: bool = False
     front_sprite_url: str | None = None  # always set from sprites.front_default
     sprite_urls: SpriteUrlsFull | None = None
 
@@ -164,15 +201,38 @@ class PokemonResolvedResponse(BaseModel):
     pokemon_id: int
     gen: int
     name: str
+    # pokemon detail
     types: list[str]
     base_stats: dict[str, int]
-    abilities: dict[str, str]
+    abilities: list[AbilityInfo]          # changed from dict[str, str]
+    height: int = 0
+    weight: int = 0
+    base_experience: int | None = None
+    species_name: str | None = None
+    form_names: list[str] = []            # derived from forms[].name for convenience
+    moves: list[MoveSummary] = []         # slim: []; full via ?includes[]=moves
+    moves_url: str | None = None
     supplement_moves: list[EventMove]
-    smogon_analyses: list[SmogonFormatData] | None  # slim: format_ids only; full: sets included
-    smogon_url: str | None = None      # /pokemon/{pokemon_id}/smogon
+    smogon_analyses: list[SmogonFormatData] | None
+    smogon_url: str | None = None
     varieties: list[VarietyData]
-    varieties_url: str | None = None   # /pokemon/{pokemon_id}/varieties
+    varieties_url: str | None = None
     forms: list[FormData]
-    forms_url: str | None = None       # /pokemon/{pokemon_id}/forms
+    forms_url: str | None = None
     sprite_urls: SpriteUrlsFull
     resolved_at: datetime
+    # species detail
+    genus: str | None = None
+    generation_name: str = "generation-ix"
+    gender_rate: int | None = None
+    capture_rate: int | None = None
+    base_happiness: int | None = None
+    hatch_counter: int | None = None
+    growth_rate: str | None = None
+    egg_groups: list[str] = []
+    flavor_text_entries: list[FlavorTextEntry] = []  # slim: []; full via ?includes[]=flavor
+    flavor_text_url: str | None = None
+    is_baby: bool = False
+    is_legendary: bool = False
+    is_mythical: bool = False
+    evolution_chain_id: int | None = None

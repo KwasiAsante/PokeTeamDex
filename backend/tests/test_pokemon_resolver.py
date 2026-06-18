@@ -849,3 +849,88 @@ class TestResolveNameOrId:
         assert "charizard-mega-x".isdigit() is False
         assert "charizard".isdigit() is False
         assert "201".isdigit() is True
+
+
+# ---------------------------------------------------------------------------
+# Schema validation — new fields (Task 1)
+# ---------------------------------------------------------------------------
+
+def test_pokemon_resolved_response_has_new_fields():
+    """PokemonResolvedResponse accepts all new fields without validation errors."""
+    from app.schemas.pokemon_resolved import (
+        PokemonResolvedResponse, AbilityInfo, MoveLearnDetail, MoveSummary,
+        SpriteUrlsFull, FlavorTextEntry, FormData
+    )
+    from datetime import datetime, timezone
+
+    data = PokemonResolvedResponse(
+        pokemon_id=6,
+        gen=9,
+        name="charizard",
+        types=["Fire", "Flying"],
+        base_stats={"hp": 78, "attack": 84, "defense": 78,
+                    "special-attack": 109, "special-defense": 85, "speed": 100},
+        abilities=[
+            AbilityInfo(name="blaze", is_hidden=False, slot=1),
+            AbilityInfo(name="solar-power", is_hidden=True, slot=3),
+        ],
+        height=17,
+        weight=905,
+        base_experience=240,
+        species_name="charizard",
+        supplement_moves=[],
+        smogon_analyses=None,
+        varieties=[],
+        forms=[
+            FormData(name="charizard", form_id=6, is_default=True,
+                     front_sprite_url="https://example.com/6.png")
+        ],
+        sprite_urls=SpriteUrlsFull(official_artwork="https://example.com/art/6.png"),
+        resolved_at=datetime.now(timezone.utc),
+        genus="Flame Pokémon",
+        generation_name="generation-i",
+        gender_rate=1,
+        evolution_chain_id=2,
+        egg_groups=["monster", "dragon"],
+        flavor_text_entries=[
+            FlavorTextEntry(text="Spits fire.", language="en", version="red")
+        ],
+    )
+    assert data.pokemon_id == 6
+    assert data.abilities[0].name == "blaze"
+    assert data.abilities[0].is_hidden is False
+    assert data.evolution_chain_id == 2
+    assert data.forms[0].is_default is True
+    assert data.flavor_text_entries[0].language == "en"
+
+
+def test_moves_response_schema():
+    from app.schemas.pokemon_resolved import MovesResponse, MoveSummary, MoveLearnDetail
+
+    data = MovesResponse(
+        pokemon_id=6,
+        name="charizard",
+        moves=[
+            MoveSummary(
+                name="flamethrower",
+                learn_details=[
+                    MoveLearnDetail(version_group="sword-shield", method="machine", level=0)
+                ],
+            )
+        ],
+    )
+    assert data.moves[0].name == "flamethrower"
+    assert data.moves[0].learn_details[0].method == "machine"
+
+
+def test_flavor_text_response_schema():
+    from app.schemas.pokemon_resolved import FlavorTextResponse, FlavorTextEntry
+
+    data = FlavorTextResponse(
+        pokemon_id=6,
+        name="charizard",
+        flavor_text_entries=[
+            FlavorTextEntry(text="Spits fire.", language="en", version="red")
+        ],
+    )
+    assert data.flavor_text_entries[0].version == "red"
