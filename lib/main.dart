@@ -143,6 +143,7 @@ void main() async {
 
   await Hive.initFlutter();
   await Hive.openBox('pokeapi_cache');
+  await Hive.openBox('pokemon_resolved_cache');
   await PokemonDataRegistry.initialize();
 
   // Load stored auth token before first frame
