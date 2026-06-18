@@ -37,7 +37,7 @@ final pokemonMovesProvider =
     return moves;
   } catch (_) {
     // Offline fallback: return moves from PokéAPI detail
-    final detail = await ref.watch(pokemonDetailProvider(id).future);
+    final detail = await ref.read(pokemonDetailProvider(id).future);
     return detail.moves;
   }
 });
@@ -64,7 +64,7 @@ final pokemonFlavorTextProvider =
     return entries;
   } catch (_) {
     // Offline fallback: return English entries from PokéAPI species
-    final species = await ref.watch(pokemonSpeciesProvider(id).future);
+    final species = await ref.read(pokemonSpeciesProvider(id).future);
     return species.flavorTextEntries
         .where((e) => e.language == 'en')
         .toList();
