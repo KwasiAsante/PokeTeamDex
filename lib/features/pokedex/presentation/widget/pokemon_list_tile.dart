@@ -94,10 +94,13 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
         final suffix = v.name.startsWith('$sn-')
             ? v.name.substring(sn.length + 1)
             : v.name;
-        // Use HOME artwork override when available (e.g. mimikyu-busted has no
-        // officialArtworkUrl in PokéAPI so pokemonByNameProvider returns null artwork).
+        final full = varietiesData?.where((vd) => vd.name == v.name).firstOrNull;
+        final spriteUrl =
+            PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[v.name] ??
+            full?.spriteUrls?.officialArtwork ??
+            full?.spriteUrls?.home;
         return (v.name, PokemonDataRegistry.instance.cosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix),
-            PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[v.name]);
+            spriteUrl);
       }),
       // Form-entry cosmetics: carry sprite so FormOptionTile doesn't call
       // pokemonByNameProvider with a form name that has no /pokemon endpoint.

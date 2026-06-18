@@ -84,8 +84,13 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         final suffix = v.name.startsWith('$sn-')
             ? v.name.substring(sn.length + 1)
             : v.name;
+        final full = varietiesData?.where((vd) => vd.name == v.name).firstOrNull;
+        final spriteUrl =
+            PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[v.name] ??
+            full?.spriteUrls?.officialArtwork ??
+            full?.spriteUrls?.home;
         return (v.name, PokemonDataRegistry.instance.cosmeticFormLabels[v.name] ?? cosmeticFormLabel(suffix),
-            PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[v.name]);
+            spriteUrl);
       }),
       ...cosmeticFormEntries.map((f) => (
         f.name,
