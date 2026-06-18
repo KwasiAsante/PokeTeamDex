@@ -107,7 +107,10 @@ final resolvedPokemonProvider =
 ResolvedPokemon _fromBackendResponse(PokemonResolvedBackendResponse r) {
   final detail = r.toPokemonEntry();
   final species = r.toPokemonSpeciesEntry();
-  final cosmeticForms = _patchCosmeticForms(r.toCosmeticForms(), detail.id, detail.name);
+  final rawCosmetic = PokemonDataRegistry.instance.noCosmeticFormsPokemon.contains(detail.name)
+      ? const <PokemonFormEntry>[]
+      : r.toCosmeticForms();
+  final cosmeticForms = _patchCosmeticForms(rawCosmetic, detail.id, detail.name);
 
   return ResolvedPokemon(
     detail: detail,
