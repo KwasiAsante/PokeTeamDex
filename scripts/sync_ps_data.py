@@ -18,6 +18,7 @@ Commit the updated assets/data/ps/ files.
 import hashlib
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 
@@ -65,6 +66,9 @@ def fetch_js_endpoint(path: str, base: str = PS_BASE) -> dict:
     source (export const Learnsets: SomeType = {unquotedKey:{...},...};) — in
     both cases we just locate the first '{' and hand the rest to json5, which
     tolerates unquoted keys, single-quoted strings, and trailing commas.
+
+    Extra step: json5 does not support bare numeric property keys (e.g. `0:`,
+    `1:`), which PS uses for ability slots.  We quote them before parsing.
     """
     url = f"{base}/{path}"
     print(f"  GET {url}")
@@ -73,6 +77,8 @@ def fetch_js_endpoint(path: str, base: str = PS_BASE) -> dict:
     text = r.text.strip()
     start = text.index("{")
     js_str = text[start:].rstrip(";").strip()
+    # Quote bare numeric keys: `0: ` → `"0": ` (json5 requires string/identifier keys).
+    js_str = re.sub(r'\b(\d+)\s*:', r'"\1":', js_str)
     return json5.loads(js_str)
 
 
@@ -216,7 +222,8 @@ def transform_moves(raw: dict) -> dict:
             "category": d.get("category", "Status"),
             "base_power": d.get("basePower") or 0,
             # PS uses True (bool) for moves that always hit; normalise to None.
-            "accuracy": d.get("accuracy") if isinstance(d.get("accuracy"), int) else None,
+            # Must check bool first — bool is a subclass of int in Python.
+            "accuracy": d.get("accuracy") if isinstance(d.get("accuracy"), int) and not isinstance(d.get("accuracy"), bool) else None,
             "pp": d.get("pp", 0),
             "is_z_move": bool(d.get("isZ")),
             "is_max_move": bool(d.get("isMax")),
@@ -255,6 +262,86 @@ def transform_abilities(raw: dict) -> dict:
             "name": d.get("name", ability_id),
             "gen": d.get("gen", 3),
         }
+    return result
+
+
+# Non-standard tags that indicate the Pokémon is not part of the main series.
+# "Past" means retired from competitive but real — keep it.
+_NONSTANDARD_SKIP = {"CAP", "Custom", "Gigantamax", "LGPE", "NFE"}
+
+
+def transform_pokedex(raw: dict) -> dict:
+    """
+    Transform data/pokedex.ts into a compact species index for the backend.
+
+    Keeps: num, name, types, baseStats, abilities, gen (derived from num when absent).
+    Skips CAP / Custom / non-main-series entries (negative num or isNonstandard in
+    the skip set).
+
+    Output key is the PS lowercase ID (e.g. "bulbasaur", "mrmime", "giratinaorigin").
+    """
+    result: dict[str, dict] = {}
+    for ps_id, d in raw.items():
+        num = d.get("num")
+        if not isinstance(num, int) or num <= 0:
+            continue
+        nonstandard = d.get("isNonstandard")
+        if nonstandard in _NONSTANDARD_SKIP:
+            continue
+        entry: dict = {
+            "num": num,
+            "name": d.get("name", ps_id),
+            "types": d.get("types", ["Normal"]),
+            "baseStats": d.get("baseStats", {}),
+            "abilities": d.get("abilities", {}),
+        }
+        # Explicit gen tag present on a few entries (Pokestar, etc.); otherwise
+        # derive from Dex number so callers can filter "didn't exist yet".
+        if "gen" in d:
+            entry["gen"] = d["gen"]
+        result[ps_id] = entry
+    return result
+
+
+def transform_pokedex_mods(mod_raws: dict[int, dict]) -> dict:
+    """
+    Build a nested gen-override index from data/mods/gen{N}/pokedex.ts files.
+
+    Each mod entry uses `inherit: true` (delta pattern) — only fields that differ
+    from the modern base are present.  We extract only the battle-relevant fields
+    that can vary across generations:
+        types, baseStats, abilities, unreleasedHidden, maleOnlyHidden
+
+    Output: { "gen1": { "psId": { "types": [...], "baseStats": {...} } }, ... }
+    """
+    result: dict[str, dict] = {}
+    _OVERRIDE_FIELDS = {"types", "baseStats", "abilities", "unreleasedHidden", "maleOnlyHidden"}
+    for gen, raw in sorted(mod_raws.items()):
+        gen_overrides: dict[str, dict] = {}
+        for ps_id, d in raw.items():
+            if not d.get("inherit"):
+                continue
+            override = {k: v for k, v in d.items() if k in _OVERRIDE_FIELDS}
+            if override:
+                gen_overrides[ps_id] = override
+        if gen_overrides:
+            result[f"gen{gen}"] = gen_overrides
+    return result
+
+
+def transform_formats_data(raw: dict) -> dict:
+    """
+    Transform data/formats-data.ts into a compact tier index.
+
+    Keeps: tier, doublesTier, isNonstandard, nfe.
+    Stored for future use (tier display, format validation).
+    """
+    result: dict[str, dict] = {}
+    _TIER_FIELDS = {"tier", "doublesTier", "isNonstandard", "nfe"}
+    for ps_id, d in raw.items():
+        entry = {k: v for k, v in d.items() if k in _TIER_FIELDS}
+        if entry:
+            result[ps_id] = entry
     return result
 
 
@@ -310,32 +397,75 @@ def main() -> None:
     print("\nEvent learnsets (raw TS source on GitHub)…")
     try:
         main_raw = fetch_js_endpoint("data/learnsets.ts", base=PS_GITHUB_RAW)
-        mod_raws: dict[int, dict] = {}
+        learnset_mod_raws: dict[int, dict] = {}
         for gen in range(1, 10):
             try:
-                mod_raws[gen] = fetch_js_endpoint(
+                learnset_mod_raws[gen] = fetch_js_endpoint(
                     f"data/mods/gen{gen}/learnsets.ts", base=PS_GITHUB_RAW
                 )
             except Exception:
                 continue  # no mod-specific learnset override for this gen
-        detailed = transform_detailed_learnsets(main_raw, mod_raws)
+        detailed = transform_detailed_learnsets(main_raw, learnset_mod_raws)
         ev_sha = write_json("event_learnsets.json", detailed)
         with_events = sum(1 for d in detailed.values() if d.get("eventData"))
         print(f"  Built detailed learnsets for {len(detailed)} Pokémon "
-              f"({with_events} with eventData; mods found for gens {sorted(mod_raws)})")
+              f"({with_events} with eventData; mods found for gens {sorted(learnset_mod_raws)})")
     except Exception as e:
         print(f"  WARNING: Could not build event learnsets: {e}")
         ev_sha = "0" * 16
+
+    print("\nPokédex (raw TS source on GitHub)…")
+    try:
+        pokedex_raw = fetch_js_endpoint("data/pokedex.ts", base=PS_GITHUB_RAW)
+        pokedex = transform_pokedex(pokedex_raw)
+        pd_sha = write_json("pokedex.json", pokedex)
+        print(f"  Built Pokédex index for {len(pokedex)} species")
+    except Exception as e:
+        print(f"  WARNING: Could not build Pokédex: {e}")
+        pd_sha = "0" * 16
+        pokedex = {}
+
+    print("\nPokédex gen overrides (raw TS mods on GitHub)…")
+    try:
+        pokedex_mod_raws: dict[int, dict] = {}
+        for gen in range(1, 10):
+            try:
+                pokedex_mod_raws[gen] = fetch_js_endpoint(
+                    f"data/mods/gen{gen}/pokedex.ts", base=PS_GITHUB_RAW
+                )
+            except Exception:
+                continue  # no mod-specific Pokédex override for this gen
+        pokedex_mods = transform_pokedex_mods(pokedex_mod_raws)
+        pdm_sha = write_json("pokedex-gen-overrides.json", pokedex_mods)
+        total_overrides = sum(len(v) for v in pokedex_mods.values())
+        print(f"  Built gen overrides for gens {sorted(pokedex_mods.keys())} "
+              f"({total_overrides} total entries)")
+    except Exception as e:
+        print(f"  WARNING: Could not build Pokédex gen overrides: {e}")
+        pdm_sha = "0" * 16
+
+    print("\nFormats data (raw TS source on GitHub — stored for future use)…")
+    try:
+        formats_raw = fetch_js_endpoint("data/formats-data.ts", base=PS_GITHUB_RAW)
+        formats_data = transform_formats_data(formats_raw)
+        fd_sha = write_json("formats-data.json", formats_data)
+        print(f"  Built formats data for {len(formats_data)} species")
+    except Exception as e:
+        print(f"  WARNING: Could not build formats data: {e}")
+        fd_sha = "0" * 16
 
     # Version manifest
     version = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "sha": {
-            "learnsets":      ls_sha,
-            "moves":          mv_sha,
-            "items":          it_sha,
-            "abilities":      ab_sha,
-            "event_learnsets": ev_sha,
+            "learnsets":             ls_sha,
+            "moves":                 mv_sha,
+            "items":                 it_sha,
+            "abilities":             ab_sha,
+            "event_learnsets":       ev_sha,
+            "pokedex":               pd_sha,
+            "pokedex_gen_overrides": pdm_sha,
+            "formats_data":          fd_sha,
         },
     }
     version_path = os.path.join(OUT_DIR, "version.json")
@@ -363,6 +493,10 @@ def main() -> None:
         "items.json",
         "abilities.json",
         "event_learnsets.json",
+        # New backend-only files (not served to Flutter via /ps-data/file/:name):
+        "pokedex.json",
+        "pokedex-gen-overrides.json",
+        "formats-data.json",
     ]
     for filename in served_files:
         src = os.path.join(OUT_DIR, filename)
