@@ -88,6 +88,34 @@ class MoveSummary {
       };
 }
 
+class SupplementMove {
+  final String name;
+  final String displayName;
+  final List<int> generations;
+  final List<String> methods;
+
+  const SupplementMove({
+    required this.name,
+    required this.displayName,
+    required this.generations,
+    required this.methods,
+  });
+
+  factory SupplementMove.fromJson(Map<String, dynamic> json) => SupplementMove(
+        name: json['name'] as String,
+        displayName: json['display_name'] as String,
+        generations: List<int>.from(json['generations'] as List),
+        methods: List<String>.from(json['methods'] as List),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'display_name': displayName,
+        'generations': generations,
+        'methods': methods,
+      };
+}
+
 class SpriteUrlsFull {
   final String? officialArtwork;
   final String? officialArtworkShiny;
@@ -153,7 +181,7 @@ class PokemonResolvedBackendResponse {
   final String? speciesName;
   final List<MoveSummary> moves;
   final String? movesUrl;
-  final List<MoveSummary> supplementMoves;
+  final List<SupplementMove> supplementMoves;
   final List<Map<String, dynamic>>? smogonAnalyses;
   final List<Map<String, dynamic>> varieties;
   final List<_FormBackendData> forms;
@@ -228,7 +256,7 @@ class PokemonResolvedBackendResponse {
           .toList(),
       movesUrl: json['moves_url'] as String?,
       supplementMoves: (json['supplement_moves'] as List<dynamic>? ?? [])
-          .map((m) => MoveSummary.fromJson(m as Map<String, dynamic>))
+          .map((m) => SupplementMove.fromJson(m as Map<String, dynamic>))
           .toList(),
       smogonAnalyses: (json['smogon_analyses'] as List<dynamic>?)
           ?.map((e) => Map<String, dynamic>.from(e as Map))
@@ -273,7 +301,7 @@ class PokemonResolvedBackendResponse {
         'species_name': speciesName,
         'moves': moves.map((m) => m.toJson()).toList(),
         'moves_url': movesUrl,
-        'supplement_moves': supplementMoves.map((m) => m.toJson()).toList(),
+        'supplement_moves': supplementMoves.map((s) => s.toJson()).toList(),
         'smogon_analyses': smogonAnalyses,
         'varieties': varieties,
         'forms': forms.map((f) => f.toJson()).toList(),

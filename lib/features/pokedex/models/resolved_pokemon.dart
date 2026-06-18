@@ -27,7 +27,7 @@ class ResolvedPokemon {
 
   /// Additional moves sourced from the backend (Smogon / supplement data).
   /// Empty on the offline fallback path.
-  final List<MoveSummary> supplementMoves;
+  final List<SupplementMove> supplementMoves;
 
   /// Smogon analysis data returned by the backend, if available.
   /// Null on the offline fallback path.
@@ -38,7 +38,7 @@ class ResolvedPokemon {
     required this.species,
     required this.cosmeticForms,
     required this.spriteUrls,
-    this.supplementMoves = const [],
+    this.supplementMoves = const <SupplementMove>[],
     this.smogonAnalyses,
   });
 

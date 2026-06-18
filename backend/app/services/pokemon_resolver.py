@@ -811,14 +811,18 @@ class PokemonResolverService:
         types, base_stats, abilities = self._apply_gen_overrides(ps_id, ps_types, ps_stats, ps_abilities, gen)
 
         # --- New fields ---
-        # abilities as typed list
+        # abilities as typed list — use gen-overridden names, keep is_hidden from PokéAPI
+        pokeapi_ability_map = {
+            str(a["slot"]): {"is_hidden": a.get("is_hidden", False)}
+            for a in pokemon_data.get("abilities", [])
+        }
         abilities_list = [
             AbilityInfo(
-                name=a["ability"]["name"],
-                is_hidden=a.get("is_hidden", False),
-                slot=a.get("slot", 1),
+                name=ability_name,
+                is_hidden=pokeapi_ability_map.get(slot_str, {}).get("is_hidden", False),
+                slot=int(slot_str),
             )
-            for a in pokemon_data.get("abilities", [])
+            for slot_str, ability_name in sorted(abilities.items(), key=lambda x: int(x[0]))
         ]
 
         # moves (always built; trimmed to [] at response time unless "moves" in includes)
