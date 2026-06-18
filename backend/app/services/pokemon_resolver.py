@@ -255,7 +255,7 @@ class PokemonResolverService:
         self._smogon_analyses: dict[str, dict] = {}
         self._smogon_loaded = False
         self._pokeapi_http = httpx.AsyncClient(
-            timeout=10.0, limits=httpx.Limits(max_connections=10)
+            timeout=10.0, limits=httpx.Limits(max_connections=100)
         )
         self._smogon_http = httpx.AsyncClient(
             timeout=30.0, limits=httpx.Limits(max_connections=20)
