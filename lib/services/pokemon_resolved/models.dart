@@ -370,12 +370,8 @@ class PokemonResolvedBackendResponse {
       );
 
   List<PokemonFormEntry> toCosmeticForms() {
-    // The base form always has the same name as the pokemon slug.
-    // Filter by name rather than is_default to handle stale cache rows
-    // where is_default was not yet stored (defaults to false for all forms).
-    final baseName = speciesName ?? name;
     return forms
-        .where((f) => !f.isDefault && f.name != baseName)
+        .where((f) => !f.isDefault)
         .map((f) => PokemonFormEntry(
               id: f.formId ?? pokemonId,
               name: f.name,

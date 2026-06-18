@@ -198,6 +198,22 @@ def _extract_form_suffix(form_name: str, species_name: str) -> str | None:
     return None
 
 
+def _patch_stale_forms(data: dict) -> dict:
+    """Patch cached rows written before `is_default` was added to FormData.
+
+    `_fetch_forms` always places the default form at index 0. Rows cached
+    before `is_default` was introduced have the field absent in JSONB, so
+    Pydantic defaults it to False for all forms. Fix by setting forms[0]
+    is_default=True when it is missing or False in the raw dict.
+    """
+    forms = data.get("forms")
+    if forms and isinstance(forms, list) and len(forms) > 0:
+        first = forms[0]
+        if isinstance(first, dict) and not first.get("is_default", False):
+            data = {**data, "forms": [{**first, "is_default": True}, *forms[1:]]}
+    return data
+
+
 class PokemonResolverService:
     def __init__(self) -> None:
         self._event_learnsets: dict[str, dict] = {}
@@ -773,7 +789,8 @@ class PokemonResolverService:
         )
         row = result.scalar_one_or_none()
         if row:
-            response = PokemonResolvedResponse(**row.data, resolved_at=row.resolved_at)
+            data = _patch_stale_forms(dict(row.data))
+            response = PokemonResolvedResponse(**data, resolved_at=row.resolved_at)
             return self._trim_response(response, includes, gen)
 
         # 2. Fetch from PokéAPI
@@ -1089,11 +1106,12 @@ class PokemonResolverService:
         )
         row = result.scalar_one_or_none()
         if row:
+            forms = _patch_stale_forms({"forms": row.data.get("forms", [])})["forms"]
             return FormsResponse(
                 pokemon_id=pokemon_id,
                 gen=gen,
                 name=row.data.get("name", ""),
-                forms=row.data.get("forms", []),
+                forms=forms,
             )
 
         full = await self.resolve(pokemon_id, gen, ["varieties", "forms"], db, base_url)
