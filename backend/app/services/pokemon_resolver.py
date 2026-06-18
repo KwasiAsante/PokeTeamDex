@@ -188,7 +188,7 @@ def _build_showdown_sprite_url(
         return f"{_SHOWDOWN_CDN}/{dir_name}/{ps_name}.png"
 
 
-def _build_icon_url(pokemon_id: int, gen: int) -> str:
+def _build_icon_url(pokemon_id: int | str, gen: int) -> str:
     """Gen-specific icon sprite URL.
 
     Fallback chain:
@@ -527,7 +527,7 @@ class PokemonResolverService:
             game_front_shiny=game_front_shiny,
             game_front_female=None,
             game_front_female_shiny=None,
-            icon=_build_icon_url(base_id, gen),
+            icon=_build_icon_url(sprite_id, gen),
             icon_shiny=game_front_shiny,
         )
 
