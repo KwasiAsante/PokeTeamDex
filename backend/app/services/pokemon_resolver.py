@@ -431,27 +431,53 @@ class PokemonResolverService:
         )
 
     def _build_form_sprite_urls(
-        self, form_name: str, base_id: int, species_name: str, ps_name: str, gen: int
+        self,
+        form_name: str,
+        base_id: int,
+        species_name: str,
+        ps_name: str,
+        gen: int,
+        is_default_form: bool = False,
     ) -> SpriteUrlsFull:
-        """Build full sprite URLs for a cosmetic form-entry (no /pokemon resource)."""
+        """Build full sprite URLs for a cosmetic form-entry (no /pokemon resource).
+
+        is_default_form=True: the form IS the base Pokémon (index 0 in forms[]).
+        PokeAPI root sprites and Showdown HOME/dex directories store the default
+        form under the base name — NOT the suffixed name:
+          sprites/pokemon/201-a.png  → 404   sprites/pokemon/201.png  → ✓
+          home/unown-a.png           → 404   home/unown.png           → ✓
+
+        However, the versioned PokeAPI sprite directories (gen 2 Crystal animated,
+        gen 5 BW animated) DO use the suffixed ID, so those paths keep the suffix
+        regardless of is_default_form:
+          crystal/animated/201-a.gif → ✓   crystal/animated/201.gif → 404
+
+        Non-default forms (B–Z, !, ? for Unown) are unaffected — suffixed paths
+        work consistently across all directories for those.
+        """
         suffix = _extract_form_suffix(form_name, species_name)
         sprite_id = f"{base_id}-{suffix}" if suffix else str(base_id)
 
-        # Gen-specific: PokeAPI/sprites (primary), Showdown gen{N} (fallback)
+        # HOME and dex Showdown paths: default form uses base species name.
+        home_ps_name = species_name if is_default_form else ps_name
+
+        # Versioned PokeAPI sprites (primary) still use the suffixed sprite_id —
+        # crystal/animated/201-a.gif is correct even for the default/A form.
+        # Showdown fallback uses home_ps_name (base name for default form).
         game_front = (
             _build_pokeapi_sprite_url(sprite_id, gen)
-            or _build_showdown_sprite_url(ps_name, gen)
+            or _build_showdown_sprite_url(home_ps_name, gen)
         )
         game_front_shiny = (
             _build_pokeapi_sprite_url(sprite_id, gen, shiny=True)
-            or _build_showdown_sprite_url(ps_name, gen, shiny=True)
+            or _build_showdown_sprite_url(home_ps_name, gen, shiny=True)
         )
 
         return SpriteUrlsFull(
             official_artwork=None,
             official_artwork_shiny=None,
-            home=f"{_SHOWDOWN_CDN}/home/{ps_name}.png",
-            home_shiny=f"{_SHOWDOWN_CDN}/home-shiny/{ps_name}.png",
+            home=f"{_SHOWDOWN_CDN}/home/{home_ps_name}.png",
+            home_shiny=f"{_SHOWDOWN_CDN}/home-shiny/{home_ps_name}.png",
             home_female=None,
             home_female_shiny=None,
             game_front=game_front,
@@ -585,18 +611,22 @@ class PokemonResolverService:
         if not non_defaults:
             non_defaults = form_names[1:] if len(form_names) > 1 else []
 
-        # Build sprite data for the default form (index 0) the same way as non-defaults.
-        # The default form may have a suffix (e.g. "unown-a") — its gen sprite is
-        # "201-a.gif" not "201.gif".
+        # The default form (index 0) IS the base Pokémon, so its sprites live under
+        # the base name/ID — never under a suffixed path.
+        # The default form IS the base Pokémon, so its static/HOME/dex sprites live
+        # under the base ID/name — NOT the suffixed path (see _build_form_sprite_urls
+        # docstring for the full explanation and the Unown-A edge case).
+        # is_default_form=True makes _build_form_sprite_urls use species_name for HOME/dex
+        # Showdown paths while still using the suffixed sprite_id for versioned PokeAPI
+        # paths (e.g. crystal/animated/201-a.gif is correct and must keep the suffix).
         default_form_name = form_names[0]
         default_ps_name = _to_showdown_name(default_form_name, self._ps_exceptions)
-        default_suffix = _extract_form_suffix(default_form_name, species_name)
-        default_sprite_id = f"{base_id}-{default_suffix}" if default_suffix else str(base_id)
         default_front_sprite = (
-            f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{default_sprite_id}.png"
+            f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{base_id}.png"
         )
         default_sprite_urls = self._build_form_sprite_urls(
-            default_form_name, base_id, species_name, default_ps_name, gen
+            default_form_name, base_id, species_name, default_ps_name, gen,
+            is_default_form=True,
         )
 
         if not non_defaults:
