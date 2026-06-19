@@ -906,9 +906,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               )
             : null;
         final formHomeUrl = formPokemon != null
-            ? (_isShiny
-                ? pokemonHomeShinyUrl(formPokemon.id)
-                : pokemonHomeUrl(formPokemon.id))
+            ? (useFormatSprites && format != null && format.gen <= 5
+                ? null  // fall through to spriteUrls.defaultUrl for gen 1-5 formats
+                : (_isShiny
+                    ? pokemonHomeShinyUrl(formPokemon.id)
+                    : pokemonHomeUrl(formPokemon.id)))
             : cosmeticFormSpriteUrls != null
                 ? (_isShiny
                     ? cosmeticFormSpriteUrls.shinyUrl
