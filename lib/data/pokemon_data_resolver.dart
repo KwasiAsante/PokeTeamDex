@@ -166,6 +166,7 @@ class PokemonDataResolver {
     required PokedexFilter? filter,
     SpriteUrlsFull? spriteUrls,
     SpriteUrlsFull? formSpriteUrls,
+    SpriteUrlsFull? varietySpriteUrls,
   }) {
     final registry = PokemonDataRegistry.instance;
 
@@ -219,8 +220,10 @@ class PokemonDataResolver {
           return (formEntry.sprites?['front_default'] as String?) ??
               '$_spritesBase$pokemonId.png';
         }
-        // compact (null imageType)
-        return '${_spritesBase}versions/generation-viii/icons/${formEntry.id}.png';
+        // compact (null imageType): prefer backend-resolved icon (handles
+        // female varieties like Indeedee-female whose variety ID has no icon).
+        return varietySpriteUrls?.icon ??
+            '${_spritesBase}versions/generation-viii/icons/${formEntry.id}.png';
       }
     }
 

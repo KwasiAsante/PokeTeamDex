@@ -165,6 +165,9 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
     final selectedFormSpriteUrls = selectedCosmeticEntry != null
         ? formsData?.where((fd) => fd.name == selectedCosmeticEntry.name).firstOrNull?.spriteUrls
         : null;
+    final selectedVarietySpriteUrls = (_selectedFormName != null && selectedCosmeticEntry == null)
+        ? varietiesData?.where((vd) => vd.name == _selectedFormName).firstOrNull?.spriteUrls
+        : null;
     final imageUrl = PokemonDataResolver.resolvePokedexImageUrl(
       pokemonId: widget.pokemon.id,
       baseSpecies: basePokemon?.speciesName ?? widget.pokemon.name,
@@ -175,6 +178,7 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
       filter: filter,
       spriteUrls: resolved?.spriteUrls,
       formSpriteUrls: selectedFormSpriteUrls,
+      varietySpriteUrls: selectedVarietySpriteUrls,
     );
     final fallbackUrl = PokemonDataResolver.resolvePokedexFallbackUrl(
       pokemonId: widget.pokemon.id,
