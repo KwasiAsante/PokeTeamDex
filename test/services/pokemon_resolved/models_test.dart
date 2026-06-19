@@ -98,7 +98,7 @@ void main() {
       final r = PokemonResolvedBackendResponse.fromJson(json);
       expect(r.pokemonId, 6);
       expect(r.name, 'charizard');
-      expect(r.types, ['Fire', 'Flying']);
+      expect(r.types, ['fire', 'flying']);
       expect(r.abilities.length, 1);
       expect(r.abilities[0].name, 'blaze');
       expect(r.height, 17);
@@ -110,9 +110,9 @@ void main() {
       final r = PokemonResolvedBackendResponse.fromJson(_minimalResolvedJson());
       final entry = r.toPokemonEntry();
       expect(entry.id, 6);
-      // types is now List<String>
-      expect(entry.types[0], 'Fire');
-      expect(entry.types[1], 'Flying');
+      // types are lowercased in toPokemonEntry() for UI colour lookups
+      expect(entry.types[0], 'fire');
+      expect(entry.types[1], 'flying');
       // stats is now Map<String, int>
       expect(entry.stats['hp'], 78);
       // abilities is now List<AbilityInfo>
