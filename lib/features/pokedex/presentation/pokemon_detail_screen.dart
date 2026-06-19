@@ -117,10 +117,10 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     _OverviewTab(pokemon: effectivePokemon, speciesAsync: speciesAsync, pokemonId: widget.pokemonId),
     _StatsTab(pokemon: effectivePokemon),
     _AbilitiesTab(pokemon: effectivePokemon),
-    _MovesTab(pokemon: effectivePokemon, pokemonId: widget.pokemonId),
+    _MovesTab(pokemon: effectivePokemon, pokemonId: effectivePokemon.id),
     _EvolutionsTab(speciesAsync: speciesAsync, selectedFormName: _selectedFormName),
     _FormsTab(speciesAsync: speciesAsync, selectedFormName: _selectedFormName),
-    _LocationsTab(pokemonId: widget.pokemonId),
+    _LocationsTab(pokemonId: effectivePokemon.id),
     _TeamsTab(pokemonId: widget.pokemonId, pokemon: basePokemon, selectedFormName: _selectedFormName),
   ];
 
