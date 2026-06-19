@@ -359,6 +359,18 @@ class PokemonResolvedBackendResponse {
   /// Passes typed fields directly — [PokemonEntry] now uses the same typed
   /// representations ([List<String>] types, [Map<String, int>] stats,
   /// [List<AbilityInfo>] abilities, [List<MoveSummary>] moves).
+  static const _statKeyMap = {
+    'atk': 'attack',
+    'def': 'defense',
+    'spa': 'special-attack',
+    'spd': 'special-defense',
+    'spe': 'speed',
+  };
+
+  static Map<String, int> _normalizeStats(Map<String, int> stats) {
+    return stats.map((k, v) => MapEntry(_statKeyMap[k] ?? k, v));
+  }
+
   PokemonEntry toPokemonEntry() {
     return PokemonEntry(
       id: pokemonId,
@@ -370,7 +382,7 @@ class PokemonResolvedBackendResponse {
       types: types,
       officialArtworkUrl: spriteUrls.officialArtwork,
       sprites: null,
-      stats: baseStats,
+      stats: _normalizeStats(baseStats),
       abilities: abilities,
       moves: moves,
       formNames: forms.map((f) => f.name).toList(),
