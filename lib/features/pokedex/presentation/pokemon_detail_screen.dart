@@ -259,6 +259,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
             cosmeticFormsLoading: cosmeticFormsLoading,
             selectedCosmeticFormName: _selectedCosmeticFormName,
             onCosmeticFormSelect: (name) => setState(() => _selectedCosmeticFormName = name),
+            formsData: formsData,
           ),
         ],
         body: TabBarView(
@@ -517,6 +518,7 @@ class _DetailSliverAppBar extends StatelessWidget {
   final bool cosmeticFormsLoading;
   final String? selectedCosmeticFormName;
   final void Function(String?) onCosmeticFormSelect;
+  final List<FormBackendData>? formsData;
 
   const _DetailSliverAppBar({
     required this.basePokemon,
@@ -534,6 +536,7 @@ class _DetailSliverAppBar extends StatelessWidget {
     required this.cosmeticFormsLoading,
     required this.selectedCosmeticFormName,
     required this.onCosmeticFormSelect,
+    this.formsData,
   });
 
   @override
