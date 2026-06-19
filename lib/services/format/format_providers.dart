@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart'
+    show pokemonByNameProvider;
 import 'package:poke_team_dex/services/api/api_client.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_service.dart';
@@ -65,8 +67,23 @@ final slotValidationProvider = FutureProvider.autoDispose
   if (format == null) return const SlotValidation({});
   final pokemon = await ref.watch(
       pokemonDetailProvider(args.slot.pokemonId).future);
-  final moves = pokemon.moves;
-  final base = await validateSlot(args.slot, pokemon.name, moves, format, svc);
+
+  // If the slot has a battle-meaningful variety form selected (e.g. Rotom-Wash),
+  // use that variety's move list so form-exclusive moves (Hydro Pump for
+  // Rotom-Wash) are not incorrectly flagged as unlearnable.
+  final formName = args.slot.formName;
+  final effectiveMoves = await () async {
+    if (formName == null || formName.isEmpty) return pokemon.moves;
+    final varietyName = '${pokemon.name}-$formName';
+    try {
+      final variety = await ref.watch(pokemonByNameProvider(varietyName).future);
+      return variety.moves.isNotEmpty ? variety.moves : pokemon.moves;
+    } catch (_) {
+      return pokemon.moves;
+    }
+  }();
+
+  final base = await validateSlot(args.slot, pokemon.name, effectiveMoves, format, svc);
   if (base.isValid) return base;
 
   // Fetch prior-evo move sets and suppress move violations for exclusive moves.

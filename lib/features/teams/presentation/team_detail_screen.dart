@@ -973,10 +973,15 @@ class _FilledSlotCard extends ConsumerWidget {
                 useFormatSprites: useFormatSprites,
               )
             : null;
+        // For variety forms in gen 1-5 formats, prefer the format-aware sprite
+        // (spriteUrls.defaultUrl) over the HOME URL so Rotom-Wash in Gen 4
+        // shows the Gen 4 sprite rather than the 3D HOME artwork.
         final formHomeUrl = formChangePokemon != null
-            ? (descriptor.isShiny
-                ? pokemonHomeShinyUrl(formChangePokemon.id)
-                : pokemonHomeUrl(formChangePokemon.id))
+            ? (useFormatSprites && format != null && format.gen <= 5
+                ? null  // fall through to spriteUrls.defaultUrl
+                : (descriptor.isShiny
+                    ? pokemonHomeShinyUrl(formChangePokemon.id)
+                    : pokemonHomeUrl(formChangePokemon.id)))
             : cosmeticFormChangeSpriteUrls != null
                 ? (descriptor.isShiny
                     ? cosmeticFormChangeSpriteUrls.shinyUrl
