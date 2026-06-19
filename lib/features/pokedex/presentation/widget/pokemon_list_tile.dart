@@ -117,10 +117,10 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
     // Only fetch full sprite data when the slim response tells us there is
     // something to enrich — skips the network/cache call for most Pokémon.
     final formsData = cosmeticFormEntries.isNotEmpty
-        ? ref.watch(pokemonFormsProvider(widget.pokemon.id)).asData?.value
+        ? ref.watch(pokemonFormsProvider((id: widget.pokemon.id, gen: null))).asData?.value
         : null;
     final varietiesData = (battleForms.isNotEmpty || cosmeticVarietyForms.isNotEmpty)
-        ? ref.watch(pokemonVarietiesProvider(widget.pokemon.id)).asData?.value
+        ? ref.watch(pokemonVarietiesProvider((id: widget.pokemon.id, gen: null))).asData?.value
         : null;
 
     // Check if the currently selected form is a cosmetic form entry.
@@ -231,8 +231,8 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
           ),
           builder: (ctx) => Consumer(
             builder: (ctx, liveRef, _) {
-              final liveFormsData = liveRef.watch(pokemonFormsProvider(widget.pokemon.id)).asData?.value;
-              final liveVarietiesData = liveRef.watch(pokemonVarietiesProvider(widget.pokemon.id)).asData?.value;
+              final liveFormsData = liveRef.watch(pokemonFormsProvider((id: widget.pokemon.id, gen: null))).asData?.value;
+              final liveVarietiesData = liveRef.watch(pokemonVarietiesProvider((id: widget.pokemon.id, gen: null))).asData?.value;
               final liveAllForms = _buildAllForms(
                 cosmeticFormEntries: cosmeticFormEntries,
                 battleForms: battleForms,

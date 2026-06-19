@@ -139,10 +139,10 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
             !v.isDefault &&
             PokemonDataRegistry.instance.cosmeticVarietyNames.contains(v.name));
     final formsData = hasCosmeticForms
-        ? ref.watch(pokemonFormsProvider(widget.pokemonId)).asData?.value
+        ? ref.watch(pokemonFormsProvider((id: widget.pokemonId, gen: null))).asData?.value
         : null;
     final varietiesData = hasCosmeticVarieties
-        ? ref.watch(pokemonVarietiesProvider(widget.pokemonId)).asData?.value
+        ? ref.watch(pokemonVarietiesProvider((id: widget.pokemonId, gen: null))).asData?.value
         : null;
 
     final isWide = MediaQuery.sizeOf(context).width > 840;

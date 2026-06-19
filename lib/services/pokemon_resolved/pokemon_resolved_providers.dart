@@ -55,29 +55,33 @@ final pokemonMovesProvider =
 /// Used by form picker chips to show artwork for Mega, regional, and other
 /// battle-meaningful variety forms.
 final pokemonVarietiesProvider =
-    FutureProvider.family<List<VarietyBackendData>, int>((ref, id) async {
+    FutureProvider.family<List<VarietyBackendData>, ({int id, int? gen})>(
+        (ref, args) async {
+  final id = args.id;
+  final gen = args.gen;
   final cache = ref.read(pokemonResolvedCacheProvider);
-  final cached = cache.getIfValid('varieties_$id');
+  final cacheKey = gen != null ? 'varieties_${id}_g$gen' : 'varieties_$id';
+  final cached = cache.getIfValid(cacheKey);
   if (cached != null) {
-    AppLogger().d('[varieties] cache hit id=$id');
+    AppLogger().d('[varieties] cache hit id=$id gen=$gen');
     return (cached['varieties'] as List<dynamic>)
         .map((v) => VarietyBackendData.fromJson(v as Map<String, dynamic>))
         .toList();
   }
 
   try {
-    AppLogger().d('[varieties] fetching from backend id=$id');
+    AppLogger().d('[varieties] fetching from backend id=$id gen=$gen');
     final repo = ref.read(pokemonBackendRepositoryProvider);
-    final varieties = await repo.fetchVarieties(id);
-    AppLogger().d('[varieties] loaded ${varieties.length} varieties for id=$id');
+    final varieties = await repo.fetchVarieties(id, gen: gen ?? 9);
+    AppLogger().d('[varieties] loaded ${varieties.length} varieties for id=$id gen=$gen');
     cache.putWithTTL(
-      'varieties_$id',
+      cacheKey,
       {'varieties': varieties.map((v) => v.toJson()).toList()},
       const Duration(days: 7),
     );
     return varieties;
   } catch (e) {
-    AppLogger().w('[varieties] failed for id=$id, returning empty', error: e);
+    AppLogger().w('[varieties] failed for id=$id gen=$gen, returning empty', error: e);
     return const [];
   }
 });
@@ -90,29 +94,33 @@ final pokemonVarietiesProvider =
 ///
 /// Used by form picker chips to show official → home → sprite quality images.
 final pokemonFormsProvider =
-    FutureProvider.family<List<FormBackendData>, int>((ref, id) async {
+    FutureProvider.family<List<FormBackendData>, ({int id, int? gen})>(
+        (ref, args) async {
+  final id = args.id;
+  final gen = args.gen;
   final cache = ref.read(pokemonResolvedCacheProvider);
-  final cached = cache.getIfValid('forms_$id');
+  final cacheKey = gen != null ? 'forms_${id}_g$gen' : 'forms_$id';
+  final cached = cache.getIfValid(cacheKey);
   if (cached != null) {
-    AppLogger().d('[forms] cache hit id=$id');
+    AppLogger().d('[forms] cache hit id=$id gen=$gen');
     return (cached['forms'] as List<dynamic>)
         .map((f) => FormBackendData.fromJson(f as Map<String, dynamic>))
         .toList();
   }
 
   try {
-    AppLogger().d('[forms] fetching from backend id=$id');
+    AppLogger().d('[forms] fetching from backend id=$id gen=$gen');
     final repo = ref.read(pokemonBackendRepositoryProvider);
-    final forms = await repo.fetchForms(id);
-    AppLogger().d('[forms] loaded ${forms.length} forms for id=$id');
+    final forms = await repo.fetchForms(id, gen: gen ?? 9);
+    AppLogger().d('[forms] loaded ${forms.length} forms for id=$id gen=$gen');
     cache.putWithTTL(
-      'forms_$id',
+      cacheKey,
       {'forms': forms.map((f) => f.toJson()).toList()},
       const Duration(days: 7),
     );
     return forms;
   } catch (e) {
-    AppLogger().w('[forms] failed for id=$id, returning empty', error: e);
+    AppLogger().w('[forms] failed for id=$id gen=$gen, returning empty', error: e);
     return const [];
   }
 });

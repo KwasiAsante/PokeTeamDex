@@ -6,8 +6,11 @@ class PokemonBackendRepository {
   PokemonBackendRepository(this._apiClient);
   final ApiClient _apiClient;
 
-  Future<PokemonResolvedBackendResponse> fetchResolved(int id) async {
-    final response = await _apiClient.dio.get<dynamic>('/pokemon/$id/resolved');
+  Future<PokemonResolvedBackendResponse> fetchResolved(int id, {int? gen}) async {
+    final response = await _apiClient.dio.get<dynamic>(
+      '/pokemon/$id/resolved',
+      queryParameters: gen != null ? {'gen': gen} : null,
+    );
     if (response.statusCode != 200) {
       throw Exception('Backend resolved fetch failed for id=$id: ${response.statusCode}');
     }
@@ -26,8 +29,11 @@ class PokemonBackendRepository {
         .toList();
   }
 
-  Future<List<VarietyBackendData>> fetchVarieties(int id) async {
-    final response = await _apiClient.dio.get<dynamic>('/pokemon/varieties/$id');
+  Future<List<VarietyBackendData>> fetchVarieties(int id, {int? gen}) async {
+    final response = await _apiClient.dio.get<dynamic>(
+      '/pokemon/varieties/$id',
+      queryParameters: gen != null ? {'gen': gen} : null,
+    );
     if (response.statusCode != 200) {
       throw Exception('Backend varieties fetch failed for id=$id: ${response.statusCode}');
     }
@@ -37,8 +43,11 @@ class PokemonBackendRepository {
         .toList();
   }
 
-  Future<List<FormBackendData>> fetchForms(int id) async {
-    final response = await _apiClient.dio.get<dynamic>('/pokemon/forms/$id');
+  Future<List<FormBackendData>> fetchForms(int id, {int? gen}) async {
+    final response = await _apiClient.dio.get<dynamic>(
+      '/pokemon/forms/$id',
+      queryParameters: gen != null ? {'gen': gen} : null,
+    );
     if (response.statusCode != 200) {
       throw Exception('Backend forms fetch failed for id=$id: ${response.statusCode}');
     }

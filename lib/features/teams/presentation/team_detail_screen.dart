@@ -803,8 +803,12 @@ class _FilledSlotCard extends ConsumerWidget {
     // Use resolvedPokemonProvider (keepAlive, already cached from Pokédex scroll)
     // instead of pokemonDetailProvider (autoDispose, separate network call per slot).
     final resolvedAsync = ref.watch(resolvedPokemonProvider(slot.pokemonId));
-    final formsData = ref.watch(pokemonFormsProvider(slot.pokemonId)).asData?.value;
-    final varietiesData = ref.watch(pokemonVarietiesProvider(slot.pokemonId)).asData?.value;
+    final _format = formatId != null
+        ? ref.watch(formatServiceProvider).formatById(formatId!)
+        : null;
+    final formatGen = _format?.gen;
+    final formsData = ref.watch(pokemonFormsProvider((id: slot.pokemonId, gen: formatGen))).asData?.value;
+    final varietiesData = ref.watch(pokemonVarietiesProvider((id: slot.pokemonId, gen: formatGen))).asData?.value;
     final itemAsync = slot.heldItemName != null
         ? ref.watch(slotItemDetailProvider(slot.heldItemName!))
         : null;

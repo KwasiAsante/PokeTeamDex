@@ -113,10 +113,10 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
 
     // Only fetch full sprite data when the slim response has something to enrich.
     final formsData = cosmeticFormEntries.isNotEmpty
-        ? ref.watch(pokemonFormsProvider(widget.pokemon.id)).asData?.value
+        ? ref.watch(pokemonFormsProvider((id: widget.pokemon.id, gen: null))).asData?.value
         : null;
     final varietiesData = (battleForms.isNotEmpty || cosmeticVarietyForms.isNotEmpty)
-        ? ref.watch(pokemonVarietiesProvider(widget.pokemon.id)).asData?.value
+        ? ref.watch(pokemonVarietiesProvider((id: widget.pokemon.id, gen: null))).asData?.value
         : null;
 
     final selectedCosmeticEntry = _selectedFormName != null
@@ -279,8 +279,8 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
                           ),
                           builder: (ctx) => Consumer(
                             builder: (ctx, liveRef, _) {
-                              final liveFormsData = liveRef.watch(pokemonFormsProvider(widget.pokemon.id)).asData?.value;
-                              final liveVarietiesData = liveRef.watch(pokemonVarietiesProvider(widget.pokemon.id)).asData?.value;
+                              final liveFormsData = liveRef.watch(pokemonFormsProvider((id: widget.pokemon.id, gen: null))).asData?.value;
+                              final liveVarietiesData = liveRef.watch(pokemonVarietiesProvider((id: widget.pokemon.id, gen: null))).asData?.value;
                               final liveAllForms = _buildAllFormsGrid(
                                 cosmeticFormEntries: cosmeticFormEntries,
                                 battleForms: battleForms,

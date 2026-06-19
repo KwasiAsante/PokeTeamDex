@@ -610,8 +610,15 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   Widget _buildWithPokemon(TeamSlot slot) {
     ref.watch(allFormatsProvider); // ensures PS data is loaded; triggers rebuild when ready
     final resolvedAsync = ref.watch(resolvedPokemonProvider(slot.pokemonId));
-    final formsData = ref.watch(pokemonFormsProvider(slot.pokemonId)).asData?.value;
-    final varietiesData = ref.watch(pokemonVarietiesProvider(slot.pokemonId)).asData?.value;
+    // Resolve format gen early so formsData/varietiesData use the correct gen.
+    final _slotTeam = ref.watch(teamByIdProvider(slot.teamId)).asData?.value;
+    final _slotFormatId = _slotTeam?.formatLabel;
+    final _slotFormat = _slotFormatId != null
+        ? ref.watch(formatServiceProvider).formatById(_slotFormatId)
+        : null;
+    final formatGen = _slotFormat?.gen;
+    final formsData = ref.watch(pokemonFormsProvider((id: slot.pokemonId, gen: formatGen))).asData?.value;
+    final varietiesData = ref.watch(pokemonVarietiesProvider((id: slot.pokemonId, gen: formatGen))).asData?.value;
     return resolvedAsync.when(
       loading: () => widget.embedded
           ? const Center(child: CircularProgressIndicator())
