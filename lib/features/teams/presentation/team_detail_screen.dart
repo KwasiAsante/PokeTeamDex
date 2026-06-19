@@ -23,7 +23,6 @@ import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/features/teams/presentation/move_copy_slot_sheet.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
 import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
-import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
@@ -898,9 +897,9 @@ class _FilledSlotCard extends ConsumerWidget {
         // a name-based check like `descriptor.formName != pokemon.name` doesn't
         // reliably identify them) and look up the active one by name, keeping
         // `formChangePokemon` null so stats/types fall through to `pokemon`.
-        final cosmeticFormEntries =
-            ref.watch(cosmeticFormsProvider(pokemon.name)).asData?.value ??
-                const <PokemonFormEntry>[];
+        // resolved.cosmeticForms is identical to cosmeticFormsProvider output —
+        // pre-patched, with synthetic female entries — already cached keepAlive.
+        final cosmeticFormEntries = resolved.cosmeticForms;
         final isCosmeticFormActive = isFormActive &&
             cosmeticFormEntries.any((f) => f.name == descriptor.formName);
         final formChangePokemon = (isFormActive && !isCosmeticFormActive)
@@ -909,15 +908,11 @@ class _FilledSlotCard extends ConsumerWidget {
                 .asData
                 ?.value
             : null;
-        PokemonFormEntry? cosmeticFormChange;
-        if (isCosmeticFormActive) {
-          for (final entry in cosmeticFormEntries) {
-            if (entry.name == descriptor.formName) {
-              cosmeticFormChange = entry;
-              break;
-            }
-          }
-        }
+        final cosmeticFormChange = isCosmeticFormActive
+            ? cosmeticFormEntries
+                .where((f) => f.name == descriptor.formName)
+                .firstOrNull
+            : null;
         // Effective types and stats for the active form (used for type badges
         // and stat bars — regional forms have different types/stats).
         final effectiveTypes = (formChangePokemon != null &&
