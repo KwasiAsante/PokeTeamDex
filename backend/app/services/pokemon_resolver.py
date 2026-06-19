@@ -986,7 +986,9 @@ class PokemonResolverService:
             else:
                 continue
             is_hidden = pokeapi_ability_map.get(str(pokeapi_slot), {}).get("is_hidden", key == "H")
-            abilities_list.append(AbilityInfo(name=ability_name, is_hidden=is_hidden, slot=pokeapi_slot))
+            # Showdown uses display names ("Sand Veil"); normalise to PokéAPI slug.
+            ability_slug = ability_name.lower().replace(" ", "-")
+            abilities_list.append(AbilityInfo(name=ability_slug, is_hidden=is_hidden, slot=pokeapi_slot))
         abilities_list.sort(key=lambda a: a.slot)
 
         # moves (always built; trimmed to [] at response time unless "moves" in includes)

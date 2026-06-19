@@ -14,7 +14,9 @@ class AbilityInfo {
   });
 
   factory AbilityInfo.fromJson(Map<String, dynamic> json) => AbilityInfo(
-        name: json['name'] as String,
+        // Backend may send Showdown display names ("Sand Veil") or PokéAPI slugs
+        // ("sand-veil"). Normalise to slug so abilityProvider can look them up.
+        name: (json['name'] as String).toLowerCase().replaceAll(' ', '-'),
         isHidden: json['is_hidden'] as bool,
         slot: json['slot'] as int,
       );
