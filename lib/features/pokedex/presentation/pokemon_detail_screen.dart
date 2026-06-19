@@ -17,9 +17,11 @@ import 'package:poke_team_dex/services/format/format_service.dart';
 import 'package:poke_team_dex/services/pokeapi/models/encounter_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
-import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show MoveSummary;
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart'
+    show MoveSummary, FormBackendData, VarietyBackendData;
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
-    show pokemonMovesProvider, pokemonFlavorTextProvider;
+    show pokemonMovesProvider, pokemonFlavorTextProvider,
+         pokemonFormsProvider, pokemonVarietiesProvider;
 import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -128,6 +130,21 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     final formAsync = _selectedFormName != null
         ? ref.watch(pokemonByNameProvider(_selectedFormName!))
         : null;
+
+    // Conditionally fetch full sprite data — same pattern as list tile.
+    final resolvedData = resolvedAsync.asData?.value;
+    final hasCosmeticForms = resolvedData?.cosmeticForms.isNotEmpty == true;
+    final hasCosmeticVarieties = resolvedData != null &&
+        resolvedData.species.varieties.any((v) =>
+            !v.isDefault &&
+            PokemonDataRegistry.instance.cosmeticVarietyNames.contains(v.name));
+    final formsData = hasCosmeticForms
+        ? ref.watch(pokemonFormsProvider(widget.pokemonId)).asData?.value
+        : null;
+    final varietiesData = hasCosmeticVarieties
+        ? ref.watch(pokemonVarietiesProvider(widget.pokemonId)).asData?.value
+        : null;
+
     final isWide = MediaQuery.sizeOf(context).width > 840;
 
     return resolvedAsync.when(
@@ -172,30 +189,28 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         // Variety-based cosmetic chips are only shown for the BASE form.
         // When a regional battle form is selected (e.g. Hisuian Basculin),
         // Unovan cosmetic variants (Blue-Striped) are not relevant.
+        // Uses pokemonVarietiesProvider (already watched above) instead of
+        // per-variety pokemonByNameProvider calls.
         final varietyCosmeticForms = <PokemonFormEntry>[];
         if (_selectedFormName == null) {
           for (final variety in species.varieties) {
             if (variety.isDefault) continue;
             if (!PokemonDataRegistry.instance.cosmeticVarietyNames.contains(variety.name)) continue;
-            final vAsync = ref.watch(pokemonByNameProvider(variety.name));
-            final vData = vAsync.asData?.value;
-            if (vData == null) continue;
-            // Use speciesName ("wormadam") not the variety name ("wormadam-plant")
-            // so the suffix strip works for default varieties with a form infix.
+            final vd = varietiesData?.where((v) => v.name == variety.name).firstOrNull;
+            if (vd == null) continue; // provider still loading; widget rebuilds when it does
             final sn = basePokemon.speciesName ?? basePokemon.name;
             final formName = variety.name.startsWith('$sn-')
                 ? variety.name.substring(sn.length + 1)
                 : variety.name;
             varietyCosmeticForms.add(PokemonFormEntry(
-              id: vData.id,
+              id: vd.pokemonId,
               name: variety.name,
               formName: formName,
               isDefault: false,
-              // Chip thumbnail uses the small sprite; header uses official artwork.
-              spriteUrl: vData.sprites?['front_default'] as String?,
-              spriteShinyUrl: vData.sprites?['front_shiny'] as String?,
-              officialArtworkUrl: vData.officialArtworkUrl,
-              officialArtworkShinyUrl: vData.officialArtworkShinyUrl,
+              spriteUrl: vd.spriteUrls?.gameFront ?? vd.spriteUrls?.home,
+              spriteShinyUrl: vd.spriteUrls?.gameFrontShiny ?? vd.spriteUrls?.homeShiny,
+              officialArtworkUrl: vd.spriteUrls?.officialArtwork,
+              officialArtworkShinyUrl: vd.spriteUrls?.officialArtworkShiny,
             ));
           }
         }
@@ -205,8 +220,8 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         final cosmeticForms = [...cosmeticFormsBase, ...varietyCosmeticForms];
 
         return isWide
-            ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms, cosmeticFormsLoading)
-            : _buildNarrowLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms, cosmeticFormsLoading);
+            ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms, cosmeticFormsLoading, formsData)
+            : _buildNarrowLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms, cosmeticFormsLoading, formsData);
       },
     );
   }
@@ -223,6 +238,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     String baseFormLabel,
     List<PokemonFormEntry> cosmeticForms,
     bool cosmeticFormsLoading,
+    List<FormBackendData>? formsData,
   ) {
     return Scaffold(
       body: NestedScrollView(
@@ -265,6 +281,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     String baseFormLabel,
     List<PokemonFormEntry> cosmeticForms,
     bool cosmeticFormsLoading,
+    List<FormBackendData>? formsData,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -272,11 +289,13 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     final wideSelectedCosmetic = _selectedCosmeticFormName != null
         ? cosmeticForms.where((f) => f.name == _selectedCosmeticFormName).firstOrNull
         : null;
-    // Cosmetic form HOME artwork uses "{baseId}-{suffix}.png" naming
-    // (e.g. 412-sandy.png for Burmy Sandy Cloak). Strip the base Pokémon name
-    // prefix from the form name to get the suffix.
     String? cosmeticHomeUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
+      // Backend-resolved sprite URLs (highest quality, CORS-safe).
+      final fd = formsData?.where((f) => f.name == form.name).firstOrNull;
+      final backendUrl = fd?.spriteUrls?.officialArtwork ?? fd?.spriteUrls?.home;
+      if (backendUrl != null) return backendUrl;
+      // Variety-based forms have official artwork URL from pokemonVarietiesProvider.
       if (form.officialArtworkUrl != null) return form.officialArtworkUrl;
       final override = PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[form.name];
       if (override != null) return override;
@@ -290,6 +309,9 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     }
     String? cosmeticHomeShinyUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
+      final fd = formsData?.where((f) => f.name == form.name).firstOrNull;
+      final backendShinyUrl = fd?.spriteUrls?.officialArtworkShiny ?? fd?.spriteUrls?.homeShiny;
+      if (backendShinyUrl != null) return backendShinyUrl;
       if (form.officialArtworkShinyUrl != null) return form.officialArtworkShinyUrl;
       if (form.formName == 'female') {
         return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/female/${basePokemon.id}.png';
@@ -522,20 +544,20 @@ class _DetailSliverAppBar extends StatelessWidget {
         : null;
 
     // Resolve header display URL for a cosmetic form.
-    // Priority: official artwork (variety-based) → HOME override → HOME → sprite.
+    // Priority: backend-resolved → variety artwork → HOME override → HOME → sprite.
     String? cosmeticUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
-      // Variety-based forms have their own official artwork URL.
+      // Backend-resolved sprite URLs (highest quality, CORS-safe).
+      final fd = formsData?.where((f) => f.name == form.name).firstOrNull;
+      final backendUrl = fd?.spriteUrls?.officialArtwork ?? fd?.spriteUrls?.home;
+      if (backendUrl != null) return backendUrl;
+      // Variety-based forms have official artwork from pokemonVarietiesProvider.
       if (form.officialArtworkUrl != null) return form.officialArtworkUrl;
-      // Specific URL overrides (e.g. xerneas-active → show neutral form).
       final override = PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[form.name];
       if (override != null) return override;
-      // Gender forms: check formName directly so it works even when basePokemon.name
-      // includes a suffix (e.g. "frillish-male" → "frillish-female" prefix check fails).
       if (form.formName == 'female') {
         return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${basePokemon.id}.png';
       }
-      // Form-name-based: try "{baseId}-{suffix}.png" HOME URL.
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteUrl;
       final suffix = form.name.substring(baseName.length + 1);
@@ -543,6 +565,9 @@ class _DetailSliverAppBar extends StatelessWidget {
     }
     String? cosmeticShinyUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
+      final fd = formsData?.where((f) => f.name == form.name).firstOrNull;
+      final backendShinyUrl = fd?.spriteUrls?.officialArtworkShiny ?? fd?.spriteUrls?.homeShiny;
+      if (backendShinyUrl != null) return backendShinyUrl;
       if (form.officialArtworkShinyUrl != null) return form.officialArtworkShinyUrl;
       final shinyOverride = PokemonDataRegistry.instance.cosmeticFormHomeShinyUrlOverrides[form.name];
       if (shinyOverride != null) return shinyOverride;
