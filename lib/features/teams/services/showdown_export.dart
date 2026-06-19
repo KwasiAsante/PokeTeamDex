@@ -32,13 +32,32 @@ const Map<String, String> kFormatToPsFormat = {
   'gen9': 'gen9anythinggoes', 'sv': 'gen9anythinggoes',
 };
 
+/// Capitalizes the first letter of each hyphen-separated segment.
+/// "rotom-wash" → "Rotom-Wash", "charizard-mega-x" → "Charizard-Mega-X"
+String _capitalizeHyphenated(String name) {
+  return name.split('-').map((part) {
+    if (part.isEmpty) return part;
+    return part[0].toUpperCase() + part.substring(1);
+  }).join('-');
+}
+
+/// Normalises a stored nature name to just the nature word, capitalised.
+/// Handles values that may have been stored with a "Nature: " prefix or
+/// " Nature" suffix due to an import parsing issue.
+String _normalisedNature(String raw) {
+  var n = raw
+      .replaceFirst(RegExp(r'^[Nn]ature:\s*'), '')   // strip "Nature: " prefix
+      .replaceAll(RegExp(r'\s*[Nn]ature\s*$'), '')   // strip " Nature" suffix
+      .trim();
+  if (n.isEmpty) return raw;
+  return n[0].toUpperCase() + n.substring(1).toLowerCase();
+}
+
 /// Generates a Pokémon Showdown-compatible export string for [slots].
 /// Produces only the Pokémon blocks — no header line.
-/// The PS format belongs in the filename, not the file body.
 Future<String> buildShowdownExport(
   List<TeamSlot> slots,
   PokeApiRepository pokeApi, {
-  // Unused — kept for API compatibility with callers that still pass these.
   String? teamName,
   String? formatLabel,
   String? formatName,
@@ -47,15 +66,30 @@ Future<String> buildShowdownExport(
 
   for (final slot in slots..sort((a, b) => a.slot.compareTo(b.slot))) {
     final pokemon = await pokeApi.fetchPokemon(slot.pokemonId);
-    final speciesName = pokemon.name.toCapitalCase();
+    final baseName = pokemon.name.toCapitalCase();
     final nickname = slot.nickname?.trim();
     final hasNickname =
-        nickname != null && nickname.isNotEmpty && nickname != speciesName;
+        nickname != null && nickname.isNotEmpty && nickname != baseName;
+
+    // Species display name includes form when set.
+    // slot.formName = "rotom-wash" → "Rotom-Wash"; null → base species name.
+    final speciesDisplay = slot.formName != null && slot.formName!.isNotEmpty
+        ? _capitalizeHyphenated(slot.formName!)
+        : baseName;
+
+    // Gender tag: (M) for male, (F) for female, empty for genderless.
+    final genderTag = slot.gender == 'male'
+        ? ' (M)'
+        : slot.gender == 'female'
+            ? ' (F)'
+            : '';
 
     final item = slot.heldItemName;
+    final itemSuffix = item != null ? ' @ ${item.toCapitalCase()}' : '';
+
     final header = hasNickname
-        ? '$nickname ($speciesName)${item != null ? ' @ ${item.toCapitalCase()}' : ''}'
-        : '$speciesName${item != null ? ' @ ${item.toCapitalCase()}' : ''}';
+        ? '$nickname ($speciesDisplay)$genderTag$itemSuffix'
+        : '$speciesDisplay$genderTag$itemSuffix';
 
     final lines = <String>[header];
 
@@ -69,7 +103,7 @@ Future<String> buildShowdownExport(
     if (slot.isShiny) lines.add('Shiny: Yes');
 
     if (slot.natureName != null) {
-      lines.add('Nature: ${slot.natureName!} Nature');
+      lines.add('Nature: ${_normalisedNature(slot.natureName!)} Nature');
     }
 
     // EVs — omit zero values
