@@ -70,6 +70,10 @@ _GEN_SPRITE_CONFIG: dict[int, tuple[str, str, str, str]] = {
     3: ("generation-iii/emerald",                  "",            "png", "shiny"),
     4: ("generation-iv/heartgold-soulsilver",      "",            "png", "shiny"),
     5: ("generation-v/black-white",                "animated",    "gif", "animated/shiny"),
+    6: ("generation-vi/omegaruby-alphasapphire",   "",            "png", "shiny"),
+    7: ("generation-vii/ultra-sun-ultra-moon",     "",            "png", "shiny"),
+    # gen 8 has no versioned sprite directories in the PokeAPI repo — Showdown fallback
+    9: ("generation-ix/scarlet-violet",            "",            "png", ""),          # no shiny dir in gen 9 repo
 }
 
 # Showdown gen-specific sprite dirs (gen number → dir name)

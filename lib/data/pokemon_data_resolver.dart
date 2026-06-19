@@ -234,18 +234,12 @@ class PokemonDataResolver {
       PokedexImageType.artwork =>
         baseHomeOverride?.homeUrl ??
         '${_spritesBase}other/official-artwork/$pokemonId.png',
-      // sprite: filter-aware icon. When no gen/game filter is active,
-      // compactIconUrl returns the plain front sprite — use spriteUrls.icon
-      // (gen-8 icon) as a better compact representation when available.
-      PokedexImageType.sprite => (() {
-        final genIcon = compactIconUrl(pokemonId, filter!);
-        // compactIconUrl falls back to plain sprite when there's no subpath;
-        // prefer the gen-aware icon from the backend in that case.
-        if (!genIcon.contains('/versions/') && spriteUrls?.icon != null) {
-          return spriteUrls!.icon!;
-        }
-        return genIcon;
-      })(),
+      // sprite: filter-aware versioned game sprite.
+      // compactIconUrl returns the versioned path for known gens (1–7, 9)
+      // and falls back to the plain front sprite for unmapped gens (8).
+      // Never use the icon-sized sprite here — it's 40x30 and looks wrong
+      // at the 64x64 sprite view size.
+      PokedexImageType.sprite => compactIconUrl(pokemonId, filter!),
       null => spriteUrls?.icon ??
           '${_spritesBase}versions/generation-viii/icons/$pokemonId.png',
     };
