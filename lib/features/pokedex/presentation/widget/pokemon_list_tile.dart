@@ -95,16 +95,6 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
 
     final resolvedAsync = ref.watch(resolvedPokemonProvider(widget.pokemon.id));
     final resolved = resolvedAsync.asData?.value;
-
-    // Auto-retry on error after a short delay — prevents permanently broken
-    // tiles when the backend or PokéAPI is temporarily rate-limited on cold start.
-    if (resolvedAsync.hasError) {
-      Future.delayed(const Duration(seconds: 3), () {
-        if (context.mounted) {
-          ref.invalidate(resolvedPokemonProvider(widget.pokemon.id));
-        }
-      });
-    }
     final basePokemon = resolved?.detail;
     final cosmeticFormEntries = resolved?.cosmeticForms ?? const <PokemonFormEntry>[];
 
