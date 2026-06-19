@@ -13,7 +13,6 @@ import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provid
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/features/teams/data/dynamax_data.dart';
 import 'package:poke_team_dex/features/teams/data/form_descriptor.dart';
-import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/presentation/ps_import_sheet.dart';
 import 'package:poke_team_dex/features/teams/presentation/slot_config_screen.dart';
@@ -803,10 +802,10 @@ class _FilledSlotCard extends ConsumerWidget {
     // Use resolvedPokemonProvider (keepAlive, already cached from Pokédex scroll)
     // instead of pokemonDetailProvider (autoDispose, separate network call per slot).
     final resolvedAsync = ref.watch(resolvedPokemonProvider(slot.pokemonId));
-    final _format = formatId != null
+    final format0 = formatId != null
         ? ref.watch(formatServiceProvider).formatById(formatId!)
         : null;
-    final formatGen = _format?.gen;
+    final formatGen = format0?.gen;
     final formsData = ref.watch(pokemonFormsProvider((id: slot.pokemonId, gen: formatGen))).asData?.value;
     final varietiesData = ref.watch(pokemonVarietiesProvider((id: slot.pokemonId, gen: formatGen))).asData?.value;
     final itemAsync = slot.heldItemName != null
@@ -850,50 +849,41 @@ class _FilledSlotCard extends ConsumerWidget {
         // Base stats map
         final baseStats = pokemon.stats;
 
-        // ── Mega Evolution support (must come before calcStats) ────────────
-        // Rayquaza is the sole exception to the "needs a Mega Stone" rule —
-        // it Mega Evolves simply by knowing Dragon Ascent, no held item
-        // required. Mirrors the same special case in slot_config_screen.dart.
-        final rayquazaDragonAscent = pokemon.name == 'rayquaza' &&
-            [slot.move1, slot.move2, slot.move3, slot.move4]
-                .contains('dragon-ascent');
-        final megaEntry = rayquazaDragonAscent
-            ? (baseSpecies: 'rayquaza', megaForm: 'rayquaza-mega')
-            : (slot.heldItemName != null
-                ? PokemonDataRegistry.instance.megaStoneMap[slot.heldItemName]
-                : null);
-        final isMegaApplicable = descriptor.isMegaEvolved &&
-            megaEntry != null &&
-            pokemon.name == megaEntry.baseSpecies;
-
-        final megaPokemon = isMegaApplicable
-            ? ref
-                .watch(pokemonByNameProvider(megaEntry.megaForm))
-                .asData
-                ?.value
+        // ── Mega Evolution — resolved via variety flags from backend ──────
+        // Backend varieties carry is_mega, associated_item, associated_move so
+        // we no longer need the local megaStoneMap or Rayquaza special-case.
+        final slotMoves = [slot.move1, slot.move2, slot.move3, slot.move4];
+        final megaVariety = descriptor.isMegaEvolved
+            ? varietiesData?.where((v) {
+                if (v.isMega != true) return false;
+                if (v.associatedItem != null &&
+                    slot.heldItemName == v.associatedItem) return true;
+                if (v.associatedMove != null &&
+                    slotMoves.contains(v.associatedMove)) return true;
+                return false;
+              }).firstOrNull
             : null;
+        final isMegaApplicable = megaVariety != null;
 
         // Override base stats: form > mega > base.
         // formEffectiveStats is computed below after formChangePokemon resolves.
         // We use a late override pattern: compute tentative stats from mega/base
         // first, then override with form stats in calcStats below.
-        final effectiveBaseStats = megaPokemon != null
-            ? megaPokemon.stats
-            : baseStats;
-        // Prefer HOME artwork; fall back to official artwork.
-        // Use shiny variants when the slot is shiny (mirrors form-change handling
-        // below) — otherwise a shiny mega/G-Max Pokémon renders in its regular
-        // colours since mega/gmax artwork takes priority over the gen sprite.
-        final megaHomeUrl = megaPokemon != null
+        // Stats and sprite come directly from the variety data — no extra
+        // pokemonByNameProvider fetch needed.
+        final megaStats = megaVariety?.baseStats
+            ?.map((k, v) => MapEntry(k, v));
+        final effectiveBaseStats = megaStats != null ? megaStats : baseStats;
+        final megaHomeUrl = megaVariety != null
             ? (descriptor.isShiny
-                ? pokemonHomeShinyUrl(megaPokemon.id)
-                : pokemonHomeUrl(megaPokemon.id))
+                ? (megaVariety.spriteUrls?.homeShiny ?? megaVariety.spriteUrls?.home)
+                : megaVariety.spriteUrls?.home)
             : null;
-        final megaOfficialUrl = megaPokemon != null
+        final megaOfficialUrl = megaVariety != null
             ? (descriptor.isShiny
-                ? (megaPokemon.officialArtworkShinyUrl ??
-                    megaPokemon.officialArtworkUrl)
-                : megaPokemon.officialArtworkUrl)
+                ? (megaVariety.spriteUrls?.officialArtworkShiny ??
+                    megaVariety.spriteUrls?.officialArtwork)
+                : megaVariety.spriteUrls?.officialArtwork)
             : null;
 
         // ── Form change sprite ──────────────────────────────────────────────
@@ -968,8 +958,7 @@ class _FilledSlotCard extends ConsumerWidget {
         // sprite uses (HOME override for "no format"/Gen 6+, versioned
         // sprites for Gen 1-5) so cosmetic forms display correctly for the
         // selected format, just like the default form does.
-        final cosmeticFormChangeSuffix =
-            cosmeticFormChange?.name.substring(pokemon.name.length + 1);
+        // final cosmeticFormChangeSuffix = cosmeticFormChange?.name.substring(pokemon.name.length + 1);
         final cosmeticFormChangeSpriteUrls = cosmeticFormChange != null
             ? PokemonDataResolver.resolveFormSprite(
                 sprites: null,
@@ -1326,10 +1315,10 @@ class _FilledSlotCard extends ConsumerWidget {
                               ),
                             // Ability — show mega form ability when evolved
                             Builder(builder: (_) {
-                              final abilityName = (isMegaApplicable &&
-                                      megaPokemon != null &&
-                                      megaPokemon.abilities.isNotEmpty)
-                                  ? megaPokemon.abilities.first.name
+                              // megaVariety abilities: PS format {"0": "tough-claws"}
+                              final megaAbility = megaVariety?.abilities?.values.firstOrNull;
+                              final abilityName = (isMegaApplicable && megaAbility != null)
+                                  ? megaAbility
                                   : slot.abilityName;
                               if (abilityName == null) return const SizedBox.shrink();
                               return Text(

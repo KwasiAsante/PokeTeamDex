@@ -233,6 +233,12 @@ class PokemonResolvedBackendResponse {
   final bool isBaby;
   final bool isLegendary;
   final bool isMythical;
+  final bool isMega;
+  final bool isBattleOnly;
+  final bool isGmax;
+  final String? associatedItem;
+  final String? associatedMove;
+  final String? associatedAbility;
   final int? evolutionChainId;
 
   const PokemonResolvedBackendResponse({
@@ -266,6 +272,12 @@ class PokemonResolvedBackendResponse {
     required this.isBaby,
     required this.isLegendary,
     required this.isMythical,
+    this.isMega = false,
+    this.isBattleOnly = false,
+    this.isGmax = false,
+    this.associatedItem,
+    this.associatedMove,
+    this.associatedAbility,
     this.evolutionChainId,
   });
 
@@ -318,6 +330,12 @@ class PokemonResolvedBackendResponse {
       isBaby: json['is_baby'] as bool? ?? false,
       isLegendary: json['is_legendary'] as bool? ?? false,
       isMythical: json['is_mythical'] as bool? ?? false,
+      isMega: json['is_mega'] as bool? ?? false,
+      isBattleOnly: json['is_battle_only'] as bool? ?? false,
+      isGmax: json['is_gmax'] as bool? ?? false,
+      associatedItem: json['associated_item'] as String?,
+      associatedMove: json['associated_move'] as String?,
+      associatedAbility: json['associated_ability'] as String?,
       evolutionChainId: (json['evolution_chain_id'] as num?)?.toInt(),
     );
   }
@@ -353,6 +371,12 @@ class PokemonResolvedBackendResponse {
         'is_baby': isBaby,
         'is_legendary': isLegendary,
         'is_mythical': isMythical,
+        'is_mega': isMega,
+        'is_battle_only': isBattleOnly,
+        'is_gmax': isGmax,
+        'associated_item': associatedItem,
+        'associated_move': associatedMove,
+        'associated_ability': associatedAbility,
         'evolution_chain_id': evolutionChainId,
       };
 
@@ -488,6 +512,15 @@ class VarietyBackendData {
   // PS ability format: {"0": "blaze", "1": "fire-spin", "H": "solar-power"}
   final Map<String, String>? abilities;
   final SpriteUrlsFull? spriteUrls;
+  // Form classification flags from backend
+  final bool? isMega;
+  final bool? isBattleOnly;
+  final bool? isGmax;
+  // Associated trigger: item (e.g. "charizardite-x"), move (e.g. "dragon-ascent"),
+  // or ability (e.g. "stance-change"). At most one is non-null per variety.
+  final String? associatedItem;
+  final String? associatedMove;
+  final String? associatedAbility;
 
   const VarietyBackendData({
     required this.name,
@@ -498,6 +531,12 @@ class VarietyBackendData {
     this.baseStats,
     this.abilities,
     this.spriteUrls,
+    this.isMega,
+    this.isBattleOnly,
+    this.isGmax,
+    this.associatedItem,
+    this.associatedMove,
+    this.associatedAbility,
   });
 
   factory VarietyBackendData.fromJson(Map<String, dynamic> json) =>
@@ -517,6 +556,12 @@ class VarietyBackendData {
             ? SpriteUrlsFull.fromJson(
                 json['sprite_urls'] as Map<String, dynamic>)
             : null,
+        isMega: json['is_mega'] as bool?,
+        isBattleOnly: json['is_battle_only'] as bool?,
+        isGmax: json['is_gmax'] as bool?,
+        associatedItem: json['associated_item'] as String?,
+        associatedMove: json['associated_move'] as String?,
+        associatedAbility: json['associated_ability'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -528,5 +573,11 @@ class VarietyBackendData {
         'base_stats': baseStats,
         'abilities': abilities,
         'sprite_urls': spriteUrls?.toJson(),
+        'is_mega': isMega,
+        'is_battle_only': isBattleOnly,
+        'is_gmax': isGmax,
+        'associated_item': associatedItem,
+        'associated_move': associatedMove,
+        'associated_ability': associatedAbility,
       };
 }
