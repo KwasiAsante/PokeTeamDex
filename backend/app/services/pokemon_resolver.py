@@ -1054,8 +1054,18 @@ class PokemonResolverService:
         # just "{id}" — Gen 2 Crystal animated has 201-a.gif but no 201.gif.
         # See _build_base_sprite_urls docstring for the full compatibility matrix.
         ps_sprite_name = _to_showdown_name(pokemon_name, self._ps_exceptions)
-        first_form = (pokemon_data.get("forms") or [{}])[0].get("name", "")
-        first_form_suffix = _extract_form_suffix(first_form, species_name) if first_form else None
+        all_forms = pokemon_data.get("forms") or []
+        first_form = all_forms[0].get("name", "") if all_forms else ""
+        # Only apply a form suffix to the sprite ID when the pokemon actually
+        # has multiple forms — this handles Unown where "201-a.gif" is needed
+        # in Gen-2 Crystal but "201.gif" does not exist. For variety pokemon
+        # like Rotom-Wash (10009), the variety ID alone identifies the sprite
+        # file; there is no "10009-wash.png" in the sprites repo.
+        first_form_suffix = (
+            _extract_form_suffix(first_form, species_name)
+            if first_form and len(all_forms) > 1
+            else None
+        )
         gen_sprite_id = f"{pokemon_id}-{first_form_suffix}" if first_form_suffix else None
         sprite_urls = self._build_base_sprite_urls(
             pokemon_data.get("sprites") or {}, ps_sprite_name, pokemon_id, gen,
