@@ -260,6 +260,11 @@ class PokemonResolverService:
         self._pokeapi_http = httpx.AsyncClient(
             timeout=10.0, limits=httpx.Limits(max_connections=100)
         )
+        # Cap concurrent outgoing PokéAPI calls to avoid rate-limiting.
+        # Probe requests go to raw.githubusercontent.com (different host, not capped).
+        # 20 lets Vivillon's 17 form fetches complete in one batch while preventing
+        # hundreds of simultaneous calls when the full Pokédex warms a cold cache.
+        self._pokeapi_semaphore = asyncio.Semaphore(20)
         self._smogon_http = httpx.AsyncClient(
             timeout=30.0, limits=httpx.Limits(max_connections=20)
         )
@@ -624,8 +629,12 @@ class PokemonResolverService:
         if not non_defaults:
             return []
 
+        async def _fetch_variety(url: str) -> httpx.Response:
+            async with self._pokeapi_semaphore:
+                return await self._pokeapi_http.get(url)
+
         responses = await asyncio.gather(
-            *[self._pokeapi_http.get(v["pokemon"]["url"]) for v in non_defaults],
+            *[_fetch_variety(v["pokemon"]["url"]) for v in non_defaults],
             return_exceptions=True,
         )
 
@@ -722,8 +731,12 @@ class PokemonResolverService:
             oa_id = f"{base_id}-{mapped}" if mapped else str(base_id)
             return f"{_POKEAPI_OA}/{oa_id}.png"
 
+        async def _fetch_form(name: str) -> httpx.Response:
+            async with self._pokeapi_semaphore:
+                return await self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon-form/{name}")
+
         _home_paths = [_form_home_paths(n) for n in non_defaults]
-        form_tasks = [self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon-form/{n}") for n in non_defaults]
+        form_tasks = [_fetch_form(n) for n in non_defaults]
         home_tasks = [_probe_url(self._pokeapi_http, p[0]) for p in _home_paths]
         home_shiny_tasks = [_probe_url(self._pokeapi_http, p[1]) for p in _home_paths]
         oa_tasks = [_probe_url(self._pokeapi_http, _form_oa_url(n)) for n in non_defaults]
@@ -1273,8 +1286,9 @@ class PokemonResolverService:
 
     async def _fetch_pokeapi(self, pokemon_id: int) -> tuple[dict, dict, dict]:
         """Returns (pokemon_data, species_data, meta) where meta = {english_name, gen, species_name}."""
-        pokemon_r = await self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon/{pokemon_id}")
-        pokemon_r.raise_for_status()
+        async with self._pokeapi_semaphore:
+            pokemon_r = await self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon/{pokemon_id}")
+            pokemon_r.raise_for_status()
         pokemon_data = pokemon_r.json()
 
         species_url: str = pokemon_data["species"]["url"]
