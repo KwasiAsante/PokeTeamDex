@@ -474,6 +474,8 @@ class PokemonResolverService:
         return SpriteUrlsFull(
             official_artwork=artwork.get("front_default"),
             official_artwork_shiny=artwork.get("front_shiny"),
+            official_artwork_female=artwork.get("front_female"),
+            official_artwork_female_shiny=artwork.get("front_shiny_female"),
             home=home.get("front_default"),
             home_shiny=home.get("front_shiny"),
             home_female=home.get("front_female"),

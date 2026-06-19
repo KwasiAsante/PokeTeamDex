@@ -119,6 +119,8 @@ class SupplementMove {
 class SpriteUrlsFull {
   final String? officialArtwork;
   final String? officialArtworkShiny;
+  final String? officialArtworkFemale;
+  final String? officialArtworkFemaleShiny;
   final String? home;
   final String? homeShiny;
   final String? homeFemale;
@@ -143,6 +145,8 @@ class SpriteUrlsFull {
   const SpriteUrlsFull({
     this.officialArtwork,
     this.officialArtworkShiny,
+    this.officialArtworkFemale,
+    this.officialArtworkFemaleShiny,
     this.home,
     this.homeShiny,
     this.homeFemale,
@@ -160,6 +164,8 @@ class SpriteUrlsFull {
   factory SpriteUrlsFull.fromJson(Map<String, dynamic> json) => SpriteUrlsFull(
         officialArtwork: json['official_artwork'] as String?,
         officialArtworkShiny: json['official_artwork_shiny'] as String?,
+        officialArtworkFemale: json['official_artwork_female'] as String?,
+        officialArtworkFemaleShiny: json['official_artwork_female_shiny'] as String?,
         home: json['home'] as String?,
         homeShiny: json['home_shiny'] as String?,
         homeFemale: json['home_female'] as String?,
@@ -177,6 +183,8 @@ class SpriteUrlsFull {
   Map<String, dynamic> toJson() => {
         'official_artwork': officialArtwork,
         'official_artwork_shiny': officialArtworkShiny,
+        'official_artwork_female': officialArtworkFemale,
+        'official_artwork_female_shiny': officialArtworkFemaleShiny,
         'home': home,
         'home_shiny': homeShiny,
         'home_female': homeFemale,

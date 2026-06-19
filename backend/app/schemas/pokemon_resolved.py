@@ -107,6 +107,8 @@ class SpriteUrlsFull(BaseModel):
 
     official_artwork: str | None = None
     official_artwork_shiny: str | None = None
+    official_artwork_female: str | None = None
+    official_artwork_female_shiny: str | None = None
     home: str | None = None
     home_shiny: str | None = None
     home_female: str | None = None
