@@ -1003,7 +1003,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                   megaArtworkUrl: effectiveMegaArtworkUrl,
                   megaFallbackUrl: cosmeticFormSpriteUrls?.fallbackUrl ?? effectiveMegaFallbackUrl,
                   megaFallbackUrl2: cosmeticFormSpriteUrls?.fallbackUrl2,
-                  isFormLoading: formPokemonAsync?.isLoading ?? false),
+                  isFormLoading: formPokemonAsync?.isLoading ?? false,
+                  // No format or gen 6+: HOME as primary, pixel sprite as fallback.
+                  useHomeAsDefault: format == null || format.gen > 5,
+                  homeUrl: _isShiny
+                      ? (resolved.spriteUrls.homeShiny ?? resolved.spriteUrls.home)
+                      : resolved.spriteUrls.home),
               // ── Form selector (when Pokémon has multiple forms) ──
               if (hasMultipleForms) ...[
                 const SizedBox(height: 16),
@@ -1299,6 +1304,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     String? megaFallbackUrl,
     String? megaFallbackUrl2,
     bool isFormLoading = false,
+    bool useHomeAsDefault = false,
+    String? homeUrl,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -1324,12 +1331,14 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           children: [
             PokemonSprite(
               // Priority: form/mega/gmax override > gen female > gen default.
-              defaultUrl: megaArtworkUrl ?? genderUrl ?? spriteUrls.defaultUrl,
+              // No format or gen 6+: HOME is primary, pixel sprite is fallback.
+              defaultUrl: megaArtworkUrl ?? genderUrl ??
+                  (useHomeAsDefault ? (homeUrl ?? spriteUrls.defaultUrl) : spriteUrls.defaultUrl),
               fallbackUrl: megaArtworkUrl != null
                   ? megaFallbackUrl
                   : genderUrl != null
                       ? genFallback
-                      : null,
+                      : (useHomeAsDefault ? spriteUrls.defaultUrl : null),
               fallbackUrl2: megaArtworkUrl != null
                   ? (megaFallbackUrl2 ?? spriteUrls.defaultUrl)
                   : genderUrl != null

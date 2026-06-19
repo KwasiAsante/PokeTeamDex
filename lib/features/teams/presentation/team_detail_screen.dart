@@ -998,13 +998,12 @@ class _FilledSlotCard extends ConsumerWidget {
               }()
             : null;
         final formHomeUrl = formChangePokemon != null
-            ? (formVarietySprite != null
-                ? formVarietySprite
-                : useFormatSprites && format != null && format.gen <= 5
+            ? (formVarietySprite
+              ?? (useFormatSprites && format != null && format.gen <= 5
                     ? null  // fall through to spriteUrls.defaultUrl
                     : (descriptor.isShiny
                         ? pokemonHomeShinyUrl(formChangePokemon.id)
-                        : pokemonHomeUrl(formChangePokemon.id)))
+                        : pokemonHomeUrl(formChangePokemon.id))))
             : cosmeticFormChangeSpriteUrls != null
                 ? (descriptor.isShiny
                     ? cosmeticFormChangeSpriteUrls.shinyUrl
@@ -1219,15 +1218,29 @@ class _FilledSlotCard extends ConsumerWidget {
                                       ? pokemonHomeShinyFemaleUrl(pokemon.id)
                                       : pokemonHomeFemaleUrl(pokemon.id))
                                   : null;
+                              // No format or gen 6+: use HOME artwork as primary,
+                              // fall back to versioned/pixel sprite. Gen 1-5:
+                              // resolveFormSprite already provides the correct
+                              // versioned sprite as defaultUrl.
+                              final useHome = format == null || format.gen > 5;
+                              final homeDefault = descriptor.isShiny
+                                  ? (resolved.spriteUrls.homeShiny ?? resolved.spriteUrls.home)
+                                  : resolved.spriteUrls.home;
+                              final effectiveDefault = useHome
+                                  ? (homeDefault ?? spriteUrls.defaultUrl)
+                                  : spriteUrls.defaultUrl;
+                              final effectiveFallback = useHome
+                                  ? spriteUrls.defaultUrl
+                                  : null;
                               return PokemonSprite(
                                 defaultUrl: megaArtworkUrl ??
                                     genderUrl ??
-                                    spriteUrls.defaultUrl,
+                                    effectiveDefault,
                                 fallbackUrl: megaArtworkUrl != null
                                     ? (cosmeticFormChangeSpriteUrls?.fallbackUrl ?? megaArtworkFallback)
                                     : genderUrl != null
                                         ? genFallback
-                                        : null,
+                                        : effectiveFallback,
                                 fallbackUrl2: megaArtworkUrl != null
                                     ? (cosmeticFormChangeSpriteUrls?.fallbackUrl2 ?? spriteUrls.defaultUrl)
                                     : genderUrl != null
