@@ -802,6 +802,7 @@ class _FilledSlotCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final pokemonAsync = ref.watch(pokemonDetailProvider(slot.pokemonId));
     final formsData = ref.watch(pokemonFormsProvider(slot.pokemonId)).asData?.value;
+    final varietiesData = ref.watch(pokemonVarietiesProvider(slot.pokemonId)).asData?.value;
     final itemAsync = slot.heldItemName != null
         ? ref.watch(slotItemDetailProvider(slot.heldItemName!))
         : null;
@@ -973,15 +974,27 @@ class _FilledSlotCard extends ConsumerWidget {
                 useFormatSprites: useFormatSprites,
               )
             : null;
-        // For variety forms in gen 1-5 formats, prefer the format-aware sprite
-        // (spriteUrls.defaultUrl) over the HOME URL so Rotom-Wash in Gen 4
-        // shows the Gen 4 sprite rather than the 3D HOME artwork.
+        // For variety forms in gen 1-5 formats, use the variety's game_front
+        // sprite from pokemonVarietiesProvider (e.g. Rotom-Wash gen-4 HGSS
+        // sprite) instead of the HOME URL.
+        final formVarietySprite = (useFormatSprites && format != null && format.gen <= 5 &&
+                formChangePokemon != null && descriptor.formName != null)
+            ? () {
+                final vd = varietiesData?.where((v) =>
+                    v.name == '${pokemon.name}-${descriptor.formName}').firstOrNull;
+                return descriptor.isShiny
+                    ? (vd?.spriteUrls?.gameFrontShiny ?? vd?.spriteUrls?.gameFront)
+                    : vd?.spriteUrls?.gameFront;
+              }()
+            : null;
         final formHomeUrl = formChangePokemon != null
-            ? (useFormatSprites && format != null && format.gen <= 5
-                ? null  // fall through to spriteUrls.defaultUrl
-                : (descriptor.isShiny
-                    ? pokemonHomeShinyUrl(formChangePokemon.id)
-                    : pokemonHomeUrl(formChangePokemon.id)))
+            ? (formVarietySprite != null
+                ? formVarietySprite
+                : useFormatSprites && format != null && format.gen <= 5
+                    ? null  // fall through to spriteUrls.defaultUrl
+                    : (descriptor.isShiny
+                        ? pokemonHomeShinyUrl(formChangePokemon.id)
+                        : pokemonHomeUrl(formChangePokemon.id)))
             : cosmeticFormChangeSpriteUrls != null
                 ? (descriptor.isShiny
                     ? cosmeticFormChangeSpriteUrls.shinyUrl

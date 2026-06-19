@@ -23,7 +23,7 @@ import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show AbilityInfo, MoveSummary;
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
-    show pokemonFormsProvider, pokemonMovesProvider;
+    show pokemonFormsProvider, pokemonMovesProvider, pokemonVarietiesProvider;
 import 'package:poke_team_dex/services/pokeapi/models/type_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
@@ -611,6 +611,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     ref.watch(allFormatsProvider); // ensures PS data is loaded; triggers rebuild when ready
     final resolvedAsync = ref.watch(resolvedPokemonProvider(slot.pokemonId));
     final formsData = ref.watch(pokemonFormsProvider(slot.pokemonId)).asData?.value;
+    final varietiesData = ref.watch(pokemonVarietiesProvider(slot.pokemonId)).asData?.value;
     return resolvedAsync.when(
       loading: () => widget.embedded
           ? const Center(child: CircularProgressIndicator())
@@ -905,12 +906,24 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 useFormatSprites: useFormatSprites,
               )
             : null;
+        final formVarietySprite = (useFormatSprites && format != null && format.gen <= 5 &&
+                formPokemon != null && _formName != null)
+            ? () {
+                final vd = varietiesData?.where((v) =>
+                    v.name == _formName).firstOrNull;
+                return _isShiny
+                    ? (vd?.spriteUrls?.gameFrontShiny ?? vd?.spriteUrls?.gameFront)
+                    : vd?.spriteUrls?.gameFront;
+              }()
+            : null;
         final formHomeUrl = formPokemon != null
-            ? (useFormatSprites && format != null && format.gen <= 5
-                ? null  // fall through to spriteUrls.defaultUrl for gen 1-5 formats
-                : (_isShiny
-                    ? pokemonHomeShinyUrl(formPokemon.id)
-                    : pokemonHomeUrl(formPokemon.id)))
+            ? (formVarietySprite != null
+                ? formVarietySprite
+                : useFormatSprites && format != null && format.gen <= 5
+                    ? null  // fall through to spriteUrls.defaultUrl for gen 1-5 formats
+                    : (_isShiny
+                        ? pokemonHomeShinyUrl(formPokemon.id)
+                        : pokemonHomeUrl(formPokemon.id)))
             : cosmeticFormSpriteUrls != null
                 ? (_isShiny
                     ? cosmeticFormSpriteUrls.shinyUrl
