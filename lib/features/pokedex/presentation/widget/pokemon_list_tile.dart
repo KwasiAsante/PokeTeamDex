@@ -315,7 +315,19 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
                   child: SizedBox(
                     width: imageSize,
                     height: imageHeight,
-                    child: isFormLoading
+                    child: resolvedAsync.isLoading
+                        ? Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.4),
+                              ),
+                            ),
+                          )
+                        : isFormLoading
                         ? const Center(
                             child: SizedBox(
                               width: 24,
@@ -364,23 +376,42 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
                             ?.copyWith(fontWeight: FontWeight.bold),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (types.isNotEmpty || (hasFormChip && !isCompact))
+                      if (resolvedAsync.isLoading)
                         Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Wrap(
-                            spacing: 4,
-                            runSpacing: 2,
-                            children: [
-                              ...types.map((t) => TypeBadge(type: t)),
-                              if (!isCompact && formChip != null) formChip,
-                            ],
+                          padding: const EdgeInsets.only(top: 6),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox(
+                              width: 72,
+                              height: 20,
+                              child: LinearProgressIndicator(
+                                color: colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.15),
+                                backgroundColor: colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.07),
+                              ),
+                            ),
                           ),
-                        ),
-                      if (isCompact && formChip != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: formChip,
-                        ),
+                        )
+                      else ...[
+                        if (types.isNotEmpty || (hasFormChip && !isCompact))
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Wrap(
+                              spacing: 4,
+                              runSpacing: 2,
+                              children: [
+                                ...types.map((t) => TypeBadge(type: t)),
+                                if (!isCompact && formChip != null) formChip,
+                              ],
+                            ),
+                          ),
+                        if (isCompact && formChip != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: formChip,
+                          ),
+                      ],
                     ],
                   ),
                 ),
