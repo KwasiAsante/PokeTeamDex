@@ -96,19 +96,8 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
     final resolved = resolvedAsync.asData?.value;
     final basePokemon = resolved?.detail;
     final cosmeticFormEntries = resolved?.cosmeticForms ?? const <PokemonFormEntry>[];
-    final formsData = ref.watch(pokemonFormsProvider(widget.pokemon.id)).asData?.value;
-    final varietiesData = ref.watch(pokemonVarietiesProvider(widget.pokemon.id)).asData?.value;
 
-    final selectedCosmeticEntry = _selectedFormName != null
-        ? cosmeticFormEntries
-            .where((f) => f.name == _selectedFormName)
-            .firstOrNull
-        : null;
-    final formAsync = (_selectedFormName != null && selectedCosmeticEntry == null)
-        ? ref.watch(pokemonByNameProvider(_selectedFormName!))
-        : null;
-
-    // Form list
+    // Compute form lists before deciding whether to fetch full data.
     final species = resolved?.species;
     final battleForms =
         species != null ? battleMeaningfulForms(species.varieties) : <PokemonVariety>[];
@@ -121,6 +110,23 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         ? computeBaseFormLabel(
             widget.pokemon.name, species.generationName, battleForms)
         : 'Base';
+
+    // Only fetch full sprite data when the slim response has something to enrich.
+    final formsData = cosmeticFormEntries.isNotEmpty
+        ? ref.watch(pokemonFormsProvider(widget.pokemon.id)).asData?.value
+        : null;
+    final varietiesData = (battleForms.isNotEmpty || cosmeticVarietyForms.isNotEmpty)
+        ? ref.watch(pokemonVarietiesProvider(widget.pokemon.id)).asData?.value
+        : null;
+
+    final selectedCosmeticEntry = _selectedFormName != null
+        ? cosmeticFormEntries
+            .where((f) => f.name == _selectedFormName)
+            .firstOrNull
+        : null;
+    final formAsync = (_selectedFormName != null && selectedCosmeticEntry == null)
+        ? ref.watch(pokemonByNameProvider(_selectedFormName!))
+        : null;
 
     final allForms = _buildAllFormsGrid(
       cosmeticFormEntries: cosmeticFormEntries,

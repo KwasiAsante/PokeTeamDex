@@ -98,10 +98,30 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
     final basePokemon = resolved?.detail;
     final cosmeticFormEntries = resolved?.cosmeticForms ?? const <PokemonFormEntry>[];
 
-    // Full form sprite data (official → home → sprite) — loaded lazily from backend.
-    final formsData = ref.watch(pokemonFormsProvider(widget.pokemon.id)).asData?.value;
-    // Full variety sprite data for battle-form chips (Mega, regional, etc.).
-    final varietiesData = ref.watch(pokemonVarietiesProvider(widget.pokemon.id)).asData?.value;
+    // Compute form lists from slim resolved data before deciding whether to
+    // fetch the full forms/varieties endpoints — avoids unnecessary fetches
+    // for Pokémon with no forms or varieties (the majority of the Pokédex).
+    final species = resolved?.species;
+    final battleForms =
+        species != null ? battleMeaningfulForms(species.varieties) : <PokemonVariety>[];
+    final cosmeticVarietyForms = species != null
+        ? species.varieties
+            .where((v) => PokemonDataRegistry.instance.cosmeticVarietyNames.contains(v.name))
+            .toList()
+        : <PokemonVariety>[];
+    final baseFormLabel = species != null
+        ? computeBaseFormLabel(
+            widget.pokemon.name, species.generationName, battleForms)
+        : 'Base';
+
+    // Only fetch full sprite data when the slim response tells us there is
+    // something to enrich — skips the network/cache call for most Pokémon.
+    final formsData = cosmeticFormEntries.isNotEmpty
+        ? ref.watch(pokemonFormsProvider(widget.pokemon.id)).asData?.value
+        : null;
+    final varietiesData = (battleForms.isNotEmpty || cosmeticVarietyForms.isNotEmpty)
+        ? ref.watch(pokemonVarietiesProvider(widget.pokemon.id)).asData?.value
+        : null;
 
     // Check if the currently selected form is a cosmetic form entry.
     // Cosmetic form entries share the base Pokémon's types — no provider call
@@ -115,20 +135,6 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
     final formAsync = (_selectedFormName != null && selectedCosmeticEntry == null)
         ? ref.watch(pokemonByNameProvider(_selectedFormName!))
         : null;
-
-    // Form list — computed once species resolves
-    final species = resolved?.species;
-    final battleForms =
-        species != null ? battleMeaningfulForms(species.varieties) : <PokemonVariety>[];
-    final cosmeticVarietyForms = species != null
-        ? species.varieties
-            .where((v) => PokemonDataRegistry.instance.cosmeticVarietyNames.contains(v.name))
-            .toList()
-        : <PokemonVariety>[];
-    final baseFormLabel = species != null
-        ? computeBaseFormLabel(
-            widget.pokemon.name, species.generationName, battleForms)
-        : 'Base';
 
     final allForms = _buildAllForms(
       cosmeticFormEntries: cosmeticFormEntries,
