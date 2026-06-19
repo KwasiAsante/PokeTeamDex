@@ -902,22 +902,19 @@ class _FilledSlotCard extends ConsumerWidget {
         final cosmeticFormEntries = resolved.cosmeticForms;
         final isCosmeticFormActive = isFormActive &&
             cosmeticFormEntries.any((f) => f.name == descriptor.formName);
-        final formChangePokemon = (isFormActive && !isCosmeticFormActive)
-            ? ref
-                .watch(pokemonByNameProvider(descriptor.formName!))
-                .asData
-                ?.value
+        // All battle-meaningful forms are confirmed varieties — look them up
+        // directly in varietiesData rather than watching pokemonByNameProvider.
+        final formVariety = (isFormActive && !isCosmeticFormActive)
+            ? varietiesData?.where((v) => v.name == descriptor.formName).firstOrNull
             : null;
         final cosmeticFormChange = isCosmeticFormActive
             ? cosmeticFormEntries
                 .where((f) => f.name == descriptor.formName)
                 .firstOrNull
             : null;
-        // Effective types and stats for the active form (used for type badges
-        // and stat bars — regional forms have different types/stats).
-        final effectiveTypes = (formChangePokemon != null &&
-                formChangePokemon.types.isNotEmpty)
-            ? formChangePokemon.types
+        // Effective types and stats for the active form.
+        final effectiveTypes = (formVariety?.types?.isNotEmpty == true)
+            ? formVariety!.types!
             : pokemon.types;
         final effectivePrimaryType = effectiveTypes.isNotEmpty
             ? effectiveTypes[0]
@@ -926,7 +923,8 @@ class _FilledSlotCard extends ConsumerWidget {
             PokemonTypeColors.colors[effectivePrimaryType] ?? colorScheme.primary;
 
         // Form-specific base stats (overrides mega stats too if both active).
-        final formEffectiveStats = formChangePokemon?.stats;
+        // VarietyBackendData uses baseStats (PokéAPI key names same as PokemonEntry.stats).
+        final formEffectiveStats = formVariety?.baseStats;
 
         // Sprite resolution — use format-aware sprites when setting is on.
         // Computed here (ahead of `spriteUrls` below) because the cosmetic
@@ -981,13 +979,13 @@ class _FilledSlotCard extends ConsumerWidget {
                     : vd?.spriteUrls?.gameFront;
               }()
             : null;
-        final formHomeUrl = formChangePokemon != null
+        final formHomeUrl = formVariety != null
             ? (formVarietySprite
               ?? (useFormatSprites && format != null && format.gen <= 5
                     ? null  // fall through to spriteUrls.defaultUrl
                     : (descriptor.isShiny
-                        ? pokemonHomeShinyUrl(formChangePokemon.id)
-                        : pokemonHomeUrl(formChangePokemon.id))))
+                        ? (formVariety.spriteUrls?.homeShiny ?? formVariety.spriteUrls?.home)
+                        : formVariety.spriteUrls?.home)))
             : cosmeticFormChangeSpriteUrls != null
                 ? (descriptor.isShiny
                     ? cosmeticFormChangeSpriteUrls.shinyUrl
@@ -1001,11 +999,11 @@ class _FilledSlotCard extends ConsumerWidget {
             cosmeticFullSprite?.spriteUrls?.home ??
             cosmeticFullSprite?.frontSpriteUrl ??
             cosmeticFormChange?.spriteUrl;
-        final formOfficialUrl = formChangePokemon != null
+        final formOfficialUrl = formVariety != null
             ? (descriptor.isShiny
-                ? (formChangePokemon.officialArtworkShinyUrl ??
-                    formChangePokemon.officialArtworkUrl)
-                : formChangePokemon.officialArtworkUrl)
+                ? (formVariety.spriteUrls?.officialArtworkShiny ??
+                    formVariety.spriteUrls?.officialArtwork)
+                : formVariety.spriteUrls?.officialArtwork)
             : cosmeticFormChange != null
                 ? (descriptor.isShiny
                     ? (cosmeticFormChange.spriteShinyUrl ??
@@ -1018,7 +1016,7 @@ class _FilledSlotCard extends ConsumerWidget {
         // Use the actively-selected form (e.g. Urshifu Rapid Strike, Toxtricity
         // Low Key) rather than the base species — species with multiple forms
         // can have different G-Max moves/artwork per form.
-        final gmaxSpeciesName = formChangePokemon?.name ?? pokemon.name;
+        final gmaxSpeciesName = formVariety?.name ?? pokemon.name;
         final isGMaxActive = descriptor.hasGigantamax && descriptor.gigantamaxEnabled &&
             gmaxMoveForSpecies(gmaxSpeciesName) != null;
         final gmaxPokemon = isGMaxActive
