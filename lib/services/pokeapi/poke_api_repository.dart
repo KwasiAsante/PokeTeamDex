@@ -437,12 +437,18 @@ class PokeApiRepository {
 
     final result = <({String speciesName, List<MoveSummary> moves})>[];
     for (final ancestorId in ancestorIds) {
-      final pokemon = await fetchPokemon(ancestorId);
-      result.add((speciesName: pokemon.name, moves: pokemon.moves));
+      // For regional forms, skip the default ancestor — only the matching
+      // regional variety is relevant (Alolan Ninetales → Alolan Vulpix only,
+      // not Kantonian Vulpix).
+      if (isDefaultForm) {
+        final pokemon = await fetchPokemon(ancestorId);
+        result.add((speciesName: pokemon.name, moves: pokemon.moves));
+      }
       // Also include non-default regional forms so that breeding moves exclusive
       // to those forms surface as prior-evo moves (e.g. Galarian Zigzagoon egg
       // moves for Obstagoon). Apply regional filtering so Alolan Vulpix does not
-      // appear when viewing Kantonian Ninetales.
+      // appear when viewing Kantonian Ninetales, and Kantonian Vulpix does not
+      // appear when viewing Alolan Ninetales.
       final ancestorSpecies = await fetchPokemonSpecies(ancestorId);
       for (final variety in ancestorSpecies.varieties) {
         if (variety.isDefault) continue;
