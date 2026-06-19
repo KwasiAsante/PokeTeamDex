@@ -907,7 +907,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               )
             : null;
         final formVarietySprite = (useFormatSprites && format != null && format.gen <= 5 &&
-                formPokemon != null && _formName != null)
+                _formName != null)
             ? () {
                 final vd = varietiesData?.where((v) =>
                     v.name == _formName).firstOrNull;

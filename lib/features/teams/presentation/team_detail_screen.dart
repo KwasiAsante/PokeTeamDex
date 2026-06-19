@@ -980,12 +980,13 @@ class _FilledSlotCard extends ConsumerWidget {
         // For variety forms in gen 1-5 formats, use the variety's game_front
         // sprite from pokemonVarietiesProvider (e.g. Rotom-Wash gen-4 HGSS
         // sprite) instead of the HOME URL.
+        // Look up variety game sprite independently of formChangePokemon loading
+        // state — varietiesData loads from its own cache and may be ready before
+        // pokemonByNameProvider. If varietiesData is null, falls through safely.
         final formVarietySprite = (useFormatSprites && format != null && format.gen <= 5 &&
-                formChangePokemon != null && descriptor.formName != null)
+                descriptor.formName != null)
             ? () {
-                // descriptor.formName already IS the full variety name (e.g. "rotom-wash"),
-        // not just the suffix — don't prefix with pokemon.name again.
-        final vd = varietiesData?.where((v) =>
+                final vd = varietiesData?.where((v) =>
                     v.name == descriptor.formName).firstOrNull;
                 return descriptor.isShiny
                     ? (vd?.spriteUrls?.gameFrontShiny ?? vd?.spriteUrls?.gameFront)
