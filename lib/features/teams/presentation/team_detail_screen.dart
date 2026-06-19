@@ -800,7 +800,9 @@ class _FilledSlotCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pokemonAsync = ref.watch(pokemonDetailProvider(slot.pokemonId));
+    // Use resolvedPokemonProvider (keepAlive, already cached from Pokédex scroll)
+    // instead of pokemonDetailProvider (autoDispose, separate network call per slot).
+    final resolvedAsync = ref.watch(resolvedPokemonProvider(slot.pokemonId));
     final formsData = ref.watch(pokemonFormsProvider(slot.pokemonId)).asData?.value;
     final varietiesData = ref.watch(pokemonVarietiesProvider(slot.pokemonId)).asData?.value;
     final itemAsync = slot.heldItemName != null
@@ -810,7 +812,7 @@ class _FilledSlotCard extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return pokemonAsync.when(
+    return resolvedAsync.when(
       loading: () => Card(
         child: SizedBox(
           height: 120,
@@ -819,7 +821,8 @@ class _FilledSlotCard extends ConsumerWidget {
       ),
       error: (e, _) =>
           Card(child: Center(child: Text('Error', style: textTheme.bodySmall))),
-      data: (pokemon) {
+      data: (resolved) {
+        final pokemon = resolved.detail;
         final speciesName = pokemon.displaySpeciesName;
         final nickname = slot.nickname?.trim();
         final hasNickname =
@@ -980,8 +983,10 @@ class _FilledSlotCard extends ConsumerWidget {
         final formVarietySprite = (useFormatSprites && format != null && format.gen <= 5 &&
                 formChangePokemon != null && descriptor.formName != null)
             ? () {
-                final vd = varietiesData?.where((v) =>
-                    v.name == '${pokemon.name}-${descriptor.formName}').firstOrNull;
+                // descriptor.formName already IS the full variety name (e.g. "rotom-wash"),
+        // not just the suffix — don't prefix with pokemon.name again.
+        final vd = varietiesData?.where((v) =>
+                    v.name == descriptor.formName).firstOrNull;
                 return descriptor.isShiny
                     ? (vd?.spriteUrls?.gameFrontShiny ?? vd?.spriteUrls?.gameFront)
                     : vd?.spriteUrls?.gameFront;
