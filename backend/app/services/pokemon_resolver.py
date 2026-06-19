@@ -456,6 +456,8 @@ class PokemonResolverService:
         variety_id: int,
         gen: int,
         gen_sprite_id_override: str | None = None,
+        variety_name: str = "",
+        base_pokemon_id: int | None = None,
     ) -> SpriteUrlsFull:
         """Build full sprite URLs for a variety (has its own /pokemon resource).
 
@@ -480,6 +482,24 @@ class PokemonResolverService:
         )
 
         has_female_home = bool(home.get("front_female"))
+
+        # Icon: prefer PokéAPI's own icon URL from the sprites object.
+        # Some female varieties (e.g. Indeedee-female, ID 10186) have no icon
+        # at their variety ID — the repo only has female/{base_id}.png.
+        # PokéAPI signals this by returning front_default=null in icons.
+        gen8_icon_api = (
+            (sprites.get("versions") or {})
+            .get("generation-viii", {})
+            .get("icons", {})
+            .get("front_default")
+        )
+        if gen8_icon_api:
+            icon = gen8_icon_api
+        elif variety_name.endswith("-female") and base_pokemon_id is not None:
+            icon = _build_icon_url(base_pokemon_id, gen, female=True)
+        else:
+            icon = _build_icon_url(variety_id, gen)
+
         return SpriteUrlsFull(
             official_artwork=artwork.get("front_default"),
             official_artwork_shiny=artwork.get("front_shiny"),
@@ -493,7 +513,7 @@ class PokemonResolverService:
             game_front_shiny=game_front_shiny,
             game_front_female=None,
             game_front_female_shiny=None,
-            icon=_build_icon_url(variety_id, gen),
+            icon=icon,
             icon_shiny=game_front_shiny,
             icon_female=_build_icon_url(variety_id, gen, female=True) if has_female_home else None,
             icon_female_shiny=None,
@@ -615,7 +635,8 @@ class PokemonResolverService:
     # ------------------------------------------------------------------
 
     async def _fetch_varieties(
-        self, varieties: list[dict], species_name: str, gen: int, base_url: str = ""
+        self, varieties: list[dict], species_name: str, gen: int, base_url: str = "",
+        base_pokemon_id: int | None = None,
     ) -> list[VarietyData]:
         """Parallel fetch /pokemon/{id} for each non-default variety.
 
@@ -676,7 +697,8 @@ class PokemonResolverService:
             )
 
             sprite_urls = self._build_variety_sprite_urls(
-                data.get("sprites") or {}, ps_sprite_name, variety_id, gen
+                data.get("sprites") or {}, ps_sprite_name, variety_id, gen,
+                variety_name=variety_name, base_pokemon_id=base_pokemon_id,
             )
 
             result.append(VarietyData(
@@ -1027,7 +1049,7 @@ class PokemonResolverService:
 
         # 8. Varieties (always fetched on cache miss, trimmed at response time)
         raw_varieties = species_data.get("varieties", [])
-        varieties = await self._fetch_varieties(raw_varieties, species_name, gen, base_url)
+        varieties = await self._fetch_varieties(raw_varieties, species_name, gen, base_url, base_pokemon_id=pokemon_id)
 
         # 9. Forms (form-entry cosmetics)
         form_names = [f["name"] for f in pokemon_data.get("forms", [])]
