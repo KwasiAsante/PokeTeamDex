@@ -115,8 +115,10 @@ class SpriteUrlsFull(BaseModel):
     game_front_shiny: str | None = None
     game_front_female: str | None = None
     game_front_female_shiny: str | None = None
-    icon: str | None = None        # Gen-specific icon sprite (gen 8/7); plain front sprite for gen ≤ 6
-    icon_shiny: str | None = None  # game_front_shiny (no dedicated shiny icon sprites exist)
+    icon: str | None = None              # Gen-specific icon sprite (gen 8/7); plain front sprite for gen ≤ 6
+    icon_shiny: str | None = None        # game_front_shiny (no dedicated shiny icon sprites exist)
+    icon_female: str | None = None       # Female icon (gen-viii/icons/female/ or gen-vii/icons/female/)
+    icon_female_shiny: str | None = None # game_front_female_shiny (no dedicated shiny female icons)
 
 
 class VarietyData(BaseModel):

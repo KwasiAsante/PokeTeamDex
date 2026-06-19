@@ -134,6 +134,11 @@ class SpriteUrlsFull {
   final String? icon;
   // Shiny icon — uses game_front_shiny since no dedicated shiny icon sprites exist.
   final String? iconShiny;
+  // Female icon — generation-viii/icons/female/{id}.png (or gen-vii equivalent).
+  // Only non-null for Pokémon with visually distinct female sprites.
+  final String? iconFemale;
+  // Female shiny icon — uses game_front_female_shiny (no dedicated sprites exist).
+  final String? iconFemaleShiny;
 
   const SpriteUrlsFull({
     this.officialArtwork,
@@ -148,6 +153,8 @@ class SpriteUrlsFull {
     this.gameFrontFemaleShiny,
     this.icon,
     this.iconShiny,
+    this.iconFemale,
+    this.iconFemaleShiny,
   });
 
   factory SpriteUrlsFull.fromJson(Map<String, dynamic> json) => SpriteUrlsFull(
@@ -163,6 +170,8 @@ class SpriteUrlsFull {
         gameFrontFemaleShiny: json['game_front_female_shiny'] as String?,
         icon: json['icon'] as String?,
         iconShiny: json['icon_shiny'] as String?,
+        iconFemale: json['icon_female'] as String?,
+        iconFemaleShiny: json['icon_female_shiny'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -178,6 +187,8 @@ class SpriteUrlsFull {
         'game_front_female_shiny': gameFrontFemaleShiny,
         'icon': icon,
         'icon_shiny': iconShiny,
+        'icon_female': iconFemale,
+        'icon_female_shiny': iconFemaleShiny,
       };
 }
 

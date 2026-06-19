@@ -205,20 +205,23 @@ def _build_showdown_sprite_url(
         return f"{_SHOWDOWN_CDN}/{dir_name}/{ps_name}.png"
 
 
-def _build_icon_url(pokemon_id: int | str, gen: int) -> str:
+def _build_icon_url(pokemon_id: int | str, gen: int, female: bool = False) -> str:
     """Gen-specific icon sprite URL.
 
     Fallback chain:
-      gen >= 8  → generation-viii/icons/{id}.png
-      gen == 7  → generation-vii/icons/{id}.png
-      gen <= 6  → plain front sprite (no icon directories exist for these gens)
+      gen >= 8  → generation-viii/icons/{id}.png  (female/ subdir if female=True)
+      gen == 7  → generation-vii/icons/{id}.png   (female/ subdir if female=True)
+      gen <= 6  → plain front sprite (no icon directories; female/ subdir for female=True)
     """
     if gen >= 8:
-        return f"{_POKEAPI_SPRITES}/generation-viii/icons/{pokemon_id}.png"
+        subdir = "female/" if female else ""
+        return f"{_POKEAPI_SPRITES}/generation-viii/icons/{subdir}{pokemon_id}.png"
     elif gen >= 7:
-        return f"{_POKEAPI_SPRITES}/generation-vii/icons/{pokemon_id}.png"
+        subdir = "female/" if female else ""
+        return f"{_POKEAPI_SPRITES}/generation-vii/icons/{subdir}{pokemon_id}.png"
     else:
-        return f"{_POKEAPI_PLAIN_SPRITES}/{pokemon_id}.png"
+        subdir = "female/" if female else ""
+        return f"{_POKEAPI_PLAIN_SPRITES}/{subdir}{pokemon_id}.png"
 
 
 def _extract_form_suffix(form_name: str, species_name: str) -> str | None:
@@ -467,6 +470,7 @@ class PokemonResolverService:
             or _build_showdown_sprite_url(ps_name, gen, shiny=True)
         )
 
+        has_female_home = bool(home.get("front_female"))
         return SpriteUrlsFull(
             official_artwork=artwork.get("front_default"),
             official_artwork_shiny=artwork.get("front_shiny"),
@@ -480,6 +484,8 @@ class PokemonResolverService:
             game_front_female_shiny=None,
             icon=_build_icon_url(variety_id, gen),
             icon_shiny=game_front_shiny,
+            icon_female=_build_icon_url(variety_id, gen, female=True) if has_female_home else None,
+            icon_female_shiny=None,
         )
 
     def _build_form_sprite_urls(
