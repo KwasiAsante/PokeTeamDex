@@ -555,7 +555,10 @@ class PokemonResolverService:
             game_front_shiny=game_front_shiny,
             game_front_female=None,
             game_front_female_shiny=None,
-            icon=_build_icon_url(sprite_id, gen),
+            # Female form entries live at icons/female/{base_id}.png, not
+            # icons/{base_id}-female.png — use the female=True path for those.
+            icon=_build_icon_url(base_id, gen, female=True) if repo_suffix == "female"
+                 else _build_icon_url(sprite_id, gen),
             icon_shiny=game_front_shiny,
         )
 

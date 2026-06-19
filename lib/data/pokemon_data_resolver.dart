@@ -171,16 +171,20 @@ class PokemonDataResolver {
 
     if (selectedFormName != null) {
       if (cosmeticEntry != null) {
+        final isFemaleForm = cosmeticEntry.formName == 'female';
         if (imageType == PokedexImageType.artwork) {
           final override =
               registry.cosmeticFormHomeUrlOverrides[cosmeticEntry.name];
           if (override != null) return override;
+          // Female: prefer official_artwork_female (future-proof) then home_female.
+          if (isFemaleForm) {
+            return spriteUrls?.officialArtworkFemale ??
+                spriteUrls?.homeFemale ??
+                formSpriteUrls?.home ??
+                pokemonHomeFemaleUrl(pokemonId);
+          }
           final formHome = formSpriteUrls?.home;
           if (formHome != null) return formHome;
-          // Female HOME artwork lives at home/female/{id}.png — not {id}-female.png.
-          if (cosmeticEntry.formName == 'female') {
-            return pokemonHomeFemaleUrl(pokemonId);
-          }
           if (cosmeticEntry.name.startsWith('$baseSpecies-')) {
             final suffix =
                 cosmeticEntry.name.substring(baseSpecies.length + 1);
@@ -188,11 +192,16 @@ class PokemonDataResolver {
           }
         }
         if (imageType == null) {
-          // Compact mode: use form-specific gen-8 icon when available.
+          // Compact mode: female form uses the dedicated female icon path.
+          if (isFemaleForm) {
+            return spriteUrls?.iconFemale ??
+                formSpriteUrls?.icon ??
+                '${_spritesBase}female/$pokemonId.png';
+          }
           final formIcon = formSpriteUrls?.icon;
           if (formIcon != null) return formIcon;
         }
-        if (cosmeticEntry.formName == 'female') {
+        if (isFemaleForm) {
           return '${_spritesBase}female/$pokemonId.png';
         }
         return cosmeticEntry.spriteUrl ?? '$_spritesBase$pokemonId.png';
