@@ -267,6 +267,12 @@ class PokemonResolverService:
         self._ps_pokedex: dict[str, dict] = {}
         self._ps_pokedex_overrides: dict[str, dict[str, dict]] = {}
         self._ps_exceptions: dict[str, str] = {}
+        # mega form name → mega stone item name  (inverse of megaStoneMap)
+        self._mega_form_to_item: dict[str, str] = {}
+        # mega form name → required move (e.g. rayquaza-mega → dragon-ascent)
+        self._mega_form_to_move: dict[str, str] = {}
+        # form name → required ability (from abilityGatingRules)
+        self._form_to_ability: dict[str, str] = {}
         self._smogon_sets: dict[str, dict] = {}
         self._smogon_analyses: dict[str, dict] = {}
         self._smogon_loaded = False
@@ -314,6 +320,13 @@ class PokemonResolverService:
             with open(registry_path, encoding="utf-8") as f:
                 registry = json.load(f)
             self._ps_exceptions = registry.get("psFormExceptions", {})
+            # Build inverse mega stone map: megaForm → item
+            self._mega_form_to_item = {
+                entry["megaForm"]: item
+                for item, entry in registry.get("megaStoneMap", {}).items()
+            }
+            self._mega_form_to_move = registry.get("megaFormMoveRequirements", {})
+            self._form_to_ability = registry.get("abilityGatingRules", {})
             logger.info("Loaded pokemon_registry.json (%d PS form exceptions)", len(self._ps_exceptions))
         else:
             logger.warning("pokemon_registry.json not found in static/ — copy from assets/data/")
@@ -714,6 +727,18 @@ class PokemonResolverService:
                 variety_name=variety_name, base_pokemon_id=base_pokemon_id,
             )
 
+            # Form classification from PokéAPI + registry lookups
+            form_data_json = data  # the /pokemon/{variety_id} response
+            # is_mega and is_battle_only come from the pokemon-form endpoint;
+            # detect gmax by name since PokéAPI doesn't have an explicit flag.
+            is_gmax = "gmax" in variety_name
+            is_mega = self._mega_form_to_item.get(variety_name) is not None or \
+                      self._mega_form_to_move.get(variety_name) is not None
+            is_battle_only = is_mega or is_gmax  # all megas/gmax are battle-only
+            associated_item = self._mega_form_to_item.get(variety_name)
+            associated_move = self._mega_form_to_move.get(variety_name)
+            associated_ability = self._form_to_ability.get(variety_name)
+
             result.append(VarietyData(
                 name=variety_name,
                 pokemon_id=variety_id,
@@ -723,6 +748,12 @@ class PokemonResolverService:
                 base_stats=base_stats,
                 abilities=abilities,
                 sprite_urls=sprite_urls,
+                is_mega=is_mega,
+                is_battle_only=is_battle_only,
+                is_gmax=is_gmax,
+                associated_item=associated_item,
+                associated_move=associated_move,
+                associated_ability=associated_ability,
             ))
         return result
 
@@ -882,6 +913,14 @@ class PokemonResolverService:
                         pokemon_id=v.pokemon_id,
                         is_default=v.is_default,
                         resolved_url=v.resolved_url,
+                        # Always preserve classification flags in slim response
+                        # so clients can detect megas/gmax without fetching full data.
+                        is_mega=v.is_mega,
+                        is_battle_only=v.is_battle_only,
+                        is_gmax=v.is_gmax,
+                        associated_item=v.associated_item,
+                        associated_move=v.associated_move,
+                        associated_ability=v.associated_ability,
                     )
                     for v in response.varieties
                 ]
@@ -1114,10 +1153,20 @@ class PokemonResolverService:
             egg_groups=egg_groups,                            # new
             flavor_text_entries=flavor_text_entries_list,     # new (trimmed to [] by _trim_response)
             flavor_text_url=f"{base_url}/pokemon/{pokemon_id}/flavor-text",  # new
-            is_baby=is_baby,                                  # new
-            is_legendary=is_legendary,                        # new
-            is_mythical=is_mythical,                          # new
-            evolution_chain_id=evolution_chain_id,            # new
+            is_baby=is_baby,
+            is_legendary=is_legendary,
+            is_mythical=is_mythical,
+            # Form classification for this pokemon itself (relevant for variety pokemon)
+            is_mega=self._mega_form_to_item.get(pokemon_name) is not None or
+                    self._mega_form_to_move.get(pokemon_name) is not None,
+            is_battle_only="gmax" in pokemon_name or
+                           self._mega_form_to_item.get(pokemon_name) is not None or
+                           self._mega_form_to_move.get(pokemon_name) is not None,
+            is_gmax="gmax" in pokemon_name,
+            associated_item=self._mega_form_to_item.get(pokemon_name),
+            associated_move=self._mega_form_to_move.get(pokemon_name),
+            associated_ability=self._form_to_ability.get(pokemon_name),
+            evolution_chain_id=evolution_chain_id,
         )
 
         # 11. Upsert full data to cache

@@ -141,6 +141,14 @@ class VarietyData(BaseModel):
     base_stats: dict[str, int] | None = None
     abilities: dict[str, str] | None = None
     sprite_urls: SpriteUrlsFull | None = None
+    # Form classification flags
+    is_mega: bool = False
+    is_battle_only: bool = False
+    is_gmax: bool = False
+    # Trigger for activating this variety (at most one is non-null per variety)
+    associated_item: str | None = None   # e.g. "charizardite-x"
+    associated_move: str | None = None   # e.g. "dragon-ascent" (Rayquaza)
+    associated_ability: str | None = None  # e.g. "stance-change" (Aegislash)
 
 
 class FormData(BaseModel):
@@ -241,4 +249,11 @@ class PokemonResolvedResponse(BaseModel):
     is_baby: bool = False
     is_legendary: bool = False
     is_mythical: bool = False
+    # Form classification flags (mirrors VarietyData fields for variety pokemon)
+    is_mega: bool = False
+    is_battle_only: bool = False
+    is_gmax: bool = False
+    associated_item: str | None = None
+    associated_move: str | None = None
+    associated_ability: str | None = None
     evolution_chain_id: int | None = None
