@@ -227,7 +227,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
                     child: Hero(
                       tag:
                           'pokemon-sprite-${widget.pokemon.id}${_selectedFormName != null ? '-$_selectedFormName' : ''}',
-                      child: resolvedAsync.isLoading
+                      child: (resolvedAsync.isLoading || resolvedAsync.hasError)
                           ? Center(
                               child: SizedBox(
                                 width: 32,
@@ -353,7 +353,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (resolvedAsync.isLoading)
+                  if ((resolvedAsync.isLoading || resolvedAsync.hasError))
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: ClipRRect(
