@@ -149,10 +149,10 @@
     "deerling":                  "Spring",
     "sawsbuck":                  "Spring",
     "arceus":                    "Normal",
-    "shellos":                   "West Sea",
-    "gastrodon":                 "West Sea",
+    "shellos":                   "West",
+    "gastrodon":                 "West",
     "cherrim":                   "Overcast",
-    "burmy":                     "Plant Cloak",
+    "burmy":                     "Plant",
     "castform":                  "Normal",
     "unown":                     "A",
     "furfrou":                   "Natural",
@@ -266,7 +266,7 @@
     "keldeo-resolute"
   ],
 
-  "noCosmeticFormsPokemon": ["mothim"],
+  "noCosmeticFormsPokemon": ["mothim", "scatterbug", "spewpa"],
 
   "cosmeticGenderDiffPokemon": ["unfezant"],
 
