@@ -172,9 +172,10 @@ _PsSlot? _parseBlock(String block) {
       _parseStatLine(line.substring(5), evs);
     } else if (line.startsWith('IVs: ')) {
       _parseStatLine(line.substring(5), ivs);
-    } else if (line.endsWith(' Nature')) {
-      // Keep PS casing: "Sassy Nature" → "Sassy" (matches DropdownButton items).
-      final raw = line.substring(0, line.length - 7).trim();
+    } else if (line.startsWith('Nature: ')) {
+      // "Nature: Timid Nature" → strip prefix and " Nature" suffix → "Timid"
+      var raw = line.substring(8).trim();
+      if (raw.endsWith(' Nature')) raw = raw.substring(0, raw.length - 7).trim();
       nature = raw.isNotEmpty
           ? raw[0].toUpperCase() + raw.substring(1).toLowerCase()
           : null;
