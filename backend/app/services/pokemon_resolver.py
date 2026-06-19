@@ -1114,6 +1114,9 @@ class PokemonResolverService:
         # 8. Varieties (always fetched on cache miss, trimmed at response time)
         raw_varieties = species_data.get("varieties", [])
         varieties = await self._fetch_varieties(raw_varieties, species_name, gen, base_url, base_pokemon_id=pokemon_id)
+        # When resolving a variety directly (e.g. charizard-mega-x = 10034),
+        # the species varieties list includes the pokemon itself — exclude it.
+        varieties = [v for v in varieties if v.pokemon_id != pokemon_id]
 
         # 9. Forms (form-entry cosmetics)
         form_names = [f["name"] for f in pokemon_data.get("forms", [])]
