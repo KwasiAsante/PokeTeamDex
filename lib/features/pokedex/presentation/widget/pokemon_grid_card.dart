@@ -148,6 +148,9 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
         ? (PokemonTypeColors.colors[primaryType] ?? colorScheme.primary)
         : colorScheme.surfaceContainerHighest;
 
+    final selectedFormSpriteUrls = selectedCosmeticEntry != null
+        ? formsData?.where((fd) => fd.name == selectedCosmeticEntry.name).firstOrNull?.spriteUrls
+        : null;
     final imageUrl = PokemonDataResolver.resolvePokedexImageUrl(
       pokemonId: widget.pokemon.id,
       baseSpecies: basePokemon?.speciesName ?? widget.pokemon.name,
@@ -157,6 +160,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
       cosmeticEntry: selectedCosmeticEntry,
       filter: const PokedexFilter(),
       spriteUrls: resolved?.spriteUrls,
+      formSpriteUrls: selectedFormSpriteUrls,
     );
 
     final baseDisplayName = basePokemon?.displaySpeciesName ??

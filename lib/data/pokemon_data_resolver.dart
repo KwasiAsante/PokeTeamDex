@@ -165,6 +165,7 @@ class PokemonDataResolver {
     required PokemonFormEntry? cosmeticEntry,
     required PokedexFilter? filter,
     SpriteUrlsFull? spriteUrls,
+    SpriteUrlsFull? formSpriteUrls,
   }) {
     final registry = PokemonDataRegistry.instance;
 
@@ -174,6 +175,8 @@ class PokemonDataResolver {
           final override =
               registry.cosmeticFormHomeUrlOverrides[cosmeticEntry.name];
           if (override != null) return override;
+          final formHome = formSpriteUrls?.home;
+          if (formHome != null) return formHome;
           // Female HOME artwork lives at home/female/{id}.png — not {id}-female.png.
           if (cosmeticEntry.formName == 'female') {
             return pokemonHomeFemaleUrl(pokemonId);
@@ -183,6 +186,11 @@ class PokemonDataResolver {
                 cosmeticEntry.name.substring(baseSpecies.length + 1);
             return cosmeticFormHomeUrl(pokemonId, suffix);
           }
+        }
+        if (imageType == null) {
+          // Compact mode: use form-specific gen-8 icon when available.
+          final formIcon = formSpriteUrls?.icon;
+          if (formIcon != null) return formIcon;
         }
         if (cosmeticEntry.formName == 'female') {
           return '${_spritesBase}female/$pokemonId.png';
