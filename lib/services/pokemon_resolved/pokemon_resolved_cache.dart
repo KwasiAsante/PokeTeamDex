@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
 
 /// Bump this whenever the backend response schema changes in a way that makes
@@ -19,7 +20,10 @@ class PokemonResolvedCache {
       final expiresAt = data['expiresAt'] as int?;
       if (payload is Map && expiresAt != null &&
           expiresAt > DateTime.now().millisecondsSinceEpoch) {
-        return Map<String, dynamic>.from(payload as Map);
+        // JSON round-trip guarantees all nested maps become Map<String,dynamic>.
+        // Hive on web (IndexedDB/MessagePack) deserialises nested maps as
+        // Map<dynamic,dynamic>, causing CastErrors in fromJson on web.
+        return jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
       }
     }
     return null;
