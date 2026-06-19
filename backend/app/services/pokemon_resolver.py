@@ -87,6 +87,15 @@ _SHOWDOWN_GEN_SHINY_DIRS: dict[int, str] = {
 _ROMAN = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5,
           "vi": 6, "vii": 7, "viii": 8, "ix": 9}
 
+# Variety name → icon sprite_id override.
+# Used when the sprites repo icon file uses a different suffix than the variety
+# name and neither the variety ID nor base_id-variety_suffix works.
+# Calyrex riders: variety names are calyrex-ice/shadow but icons are 898-ice-rider/shadow-rider.
+_VARIETY_ICON_ID_OVERRIDES: dict[str, str] = {
+    "calyrex-ice":    "898-ice-rider",
+    "calyrex-shadow": "898-shadow-rider",
+}
+
 # PokéAPI form name suffix → PokeAPI/sprites repo suffix.
 # The sprites repo uses shorter names for some forms whose PokéAPI slug is longer.
 # e.g. "shellos-east-sea" → sprites use "422-east.png", not "422-east-sea.png".
@@ -484,17 +493,21 @@ class PokemonResolverService:
         has_female_home = bool(home.get("front_female"))
 
         # Icon: prefer PokéAPI's own icon URL from the sprites object.
-        # Some female varieties (e.g. Indeedee-female, ID 10186) have no icon
-        # at their variety ID — the repo only has female/{base_id}.png.
-        # PokéAPI signals this by returning front_default=null in icons.
+        # Fall back to overrides and constructed paths when the API returns null.
         gen8_icon_api = (
             (sprites.get("versions") or {})
             .get("generation-viii", {})
             .get("icons", {})
             .get("front_default")
         )
+        icon_override_id = _VARIETY_ICON_ID_OVERRIDES.get(variety_name)
         if gen8_icon_api:
             icon = gen8_icon_api
+        elif icon_override_id:
+            # Static override for varieties whose icon uses a different sprite_id
+            # than either the variety ID or the base_id-suffix pattern
+            # (e.g. calyrex-ice → 898-ice-rider, not 898-ice or 10193).
+            icon = _build_icon_url(icon_override_id, gen)
         elif variety_name.endswith("-female") and base_pokemon_id is not None:
             icon = _build_icon_url(base_pokemon_id, gen, female=True)
         else:
