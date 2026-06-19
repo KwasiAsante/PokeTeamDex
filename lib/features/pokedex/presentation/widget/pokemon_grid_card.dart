@@ -223,7 +223,19 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
                     child: Hero(
                       tag:
                           'pokemon-sprite-${widget.pokemon.id}${_selectedFormName != null ? '-$_selectedFormName' : ''}',
-                      child: isFormLoading
+                      child: resolvedAsync.isLoading
+                          ? Center(
+                              child: SizedBox(
+                                width: 32,
+                                height: 32,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.4),
+                                ),
+                              ),
+                            )
+                          : isFormLoading
                           ? const Center(
                               child: SizedBox(
                                 width: 32,
@@ -337,7 +349,24 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (types.isNotEmpty)
+                  if (resolvedAsync.isLoading)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: SizedBox(
+                          width: 64,
+                          height: 18,
+                          child: LinearProgressIndicator(
+                            color: colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.15),
+                            backgroundColor: colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.07),
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (types.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Wrap(
