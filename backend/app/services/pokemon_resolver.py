@@ -747,7 +747,12 @@ class PokemonResolverService:
             sprite_id = f"{base_id}-{suffix}" if suffix else str(base_id)
             # front_sprite_url: prefer PokeAPI form API front_default, fall back to
             # PokeAPI home (which exists for most forms), then constructed sprite path.
-            fallback_front = f"{_POKEAPI_PLAIN_SPRITES}/{sprite_id}.png"
+            # Female forms: sprites/pokemon uses female/ subdir, not {id}-female.png.
+            repo_suffix = _SPRITE_SUFFIX_REMAP.get(suffix, suffix)
+            if repo_suffix == "female":
+                fallback_front = f"{_POKEAPI_PLAIN_SPRITES}/female/{base_id}.png"
+            else:
+                fallback_front = f"{_POKEAPI_PLAIN_SPRITES}/{sprite_id}.png"
 
             pokeapi_home = home_results[i] if not isinstance(home_results[i], Exception) else None
             pokeapi_home_shiny = home_shiny_results[i] if not isinstance(home_shiny_results[i], Exception) else None
