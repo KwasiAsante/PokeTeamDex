@@ -694,17 +694,39 @@ class PokemonResolverService:
         if not non_defaults:
             return []
 
-        def _form_home_id(fn: str) -> str:
+        def _form_home_paths(fn: str) -> tuple[str, str]:
+            """Return (home_url, home_shiny_url) for a form entry.
+
+            Female forms live at home/female/{id}.png, not home/{id}-female.png —
+            same subdirectory pattern as icons/female/{id}.png.
+            All other forms use the {id}-{mapped_suffix}.png pattern.
+            """
             sfx = _extract_form_suffix(fn, species_name)
             mapped = _SPRITE_SUFFIX_REMAP.get(sfx, sfx)
-            return f"{base_id}-{mapped}" if mapped else str(base_id)
+            if mapped == "female":
+                return (
+                    f"{_POKEAPI_HOME}/female/{base_id}.png",
+                    f"{_POKEAPI_HOME}/shiny/female/{base_id}.png",
+                )
+            home_id = f"{base_id}-{mapped}" if mapped else str(base_id)
+            return (
+                f"{_POKEAPI_HOME}/{home_id}.png",
+                f"{_POKEAPI_HOME}/shiny/{home_id}.png",
+            )
 
         # Batch: form-data fetches + PokeAPI sprite CDN probes (home, home_shiny,
         # official-artwork). All run in parallel; probes are HEAD-only, cheap.
+        def _form_oa_url(fn: str) -> str:
+            sfx = _extract_form_suffix(fn, species_name)
+            mapped = _SPRITE_SUFFIX_REMAP.get(sfx, sfx)
+            oa_id = f"{base_id}-{mapped}" if mapped else str(base_id)
+            return f"{_POKEAPI_OA}/{oa_id}.png"
+
+        _home_paths = [_form_home_paths(n) for n in non_defaults]
         form_tasks = [self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon-form/{n}") for n in non_defaults]
-        home_tasks = [_probe_url(self._pokeapi_http, f"{_POKEAPI_HOME}/{_form_home_id(n)}.png") for n in non_defaults]
-        home_shiny_tasks = [_probe_url(self._pokeapi_http, f"{_POKEAPI_HOME}/shiny/{_form_home_id(n)}.png") for n in non_defaults]
-        oa_tasks = [_probe_url(self._pokeapi_http, f"{_POKEAPI_OA}/{_form_home_id(n)}.png") for n in non_defaults]
+        home_tasks = [_probe_url(self._pokeapi_http, p[0]) for p in _home_paths]
+        home_shiny_tasks = [_probe_url(self._pokeapi_http, p[1]) for p in _home_paths]
+        oa_tasks = [_probe_url(self._pokeapi_http, _form_oa_url(n)) for n in non_defaults]
 
         all_results = await asyncio.gather(
             *form_tasks, *home_tasks, *home_shiny_tasks, *oa_tasks,
