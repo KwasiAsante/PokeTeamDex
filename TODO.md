@@ -293,7 +293,7 @@
 
 ## Investigations
 
-- [ ] **Unified Pokémon data resolution layer** — cross-source gaps (PokéAPI / Showdown / Smogon), scattered override maps, and unresiolved form data are recomputed on every request with no single cached result; investigate a unified model that does gap-filling once and caches the resolved output *(#201)*
+- [x] **Unified Pokémon data resolution layer** — cross-source gaps (PokéAPI / Showdown / Smogon), scattered override maps, and unresiolved form data are recomputed on every request with no single cached result; investigate a unified model that does gap-filling once and caches the resolved output *(#201)*
   - [x] **Task A** — Consolidate override maps into JSON asset and `PokemonDataRegistry` singleton *(#234)*
   - [x] **Task B** — Unified sprite resolver (`PokemonDataResolver`) replacing 4 divergent sprite URL implementations *(#235)*
   - [x] **Task C** — `resolvedPokemonProvider` with `keepAlive` caching to eliminate per-scroll provider rebuilds *(#236)*
