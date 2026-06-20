@@ -958,7 +958,7 @@ Three artifacts are built and uploaded to every GitHub Release automatically (`r
 ```bash
 sudo apt-get install -y \
   clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
-  libfuse2 libayatana-appindicator3-1 libdbusmenu-gtk3-4 \
+  libfuse2 libayatana-appindicator3-1 libayatana-appindicator3-dev libdbusmenu-gtk3-4 \
   flatpak flatpak-builder
 
 flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
