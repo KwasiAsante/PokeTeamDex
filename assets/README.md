@@ -33,6 +33,12 @@ git commit -m "chore: update PS data"
 
 ---
 
+## data/pokemon_registry.json
+
+Consolidated override maps consumed by `PokemonDataRegistry` (`lib/data/pokemon_data_registry.dart`) on app startup — cosmetic form labels/sprite URLs, base form name overrides, mega stone mapping, version-group lookups, regional form lookup, and `varietyIconIdOverrides` (icon resolution for specific Pokémon varieties). Replaces what used to be hand-maintained Dart const maps spread across half a dozen files. A copy is also bundled at `backend/app/static/pokemon_registry.json` for the backend's aggregation endpoints to read the same overrides server-side — **keep both copies in sync when editing.**
+
+---
+
 ## images/
 
 | File | Usage |

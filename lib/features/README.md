@@ -44,6 +44,11 @@ Notable behaviours:
 - `form_filter.dart` — `filterFormChips()`: determines which form chips to show for a species, gated by generation and prerequisite item/ability
 - `evolution_chain_builder.dart` — builds a typed evolution tree from PokéAPI `evolution_chain` JSON
 
+`providers/` + `models/` — backend-hybrid data:
+
+- `providers/resolved_pokemon_provider.dart` — `resolvedPokemonProvider` (`FutureProvider.family`, `keepAlive`): merges detail + species + cosmetic forms into one `ResolvedPokemon`, sourced from Hive cache → backend `/pokemon/{id}/resolved` → PokéAPI fallback (built on top of `lib/services/pokemon_resolved/`, see [`services/README.md`](../services/README.md#pokemon_resolved))
+- `models/resolved_pokemon.dart` — `ResolvedPokemon`: the merged object consumed by the detail screen, list tiles/cards, and team/slot screens
+
 ---
 
 ### `teams/`

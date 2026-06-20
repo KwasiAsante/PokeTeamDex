@@ -31,14 +31,15 @@ Builds the FastAPI Docker image and pushes it to GHCR as `ghcr.io/kwasiasante/po
 
 **Trigger:** push of any `v*.*.*` tag
 
-Creates a GitHub Release, then runs 4 jobs in parallel:
+Creates a GitHub Release, then runs 4 build jobs in parallel, followed by a notify job:
 
 | Job | Output | Notes |
 |-----|--------|-------|
 | `build-android` | `PokeTeamDex-vX.Y.Z.apk` | Signed with release keystore from Secrets |
 | `build-windows` | `PokeTeamDex-vX.Y.Z-Setup.msi` + `PokeTeamDex-vX.Y.Z-Setup.exe` | WiX v4.0.5 (MSI) + Inno Setup (EXE); see known issue #96 for MSI launch bug |
+| `build-linux` | `PokeTeamDex-vX.Y.Z-linux-x64.tar.gz` + `PokeTeamDex-vX.Y.Z-x86_64.AppImage` + `PokeTeamDex-vX.Y.Z.flatpak` | tar.gz/AppImage bundle `tray_manager`'s native libs (ayatana-appindicator3 et al.) copied from the runner; Flatpak builds the same libs from source via the `linux/flatpak/shared-modules` submodule instead, to avoid glib ABI mismatches with the Flatpak runtime. See root README's [Linux — tar.gz, AppImage, Flatpak](../../README.md#linux--targz-appimage-flatpak) section for manual build steps |
 | `build-backend-docker` | GHCR image tagged `vX.Y.Z` + `latest` | Same Dockerfile as `deploy-backend.yml` but version-tagged |
-| `notify-backend` | — | POSTs to `/admin/notify-update` so the backend can surface the new version for in-app update checks |
+| `notify-backend` | — | Runs after all 4 build jobs; POSTs to `/admin/notify-update` so the backend can surface the new version for in-app update checks |
 
 All build artifacts are uploaded directly to the GitHub Release via `gh release upload`.
 

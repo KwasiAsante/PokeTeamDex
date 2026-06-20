@@ -36,7 +36,7 @@ The format engine — the most complex service. Validates team slots against Pok
 | `format_models.dart` | `GameFormat`, `GenerationMechanics`, `PsMoveEntry`, `PsItemEntry`, `PsAbilityEntry` |
 | `format_providers.dart` | Riverpod: `allFormatsProvider`, `generalFormatsProvider`, `gameFormatsProvider`, `learnsetProvider`, `itemsForGenProvider`, `abilitiesForGenProvider`, `slotValidationProvider` |
 | `slot_validator.dart` | `validateSlot()` → `SlotValidation` (per-move/item/ability legality flags) |
-| `sprite_resolver.dart` | Thin wrapper; sprite resolution has moved to `PokemonDataResolver.resolveFormSprite()` in `lib/data/pokemon_data_resolver.dart` |
+| `sprite_resolver.dart` | Thin wrapper kept for call-site compatibility; sprite/form resolution itself lives in `PokemonDataResolver` (`lib/data/pokemon_data_resolver.dart`, outside `lib/services/` — see [`lib/README.md`](../README.md#data)) |
 
 ### FormatService data loading flow
 
@@ -70,10 +70,40 @@ PokéAPI integration with Hive TTL cache.
 | File | Purpose |
 | ---- | ------- |
 | `poke_api_client.dart` | Dio configured for `https://pokeapi.co/api/v2` |
-| `poke_api_repository.dart` | `fetchPokemon(id)`, `fetchPokemonSpecies(id)`, `fetchPokemonByName(name)`, `fetchPokemonEncounters(id)` |
+| `poke_api_repository.dart` | `fetchPokemon(id)`, `fetchPokemonSpecies(id)`, `fetchPokemonByName(name)`, `fetchPokemonEncounters(id)`, `fetchMove(name)`, `fetchItem(name)`, `fetchItemsByCategory(category)` |
 | `poke_api_cache.dart` | Hive box wrapper; TTL = 24h for list data, 7d for detail data |
 | `poke_api_providers.dart` | `pokeApiRepositoryProvider` (injectable in tests via override) |
 | `models/` | `PokemonEntry`, `PokemonSpeciesEntry`, `PokemonEncounterEntry` — JSON deserialization |
+
+`PokeApiRepository` keeps an in-memory map per entity type (`_pokemonById`, `_speciesById`, `_abilityByName`, `_evolutionChainById`, `_formByName`, `_moveByName`, `_itemByName`) layered on top of the Hive cache, so repeat lookups of the same Pokémon/move/item/ability skip re-parsing the cached JSON. `fetchItemsByCategory` exists separately from the pocket-based fetch because PokéAPI's `"held-items"` filter is an item *category* nested inside the `misc` pocket, not a pocket itself — calling the pocket endpoint with `"held-items"` 404s.
+
+---
+
+## `pokemon_resolved/`
+
+Backend-resolved Pokémon data infrastructure — the Flutter-side counterpart to the backend's `/pokemon/{id}/resolved` aggregation endpoint (see [`backend/README.md`](../../backend/README.md#key-endpoints)). Provides the cache, repository, and models that other layers build on; the merging provider that consumers actually `watch()` lives in `lib/features/pokedex/` (see below), not here.
+
+| File | Purpose |
+| ---- | ------- |
+| `models.dart` | `AbilityInfo`, `MoveSummary`, `SupplementMove`, `SpriteUrlsFull`, `VarietyBackendData`, `FormBackendData`, `PokemonResolvedBackendResponse` — typed models for the backend response, plus `toPokemonEntry()`/`toPokemonSpeciesEntry()`/`toCosmeticForms()` converters |
+| `pokemon_resolved_cache.dart` | Hive box wrapper for backend-resolved responses (7-day TTL, versioned cache key) |
+| `pokemon_backend_repository.dart` | `PokemonBackendRepository` — HTTP calls to `GET /pokemon/{id}/resolved` and the `varieties`/`forms`/`smogon`/`moves`/`flavor-text` sub-endpoints |
+| `pokemon_resolved_providers.dart` | `pokemonResolvedCacheProvider`, `pokemonBackendRepositoryProvider`, and lazy-loaded sub-resource providers (`pokemonMovesProvider`, `pokemonVarietiesProvider`, `pokemonFormsProvider`, `pokemonFlavorTextProvider`) — each checks the Hive cache, then the backend, then falls back to PokéAPI |
+
+### Where `resolvedPokemonProvider` lives
+
+The provider most screens actually consume, `resolvedPokemonProvider` (`FutureProvider.family`, `keepAlive`), and its return type `ResolvedPokemon`, live in the `pokedex` feature module rather than here — see [`features/README.md` → pokedex](../features/README.md#pokedex):
+
+- `lib/features/pokedex/models/resolved_pokemon.dart` — `ResolvedPokemon`: merges `PokemonEntry` + `PokemonSpeciesEntry` + cosmetic forms + `SpriteUrlsFull` (+ optional supplement moves / Smogon analyses) into one object, kept alive for the app session
+- `lib/features/pokedex/providers/resolved_pokemon_provider.dart` — builds a `ResolvedPokemon`:
+  ```text
+  resolvedPokemonProvider(id, gen)
+  ├── Hive cache hit (pokemon_resolved_cache) → return
+  ├── Backend reachable → GET /pokemon/{id}/resolved → cache in Hive → return
+  └── Backend unreachable → assemble from PokeApiRepository (fetchPokemon + fetchPokemonSpecies + cosmeticFormsProvider) → return
+  ```
+
+`PokemonEntry.types`/`stats`/`abilities`/`moves` are typed (`List<String>`, `Map<String,int>`, `List<AbilityInfo>`, `List<MoveSummary>`) regardless of which path populates them, so consumers (detail screen, slot config, team screens) don't need to know which source served the data.
 
 ---
 

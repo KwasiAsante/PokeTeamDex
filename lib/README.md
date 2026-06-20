@@ -6,6 +6,7 @@ Flutter application source. Organized into four top-level layers:
 lib/
 ├── main.dart          # Entry point
 ├── router/            # Navigation
+├── data/              # Unified Pokémon data resolution (sprites, form overrides)
 ├── database/          # Local persistence (Drift + SQLite)
 ├── features/          # Screen-level feature modules
 ├── services/          # Cross-feature services (sync, API, format engine)
@@ -32,6 +33,17 @@ Entry point. Responsibilities:
 - `StatefulShellRoute` with 5 branches: Pokédex, Moves, Items, Reference, Teams
 - Redirect guard: users already logged in skip `/login` → `/pokedex`
 - `ScaffoldWithNavBar` switches between `BottomNavigationBar` (< 600dp), `NavigationRail` (600–840dp), and permanent `NavigationDrawer` (> 840dp)
+
+---
+
+## data/
+
+Unified Pokémon data resolution layer — the canonical place for sprite URL and form-override logic, replacing what used to be scattered across `form_data.dart`, `form_filter.dart`, `evolution_chain_builder.dart`, `mega_forms_data.dart`, and `sprite_resolver.dart`.
+
+| File | Purpose |
+|------|---------|
+| `pokemon_data_resolver.dart` | `PokemonDataResolver` — `resolveFormSprite()`, `resolvePokedexImageUrl()`, `resolveVersionedSprite()`, `genViiiIconFallbackUrl()` |
+| `pokemon_data_registry.dart` | `PokemonDataRegistry` — singleton loaded once via `initialize()`; parses `assets/data/pokemon_registry.json` into the override maps consumed by `PokemonDataResolver` and other call sites (cosmetic form labels, base form names, mega stone map, version-group lookups, etc.) |
 
 ---
 

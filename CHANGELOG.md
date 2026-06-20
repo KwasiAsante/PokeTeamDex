@@ -4,6 +4,32 @@ All notable changes to PokeTeamDex are documented here.
 
 ---
 
+## [1.0.8] — 2026-06-20
+
+### Added
+
+- **Linux desktop support** — tar.gz, AppImage, and Flatpak packages now built and published to every GitHub Release alongside Windows/Android; tar.gz bundles a `.desktop` file, app icon, and `install.sh` for launcher integration; system tray works on Linux (`tray_manager` native libs bundled for tar.gz/AppImage, built from source via Flatpak `shared-modules` to avoid glib ABI mismatches)
+- **Backend Pokémon data aggregation** — `GET /pokemon/{id}/resolved` combines PokéAPI + Showdown event learnsets + Smogon competitive sets into one 7-day-cached response, gen-aware (types/stats reflect the requested generation); dedicated `GET /pokemon/varieties`, `/forms`, `/smogon`, `/moves`, and `/flavor-text` endpoints for on-demand expansion without re-fetching the full resolved payload
+- **Admin cache eviction** — `DELETE /admin/cache/pokemon` clears stale `pokemon_resolved` rows by ID or in full, so registry/sprite-override fixes show up immediately instead of waiting out the 7-day TTL
+- Held Items category filter now hits the correct PokéAPI endpoint (see Fixed)
+
+### Changed
+
+- **Unified Pokémon data resolution layer** — new `PokemonDataResolver` (`lib/data/pokemon_data_resolver.dart`) and `PokemonDataRegistry` (backed by `assets/data/pokemon_registry.json`) consolidate sprite/form override maps that were previously duplicated across `form_data.dart`, `form_filter.dart`, `evolution_chain_builder.dart`, `mega_forms_data.dart`, and `sprite_resolver.dart`; `sprite_resolver.dart` is now a thin wrapper
+- **Flutter hybrid data integration** — `PokemonEntry.types`/`stats`/`abilities`/`moves` are now typed (`List<String>`, `Map<String,int>`, `List<AbilityInfo>`, `List<MoveSummary>`) instead of raw JSON maps; `resolvedPokemonProvider` fetches Hive cache → backend → PokéAPI fallback with keepAlive caching; moves and flavor text in the detail screen and Slot Config now lazy-load through the backend
+- **Provider hygiene audit** — memoized `fetchMove`/`fetchItem` in `PokeApiRepository` (mirrors the existing `fetchAbility` cache); consolidated duplicate per-screen ability/move/item detail providers (Slot Config, team detail) into the shared Pokédex-wide providers; Slot Picker now reads the cached `resolvedPokemonProvider` instead of issuing its own full detail fetch
+- `pokemon_registry.json` gained `varietyIconIdOverrides` for icon resolution on specific Pokémon varieties
+
+### Fixed
+
+- Held Items filter 404s — `"held-items"` is a PokéAPI item *category* nested in the `misc` pocket, not a pocket itself; added `PokeApiRepository.fetchItemsByCategory` and routed the filter through it
+- RenderFlex overflow on the Items tab's wide-layout loading skeleton (grid cell height was 2px short of the skeleton's minimum)
+- Double navigation on startup — GoRouter was being constructed twice, firing the initial redirect twice
+- Form-aware slot linking, sprites, and team list icons corrected for several form-switching edge cases
+- Flatpak runtime upgraded to 24.08; library install paths corrected
+
+---
+
 ## [1.0.7] — 2026-06-12
 
 ### Added

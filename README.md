@@ -359,10 +359,16 @@ lib/services/
 │   └── sprite_resolver.dart     # Picks sprite URL by generation + form
 ├── pokeapi/
 │   ├── poke_api_client.dart     # Dio for pokeapi.co
-│   ├── poke_api_repository.dart # fetchPokemon, fetchSpecies, fetchEncounters…
+│   ├── poke_api_repository.dart # fetchPokemon, fetchSpecies, fetchEncounters, fetchMove/fetchItem (memoized), fetchItemsByCategory…
 │   ├── poke_api_cache.dart      # Hive TTL cache (24h lists, 7d details)
 │   ├── poke_api_providers.dart  # Riverpod providers
 │   └── models/                  # PokemonEntry, PokemonSpeciesEntry, etc.
+├── pokemon_resolved/             # Backend-resolved data infra: cache + repository + models
+│   ├── models.dart              # AbilityInfo, MoveSummary, SpriteUrlsFull, PokemonResolvedBackendResponse
+│   ├── pokemon_resolved_cache.dart       # Hive cache (7d TTL) for backend-resolved responses
+│   ├── pokemon_backend_repository.dart   # HTTP calls to GET /pokemon/{id}/resolved + sub-endpoints
+│   └── pokemon_resolved_providers.dart   # pokemonResolvedCacheProvider, lazy moves/varieties/forms/flavor-text providers
+│                                  # (resolvedPokemonProvider itself lives in features/pokedex/providers/, below)
 ├── sync/
 │   ├── sync_service.dart        # Push + pull orchestration
 │   ├── sync_providers.dart      # Riverpod wrappers + sync trigger helper
@@ -467,6 +473,21 @@ graph LR
         I1["GET /instances/:id"]
         I2["POST /instances"]
         I3["PATCH /instances/:id"]
+    end
+
+    subgraph Pokemon["Pokémon Data Resolution"]
+        PR1["GET /pokemon/:id/resolved"]
+        PR2["GET /pokemon/varieties/:id"]
+        PR3["GET /pokemon/forms/:id"]
+        PR4["GET /pokemon/smogon/:id"]
+        PR5["GET /pokemon/moves/:id"]
+        PR6["GET /pokemon/flavor-text/:id"]
+    end
+
+    subgraph Admin
+        AD1["POST /admin/notify-update"]
+        AD2["GET /admin/version"]
+        AD3["DELETE /admin/cache/pokemon"]
     end
 
     subgraph Health
@@ -881,6 +902,7 @@ uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
 | `0006_add_format_label_to_teams` | `format_label` column on teams |
 | `0007_add_tera_type_to_slots` | `tera_type` column on TeamSlots |
 | `0008_add_sort_order_and_is_box` | `sort_order` on Teams/TeamFolders; `is_box` on Teams |
+| `0009_add_pokemon_resolved` | `pokemon_resolved` cache table (server-side aggregation cache, 7-day TTL) |
 
 ```bash
 cd backend
@@ -970,7 +992,7 @@ done
 Includes a `.desktop` file, app icon, and `install.sh` for desktop integration.
 
 ```bash
-TAG=v1.0.7   # replace with actual tag
+TAG=v1.0.8   # replace with actual tag
 BUNDLE=build/linux/x64/release/bundle
 cp linux/flatpak/io.github.KwasiAsante.PokeTeamDex.desktop "$BUNDLE/"
 cp assets/images/app_icon.png "$BUNDLE/io.github.KwasiAsante.PokeTeamDex.png"
@@ -986,7 +1008,7 @@ After extracting, users run `./install.sh` once to register the app in their lau
 Requires `libfuse2`. Run `appimagetool` with `APPIMAGE_EXTRACT_AND_RUN=1` if FUSE is unavailable.
 
 ```bash
-TAG=v1.0.7
+TAG=v1.0.8
 wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" \
   -O /tmp/appimagetool
 chmod +x /tmp/appimagetool
@@ -1014,7 +1036,7 @@ To run: `chmod +x PokeTeamDex-*.AppImage && ./PokeTeamDex-*.AppImage`. Double-cl
 The Flatpak manifest uses `shared-modules` (a git submodule) to build `libdbusmenu`, `libayatana-ido3`, `libayatana-indicator3`, and `libayatana-appindicator3` from source inside the runtime, avoiding glib ABI mismatches that occur when bundling host binaries.
 
 ```bash
-TAG=v1.0.7
+TAG=v1.0.8
 git submodule update --init --recursive   # only needed once after cloning
 
 # Route all output through /tmp (ext4) so rofiles-fuse overlay works correctly.
@@ -1039,7 +1061,7 @@ To run: `flatpak run io.github.KwasiAsante.PokeTeamDex`
 #### 6. Upload to GitHub Release
 
 ```bash
-TAG=v1.0.7
+TAG=v1.0.8
 gh release upload $TAG \
   ~/PokeTeamDex-$TAG-linux-x64.tar.gz \
   ~/PokeTeamDex-$TAG-x86_64.AppImage \
@@ -1079,7 +1101,11 @@ test/
 │   ├── sync_service_test.dart      # Push drain, pull merge, conflict resolution
 │   ├── format_models_test.dart     # GameFormat, GenerationMechanics, PsMoveEntry
 │   ├── form_filter_test.dart       # filterFormChips — regional/mega/gmax forms
-│   └── gimmicks_test.dart          # Z-moves, Dynamax Max moves, Gigantamax
+│   ├── dynamax_test.dart           # Max Move resolution
+│   ├── z_moves_test.dart           # Z-move resolution, Gigantamax
+│   ├── pokemon_data_resolver_test.dart   # PokemonDataResolver.resolveFormSprite
+│   ├── pokemon_data_registry_test.dart   # PokemonDataRegistry.initialize() JSON parsing
+│   └── resolved_pokemon_provider_test.dart # Hive → backend → PokéAPI fallback ordering
 ├── widget/                         # Flutter widget tests with in-memory Drift DB
 │   ├── teams_screen_test.dart      # Folder list, team list, offline indicator
 │   ├── team_detail_screen_test.dart # AppBar, export icon, format label
@@ -1088,6 +1114,7 @@ test/
 ├── integration/                    # Multi-layer tests against real Drift DB
 │   ├── crud_flow_test.dart         # Full folder → team → slot CRUD lifecycle
 │   └── sync_conflict_test.dart     # Last-write-wins conflict scenarios
+├── services/pokemon_resolved/      # Backend-resolved Pokémon data layer (models, repository, provider)
 └── helpers/
     ├── test_app.dart               # pumpTestApp() — ProviderScope + GoRouter wrapper
     └── test_database.dart          # openTestDatabase() — NativeDatabase.memory()
@@ -1108,7 +1135,7 @@ genhtml coverage/lcov.info -o coverage/html
 open coverage/html/index.html
 ```
 
-**Test count**: 48+ automated tests across 8 test files.
+See [`test/README.md`](test/README.md) for the full per-file test breakdown.
 
 ---
 
@@ -1137,11 +1164,15 @@ poke_team_dex/
 │   │   ├── reference/               # Reference hub screen
 │   │   ├── settings/                # Settings + sync monitor
 │   │   └── auth/                    # Login / register
+│   ├── data/
+│   │   ├── pokemon_data_resolver.dart  # PokemonDataResolver — unified sprite/form resolution
+│   │   └── pokemon_data_registry.dart  # PokemonDataRegistry — loads assets/data/pokemon_registry.json
 │   ├── services/
 │   │   ├── api/                     # HTTP clients (Dio wrappers)
 │   │   ├── connectivity/            # Network status stream
 │   │   ├── format/                  # PS format engine
 │   │   ├── pokeapi/                 # PokéAPI client + Hive cache
+│   │   ├── pokemon_resolved/        # Backend-resolved Pokémon data: cache, repository, providers
 │   │   ├── sync/                    # Bidirectional sync engine
 │   │   ├── tray/                    # Desktop system tray
 │   │   ├── update/                  # GitHub release update checker
@@ -1157,12 +1188,13 @@ poke_team_dex/
 │   ├── app/
 │   │   ├── main.py                  # FastAPI app + CORS
 │   │   ├── database.py              # Async SQLAlchemy session
-│   │   ├── routers/                 # auth, teams, folders, instances, sync, ps_data
-│   │   ├── models/                  # SQLAlchemy ORM models (user, team, slot, folder, instance)
+│   │   ├── routers/                 # auth, teams, folders, instances, sync, ps_data, admin, logs, pokemon
+│   │   ├── models/                  # SQLAlchemy ORM models (user, team, slot, folder, instance, pokemon_resolved)
 │   │   ├── schemas/                 # Pydantic request/response models
+│   │   ├── services/                # pokemon_resolver.py — PS data loader + cross-source aggregation
 │   │   └── core/                    # config.py, security.py, deps.py
 │   ├── alembic/
-│   │   └── versions/                # 0001–0008 SQL migrations
+│   │   └── versions/                # 0001–0009 SQL migrations
 │   ├── Dockerfile
 │   ├── docker-compose.yml
 │   ├── requirements.txt

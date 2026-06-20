@@ -11,6 +11,7 @@ test/
 ├── unit/                           # Pure Dart — no Flutter framework dependency
 ├── widget/                         # Flutter widget tests — in-memory Drift DB
 ├── integration/                    # Multi-layer tests against real Drift DB
+├── services/pokemon_resolved/      # Backend-resolved Pokémon data layer tests
 └── helpers/                        # Shared test utilities
 ```
 
@@ -48,7 +49,12 @@ Pure logic tests — no Flutter, no Drift, no network.
 | `sync_service_test.dart` | ~25 | Push drain (happy path, retry, discard after 5), pull merge (create/update/delete), conflict resolution (local newer / remote newer / remote deleted) |
 | `format_models_test.dart` | ~20 | `GameFormat.fromJson()`, `GenerationMechanics.forGen()`, `PsMoveEntry`/`PsItemEntry`/`PsAbilityEntry` parsing |
 | `form_filter_test.dart` | ~18 | `filterFormChips()` — regional variants, Mega, Gigantamax, alternate forms |
-| `gimmicks_test.dart` | ~25 | `resolveZMove()`, `gmaxMoveForSpecies()`, `resolveMaxMove()`, exclusive Z-move lookup |
+| `dynamax_test.dart` | — | `resolveMaxMove()` — Max Move resolution |
+| `z_moves_test.dart` | — | `resolveZMove()`, `gmaxMoveForSpecies()`, exclusive Z-move lookup |
+| `pokemon_data_resolver_test.dart` | — | `PokemonDataResolver.resolveFormSprite()` — versioned/HOME sprite URL resolution per generation and form |
+| `pokemon_data_registry_test.dart` | — | `PokemonDataRegistry.initialize()` — parses `assets/data/pokemon_registry.json` into the override maps |
+| `sprite_resolver_test.dart` | — | Thin-wrapper passthrough to `PokemonDataResolver` |
+| `resolved_pokemon_provider_test.dart` | — | `resolvedPokemonProvider` — Hive cache → backend → PokéAPI fallback ordering |
 
 ---
 
@@ -86,6 +92,18 @@ Tests that exercise multiple layers together against a real in-memory SQLite dat
 |------|-------|---------------|
 | `crud_flow_test.dart` | ~15 | Create folder → team → slot; rename; soft-delete; cascade delete |
 | `sync_conflict_test.dart` | ~12 | Last-write-wins (local newer wins, remote newer wins), remote delete propagation, folder cascade, instance chain updates |
+
+---
+
+## Services Tests (`test/services/pokemon_resolved/`)
+
+Tests for the Flutter-side backend-resolved Pokémon data layer (see [`lib/services/README.md`](../lib/services/README.md#pokemon_resolved)).
+
+| File | What it covers |
+|------|---------------|
+| `models_test.dart` | `AbilityInfo`, `MoveLearnDetail`, `MoveSummary`, `SpriteUrlsFull`, `PokemonResolvedBackendResponse` JSON parsing and `toPokemonEntry()`/`toPokemonSpeciesEntry()`/`toCosmeticForms()` conversion |
+| `pokemon_backend_repository_test.dart` | HTTP calls to `GET /pokemon/{id}/resolved` and sub-endpoints |
+| `resolved_pokemon_provider_test.dart` | `resolvedPokemonProvider` overriding `pokemonResolvedCacheProvider`/`pokemonBackendRepositoryProvider` to exercise the PokéAPI fallback path without Hive or a live backend |
 
 ---
 
