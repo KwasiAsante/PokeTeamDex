@@ -101,6 +101,12 @@ class PokemonDataResolver {
     );
   }
 
+  /// Generation-VIII icon fallback used when a resolved Pokémon has no
+  /// backend-supplied icon URL (e.g. the "learned by" / "held by" / "has
+  /// this ability" cross-reference lists on move/item/ability detail screens).
+  static String genViiiIconFallbackUrl(int pokemonId) =>
+      '${_spritesBase}versions/generation-viii/icons/$pokemonId.png';
+
   /// Version-group compact icon URL for list tile compact display mode.
   /// Replaces `_compactIconUrl()` from `pokemon_list_tile.dart`.
   static String compactIconUrl(int pokemonId, PokedexFilter filter) {

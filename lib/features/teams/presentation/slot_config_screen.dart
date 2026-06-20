@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
+import 'package:poke_team_dex/features/items/providers/items_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
@@ -18,8 +19,6 @@ import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/services/format/format_service.dart';
 import 'package:poke_team_dex/services/format/slot_validator.dart';
-import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
-import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart'
     show MoveSummary, VarietyBackendData;
@@ -98,18 +97,6 @@ final _hisuiDexProvider = FutureProvider.autoDispose<Set<String>>((ref) async {
       await ref.read(pokeApiRepositoryProvider).fetchRegionalPokedex('hisui');
   return dex.keys.toSet();
 });
-
-final _abilityDetailProvider =
-    FutureProvider.autoDispose.family<AbilityEntry, String>((ref, name) =>
-        ref.read(pokeApiRepositoryProvider).fetchAbility(name));
-
-final _moveDetailProvider =
-    FutureProvider.autoDispose.family<MoveEntry, String>((ref, name) =>
-        ref.read(pokeApiRepositoryProvider).fetchMove(name));
-
-final _itemDetailProvider =
-    FutureProvider.autoDispose.family<ItemEntry, String>((ref, name) =>
-        ref.read(pokeApiRepositoryProvider).fetchItem(name));
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -710,7 +697,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           ..sort((a, b) => a.abilitySlot.compareTo(b.abilitySlot));
         // Form abilities from VarietyBackendData: {"0": "blaze", "H": "solar-power"}.
         // PS data uses display names ("Sand Veil"); normalise to PokéAPI slug
-        // so _abilityDetailProvider and route navigation receive the right format.
+        // so abilityProvider and route navigation receive the right format.
         final effectiveAbilities = (formVariety?.abilities?.isNotEmpty == true)
             ? (formVariety!.abilities!.entries
                     .map((e) => (
@@ -1402,7 +1389,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
     final cards = Column(
       children: abilities.map((a) {
-        final detailAsync = ref.watch(_abilityDetailProvider(a.name));
+        final detailAsync = ref.watch(abilityProvider(a.name));
         final isSelected = _abilityName == a.name;
         final colorScheme = Theme.of(context).colorScheme;
         final textTheme = Theme.of(context).textTheme;
@@ -1581,7 +1568,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     String? description;
     bool descriptionLoading = false;
     if (_heldItemName != null) {
-      final detailAsync = ref.watch(_itemDetailProvider(_heldItemName!));
+      final detailAsync = ref.watch(itemProvider(_heldItemName!));
       description = detailAsync.whenOrNull(data: (e) => e.shortEffect);
       descriptionLoading = description == null && detailAsync.isLoading;
     }
@@ -1673,7 +1660,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         MoveEntry? moveDetail;
         bool moveDetailLoading = false;
         if (_moves[i] != null) {
-          final detailAsync = ref.watch(_moveDetailProvider(_moves[i]!));
+          final detailAsync = ref.watch(moveProvider(_moves[i]!));
           moveDetail = detailAsync.whenOrNull(data: (e) => e);
           moveDetailLoading = moveDetail == null && detailAsync.isLoading;
         }
@@ -3341,7 +3328,7 @@ class _SectionTitle extends StatelessWidget {
 
 // ── Move picker sheet ─────────────────────────────────────────────────────────
 //
-// ConsumerStatefulWidget so each list tile can watch _moveDetailProvider.
+// ConsumerStatefulWidget so each list tile can watch moveProvider.
 
 class _MovePickerSheet extends ConsumerStatefulWidget {
   final List<String> moves;
@@ -3469,7 +3456,7 @@ class _MoveListTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync = ref.watch(_moveDetailProvider(moveName));
+    final detailAsync = ref.watch(moveProvider(moveName));
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -3717,7 +3704,7 @@ class _ItemListTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync = ref.watch(_itemDetailProvider(itemName));
+    final detailAsync = ref.watch(itemProvider(itemName));
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 

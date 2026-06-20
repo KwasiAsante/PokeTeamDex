@@ -118,7 +118,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
         loading: () => LayoutBuilder(
           builder: (context, constraints) {
             if (constraints.maxWidth >= 600) {
-              return SkeletonGridView(count: 12, mainAxisExtent: 72);
+              return SkeletonGridView(count: 12, mainAxisExtent: 76);
             }
             return const SkeletonListView(
               count: 12,
@@ -150,7 +150,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                   padding: const EdgeInsets.all(8),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    mainAxisExtent: 72,
+                    mainAxisExtent: 76,
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
                   ),

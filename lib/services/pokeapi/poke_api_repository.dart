@@ -32,15 +32,19 @@ class PokeApiRepository {
 
   /// Same memoization as [_pokemonById] for the other detail-screen fetches —
   /// `fetchPokemonSpecies`/`fetchAbility`/`fetchEvolutionChain`/
-  /// `fetchPokemonForm` had no in-memory layer, so every `.autoDispose`
-  /// provider rebuild (and every internal helper that calls them, e.g.
-  /// `fetchForwardEvolutionInfo` + `fetchBackwardEvolutionInfo` both fetching
-  /// the same species/chain back to back) re-ran `fromJson` on the cached
-  /// Hive payload from scratch.
+  /// `fetchPokemonForm`/`fetchMove`/`fetchItem` had no in-memory layer, so
+  /// every `.autoDispose` provider rebuild (and every internal helper that
+  /// calls them, e.g. `fetchForwardEvolutionInfo` + `fetchBackwardEvolutionInfo`
+  /// both fetching the same species/chain back to back) re-ran `fromJson` on
+  /// the cached Hive payload from scratch. `fetchMove`/`fetchItem` are
+  /// particularly hot — the same move/item name is looked up from the global
+  /// Moves/Items lists, every Pokémon's moveset tab, and team slot screens.
   final Map<int, PokemonSpeciesEntry> _speciesById = {};
   final Map<String, AbilityEntry> _abilityByName = {};
   final Map<int, EvolutionNode> _evolutionChainById = {};
   final Map<String, PokemonFormEntry> _formByName = {};
+  final Map<String, MoveEntry> _moveByName = {};
+  final Map<String, ItemEntry> _itemByName = {};
 
   Future<List<PokemonListEntry>> fetchPokemonList({bool include = false}) async {
     try {
@@ -486,10 +490,14 @@ class PokeApiRepository {
   }
 
   Future<MoveEntry> fetchMove(String name) async {
+    final memoized = _moveByName[name];
+    if (memoized != null) return memoized;
     final cacheKey = 'move_$name';
     final cached = _pokeApiCache.getIfValid(cacheKey);
     if (cached is Map<String, dynamic>) {
-      return MoveEntry.fromJson(cached);
+      final entry = MoveEntry.fromJson(cached);
+      _moveByName[name] = entry;
+      return entry;
     }
     final response = await _pokeApiClient.client.get('/move/$name');
     if (response.statusCode != 200) {
@@ -497,7 +505,9 @@ class PokeApiRepository {
     }
     final data = Map<String, dynamic>.from(response.data);
     _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
-    return MoveEntry.fromJson(data);
+    final entry = MoveEntry.fromJson(data);
+    _moveByName[name] = entry;
+    return entry;
   }
 
   /// Returns the set of national dex IDs (1–1025) that belong to [typeName].
@@ -624,10 +634,14 @@ class PokeApiRepository {
   }
 
   Future<ItemEntry> fetchItem(String name) async {
+    final memoized = _itemByName[name];
+    if (memoized != null) return memoized;
     final cacheKey = 'item_$name';
     final cached = _pokeApiCache.getIfValid(cacheKey);
     if (cached is Map<String, dynamic>) {
-      return ItemEntry.fromJson(cached);
+      final entry = ItemEntry.fromJson(cached);
+      _itemByName[name] = entry;
+      return entry;
     }
     final response = await _pokeApiClient.client.get('/item/$name');
     if (response.statusCode != 200) {
@@ -635,7 +649,9 @@ class PokeApiRepository {
     }
     final data = Map<String, dynamic>.from(response.data);
     _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
-    return ItemEntry.fromJson(data);
+    final entry = ItemEntry.fromJson(data);
+    _itemByName[name] = entry;
+    return entry;
   }
 
   Future<TypeEntry> fetchType(String name) async {
@@ -806,18 +822,40 @@ class PokeApiRepository {
 
     final allItems = <String>[];
     for (final cat in categoryNames) {
-      final catResp =
-          await _pokeApiClient.client.get('/item-category/$cat');
-      if (catResp.statusCode == 200) {
-        final items = (catResp.data['items'] as List)
-            .map((i) => (i as Map)['name'] as String)
-            .toList();
-        allItems.addAll(items);
-      }
+      allItems.addAll(await _fetchCategoryItemNames(cat));
     }
     allItems.sort();
     _pokeApiCache.putWithTTL(cacheKey, allItems, const Duration(days: 7));
     return allItems;
+  }
+
+  /// Returns all item names belonging to a single item *category* (e.g.
+  /// "held-items"); cached 7 days.
+  ///
+  /// Categories are not pockets — PokéAPI's `/item-pocket` list is only
+  /// {misc, medicine, pokeballs, machines, berries, mail, battle, key}.
+  /// "held-items" is one of ~25 categories nested inside the catch-all
+  /// "misc" pocket (alongside unrelated categories like mulch, picnic
+  /// ingredients, and dex-completion items), so it must be fetched as a
+  /// category directly rather than via [fetchItemsByPocket].
+  Future<List<String>> fetchItemsByCategory(String categoryName) async {
+    final cacheKey = 'item_category_$categoryName';
+    final cached = _pokeApiCache.getIfValid(cacheKey);
+    if (cached is List) return cached.cast<String>();
+
+    final items = await _fetchCategoryItemNames(categoryName)
+      ..sort();
+    _pokeApiCache.putWithTTL(cacheKey, items, const Duration(days: 7));
+    return items;
+  }
+
+  Future<List<String>> _fetchCategoryItemNames(String categoryName) async {
+    final catResp =
+        await _pokeApiClient.client.get('/item-category/$categoryName');
+    if (catResp.statusCode != 200) return const [];
+    return (catResp.data['items'] as List)
+        .map((i) => (i as Map)['name'] as String)
+        .toList();
   }
 
   Future<String?> fetchMachineMove(String url) async {

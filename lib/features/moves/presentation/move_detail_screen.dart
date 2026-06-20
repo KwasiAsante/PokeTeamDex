@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/features/moves/providers/moves_provider.dart'
     show contestEffectProvider, machineProvider, superContestEffectProvider;
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
@@ -636,8 +637,7 @@ class _PokemonListTile extends ConsumerWidget {
         ?.value
         .spriteUrls;
     final iconUrl = sprites?.icon ?? sprites?.gameFront ??
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-        'sprites/pokemon/versions/generation-viii/icons/${pokemon.id}.png';
+        PokemonDataResolver.genViiiIconFallbackUrl(pokemon.id);
 
     return ListTile(
       dense: true,
