@@ -27,7 +27,6 @@ import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
-import 'package:poke_team_dex/utils/app_logger.dart';
 
 class TeamsScreen extends ConsumerWidget {
   const TeamsScreen({super.key});
