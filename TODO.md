@@ -299,7 +299,7 @@
   - [x] **Task C** — `resolvedPokemonProvider` with `keepAlive` caching to eliminate per-scroll provider rebuilds *(#236)*
   - [x] **Task D** — Backend `GET /pokemon/{id}/resolved` endpoint with Showdown + Smogon aggregation and PostgreSQL caching *(#237)*
   - [x] **Task E** — Flutter hybrid integration: `resolvedPokemonProvider` → backend first, Hive offline fallback *(#238)*
-  - [x] **Task F** *(optional)* — Frontend lazy-loading and provider hygiene audit post-B+C *(#239)*
+  - [ ] **Task F** *(optional)* — Frontend lazy-loading and provider hygiene audit post-B+C *(#239)*
   - [ ] **Sprite consolidation investigation** — single backend resolver for icons, battle sprites (all gens), HOME artwork, official artwork across all form variants *(#244)*
 
 ---
