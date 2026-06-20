@@ -10,6 +10,7 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_cache.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_client.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show MoveSummary;
 
 class PokeApiRepository {
   PokeApiRepository(this._pokeApiClient, this._pokeApiCache);
@@ -403,10 +404,10 @@ class PokeApiRepository {
     return ids;
   }
 
-  /// Returns each ancestor Pokémon's display name and raw moves list, in chain
+  /// Returns each ancestor Pokémon's display name and moves list, in chain
   /// order (oldest first). Returns an empty list if [pokemonId] has no prior
   /// evolutions (e.g. unevolved or a baby with no pre-baby).
-  Future<List<({String speciesName, List<Map<String, dynamic>> moves})>>
+  Future<List<({String speciesName, List<MoveSummary> moves})>>
       fetchPriorEvoMoveSets(int pokemonId) async {
     final speciesId = await _getSpeciesIdForPokemon(pokemonId);
     final species = await fetchPokemonSpecies(speciesId);
@@ -417,21 +418,54 @@ class PokeApiRepository {
     if (path == null || path.length <= 1) return [];
     // All species IDs that precede the current one in the evolution path.
     final ancestorIds = path.sublist(0, path.length - 1);
-    final result = <({String speciesName, List<Map<String, dynamic>> moves})>[];
+
+    // Determine the regional identity of the pokemon being viewed.
+    // Variety IDs >= 10000 are regional/alternate forms; the base ID is the default.
+    final bool isDefaultForm = pokemonId == speciesId;
+    String? currentRegionalSuffix;
+    if (!isDefaultForm) {
+      final currentPokemon = await fetchPokemon(pokemonId);
+      currentRegionalSuffix = _regionalFormSuffix(currentPokemon.name);
+    }
+    // Regional suffixes that exist in the CURRENT species' non-default varieties.
+    // Used to decide whether an ancestor's regional variant is relevant.
+    final currentSpeciesRegionalSuffixes = species.varieties
+        .where((v) => !v.isDefault)
+        .map((v) => _regionalFormSuffix(v.name))
+        .whereType<String>()
+        .toSet();
+
+    final result = <({String speciesName, List<MoveSummary> moves})>[];
     for (final ancestorId in ancestorIds) {
-      final pokemon = await fetchPokemon(ancestorId);
-      result.add((speciesName: pokemon.name, moves: pokemon.moves));
-      // Also include non-default regional forms (e.g. zigzagoon-galar) so that
-      // breeding moves exclusive to those forms surface as prior-evo moves.
-      // Regional forms can have different Gen-specific egg move pools that the
-      // default (Kantonian) form never had — Obstagoon's knockoff/partingshot/
-      // quickguard come from Galarian Zigzagoon's Gen 8 egg moves, for example.
+      // For regional forms, skip the default ancestor — only the matching
+      // regional variety is relevant (Alolan Ninetales → Alolan Vulpix only,
+      // not Kantonian Vulpix).
+      if (isDefaultForm) {
+        final pokemon = await fetchPokemon(ancestorId);
+        result.add((speciesName: pokemon.name, moves: pokemon.moves));
+      }
+      // Also include non-default regional forms so that breeding moves exclusive
+      // to those forms surface as prior-evo moves (e.g. Galarian Zigzagoon egg
+      // moves for Obstagoon). Apply regional filtering so Alolan Vulpix does not
+      // appear when viewing Kantonian Ninetales, and Kantonian Vulpix does not
+      // appear when viewing Alolan Ninetales.
       final ancestorSpecies = await fetchPokemonSpecies(ancestorId);
       for (final variety in ancestorSpecies.varieties) {
         if (variety.isDefault) continue;
-        // Skip mega/gmax/etc. — only fetch forms that have their own /pokemon
-        // resource with a distinct move pool (regional forms do; cosmetic forms
-        // share the base species resource and have no separate entry).
+        final varSuffix = _regionalFormSuffix(variety.name);
+        if (varSuffix != null) {
+          if (isDefaultForm) {
+            // Default form: skip ancestor regional variants whose region IS
+            // represented by a non-default variety of the current species
+            // (Ninetales has -alola → skip vulpix-alola). Keep regional ancestors
+            // whose region has NO counterpart in the current species (Obstagoon
+            // has no other forms → keep zigzagoon-galar).
+            if (currentSpeciesRegionalSuffixes.contains(varSuffix)) continue;
+          } else {
+            // Regional form: only include ancestors from the same region.
+            if (varSuffix != currentRegionalSuffix) continue;
+          }
+        }
         try {
           final formPokemon = await fetchPokemonByNameOrDefault(variety.name);
           result.add((speciesName: variety.name, moves: formPokemon.moves));
@@ -441,6 +475,14 @@ class PokeApiRepository {
       }
     }
     return result;
+  }
+
+  static String? _regionalFormSuffix(String name) {
+    const suffixes = ['-alola', '-galar', '-hisui', '-paldea'];
+    for (final s in suffixes) {
+      if (name.endsWith(s)) return s;
+    }
+    return null;
   }
 
   Future<MoveEntry> fetchMove(String name) async {

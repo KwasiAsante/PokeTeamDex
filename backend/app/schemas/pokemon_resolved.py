@@ -16,6 +16,41 @@ def _coerce_to_list(v: object) -> object:
 _StrOrList = Annotated[list[str] | None, BeforeValidator(_coerce_to_list)]
 
 
+class AbilityInfo(BaseModel):
+    name: str
+    is_hidden: bool
+    slot: int
+
+
+class MoveLearnDetail(BaseModel):
+    version_group: str
+    method: str   # "level-up", "machine", "egg", "tutor"
+    level: int    # 0 for non-level-up methods
+
+
+class MoveSummary(BaseModel):
+    name: str
+    learn_details: list[MoveLearnDetail]
+
+
+class FlavorTextEntry(BaseModel):
+    text: str
+    language: str
+    version: str
+
+
+class MovesResponse(BaseModel):
+    pokemon_id: int
+    name: str
+    moves: list[MoveSummary]
+
+
+class FlavorTextResponse(BaseModel):
+    pokemon_id: int
+    name: str
+    flavor_text_entries: list[FlavorTextEntry]
+
+
 class EventMove(BaseModel):
     """A move absent from PokéAPI's learnset that Showdown's data supplies.
 
@@ -72,6 +107,8 @@ class SpriteUrlsFull(BaseModel):
 
     official_artwork: str | None = None
     official_artwork_shiny: str | None = None
+    official_artwork_female: str | None = None
+    official_artwork_female_shiny: str | None = None
     home: str | None = None
     home_shiny: str | None = None
     home_female: str | None = None
@@ -80,6 +117,10 @@ class SpriteUrlsFull(BaseModel):
     game_front_shiny: str | None = None
     game_front_female: str | None = None
     game_front_female_shiny: str | None = None
+    icon: str | None = None              # Gen-specific icon sprite (gen 8/7); plain front sprite for gen ≤ 6
+    icon_shiny: str | None = None        # game_front_shiny (no dedicated shiny icon sprites exist)
+    icon_female: str | None = None       # Female icon (gen-viii/icons/female/ or gen-vii/icons/female/)
+    icon_female_shiny: str | None = None # game_front_female_shiny (no dedicated shiny female icons)
 
 
 class VarietyData(BaseModel):
@@ -100,6 +141,14 @@ class VarietyData(BaseModel):
     base_stats: dict[str, int] | None = None
     abilities: dict[str, str] | None = None
     sprite_urls: SpriteUrlsFull | None = None
+    # Form classification flags
+    is_mega: bool = False
+    is_battle_only: bool = False
+    is_gmax: bool = False
+    # Trigger for activating this variety (at most one is non-null per variety)
+    associated_item: str | None = None   # e.g. "charizardite-x"
+    associated_move: str | None = None   # e.g. "dragon-ascent" (Rayquaza)
+    associated_ability: str | None = None  # e.g. "stance-change" (Aegislash)
 
 
 class FormData(BaseModel):
@@ -114,6 +163,8 @@ class FormData(BaseModel):
     """
 
     name: str
+    form_id: int | None = None
+    is_default: bool = False
     front_sprite_url: str | None = None  # always set from sprites.front_default
     sprite_urls: SpriteUrlsFull | None = None
 
@@ -164,15 +215,45 @@ class PokemonResolvedResponse(BaseModel):
     pokemon_id: int
     gen: int
     name: str
+    # pokemon detail
     types: list[str]
     base_stats: dict[str, int]
-    abilities: dict[str, str]
+    abilities: list[AbilityInfo]          # changed from dict[str, str]
+    height: int = 0
+    weight: int = 0
+    base_experience: int | None = None
+    species_name: str | None = None
+    form_names: list[str] = []            # derived from forms[].name for convenience
+    moves: list[MoveSummary] = []         # slim: []; full via ?includes[]=moves
+    moves_url: str | None = None          # /pokemon/moves/{pokemon_id}
     supplement_moves: list[EventMove]
-    smogon_analyses: list[SmogonFormatData] | None  # slim: format_ids only; full: sets included
-    smogon_url: str | None = None      # /pokemon/{pokemon_id}/smogon
+    smogon_analyses: list[SmogonFormatData] | None
+    smogon_url: str | None = None          # /pokemon/smogon/{pokemon_id}
     varieties: list[VarietyData]
-    varieties_url: str | None = None   # /pokemon/{pokemon_id}/varieties
+    varieties_url: str | None = None       # /pokemon/varieties/{pokemon_id}
     forms: list[FormData]
-    forms_url: str | None = None       # /pokemon/{pokemon_id}/forms
+    forms_url: str | None = None           # /pokemon/forms/{pokemon_id}
     sprite_urls: SpriteUrlsFull
     resolved_at: datetime
+    # species detail
+    genus: str | None = None
+    generation_name: str = "generation-ix"
+    gender_rate: int | None = None
+    capture_rate: int | None = None
+    base_happiness: int | None = None
+    hatch_counter: int | None = None
+    growth_rate: str | None = None
+    egg_groups: list[str] = []
+    flavor_text_entries: list[FlavorTextEntry] = []  # slim: []; full via ?includes[]=flavor
+    flavor_text_url: str | None = None     # /pokemon/flavor-text/{pokemon_id}
+    is_baby: bool = False
+    is_legendary: bool = False
+    is_mythical: bool = False
+    # Form classification flags (mirrors VarietyData fields for variety pokemon)
+    is_mega: bool = False
+    is_battle_only: bool = False
+    is_gmax: bool = False
+    associated_item: str | None = None
+    associated_move: str | None = None
+    associated_ability: str | None = None
+    evolution_chain_id: int | None = None

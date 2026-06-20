@@ -77,7 +77,7 @@ List<String> filterFormChips({
   int? gen,
 }) {
   final candidates = [
-    if (varieties.length > 1) ...varieties.skip(1),
+    ...varieties,
     ...cosmeticForms,
   ];
   if (candidates.isEmpty) return [];

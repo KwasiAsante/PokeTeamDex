@@ -2,7 +2,9 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.core.deps import DB
 from app.schemas.pokemon_resolved import (
+    FlavorTextResponse,
     FormsResponse,
+    MovesResponse,
     PokemonResolvedResponse,
     SmogonResponse,
     VarietiesResponse,
@@ -94,12 +96,44 @@ async def get_pokemon_smogon(
     return await pokemon_resolver_service.resolve_smogon(name_or_id, gen, db, _base_url(request))
 
 
+@router.get("/moves/{name_or_id}", response_model=MovesResponse)
+async def get_pokemon_moves(
+    request: Request,
+    name_or_id: str,
+    db: DB,
+) -> MovesResponse:
+    """
+    Return the full moves list for a Pokémon (all version groups).
+    Served from PostgreSQL cache when available; triggers a full resolve on miss.
+    """
+    return await pokemon_resolver_service.resolve_moves(
+        name_or_id, db, _base_url(request)
+    )
+
+
+@router.get("/flavor-text/{name_or_id}", response_model=FlavorTextResponse)
+async def get_pokemon_flavor_text(
+    request: Request,
+    name_or_id: str,
+    db: DB,
+    lang: str | None = None,
+) -> FlavorTextResponse:
+    """
+    Return Pokédex flavor text entries for a Pokémon.
+    - **lang**: Optional language code (e.g. "en"). Omit for all languages.
+    Served from PostgreSQL cache when available.
+    """
+    return await pokemon_resolver_service.resolve_flavor_text(
+        name_or_id, lang, db, _base_url(request)
+    )
+
+
 @router.get("/{name_or_id}/resolved", response_model=PokemonResolvedResponse)
 async def get_resolved_pokemon(
     request: Request,
     name_or_id: str,
     db: DB,
-    gen: int = 9,
+    gen: int | None = None,
     includes: list[str] = Query(default=[]),
 ) -> PokemonResolvedResponse:
     """
@@ -108,9 +142,9 @@ async def get_resolved_pokemon(
 
     - **name_or_id**: PokéAPI pokemon name ("charizard", "charizard-mega-x") or
       numeric ID (6, 10034). Form variants have their own names and IDs.
-    - **gen**: Generation to resolve for (1–9, default 9).
-      Types and base stats reflect gen-accurate values from Showdown's
-      historical data (e.g. Clefairy is Normal-type in gen ≤ 5).
+    - **gen**: Generation to resolve for (1–9). When omitted, types and base stats
+      use gen 9 accuracy and game_front uses the plain PokéAPI front sprite
+      (sprites/pokemon/{id}.png) rather than a versioned game directory.
     - **includes**: Comma-separated list of fields to expand.
       - `varieties` — embed types, base_stats, abilities, sprite_urls per variety
       - `forms` — embed sprite_urls per cosmetic form
@@ -120,7 +154,7 @@ async def get_resolved_pokemon(
     Navigation URLs (`smogon_url`, `varieties_url`, `forms_url`) are absolute
     so the client can follow them directly without constructing paths.
     """
-    if not 1 <= gen <= 9:
+    if gen is not None and not 1 <= gen <= 9:
         raise HTTPException(status_code=400, detail="gen must be between 1 and 9")
     pokemon_id = await pokemon_resolver_service._resolve_name_or_id(name_or_id)
     normalised = []

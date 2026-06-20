@@ -3,9 +3,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart'
     show teamRepositoryProvider, teamSlotRepositoryProvider;
+import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
+import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
+import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
@@ -15,23 +19,24 @@ import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/services/format/format_service.dart';
 import 'package:poke_team_dex/services/pokeapi/models/encounter_entry.dart';
-import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
-import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart'
+    show MoveSummary, FormBackendData;
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
+    show pokemonMovesProvider, pokemonFlavorTextProvider,
+         pokemonFormsProvider, pokemonVarietiesProvider;
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
+import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
-import 'package:poke_team_dex/shared/utils/snack_bar.dart';
-import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/stat_bar.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
-import 'package:poke_team_dex/data/pokemon_data_registry.dart';
-import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
-import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
-import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 
 /// Derives a display label from a PokéAPI cosmetic form name.
 /// e.g. "red-flower" → "Red Flower", "sandy" → "Sandy", "a" → "A".
@@ -109,10 +114,10 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     PokemonEntry effectivePokemon,
     AsyncValue<PokemonSpeciesEntry> speciesAsync,
   ) => [
-    _OverviewTab(pokemon: effectivePokemon, speciesAsync: speciesAsync),
+    _OverviewTab(pokemon: effectivePokemon, speciesAsync: speciesAsync, pokemonId: widget.pokemonId),
     _StatsTab(pokemon: effectivePokemon),
     _AbilitiesTab(pokemon: effectivePokemon),
-    _MovesTab(pokemon: effectivePokemon),
+    _MovesTab(pokemon: effectivePokemon, pokemonId: effectivePokemon.id),
     _EvolutionsTab(speciesAsync: speciesAsync, selectedFormName: _selectedFormName),
     _FormsTab(speciesAsync: speciesAsync, selectedFormName: _selectedFormName),
     _LocationsTab(pokemonId: effectivePokemon.id),
@@ -121,10 +126,25 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    final resolvedAsync = ref.watch(resolvedPokemonProvider(widget.pokemonId));
+    final resolvedAsync = ref.watch(resolvedPokemonProvider((id: widget.pokemonId, gen: null)));
     final formAsync = _selectedFormName != null
         ? ref.watch(pokemonByNameProvider(_selectedFormName!))
         : null;
+
+    // Conditionally fetch full sprite data — same pattern as list tile.
+    final resolvedData = resolvedAsync.asData?.value;
+    final hasCosmeticForms = resolvedData?.cosmeticForms.isNotEmpty == true;
+    final hasCosmeticVarieties = resolvedData != null &&
+        resolvedData.species.varieties.any((v) =>
+            !v.isDefault &&
+            PokemonDataRegistry.instance.cosmeticVarietyNames.contains(v.name));
+    final formsData = hasCosmeticForms
+        ? ref.watch(pokemonFormsProvider((id: widget.pokemonId, gen: null))).asData?.value
+        : null;
+    final varietiesData = hasCosmeticVarieties
+        ? ref.watch(pokemonVarietiesProvider((id: widget.pokemonId, gen: null))).asData?.value
+        : null;
+
     final isWide = MediaQuery.sizeOf(context).width > 840;
 
     return resolvedAsync.when(
@@ -136,7 +156,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         appBar: AppBar(leading: BackButton(onPressed: () => context.pop())),
         body: ErrorState(
           error: e,
-          onRetry: () => ref.invalidate(resolvedPokemonProvider(widget.pokemonId)),
+          onRetry: () => ref.invalidate(resolvedPokemonProvider((id: widget.pokemonId, gen: null))),
         ),
       ),
       data: (resolved) {
@@ -145,8 +165,9 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         // receive it in the data state — the whole resolved provider is already done.
         final speciesAsync = AsyncData<PokemonSpeciesEntry>(resolved.species);
         final effectivePokemon = formAsync?.asData?.value ?? basePokemon;
-        final primaryType =
-            effectivePokemon.types[1] ?? effectivePokemon.types.values.first;
+        final primaryType = effectivePokemon.types.isNotEmpty
+            ? effectivePokemon.types[0]
+            : 'normal';
         final headerColor =
             PokemonTypeColors.colors[primaryType] ?? Theme.of(context).colorScheme.primary;
         final species = resolved.species;
@@ -168,30 +189,28 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         // Variety-based cosmetic chips are only shown for the BASE form.
         // When a regional battle form is selected (e.g. Hisuian Basculin),
         // Unovan cosmetic variants (Blue-Striped) are not relevant.
+        // Uses pokemonVarietiesProvider (already watched above) instead of
+        // per-variety pokemonByNameProvider calls.
         final varietyCosmeticForms = <PokemonFormEntry>[];
         if (_selectedFormName == null) {
           for (final variety in species.varieties) {
             if (variety.isDefault) continue;
             if (!PokemonDataRegistry.instance.cosmeticVarietyNames.contains(variety.name)) continue;
-            final vAsync = ref.watch(pokemonByNameProvider(variety.name));
-            final vData = vAsync.asData?.value;
-            if (vData == null) continue;
-            // Use speciesName ("wormadam") not the variety name ("wormadam-plant")
-            // so the suffix strip works for default varieties with a form infix.
+            final vd = varietiesData?.where((v) => v.name == variety.name).firstOrNull;
+            if (vd == null) continue; // provider still loading; widget rebuilds when it does
             final sn = basePokemon.speciesName ?? basePokemon.name;
             final formName = variety.name.startsWith('$sn-')
                 ? variety.name.substring(sn.length + 1)
                 : variety.name;
             varietyCosmeticForms.add(PokemonFormEntry(
-              id: vData.id,
+              id: vd.pokemonId,
               name: variety.name,
               formName: formName,
               isDefault: false,
-              // Chip thumbnail uses the small sprite; header uses official artwork.
-              spriteUrl: vData.sprites?['front_default'] as String?,
-              spriteShinyUrl: vData.sprites?['front_shiny'] as String?,
-              officialArtworkUrl: vData.officialArtworkUrl,
-              officialArtworkShinyUrl: vData.officialArtworkShinyUrl,
+              spriteUrl: vd.spriteUrls?.gameFront ?? vd.spriteUrls?.home,
+              spriteShinyUrl: vd.spriteUrls?.gameFrontShiny ?? vd.spriteUrls?.homeShiny,
+              officialArtworkUrl: vd.spriteUrls?.officialArtwork,
+              officialArtworkShinyUrl: vd.spriteUrls?.officialArtworkShiny,
             ));
           }
         }
@@ -201,8 +220,8 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         final cosmeticForms = [...cosmeticFormsBase, ...varietyCosmeticForms];
 
         return isWide
-            ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms, cosmeticFormsLoading)
-            : _buildNarrowLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms, cosmeticFormsLoading);
+            ? _buildWideLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms, cosmeticFormsLoading, formsData)
+            : _buildNarrowLayout(context, basePokemon, effectivePokemon, speciesAsync, headerColor, battleForms, baseFormLabel, cosmeticForms, cosmeticFormsLoading, formsData);
       },
     );
   }
@@ -219,6 +238,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     String baseFormLabel,
     List<PokemonFormEntry> cosmeticForms,
     bool cosmeticFormsLoading,
+    List<FormBackendData>? formsData,
   ) {
     return Scaffold(
       body: NestedScrollView(
@@ -239,6 +259,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
             cosmeticFormsLoading: cosmeticFormsLoading,
             selectedCosmeticFormName: _selectedCosmeticFormName,
             onCosmeticFormSelect: (name) => setState(() => _selectedCosmeticFormName = name),
+            formsData: formsData,
           ),
         ],
         body: TabBarView(
@@ -261,6 +282,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     String baseFormLabel,
     List<PokemonFormEntry> cosmeticForms,
     bool cosmeticFormsLoading,
+    List<FormBackendData>? formsData,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -268,11 +290,13 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     final wideSelectedCosmetic = _selectedCosmeticFormName != null
         ? cosmeticForms.where((f) => f.name == _selectedCosmeticFormName).firstOrNull
         : null;
-    // Cosmetic form HOME artwork uses "{baseId}-{suffix}.png" naming
-    // (e.g. 412-sandy.png for Burmy Sandy Cloak). Strip the base Pokémon name
-    // prefix from the form name to get the suffix.
     String? cosmeticHomeUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
+      // Backend-resolved sprite URLs (highest quality, CORS-safe).
+      final fd = formsData?.where((f) => f.name == form.name).firstOrNull;
+      final backendUrl = fd?.spriteUrls?.officialArtwork ?? fd?.spriteUrls?.home;
+      if (backendUrl != null) return backendUrl;
+      // Variety-based forms have official artwork URL from pokemonVarietiesProvider.
       if (form.officialArtworkUrl != null) return form.officialArtworkUrl;
       final override = PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[form.name];
       if (override != null) return override;
@@ -286,6 +310,9 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
     }
     String? cosmeticHomeShinyUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
+      final fd = formsData?.where((f) => f.name == form.name).firstOrNull;
+      final backendShinyUrl = fd?.spriteUrls?.officialArtworkShiny ?? fd?.spriteUrls?.homeShiny;
+      if (backendShinyUrl != null) return backendShinyUrl;
       if (form.officialArtworkShinyUrl != null) return form.officialArtworkShinyUrl;
       if (form.formName == 'female') {
         return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/female/${basePokemon.id}.png';
@@ -388,7 +415,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
                       Wrap(
                         spacing: 6,
                         alignment: WrapAlignment.center,
-                        children: effectivePokemon.types.values
+                        children: effectivePokemon.types
                             .map((t) => TypeBadge(type: t))
                             .toList(),
                       ),
@@ -491,6 +518,7 @@ class _DetailSliverAppBar extends StatelessWidget {
   final bool cosmeticFormsLoading;
   final String? selectedCosmeticFormName;
   final void Function(String?) onCosmeticFormSelect;
+  final List<FormBackendData>? formsData;
 
   const _DetailSliverAppBar({
     required this.basePokemon,
@@ -508,6 +536,7 @@ class _DetailSliverAppBar extends StatelessWidget {
     required this.cosmeticFormsLoading,
     required this.selectedCosmeticFormName,
     required this.onCosmeticFormSelect,
+    this.formsData,
   });
 
   @override
@@ -518,20 +547,20 @@ class _DetailSliverAppBar extends StatelessWidget {
         : null;
 
     // Resolve header display URL for a cosmetic form.
-    // Priority: official artwork (variety-based) → HOME override → HOME → sprite.
+    // Priority: backend-resolved → variety artwork → HOME override → HOME → sprite.
     String? cosmeticUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
-      // Variety-based forms have their own official artwork URL.
+      // Backend-resolved sprite URLs (highest quality, CORS-safe).
+      final fd = formsData?.where((f) => f.name == form.name).firstOrNull;
+      final backendUrl = fd?.spriteUrls?.officialArtwork ?? fd?.spriteUrls?.home;
+      if (backendUrl != null) return backendUrl;
+      // Variety-based forms have official artwork from pokemonVarietiesProvider.
       if (form.officialArtworkUrl != null) return form.officialArtworkUrl;
-      // Specific URL overrides (e.g. xerneas-active → show neutral form).
       final override = PokemonDataRegistry.instance.cosmeticFormHomeUrlOverrides[form.name];
       if (override != null) return override;
-      // Gender forms: check formName directly so it works even when basePokemon.name
-      // includes a suffix (e.g. "frillish-male" → "frillish-female" prefix check fails).
       if (form.formName == 'female') {
         return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/female/${basePokemon.id}.png';
       }
-      // Form-name-based: try "{baseId}-{suffix}.png" HOME URL.
       final baseName = basePokemon.name;
       if (!form.name.startsWith('$baseName-')) return form.spriteUrl;
       final suffix = form.name.substring(baseName.length + 1);
@@ -539,6 +568,9 @@ class _DetailSliverAppBar extends StatelessWidget {
     }
     String? cosmeticShinyUrlFor(PokemonFormEntry? form) {
       if (form == null) return null;
+      final fd = formsData?.where((f) => f.name == form.name).firstOrNull;
+      final backendShinyUrl = fd?.spriteUrls?.officialArtworkShiny ?? fd?.spriteUrls?.homeShiny;
+      if (backendShinyUrl != null) return backendShinyUrl;
       if (form.officialArtworkShinyUrl != null) return form.officialArtworkShinyUrl;
       final shinyOverride = PokemonDataRegistry.instance.cosmeticFormHomeShinyUrlOverrides[form.name];
       if (shinyOverride != null) return shinyOverride;
@@ -668,14 +700,18 @@ class _DetailSliverAppBar extends StatelessWidget {
 
 // ── Overview Tab ──────────────────────────────────────────────────────────────
 
-class _OverviewTab extends StatelessWidget {
+class _OverviewTab extends ConsumerWidget {
   final PokemonEntry pokemon;
   final AsyncValue<PokemonSpeciesEntry> speciesAsync;
+  final int pokemonId;
 
-  const _OverviewTab({required this.pokemon, required this.speciesAsync});
+  const _OverviewTab({required this.pokemon, required this.speciesAsync, required this.pokemonId});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final flavorAsync = ref.watch(pokemonFlavorTextProvider(pokemonId));
+    final flavorEntries = flavorAsync.asData?.value;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -684,7 +720,7 @@ class _OverviewTab extends StatelessWidget {
           // Types
           Row(
             children: [
-              ...pokemon.types.values.map(
+              ...pokemon.types.map(
                 (t) => Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: TypeBadge(type: t),
@@ -706,7 +742,7 @@ class _OverviewTab extends StatelessWidget {
           speciesAsync.when(
             loading: () => const LoadingState(message: 'Loading species data…'),
             error: (e, _) => ErrorState(error: e),
-            data: (species) => _SpeciesSection(species: species),
+            data: (species) => _SpeciesSection(species: species, flavorEntries: flavorEntries),
           ),
         ],
       ),
@@ -716,13 +752,19 @@ class _OverviewTab extends StatelessWidget {
 
 class _SpeciesSection extends StatelessWidget {
   final PokemonSpeciesEntry species;
-  const _SpeciesSection({required this.species});
+  /// Pre-fetched English flavor text entries from [pokemonFlavorTextProvider].
+  /// When provided, these replace [species.flavorTextEntries] so that flavor
+  /// text is loaded lazily from the backend rather than from the slim resolved
+  /// response. When null (still loading), falls back to species entries.
+  final List<FlavorTextEntry>? flavorEntries;
+  const _SpeciesSection({required this.species, this.flavorEntries});
 
   @override
   Widget build(BuildContext context) {
-    final englishEntries = species.flavorTextEntries
-        .where((f) => f.language == 'en')
-        .toList();
+    final englishEntries = flavorEntries ??
+        species.flavorTextEntries
+            .where((f) => f.language == 'en')
+            .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -844,14 +886,7 @@ class _StatsTab extends StatelessWidget {
     ('speed', 'Spe'),
   ];
 
-  int _base(String statName) {
-    for (final s in pokemon.stats) {
-      if ((s['stat'] as Map)['name'] == statName) {
-        return s['base_stat'] as int;
-      }
-    }
-    return 0;
-  }
+  int _base(String statName) => pokemon.stats[statName] ?? 0;
 
   @override
   Widget build(BuildContext context) {
@@ -997,7 +1032,8 @@ class _StatRangeTable extends StatelessWidget {
 /// version-group filter. Move details are fetched lazily per row.
 class _MovesTab extends ConsumerStatefulWidget {
   final PokemonEntry pokemon;
-  const _MovesTab({required this.pokemon});
+  final int pokemonId;
+  const _MovesTab({required this.pokemon, required this.pokemonId});
 
   @override
   ConsumerState<_MovesTab> createState() => _MovesTabState();
@@ -1045,11 +1081,11 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
   ];
 
   /// All unique version-group names found in the moves list, sorted by release date.
-  List<String> get _versions {
+  List<String> _versions(List<MoveSummary> moves) {
     final seen = <String>{};
-    for (final m in widget.pokemon.moves) {
-      for (final vgd in (m['version_group_details'] as List)) {
-        seen.add((vgd as Map)['version_group']['name'] as String);
+    for (final m in moves) {
+      for (final vgd in m.learnDetails) {
+        seen.add(vgd.versionGroup);
       }
     }
     return seen.toList()
@@ -1073,19 +1109,20 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
   /// [formatService] are the generation/service to query — both null when the
   /// service isn't ready yet or the selected version has no known generation.
   Map<String, List<_MoveRow>> _grouped(
-    String? version, {
+    String? version,
+    List<MoveSummary> moves, {
     required Map<String, String> psIdToName,
     int? gen,
     FormatService? formatService,
   }) {
     final groups = <String, List<_MoveRow>>{};
-    for (final m in widget.pokemon.moves) {
-      final moveName = (m['move'] as Map)['name'] as String;
-      for (final vgd in (m['version_group_details'] as List)) {
-        final vg = (vgd as Map)['version_group']['name'] as String;
+    for (final m in moves) {
+      final moveName = m.name;
+      for (final vgd in m.learnDetails) {
+        final vg = vgd.versionGroup;
         if (version != null && vg != version) continue;
-        final method = vgd['move_learn_method']['name'] as String;
-        final level = vgd['level_learned_at'] as int? ?? 0;
+        final method = vgd.method;
+        final level = vgd.level;
         groups.putIfAbsent(method, () => []);
         // Avoid duplicates within same method
         if (!groups[method]!.any((r) => r.moveName == moveName)) {
@@ -1122,18 +1159,16 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
   /// appear in PokéAPI's data (just attributed to a different generation or
   /// method there), so this reverse-lookup virtually always resolves.
   static Map<String, String> _psIdToNameMap(
-    List<Map<String, dynamic>> current,
-    List<({String speciesName, List<Map<String, dynamic>> moves})> ancestorSets,
+    List<MoveSummary> current,
+    List<({String speciesName, List<MoveSummary> moves})> ancestorSets,
   ) {
     final map = <String, String>{};
     for (final m in current) {
-      final name = (m['move'] as Map)['name'] as String;
-      map.putIfAbsent(_toPsId(name), () => name);
+      map.putIfAbsent(_toPsId(m.name), () => m.name);
     }
     for (final ancestor in ancestorSets) {
       for (final m in ancestor.moves) {
-        final name = (m['move'] as Map)['name'] as String;
-        map.putIfAbsent(_toPsId(name), () => name);
+        map.putIfAbsent(_toPsId(m.name), () => m.name);
       }
     }
     return map;
@@ -1170,7 +1205,8 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
   /// [psIdToName], [gen] and [formatService] mirror [_grouped]'s parameters.
   List<({String speciesName, List<_MoveRow> rows})> _buildPriorEvoGroups(
     String? selectedVg,
-    List<({String speciesName, List<Map<String, dynamic>> moves})> ancestorSets, {
+    List<MoveSummary> moves,
+    List<({String speciesName, List<MoveSummary> moves})> ancestorSets, {
     required Map<String, String> psIdToName,
     int? gen,
     FormatService? formatService,
@@ -1183,10 +1219,10 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     // "exclusive to an ancestor" just because PokéAPI's version-group data
     // doesn't carry them either.
     final currentInVg = <String>{};
-    for (final m in widget.pokemon.moves) {
-      final moveName = (m['move'] as Map)['name'] as String;
-      for (final vgd in m['version_group_details'] as List) {
-        final vg = ((vgd as Map)['version_group'] as Map)['name'] as String;
+    for (final m in moves) {
+      final moveName = m.name;
+      for (final vgd in m.learnDetails) {
+        final vg = vgd.versionGroup;
         if (selectedVg == null || vg == selectedVg) {
           currentInVg.add(moveName);
           break;
@@ -1204,12 +1240,12 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     for (final ancestor in ancestorSets) {
       final rows = <_MoveRow>[];
       for (final m in ancestor.moves) {
-        final moveName = (m['move'] as Map)['name'] as String;
+        final moveName = m.name;
         if (currentInVg.contains(moveName)) continue;
-        for (final vgd in m['version_group_details'] as List) {
-          final vg = ((vgd as Map)['version_group'] as Map)['name'] as String;
+        for (final vgd in m.learnDetails) {
+          final vg = vgd.versionGroup;
           if (selectedVg != null && vg != selectedVg) continue;
-          final level = vgd['level_learned_at'] as int? ?? 0;
+          final level = vgd.level;
           if (!rows.any((r) => r.moveName == moveName)) {
             rows.add(_MoveRow(moveName: moveName, level: level));
           }
@@ -1238,7 +1274,12 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final versions = _versions;
+    // Watch the lazy-loaded moves from the backend provider; fall back to the
+    // moves already embedded in the resolved PokemonEntry while loading.
+    final movesAsync = ref.watch(pokemonMovesProvider(widget.pokemonId));
+    final moves = movesAsync.asData?.value ?? widget.pokemon.moves;
+
+    final versions = _versions(moves);
     _selectedVersion ??= versions.isNotEmpty ? versions.first : null;
 
     // FormatService gates on `initialize()` resolving — `allFormatsProvider`
@@ -1253,10 +1294,11 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
 
     final priorEvoAsync = ref.watch(priorEvoMoveSetsProvider(widget.pokemon.id));
     final ancestorSets = priorEvoAsync.whenOrNull(data: (sets) => sets) ?? const [];
-    final psIdToName = _psIdToNameMap(widget.pokemon.moves, ancestorSets);
+    final psIdToName = _psIdToNameMap(moves, ancestorSets);
 
     final grouped = _grouped(
       _selectedVersion,
+      moves,
       psIdToName: psIdToName,
       gen: gen,
       formatService: formatService,
@@ -1264,7 +1306,7 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
 
     final priorEvoGroups = priorEvoAsync.whenOrNull(
       data: (sets) => _buildPriorEvoGroups(
-        _selectedVersion, sets,
+        _selectedVersion, moves, sets,
         psIdToName: psIdToName,
         gen: gen,
         formatService: formatService,
@@ -1569,9 +1611,9 @@ class _AbilitiesTab extends ConsumerWidget {
       itemCount: abilities.length,
       separatorBuilder: (_, _) => const Divider(height: 24),
       itemBuilder: (context, i) {
-        final slot = abilities[i];
-        final name = (slot['ability'] as Map)['name'] as String;
-        final isHidden = slot['is_hidden'] as bool? ?? false;
+        final ability = abilities[i];
+        final name = ability.name;
+        final isHidden = ability.isHidden;
         return _AbilityCard(name: name, isHidden: isHidden, ref: ref);
       },
     );
@@ -2004,7 +2046,7 @@ class _FormCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Row(
-                        children: pokemon.types.values
+                        children: pokemon.types
                             .map((t) => Padding(
                                   padding: const EdgeInsets.only(right: 4),
                                   child: TypeBadge(type: t),
@@ -2018,11 +2060,11 @@ class _FormCard extends ConsumerWidget {
             ),
             if (pokemon.stats.isNotEmpty) ...[
               const SizedBox(height: 12),
-              ...pokemon.stats.indexed.map((entry) {
+              ...pokemon.stats.entries.indexed.map((entry) {
                 final i = entry.$1;
-                final s = entry.$2;
-                final statName = (s['stat'] as Map)['name'] as String;
-                final value = s['base_stat'] as int;
+                final e = entry.$2;
+                final statName = e.key;
+                final value = e.value;
                 final label = _shortStatLabel(statName);
                 return StatBar(
                   label: label,
@@ -2698,8 +2740,7 @@ class _SlotPicker extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef widgetRef) {
     final slotsAsync = widgetRef.watch(teamSlotsProvider(team.id));
     final colorScheme = Theme.of(context).colorScheme;
-    final primaryType =
-        pokemon.types[1] ?? pokemon.types.values.first;
+    final primaryType = pokemon.types.isNotEmpty ? pokemon.types[0] : 'normal';
     final typeColor =
         PokemonTypeColors.colors[primaryType] ?? colorScheme.primary;
 
@@ -2843,7 +2884,7 @@ class _AddToTeamTabState extends State<_AddToTeamTab> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final pokemon = widget.pokemon;
-    final primaryType = pokemon.types[1] ?? pokemon.types.values.first;
+    final primaryType = pokemon.types.isNotEmpty ? pokemon.types[0] : 'normal';
     final typeColor = PokemonTypeColors.colors[primaryType] ?? colorScheme.primary;
 
     return SingleChildScrollView(
@@ -2879,7 +2920,7 @@ class _AddToTeamTabState extends State<_AddToTeamTab> {
                         ),
                         const SizedBox(height: 6),
                         Row(
-                          children: pokemon.types.values
+                          children: pokemon.types
                               .map((t) => Padding(
                                     padding: const EdgeInsets.only(right: 6),
                                     child: TypeBadge(type: t),

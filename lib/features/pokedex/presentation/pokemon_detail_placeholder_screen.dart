@@ -48,7 +48,7 @@ class PokemonDetailPlaceholderScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 spacing: 5.0,
                 children: [
-                  ...data.types.values.map((type) => TypeBadge(type: type)),
+                  ...data.types.map((type) => TypeBadge(type: type)),
                 ],
               ),
               Row(

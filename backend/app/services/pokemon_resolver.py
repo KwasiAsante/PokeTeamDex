@@ -23,8 +23,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.pokemon_resolved import PokemonResolved
 from app.schemas.pokemon_resolved import (
+    AbilityInfo,
     EventMove,
+    FlavorTextEntry,
     FormData,
+    MoveLearnDetail,
+    MoveSummary,
     PokemonResolvedResponse,
     SmogonFormatData,
     SmogonResponse,
@@ -54,6 +58,9 @@ _SMOGON_BASE = "https://pkmn.github.io/smogon/data"
 _POKEAPI_BASE = "https://pokeapi.co/api/v2"
 _SHOWDOWN_CDN = "https://play.pokemonshowdown.com/sprites"
 _POKEAPI_SPRITES = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions"
+_POKEAPI_PLAIN_SPRITES = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon"
+_POKEAPI_HOME = f"{_POKEAPI_PLAIN_SPRITES}/other/home"
+_POKEAPI_OA = f"{_POKEAPI_PLAIN_SPRITES}/other/official-artwork"
 
 # PokeAPI/sprites: preferred subdir and extension per gen game
 # (gen number → (game_path, subdir, ext, shiny_subdir))
@@ -63,6 +70,10 @@ _GEN_SPRITE_CONFIG: dict[int, tuple[str, str, str, str]] = {
     3: ("generation-iii/emerald",                  "",            "png", "shiny"),
     4: ("generation-iv/heartgold-soulsilver",      "",            "png", "shiny"),
     5: ("generation-v/black-white",                "animated",    "gif", "animated/shiny"),
+    6: ("generation-vi/omegaruby-alphasapphire",   "",            "png", "shiny"),
+    7: ("generation-vii/ultra-sun-ultra-moon",     "",            "png", "shiny"),
+    # gen 8 has no versioned sprite directories in the PokeAPI repo — Showdown fallback
+    9: ("generation-ix/scarlet-violet",            "",            "png", ""),          # no shiny dir in gen 9 repo
 }
 
 # Showdown gen-specific sprite dirs (gen number → dir name)
@@ -75,6 +86,32 @@ _SHOWDOWN_GEN_SHINY_DIRS: dict[int, str] = {
 
 _ROMAN = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5,
           "vi": 6, "vii": 7, "viii": 8, "ix": 9}
+
+# Variety name → icon sprite_id override.
+# Used when the sprites repo icon file uses a different suffix than the variety
+# name and neither the variety ID nor base_id-variety_suffix works.
+# Calyrex riders: variety names are calyrex-ice/shadow but icons are 898-ice-rider/shadow-rider.
+_VARIETY_ICON_ID_OVERRIDES: dict[str, str] = {
+    "calyrex-ice":    "898-ice-rider",
+    "calyrex-shadow": "898-shadow-rider",
+}
+
+# PokéAPI form name suffix → PokeAPI/sprites repo suffix.
+# The sprites repo uses shorter names for some forms whose PokéAPI slug is longer.
+# e.g. "shellos-east-sea" → sprites use "422-east.png", not "422-east-sea.png".
+_SPRITE_SUFFIX_REMAP: dict[str, str] = {
+    "east-sea":      "east",
+    "blue-flower":   "blue",
+    "orange-flower": "orange",
+    "red-flower":    "red",
+    "white-flower":  "white",
+    "yellow-flower": "yellow",
+    "blue-petal":    "blue",
+    "orange-petal":  "orange",
+    "red-petal":     "red",
+    "white-petal":   "white",
+    "yellow-petal":  "yellow",
+}
 
 _GEN_RANGES = [(151, 1), (251, 2), (386, 3), (493, 4), (649, 5),
                (721, 6), (809, 7), (905, 8), (10000, 9)]
@@ -155,8 +192,9 @@ def _build_pokeapi_sprite_url(
         else:
             parts = [_POKEAPI_SPRITES, game_path, f"{sprite_id}.{ext}"]
     if female:
-        # Female variants: insert "female" before filename (non-standard; best effort)
-        return None
+        if gen < 4:
+            return None  # female versioned sprites only exist from gen 4
+        parts.insert(-1, "female")
     return "/".join(parts)
 
 
@@ -181,6 +219,29 @@ def _build_showdown_sprite_url(
         return f"{_SHOWDOWN_CDN}/{dir_name}/{ps_name}.png"
 
 
+def _build_icon_url(pokemon_id: int | str, gen: int, female: bool = False) -> str:
+    """Gen-specific icon sprite URL.
+
+    Fallback chain:
+      gen >= 8  → generation-viii/icons/{id}.png  (female/ subdir if female=True)
+      gen == 7  → generation-vii/icons/{id}.png   (female/ subdir if female=True)
+      gen <= 6  → plain front sprite (no icon directories; female/ subdir for female=True)
+    """
+    if gen is None or gen >= 8:
+        subdir = "female/" if female else ""
+        return f"{_POKEAPI_SPRITES}/generation-viii/icons/{subdir}{pokemon_id}.png"
+    elif gen >= 7:
+        subdir = "female/" if female else ""
+        return f"{_POKEAPI_SPRITES}/generation-vii/icons/{subdir}{pokemon_id}.png"
+    elif gen == 5:
+        # Gen 5 icons use "{id}-female.png" suffix, not a female/ subdirectory
+        suffix = "-female" if female else ""
+        return f"{_POKEAPI_SPRITES}/generation-v/icons/{pokemon_id}{suffix}.png"
+    else:
+        subdir = "female/" if female else ""
+        return f"{_POKEAPI_PLAIN_SPRITES}/{subdir}{pokemon_id}.png"
+
+
 def _extract_form_suffix(form_name: str, species_name: str) -> str | None:
     """Derive the PokeAPI/sprites suffix from a form name.
 
@@ -194,6 +255,16 @@ def _extract_form_suffix(form_name: str, species_name: str) -> str | None:
     return None
 
 
+
+async def _probe_url(client: httpx.AsyncClient, url: str) -> str | None:
+    """HEAD-check a URL. Returns the URL on 200, None otherwise."""
+    try:
+        r = await client.head(url, follow_redirects=True, timeout=5.0)
+        return url if r.status_code == 200 else None
+    except Exception:
+        return None
+
+
 class PokemonResolverService:
     def __init__(self) -> None:
         self._event_learnsets: dict[str, dict] = {}
@@ -201,12 +272,23 @@ class PokemonResolverService:
         self._ps_pokedex: dict[str, dict] = {}
         self._ps_pokedex_overrides: dict[str, dict[str, dict]] = {}
         self._ps_exceptions: dict[str, str] = {}
+        # mega form name → mega stone item name  (inverse of megaStoneMap)
+        self._mega_form_to_item: dict[str, str] = {}
+        # mega form name → required move (e.g. rayquaza-mega → dragon-ascent)
+        self._mega_form_to_move: dict[str, str] = {}
+        # form name → required ability (from abilityGatingRules)
+        self._form_to_ability: dict[str, str] = {}
         self._smogon_sets: dict[str, dict] = {}
         self._smogon_analyses: dict[str, dict] = {}
         self._smogon_loaded = False
         self._pokeapi_http = httpx.AsyncClient(
-            timeout=10.0, limits=httpx.Limits(max_connections=10)
+            timeout=10.0, limits=httpx.Limits(max_connections=100)
         )
+        # Cap concurrent outgoing PokéAPI calls to avoid rate-limiting.
+        # Probe requests go to raw.githubusercontent.com (different host, not capped).
+        # 20 lets Vivillon's 17 form fetches complete in one batch while preventing
+        # hundreds of simultaneous calls when the full Pokédex warms a cold cache.
+        self._pokeapi_semaphore = asyncio.Semaphore(20)
         self._smogon_http = httpx.AsyncClient(
             timeout=30.0, limits=httpx.Limits(max_connections=20)
         )
@@ -243,6 +325,13 @@ class PokemonResolverService:
             with open(registry_path, encoding="utf-8") as f:
                 registry = json.load(f)
             self._ps_exceptions = registry.get("psFormExceptions", {})
+            # Build inverse mega stone map: megaForm → item
+            self._mega_form_to_item = {
+                entry["megaForm"]: item
+                for item, entry in registry.get("megaStoneMap", {}).items()
+            }
+            self._mega_form_to_move = registry.get("megaFormMoveRequirements", {})
+            self._form_to_ability = registry.get("abilityGatingRules", {})
             logger.info("Loaded pokemon_registry.json (%d PS form exceptions)", len(self._ps_exceptions))
         else:
             logger.warning("pokemon_registry.json not found in static/ — copy from assets/data/")
@@ -394,6 +483,8 @@ class PokemonResolverService:
         variety_id: int,
         gen: int,
         gen_sprite_id_override: str | None = None,
+        variety_name: str = "",
+        base_pokemon_id: int | None = None,
     ) -> SpriteUrlsFull:
         """Build full sprite URLs for a variety (has its own /pokemon resource).
 
@@ -406,28 +497,87 @@ class PokemonResolverService:
         artwork = other.get("official-artwork") or {}
         home = other.get("home") or {}
 
-        # Gen-specific game sprite: PokeAPI/sprites versioned (primary) or Showdown (fallback)
+        # Gen-specific game sprites: use versioned URLs when a gen was explicitly
+        # requested; fall back to the plain root sprites when gen=None (Pokédex,
+        # no-format teams) so we never return a constructed URL that may 404.
         sprite_id = gen_sprite_id_override or str(variety_id)
-        game_front = (
-            _build_pokeapi_sprite_url(sprite_id, gen)
-            or _build_showdown_sprite_url(ps_name, gen)
-        )
-        game_front_shiny = (
-            _build_pokeapi_sprite_url(sprite_id, gen, shiny=True)
-            or _build_showdown_sprite_url(ps_name, gen, shiny=True)
-        )
+        game_front = game_front_shiny = game_front_female = game_front_female_shiny = None
+        if gen is not None and gen in _GEN_SPRITE_CONFIG:
+            gpath, subdir, _, _ = _GEN_SPRITE_CONFIG[gen]
+            gen_key, game_key = gpath.split("/", 1)
+            versioned = ((sprites.get("versions") or {})
+                         .get(gen_key, {})
+                         .get(game_key, {}))
+            pool = versioned.get(subdir, {}) if subdir else versioned
+            game_front = (
+                pool.get("front_default")
+                or _build_pokeapi_sprite_url(sprite_id, gen)
+                or _build_showdown_sprite_url(ps_name, gen)
+            )
+            game_front_shiny = (
+                pool.get("front_shiny")
+                or _build_pokeapi_sprite_url(sprite_id, gen, shiny=True)
+                or _build_showdown_sprite_url(ps_name, gen, shiny=True)
+            )
+            game_front_female = (
+                pool.get("front_female")
+                or _build_pokeapi_sprite_url(sprite_id, gen, female=True)
+            )
+            game_front_female_shiny = (
+                pool.get("front_shiny_female")
+                or pool.get("front_female_shiny")
+                or _build_pokeapi_sprite_url(sprite_id, gen, shiny=True, female=True)
+            )
+        else:
+            # gen=None (no gen in request): use root sprites — always non-null
+            # for existing Pokémon and represent the canonical current-gen artwork.
+            game_front = sprites.get("front_default")
+            game_front_shiny = sprites.get("front_shiny")
+            game_front_female = sprites.get("front_female")
+            game_front_female_shiny = (sprites.get("front_shiny_female")
+                                       or sprites.get("front_female_shiny"))
+
+        has_female_home = bool(home.get("front_female"))
+
+        # Icon: prefer PokéAPI's own icon URL from the sprites object.
+        # Fall back to overrides and constructed paths when the API returns null.
+        icons_versions = sprites.get("versions") or {}
+        gen8_icon_api = icons_versions.get("generation-viii", {}).get("icons", {}).get("front_default")
+        # Gen 5 female icons use "{id}-female.png" suffix; read from response to avoid constructing wrong URL.
+        gen5_icon_female_api = icons_versions.get("generation-v", {}).get("icons", {}).get("front_female")
+        icon_override_id = _VARIETY_ICON_ID_OVERRIDES.get(variety_name)
+        if gen8_icon_api:
+            icon = gen8_icon_api
+        elif icon_override_id:
+            # Static override for varieties whose icon uses a different sprite_id
+            # than either the variety ID or the base_id-suffix pattern
+            # (e.g. calyrex-ice → 898-ice-rider, not 898-ice or 10193).
+            icon = _build_icon_url(icon_override_id, gen)
+        elif variety_name.endswith("-female") and base_pokemon_id is not None:
+            icon = _build_icon_url(base_pokemon_id, gen, female=True)
+        else:
+            icon = _build_icon_url(variety_id, gen)
 
         return SpriteUrlsFull(
             official_artwork=artwork.get("front_default"),
             official_artwork_shiny=artwork.get("front_shiny"),
+            official_artwork_female=artwork.get("front_female"),
+            official_artwork_female_shiny=artwork.get("front_shiny_female"),
             home=home.get("front_default"),
             home_shiny=home.get("front_shiny"),
             home_female=home.get("front_female"),
             home_female_shiny=home.get("front_female_shiny") or home.get("front_shiny_female"),
             game_front=game_front,
             game_front_shiny=game_front_shiny,
-            game_front_female=None,        # derivable but out of scope for now
-            game_front_female_shiny=None,
+            game_front_female=game_front_female,
+            game_front_female_shiny=game_front_female_shiny,
+            icon=icon,
+            icon_shiny=game_front_shiny,
+            icon_female=(
+                gen5_icon_female_api  # PokéAPI response (gen 5 "{id}-female.png" naming)
+                or (_build_icon_url(variety_id, gen, female=True) if has_female_home else None)
+            ),
+            icon_female_shiny=None,
         )
 
     def _build_form_sprite_urls(
@@ -438,6 +588,9 @@ class PokemonResolverService:
         ps_name: str,
         gen: int,
         is_default_form: bool = False,
+        pokeapi_home: str | None = None,
+        pokeapi_home_shiny: str | None = None,
+        pokeapi_oa: str | None = None,
     ) -> SpriteUrlsFull:
         """Build full sprite URLs for a cosmetic form-entry (no /pokemon resource).
 
@@ -456,7 +609,10 @@ class PokemonResolverService:
         work consistently across all directories for those.
         """
         suffix = _extract_form_suffix(form_name, species_name)
-        sprite_id = f"{base_id}-{suffix}" if suffix else str(base_id)
+        # Use the remapped suffix for PokeAPI sprites repo paths (icons, versioned
+        # game sprites). The sprites repo uses shorter names for some forms.
+        repo_suffix = _SPRITE_SUFFIX_REMAP.get(suffix, suffix)
+        sprite_id = f"{base_id}-{repo_suffix}" if repo_suffix else str(base_id)
 
         # HOME and dex Showdown paths: default form uses base species name.
         home_ps_name = species_name if is_default_form else ps_name
@@ -473,17 +629,27 @@ class PokemonResolverService:
             or _build_showdown_sprite_url(home_ps_name, gen, shiny=True)
         )
 
+        # Prefer PokeAPI CDN (no CORS on web). Fall back to Showdown (works on
+        # mobile/desktop but blocked by CORS policy in browsers).
+        home_url = pokeapi_home or f"{_SHOWDOWN_CDN}/home/{home_ps_name}.png"
+        home_shiny_url = pokeapi_home_shiny or f"{_SHOWDOWN_CDN}/home-shiny/{home_ps_name}.png"
+
         return SpriteUrlsFull(
-            official_artwork=None,
+            official_artwork=pokeapi_oa,
             official_artwork_shiny=None,
-            home=f"{_SHOWDOWN_CDN}/home/{home_ps_name}.png",
-            home_shiny=f"{_SHOWDOWN_CDN}/home-shiny/{home_ps_name}.png",
+            home=home_url,
+            home_shiny=home_shiny_url,
             home_female=None,
             home_female_shiny=None,
             game_front=game_front,
             game_front_shiny=game_front_shiny,
             game_front_female=None,
             game_front_female_shiny=None,
+            # Female form entries live at icons/female/{base_id}.png, not
+            # icons/{base_id}-female.png — use the female=True path for those.
+            icon=_build_icon_url(base_id, gen, female=True) if repo_suffix == "female"
+                 else _build_icon_url(sprite_id, gen),
+            icon_shiny=game_front_shiny,
         )
 
     def _build_base_sprite_urls(
@@ -530,7 +696,8 @@ class PokemonResolverService:
     # ------------------------------------------------------------------
 
     async def _fetch_varieties(
-        self, varieties: list[dict], species_name: str, gen: int, base_url: str = ""
+        self, varieties: list[dict], species_name: str, gen: int, base_url: str = "",
+        base_pokemon_id: int | None = None,
     ) -> list[VarietyData]:
         """Parallel fetch /pokemon/{id} for each non-default variety.
 
@@ -548,8 +715,12 @@ class PokemonResolverService:
         if not non_defaults:
             return []
 
+        async def _fetch_variety(url: str) -> httpx.Response:
+            async with self._pokeapi_semaphore:
+                return await self._pokeapi_http.get(url)
+
         responses = await asyncio.gather(
-            *[self._pokeapi_http.get(v["pokemon"]["url"]) for v in non_defaults],
+            *[_fetch_variety(v["pokemon"]["url"]) for v in non_defaults],
             return_exceptions=True,
         )
 
@@ -587,8 +758,21 @@ class PokemonResolverService:
             )
 
             sprite_urls = self._build_variety_sprite_urls(
-                data.get("sprites") or {}, ps_sprite_name, variety_id, gen
+                data.get("sprites") or {}, ps_sprite_name, variety_id, gen,
+                variety_name=variety_name, base_pokemon_id=base_pokemon_id,
             )
+
+            # Form classification from PokéAPI + registry lookups
+            form_data_json = data  # the /pokemon/{variety_id} response
+            # is_mega and is_battle_only come from the pokemon-form endpoint;
+            # detect gmax by name since PokéAPI doesn't have an explicit flag.
+            is_gmax = "gmax" in variety_name
+            is_mega = self._mega_form_to_item.get(variety_name) is not None or \
+                      self._mega_form_to_move.get(variety_name) is not None
+            is_battle_only = is_mega or is_gmax  # all megas/gmax are battle-only
+            associated_item = self._mega_form_to_item.get(variety_name)
+            associated_move = self._mega_form_to_move.get(variety_name)
+            associated_ability = self._form_to_ability.get(variety_name)
 
             result.append(VarietyData(
                 name=variety_name,
@@ -599,76 +783,128 @@ class PokemonResolverService:
                 base_stats=base_stats,
                 abilities=abilities,
                 sprite_urls=sprite_urls,
+                is_mega=is_mega,
+                is_battle_only=is_battle_only,
+                is_gmax=is_gmax,
+                associated_item=associated_item,
+                associated_move=associated_move,
+                associated_ability=associated_ability,
             ))
         return result
 
     async def _fetch_forms(
         self, form_names: list[str], base_id: int, species_name: str, gen: int
     ) -> list[FormData]:
-        """Parallel fetch /pokemon-form/{name} for each non-default form."""
-        # Determine which form is the default (usually has same name as species or is index 0)
+        """Fetch /pokemon-form/{name} for each non-default cosmetic form.
+
+        The default form (index 0 / species name) is always excluded — it is the
+        base Pokémon itself and is already represented by the top-level response.
+        Returns [] for Pokémon with no cosmetic variants.
+        """
         non_defaults = [n for n in form_names if n != species_name and n != form_names[0]]
         if not non_defaults:
             non_defaults = form_names[1:] if len(form_names) > 1 else []
 
-        # The default form (index 0) IS the base Pokémon, so its sprites live under
-        # the base name/ID — never under a suffixed path.
-        # The default form IS the base Pokémon, so its static/HOME/dex sprites live
-        # under the base ID/name — NOT the suffixed path (see _build_form_sprite_urls
-        # docstring for the full explanation and the Unown-A edge case).
-        # is_default_form=True makes _build_form_sprite_urls use species_name for HOME/dex
-        # Showdown paths while still using the suffixed sprite_id for versioned PokeAPI
-        # paths (e.g. crystal/animated/201-a.gif is correct and must keep the suffix).
-        default_form_name = form_names[0]
-        default_ps_name = _to_showdown_name(default_form_name, self._ps_exceptions)
-        default_front_sprite = (
-            f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{base_id}.png"
-        )
-        default_sprite_urls = self._build_form_sprite_urls(
-            default_form_name, base_id, species_name, default_ps_name, gen,
-            is_default_form=True,
-        )
-
         if not non_defaults:
-            return [
-                FormData(
-                    name=n,
-                    front_sprite_url=default_front_sprite,
-                    sprite_urls=default_sprite_urls,
-                )
-                for n in form_names
-            ]
+            return []
 
-        responses = await asyncio.gather(
-            *[self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon-form/{n}") for n in non_defaults],
+        def _form_home_paths(fn: str) -> tuple[str, str]:
+            """Return (home_url, home_shiny_url) for a form entry.
+
+            Female forms live at home/female/{id}.png, not home/{id}-female.png —
+            same subdirectory pattern as icons/female/{id}.png.
+            All other forms use the {id}-{mapped_suffix}.png pattern.
+            """
+            sfx = _extract_form_suffix(fn, species_name)
+            mapped = _SPRITE_SUFFIX_REMAP.get(sfx, sfx)
+            if mapped == "female":
+                return (
+                    f"{_POKEAPI_HOME}/female/{base_id}.png",
+                    f"{_POKEAPI_HOME}/shiny/female/{base_id}.png",
+                )
+            home_id = f"{base_id}-{mapped}" if mapped else str(base_id)
+            return (
+                f"{_POKEAPI_HOME}/{home_id}.png",
+                f"{_POKEAPI_HOME}/shiny/{home_id}.png",
+            )
+
+        # Batch: form-data fetches + PokeAPI sprite CDN probes (home, home_shiny,
+        # official-artwork). All run in parallel; probes are HEAD-only, cheap.
+        def _form_oa_url(fn: str) -> str:
+            sfx = _extract_form_suffix(fn, species_name)
+            mapped = _SPRITE_SUFFIX_REMAP.get(sfx, sfx)
+            oa_id = f"{base_id}-{mapped}" if mapped else str(base_id)
+            return f"{_POKEAPI_OA}/{oa_id}.png"
+
+        async def _fetch_form(name: str) -> httpx.Response:
+            async with self._pokeapi_semaphore:
+                return await self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon-form/{name}")
+
+        _home_paths = [_form_home_paths(n) for n in non_defaults]
+        form_tasks = [_fetch_form(n) for n in non_defaults]
+        home_tasks = [_probe_url(self._pokeapi_http, p[0]) for p in _home_paths]
+        home_shiny_tasks = [_probe_url(self._pokeapi_http, p[1]) for p in _home_paths]
+        oa_tasks = [_probe_url(self._pokeapi_http, _form_oa_url(n)) for n in non_defaults]
+
+        all_results = await asyncio.gather(
+            *form_tasks, *home_tasks, *home_shiny_tasks, *oa_tasks,
             return_exceptions=True,
         )
 
-        # Default form gets the same full sprite treatment as non-defaults
-        result: list[FormData] = [FormData(
-            name=default_form_name,
-            front_sprite_url=default_front_sprite,
-            sprite_urls=default_sprite_urls,
-        )]
-        for form_name, resp in zip(non_defaults, responses):
+        _n = len(non_defaults)
+        form_responses = all_results[:_n]
+        home_results = all_results[_n:2 * _n]
+        home_shiny_results = all_results[2 * _n:3 * _n]
+        oa_results = all_results[3 * _n:]
+
+        result: list[FormData] = []
+        for i, form_name in enumerate(non_defaults):
+            resp = form_responses[i]
             ps_name = _to_showdown_name(form_name, self._ps_exceptions)
-            # Construct the front sprite URL from the base_id + suffix pattern
             suffix = _extract_form_suffix(form_name, species_name)
             sprite_id = f"{base_id}-{suffix}" if suffix else str(base_id)
-            front_sprite = f"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{sprite_id}.png"
+            # front_sprite_url: prefer PokeAPI form API front_default, fall back to
+            # PokeAPI home (which exists for most forms), then constructed sprite path.
+            # Female forms: sprites/pokemon uses female/ subdir, not {id}-female.png.
+            repo_suffix = _SPRITE_SUFFIX_REMAP.get(suffix, suffix)
+            if repo_suffix == "female":
+                fallback_front = f"{_POKEAPI_PLAIN_SPRITES}/female/{base_id}.png"
+            else:
+                fallback_front = f"{_POKEAPI_PLAIN_SPRITES}/{sprite_id}.png"
+
+            pokeapi_home = home_results[i] if not isinstance(home_results[i], Exception) else None
+            pokeapi_home_shiny = home_shiny_results[i] if not isinstance(home_shiny_results[i], Exception) else None
+            pokeapi_oa = oa_results[i] if not isinstance(oa_results[i], Exception) else None
 
             if isinstance(resp, Exception) or resp.status_code != 200:
                 logger.warning("Failed to fetch form %s: %s", form_name, resp)
-                result.append(FormData(name=form_name, front_sprite_url=front_sprite))
+                # Even without form-API data we may have probed home sprites successfully.
+                sprite_urls = self._build_form_sprite_urls(
+                    form_name, base_id, species_name, ps_name, gen,
+                    pokeapi_home=pokeapi_home,
+                    pokeapi_home_shiny=pokeapi_home_shiny,
+                    pokeapi_oa=pokeapi_oa,
+                )
+                result.append(FormData(
+                    name=form_name, form_id=base_id, is_default=False,
+                    front_sprite_url=pokeapi_home or fallback_front,
+                    sprite_urls=sprite_urls,
+                ))
                 continue
 
-            # Use the API response's front_default if available (more authoritative)
-            api_front = (resp.json().get("sprites") or {}).get("front_default") or front_sprite
+            form_data_json = resp.json()
+            api_front = (form_data_json.get("sprites") or {}).get("front_default") or pokeapi_home or fallback_front
+            form_id = form_data_json.get("id", base_id)
             sprite_urls = self._build_form_sprite_urls(
-                form_name, base_id, species_name, ps_name, gen
+                form_name, base_id, species_name, ps_name, gen,
+                pokeapi_home=pokeapi_home,
+                pokeapi_home_shiny=pokeapi_home_shiny,
+                pokeapi_oa=pokeapi_oa,
             )
             result.append(FormData(
                 name=form_name,
+                form_id=form_id,
+                is_default=False,
                 front_sprite_url=api_front,
                 sprite_urls=sprite_urls,
             ))
@@ -712,6 +948,14 @@ class PokemonResolverService:
                         pokemon_id=v.pokemon_id,
                         is_default=v.is_default,
                         resolved_url=v.resolved_url,
+                        # Always preserve classification flags in slim response
+                        # so clients can detect megas/gmax without fetching full data.
+                        is_mega=v.is_mega,
+                        is_battle_only=v.is_battle_only,
+                        is_gmax=v.is_gmax,
+                        associated_item=v.associated_item,
+                        associated_move=v.associated_move,
+                        associated_ability=v.associated_ability,
                     )
                     for v in response.varieties
                 ]
@@ -719,7 +963,7 @@ class PokemonResolverService:
         if "forms" not in includes:
             response = response.model_copy(update={
                 "forms": [
-                    FormData(name=f.name, front_sprite_url=f.front_sprite_url)
+                    FormData(name=f.name, form_id=f.form_id, front_sprite_url=f.front_sprite_url)
                     for f in response.forms
                 ]
             })
@@ -735,6 +979,10 @@ class PokemonResolverService:
         elif filtered is not response.smogon_analyses:
             # smogon IS in includes but gen filtering changed the list
             response = response.model_copy(update={"smogon_analyses": filtered})
+        if "moves" not in includes:
+            response = response.model_copy(update={"moves": []})
+        if "flavor" not in includes:
+            response = response.model_copy(update={"flavor_text_entries": []})
         return response
 
     # ------------------------------------------------------------------
@@ -742,14 +990,18 @@ class PokemonResolverService:
     # ------------------------------------------------------------------
 
     async def resolve(
-        self, pokemon_id: int, gen: int, includes: list[str], db: AsyncSession,
+        self, pokemon_id: int, gen: int | None, includes: list[str], db: AsyncSession,
         base_url: str = "",
     ) -> PokemonResolvedResponse:
+        # gen=None means "no specific gen requested" — use gen 9 accuracy for
+        # types/stats but skip versioned game sprites (use plain root sprites instead).
+        data_gen = gen if gen is not None else 9
+
         # 1. Cache hit (full data always stored)
         result = await db.execute(
             select(PokemonResolved).where(
                 PokemonResolved.pokemon_id == pokemon_id,
-                PokemonResolved.gen == gen,
+                PokemonResolved.gen == data_gen,
                 PokemonResolved.resolved_at
                 + text("(ttl_days * interval '1 day')")
                 > func.now(),
@@ -758,11 +1010,11 @@ class PokemonResolverService:
         row = result.scalar_one_or_none()
         if row:
             response = PokemonResolvedResponse(**row.data, resolved_at=row.resolved_at)
-            return self._trim_response(response, includes, gen)
+            return self._trim_response(response, includes, data_gen)
 
         # 2. Fetch from PokéAPI
         try:
-            pokemon_data, species_info = await self._fetch_pokeapi(pokemon_id)
+            pokemon_data, species_data, species_info = await self._fetch_pokeapi(pokemon_id)
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 404:
                 raise HTTPException(404, detail=f"Pokémon {pokemon_id} not found in PokéAPI")
@@ -776,7 +1028,7 @@ class PokemonResolverService:
         species_gen: int = species_info["gen"]
         species_name: str = species_info["species_name"]
 
-        if gen < species_gen:
+        if data_gen < species_gen:
             raise HTTPException(
                 404,
                 detail=f"{english_species_name} was not introduced until Gen {species_gen}",
@@ -792,7 +1044,78 @@ class PokemonResolverService:
         ps_stats = ps_entry.get("baseStats", raw_stats)
         ps_abilities_raw = ps_entry.get("abilities", {})
         ps_abilities = ps_abilities_raw if ps_abilities_raw else raw_abilities
-        types, base_stats, abilities = self._apply_gen_overrides(ps_id, ps_types, ps_stats, ps_abilities, gen)
+        types, base_stats, abilities = self._apply_gen_overrides(ps_id, ps_types, ps_stats, ps_abilities, data_gen)
+
+        # --- New fields ---
+        # abilities as typed list — use gen-overridden names, keep is_hidden from PokéAPI.
+        # PS ability keys use "0"/"1"/"H" (0-indexed + hidden marker); PokéAPI uses "1"/"2"/"3".
+        # _apply_gen_overrides preserves whichever format was passed in, so handle both.
+        _PS_TO_SLOT = {"0": 1, "1": 2, "H": 3}
+        pokeapi_ability_map = {
+            str(a["slot"]): {"is_hidden": a.get("is_hidden", False)}
+            for a in pokemon_data.get("abilities", [])
+        }
+        abilities_list = []
+        for key, ability_name in abilities.items():
+            if key in _PS_TO_SLOT:
+                pokeapi_slot = _PS_TO_SLOT[key]
+            elif key.isdigit():
+                pokeapi_slot = int(key)
+            else:
+                continue
+            is_hidden = pokeapi_ability_map.get(str(pokeapi_slot), {}).get("is_hidden", key == "H")
+            # Showdown uses display names ("Sand Veil"); normalise to PokéAPI slug.
+            ability_slug = ability_name.lower().replace(" ", "-")
+            abilities_list.append(AbilityInfo(name=ability_slug, is_hidden=is_hidden, slot=pokeapi_slot))
+        abilities_list.sort(key=lambda a: a.slot)
+
+        # moves (always built; trimmed to [] at response time unless "moves" in includes)
+        moves_list = [
+            MoveSummary(
+                name=m["move"]["name"],
+                learn_details=[
+                    MoveLearnDetail(
+                        version_group=d["version_group"]["name"],
+                        method=d["move_learn_method"]["name"],
+                        level=d.get("level_learned_at", 0),
+                    )
+                    for d in m.get("version_group_details", [])
+                ],
+            )
+            for m in pokemon_data.get("moves", [])
+        ]
+
+        # species detail fields
+        genus = next(
+            (g["genus"] for g in species_data.get("genera", []) if g["language"]["name"] == "en"),
+            None,
+        )
+        generation_name = species_data.get("generation", {}).get("name", "generation-ix")
+        gender_rate = species_data.get("gender_rate")
+        capture_rate = species_data.get("capture_rate")
+        base_happiness = species_data.get("base_happiness")
+        hatch_counter = species_data.get("hatch_counter")
+        growth_rate_obj = species_data.get("growth_rate")
+        growth_rate = growth_rate_obj.get("name") if growth_rate_obj else None
+        egg_groups = [e["name"] for e in species_data.get("egg_groups", [])]
+        flavor_text_entries_list = [
+            FlavorTextEntry(
+                text=e["flavor_text"].replace("\n", " ").replace("\f", " "),
+                language=e["language"]["name"],
+                version=e["version"]["name"],
+            )
+            for e in species_data.get("flavor_text_entries", [])
+        ]
+        is_baby = species_data.get("is_baby", False)
+        is_legendary = species_data.get("is_legendary", False)
+        is_mythical = species_data.get("is_mythical", False)
+        chain_url = (species_data.get("evolution_chain") or {}).get("url")
+        evolution_chain_id: int | None = None
+        if chain_url:
+            try:
+                evolution_chain_id = int(chain_url.rstrip("/").split("/")[-1])
+            except (ValueError, IndexError):
+                pass
 
         # 5. Move supplementation
         move_slugs: set[str] = {m["move"]["name"] for m in pokemon_data.get("moves", [])}
@@ -809,8 +1132,23 @@ class PokemonResolverService:
         # just "{id}" — Gen 2 Crystal animated has 201-a.gif but no 201.gif.
         # See _build_base_sprite_urls docstring for the full compatibility matrix.
         ps_sprite_name = _to_showdown_name(pokemon_name, self._ps_exceptions)
-        first_form = (pokemon_data.get("forms") or [{}])[0].get("name", "")
-        first_form_suffix = _extract_form_suffix(first_form, species_name) if first_form else None
+        all_forms = pokemon_data.get("forms") or []
+        first_form = all_forms[0].get("name", "") if all_forms else ""
+        # Only apply a form suffix to the sprite ID when the pokemon actually
+        # has multiple forms — this handles Unown where "201-a.gif" is needed
+        # in Gen-2 Crystal but "201.gif" does not exist. For variety pokemon
+        # like Rotom-Wash (10009), the variety ID alone identifies the sprite
+        # file; there is no "10009-wash.png" in the sprites repo.
+        first_form_suffix = (
+            _extract_form_suffix(first_form, species_name)
+            if first_form and len(all_forms) > 1
+            else None
+        )
+        # "male"/"female" don't appear in versioned front sprite filenames —
+        # gender-variant Pokémon use the plain ID with a female/ subdirectory.
+        # (-female suffix exists only in gen-5 icons, handled by _build_icon_url.)
+        if first_form_suffix in {"male", "female"}:
+            first_form_suffix = None
         gen_sprite_id = f"{pokemon_id}-{first_form_suffix}" if first_form_suffix else None
         sprite_urls = self._build_base_sprite_urls(
             pokemon_data.get("sprites") or {}, ps_sprite_name, pokemon_id, gen,
@@ -818,22 +1156,31 @@ class PokemonResolverService:
         )
 
         # 8. Varieties (always fetched on cache miss, trimmed at response time)
-        raw_varieties = species_info["varieties"]
-        varieties = await self._fetch_varieties(raw_varieties, species_name, gen, base_url)
+        raw_varieties = species_data.get("varieties", [])
+        varieties = await self._fetch_varieties(raw_varieties, species_name, data_gen, base_url, base_pokemon_id=pokemon_id)
+        # When resolving a variety directly (e.g. charizard-mega-x = 10034),
+        # the species varieties list includes the pokemon itself — exclude it.
+        varieties = [v for v in varieties if v.pokemon_id != pokemon_id]
 
         # 9. Forms (form-entry cosmetics)
         form_names = [f["name"] for f in pokemon_data.get("forms", [])]
-        forms = await self._fetch_forms(form_names, pokemon_id, species_name, gen)
+        forms = await self._fetch_forms(form_names, pokemon_id, species_name, data_gen)
 
         # 10. Build full response (cache always stores this)
         now = datetime.now(timezone.utc)
         response = PokemonResolvedResponse(
             pokemon_id=pokemon_id,
-            gen=gen,
+            gen=data_gen,
             name=pokemon_name,
             types=types,
             base_stats=base_stats,
-            abilities=abilities,
+            abilities=abilities_list,                         # changed: list[AbilityInfo]
+            height=pokemon_data.get("height", 0),             # new
+            weight=pokemon_data.get("weight", 0),             # new
+            base_experience=pokemon_data.get("base_experience"),  # new
+            species_name=species_data.get("name"),            # new
+            moves=moves_list,                                 # new (trimmed to [] by _trim_response)
+            moves_url=f"{base_url}/pokemon/{pokemon_id}/moves",  # new
             supplement_moves=supplement_moves,
             smogon_analyses=smogon_analyses,
             smogon_url=f"{base_url}/pokemon/{pokemon_id}/smogon",
@@ -843,6 +1190,30 @@ class PokemonResolverService:
             forms_url=f"{base_url}/pokemon/{pokemon_id}/forms",
             sprite_urls=sprite_urls,
             resolved_at=now,
+            genus=genus,                                      # new
+            generation_name=generation_name,                  # new
+            gender_rate=gender_rate,                          # new
+            capture_rate=capture_rate,                        # new
+            base_happiness=base_happiness,                    # new
+            hatch_counter=hatch_counter,                      # new
+            growth_rate=growth_rate,                          # new
+            egg_groups=egg_groups,                            # new
+            flavor_text_entries=flavor_text_entries_list,     # new (trimmed to [] by _trim_response)
+            flavor_text_url=f"{base_url}/pokemon/{pokemon_id}/flavor-text",  # new
+            is_baby=is_baby,
+            is_legendary=is_legendary,
+            is_mythical=is_mythical,
+            # Form classification for this pokemon itself (relevant for variety pokemon)
+            is_mega=self._mega_form_to_item.get(pokemon_name) is not None or
+                    self._mega_form_to_move.get(pokemon_name) is not None,
+            is_battle_only="gmax" in pokemon_name or
+                           self._mega_form_to_item.get(pokemon_name) is not None or
+                           self._mega_form_to_move.get(pokemon_name) is not None,
+            is_gmax="gmax" in pokemon_name,
+            associated_item=self._mega_form_to_item.get(pokemon_name),
+            associated_move=self._mega_form_to_move.get(pokemon_name),
+            associated_ability=self._form_to_ability.get(pokemon_name),
+            evolution_chain_id=evolution_chain_id,
         )
 
         # 11. Upsert full data to cache
@@ -852,7 +1223,7 @@ class PokemonResolverService:
             pg_insert(PokemonResolved)
             .values(
                 pokemon_id=pokemon_id,
-                gen=gen,
+                gen=data_gen,
                 data=data_dict,
                 resolved_at=now,
                 ttl_days=7,
@@ -866,7 +1237,7 @@ class PokemonResolverService:
         await db.commit()
 
         # 12. Trim and return
-        return self._trim_response(response, includes)
+        return self._trim_response(response, includes, data_gen)
 
     # ------------------------------------------------------------------
     # Name-or-ID resolution + convenience endpoints
@@ -999,9 +1370,72 @@ class PokemonResolverService:
             forms=full.forms,
         )
 
-    async def _fetch_pokeapi(self, pokemon_id: int) -> tuple[dict, dict]:
-        pokemon_r = await self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon/{pokemon_id}")
-        pokemon_r.raise_for_status()
+    async def resolve_moves(
+        self, name_or_id: str, db: AsyncSession, base_url: str = ""
+    ) -> "MovesResponse":
+        from app.schemas.pokemon_resolved import MovesResponse
+        pokemon_id = await self._resolve_name_or_id(name_or_id)
+
+        result = await db.execute(
+            select(PokemonResolved).where(
+                PokemonResolved.pokemon_id == pokemon_id,
+                PokemonResolved.gen == 9,
+                PokemonResolved.resolved_at
+                + text("(ttl_days * interval '1 day')")
+                > func.now(),
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row and row.data.get("moves"):
+            return MovesResponse(
+                pokemon_id=pokemon_id,
+                name=row.data.get("name", ""),
+                moves=row.data["moves"],
+            )
+
+        full = await self.resolve(pokemon_id, 9, ["moves"], db, base_url)
+        return MovesResponse(pokemon_id=pokemon_id, name=full.name, moves=full.moves)
+
+    async def resolve_flavor_text(
+        self, name_or_id: str, lang: str | None, db: AsyncSession, base_url: str = ""
+    ) -> "FlavorTextResponse":
+        from app.schemas.pokemon_resolved import FlavorTextResponse
+        pokemon_id = await self._resolve_name_or_id(name_or_id)
+
+        result = await db.execute(
+            select(PokemonResolved).where(
+                PokemonResolved.pokemon_id == pokemon_id,
+                PokemonResolved.gen == 9,
+                PokemonResolved.resolved_at
+                + text("(ttl_days * interval '1 day')")
+                > func.now(),
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row and row.data.get("flavor_text_entries"):
+            entries = row.data["flavor_text_entries"]
+            if lang:
+                entries = [e for e in entries if e.get("language") == lang]
+            return FlavorTextResponse(
+                pokemon_id=pokemon_id,
+                name=row.data.get("name", ""),
+                flavor_text_entries=entries,
+            )
+
+        full = await self.resolve(pokemon_id, 9, ["flavor"], db, base_url)
+        filtered = (
+            [e for e in full.flavor_text_entries if e.language == lang]
+            if lang else full.flavor_text_entries
+        )
+        return FlavorTextResponse(
+            pokemon_id=pokemon_id, name=full.name, flavor_text_entries=filtered
+        )
+
+    async def _fetch_pokeapi(self, pokemon_id: int) -> tuple[dict, dict, dict]:
+        """Returns (pokemon_data, species_data, meta) where meta = {english_name, gen, species_name}."""
+        async with self._pokeapi_semaphore:
+            pokemon_r = await self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon/{pokemon_id}")
+            pokemon_r.raise_for_status()
         pokemon_data = pokemon_r.json()
 
         species_url: str = pokemon_data["species"]["url"]
@@ -1017,11 +1451,10 @@ class PokemonResolverService:
         gen_num = _ROMAN.get(gen_suffix, 9)
         species_name: str = species_data["name"]
 
-        return pokemon_data, {
+        return pokemon_data, species_data, {
             "english_name": english_name,
             "gen": gen_num,
             "species_name": species_name,
-            "varieties": species_data.get("varieties", []),
         }
 
 

@@ -67,7 +67,7 @@ PokemonEntry _pokemon(String name) => PokemonEntry(
       name: name,
       height: 10,
       weight: 100,
-      types: {1: 'normal'},
+      types: ['normal'],
     );
 
 void main() {

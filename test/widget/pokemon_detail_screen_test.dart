@@ -1,30 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/pokedex/presentation/pokemon_detail_screen.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_backend_repository.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_cache.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import '../helpers/test_app.dart';
 import '../helpers/test_database.dart';
 
 class MockPokeApiRepository extends Mock implements PokeApiRepository {}
+class _MockBackendRepo extends Mock implements PokemonBackendRepository {}
+class _MockCache extends Mock implements PokemonResolvedCache {}
 
 PokemonEntry _testEntry() => PokemonEntry(
       id: 25,
       name: 'pikachu',
       height: 4,
       weight: 60,
-      types: {1: 'electric'},
-      stats: [
-        {'base_stat': 35, 'stat': {'name': 'hp'}},
-        {'base_stat': 55, 'stat': {'name': 'attack'}},
-        {'base_stat': 40, 'stat': {'name': 'defense'}},
-        {'base_stat': 50, 'stat': {'name': 'special-attack'}},
-        {'base_stat': 50, 'stat': {'name': 'special-defense'}},
-        {'base_stat': 90, 'stat': {'name': 'speed'}},
-      ],
+      types: ['electric'],
+      stats: {
+        'hp': 35,
+        'attack': 55,
+        'defense': 40,
+        'special-attack': 50,
+        'special-defense': 50,
+        'speed': 90,
+      },
     );
 
 const _testSpecies = PokemonSpeciesEntry(
@@ -38,14 +44,37 @@ const _testSpecies = PokemonSpeciesEntry(
 
 void main() {
   late MockPokeApiRepository mockApi;
+  late _MockBackendRepo mockBackend;
+  late _MockCache mockCache;
+
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    await PokemonDataRegistry.initialize();
+    registerFallbackValue('');
+    registerFallbackValue(0);
+  });
 
   setUp(() {
     mockApi = MockPokeApiRepository();
+    mockBackend = _MockBackendRepo();
+    mockCache = _MockCache();
+
     when(() => mockApi.fetchPokemon(any())).thenAnswer((_) async => _testEntry());
     when(() => mockApi.fetchPokemonSpecies(any())).thenAnswer((_) async => _testSpecies);
     when(() => mockApi.fetchPokemonByName(any())).thenAnswer((_) async => _testEntry());
     when(() => mockApi.fetchPokemonEncounters(any())).thenAnswer((_) async => []);
+
+    // Cache always misses; backend always throws → provider falls back to PokéAPI path.
+    when(() => mockCache.getIfValid(any())).thenReturn(null);
+    when(() => mockBackend.fetchResolved(any()))
+        .thenThrow(Exception('test: backend disabled'));
   });
+
+  List<dynamic> overrides() => [
+        pokeApiRepositoryProvider.overrideWithValue(mockApi),
+        pokemonBackendRepositoryProvider.overrideWithValue(mockBackend),
+        pokemonResolvedCacheProvider.overrideWithValue(mockCache),
+      ];
 
   group('PokemonDetailScreen', () {
     testWidgets('renders without crashing', (tester) async {
@@ -55,9 +84,7 @@ void main() {
         tester,
         const PokemonDetailScreen(pokemonId: 25),
         db: db,
-        extraOverrides: [
-          pokeApiRepositoryProvider.overrideWithValue(mockApi),
-        ],
+        extraOverrides: overrides(),
       );
       await tester.pumpAndSettle();
 
@@ -77,9 +104,7 @@ void main() {
         tester,
         const PokemonDetailScreen(pokemonId: 25),
         db: db,
-        extraOverrides: [
-          pokeApiRepositoryProvider.overrideWithValue(mockApi),
-        ],
+        extraOverrides: overrides(),
       );
       await tester.pumpAndSettle();
 
@@ -97,9 +122,7 @@ void main() {
         tester,
         const PokemonDetailScreen(pokemonId: 25),
         db: db,
-        extraOverrides: [
-          pokeApiRepositoryProvider.overrideWithValue(mockApi),
-        ],
+        extraOverrides: overrides(),
       );
       await tester.pumpAndSettle();
 
@@ -118,9 +141,7 @@ void main() {
         tester,
         const PokemonDetailScreen(pokemonId: 25),
         db: db,
-        extraOverrides: [
-          pokeApiRepositoryProvider.overrideWithValue(mockApi),
-        ],
+        extraOverrides: overrides(),
       );
       await tester.pumpAndSettle();
 

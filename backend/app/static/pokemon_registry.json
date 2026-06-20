@@ -149,10 +149,10 @@
     "deerling":                  "Spring",
     "sawsbuck":                  "Spring",
     "arceus":                    "Normal",
-    "shellos":                   "West Sea",
-    "gastrodon":                 "West Sea",
+    "shellos":                   "West",
+    "gastrodon":                 "West",
     "cherrim":                   "Overcast",
-    "burmy":                     "Plant Cloak",
+    "burmy":                     "Plant",
     "castform":                  "Normal",
     "unown":                     "A",
     "furfrou":                   "Natural",
@@ -269,6 +269,10 @@
   "noCosmeticFormsPokemon": ["mothim"],
 
   "cosmeticGenderDiffPokemon": ["unfezant"],
+
+  "megaFormMoveRequirements": {
+    "rayquaza-mega": "dragon-ascent"
+  },
 
   "megaStoneMap": {
     "venusaurite":    { "baseSpecies": "venusaur",   "megaForm": "venusaur-mega" },

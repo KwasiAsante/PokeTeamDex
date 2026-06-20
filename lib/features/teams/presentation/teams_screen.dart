@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -17,8 +18,9 @@ import 'package:poke_team_dex/services/connectivity/connectivity_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
-import 'package:poke_team_dex/data/pokemon_data_registry.dart';
+import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
+    show pokemonVarietiesProvider, pokemonFormsProvider;
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
     show teamSlotsProvider;
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
@@ -1222,13 +1224,6 @@ class _TeamSpriteRow extends ConsumerWidget {
 
 // ── Team slot sprite (form-aware) ─────────────────────────────────────────────
 
-/// Single party-icon sprite for a team slot. Resolves the correct pokemonId for:
-/// - Variety-based form variants (via [pokemonByNameProvider] on formName)
-/// - Mega Evolution, Primal Reversion, and Gigantamax when the format supports
-///   them and the slot has the relevant toggle/item active.
-///
-/// Falls back to the base species ID when no format is set ("no format" or
-/// "all formats" context) or when a transformation is not active.
 class _SlotSprite extends ConsumerWidget {
   final TeamSlot slot;
   final String? formatLabel;
@@ -1247,68 +1242,49 @@ class _SlotSprite extends ConsumerWidget {
     required this.cacheHeight,
   });
 
+  // Whether this slot has an active form/transformation that needs extra data.
+  bool get _hasActiveForm =>
+      slot.formName != null || slot.isMegaEvolved ||
+      (slot.hasGigantamax && slot.gigantamaxEnabled);
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    // Resolve format mechanics. Null means no format set → don't apply
-    // Mega/Primal/Gmax icons (transformation context is ambiguous).
-    final mechanics = formatLabel != null
-        ? ref.read(formatServiceProvider).formatById(formatLabel!)?.mechanics
+    // Ensure Showdown format data is loaded; triggers rebuild when ready so
+    // formatById returns the correct GameFormat instead of null.
+    ref.watch(allFormatsProvider);
+
+    final format = formatLabel != null
+        ? ref.watch(formatServiceProvider).formatById(formatLabel!)
         : null;
+    final mechanics = format?.mechanics;
 
-    // Determine whether the slot is actively using a Mega, Primal, or Gmax
-    // transformation that is valid for the current format.
-    String? transformFormName;
-    if (mechanics != null) {
-      final item = slot.heldItemName;
-      if (mechanics.hasMegaStone && slot.isMegaEvolved && item != null) {
-        // Mega Evolution: derive form name from the held Mega Stone.
-        final megaEntry = PokemonDataRegistry.instance.megaStoneMap[item];
-        if (megaEntry != null) transformFormName = megaEntry.megaForm;
-      } else if ((mechanics.gen == 6 || mechanics.gen == 7) && item != null) {
-        // Primal Reversion: only applies in Gen 6/7 via orb.
-        if (item == 'red-orb')  transformFormName = 'groudon-primal';
-        if (item == 'blue-orb') transformFormName = 'kyogre-primal';
-      } else if (mechanics.hasGigantamax && slot.hasGigantamax && slot.gigantamaxEnabled) {
-        // Gigantamax: construct form name from the base (or active form) species.
-        // Watch the base pokemon to get its name; falls back to base ID while loading.
-        final baseName = ref
-            .watch(pokemonDetailProvider(slot.pokemonId))
-            .asData
-            ?.value
-            .name;
-        if (baseName != null) transformFormName = '$baseName-gmax';
-      }
+    // Only watch varieties/forms when the slot has an active form — avoids
+    // firing N×2 backend fetches for every slot on initial teams-screen load.
+    // Both providers are now keepAlive so once loaded (e.g. from team_detail)
+    // subsequent reads are instant from memory.
+    if (_hasActiveForm) {
+      return _SlotSpriteFormAware(
+        slot: slot,
+        format: format,
+        mechanics: mechanics,
+        width: width,
+        height: height,
+        cacheWidth: cacheWidth,
+        cacheHeight: cacheHeight,
+      );
     }
 
-    // Resolve sprite ID: transformation > formName variant > base species.
-    final int id;
-    if (transformFormName != null) {
-      final formId = ref
-          .watch(pokemonByNameProvider(transformFormName))
-          .asData
-          ?.value
-          .id;
-      id = formId ?? slot.pokemonId;
-    } else if (slot.formName != null) {
-      final formId = ref
-          .watch(pokemonByNameProvider(slot.formName!))
-          .asData
-          ?.value
-          .id;
-      id = formId ?? slot.pokemonId;
-    } else {
-      id = slot.pokemonId;
-    }
+    // Base slot: resolved provider only (keepAlive, always instant).
+    final resolved = ref
+        .watch(resolvedPokemonProvider((id: slot.pokemonId, gen: null)))
+        .asData
+        ?.value;
 
-    const versionsBase =
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions';
-    const spriteBase =
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
-    final iconGen8    = '$versionsBase/generation-viii/icons/$id.png';
-    final iconGen7    = '$versionsBase/generation-vii/icons/$id.png';
-    final spriteFallback = '$spriteBase/$id.png';
+    final iconUrl = resolved?.spriteUrls.icon;
+    final spriteFallback = resolved?.spriteUrls.gameFront
+        ?? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${slot.pokemonId}.png';
 
     final placeholder = SizedBox(
       width: width,
@@ -1328,7 +1304,7 @@ class _SlotSprite extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(right: 2),
       child: CachedNetworkImage(
-        imageUrl: iconGen8,
+        imageUrl: iconUrl ?? spriteFallback,
         width: width,
         height: height,
         fit: BoxFit.contain,
@@ -1336,29 +1312,192 @@ class _SlotSprite extends ConsumerWidget {
         memCacheHeight: cacheHeight,
         placeholder: (_, _) => placeholder,
         errorWidget: (_, _, _) => CachedNetworkImage(
-          imageUrl: iconGen7,
+          imageUrl: spriteFallback,
           width: width,
           height: height,
           fit: BoxFit.contain,
           memCacheWidth: cacheWidth,
           memCacheHeight: cacheHeight,
           placeholder: (_, _) => placeholder,
+          errorWidget: (_, _, _) => Icon(
+            Icons.catching_pokemon,
+            size: 60,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Slot sprite — form-aware variant ─────────────────────────────────────────
+
+/// Used by [_SlotSprite] only when the slot has an active form/transformation.
+/// Separated into its own widget so `ref.watch` for varieties/forms is only
+/// called for slots that actually need them.
+///
+/// Varieties and forms are fetched with gen=null so the cache key is stable
+/// across all teams/formats. Icon URLs are gen-agnostic; variety flags
+/// (isMega, associatedItem, etc.) are the same for all gens.
+class _SlotSpriteFormAware extends ConsumerWidget {
+  final TeamSlot slot;
+  final GameFormat? format;
+  final GenerationMechanics? mechanics;
+  final double width;
+  final double height;
+  final int cacheWidth;
+  final int cacheHeight;
+
+  const _SlotSpriteFormAware({
+    required this.slot,
+    required this.format,
+    required this.mechanics,
+    required this.width,
+    required this.height,
+    required this.cacheWidth,
+    required this.cacheHeight,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // gen: null keeps the cache key stable across formats — icon URLs and
+    // variety flags are the same regardless of gen.
+    final resolved = ref
+        .watch(resolvedPokemonProvider((id: slot.pokemonId, gen: null)))
+        .asData
+        ?.value;
+    final varietiesData = ref
+        .watch(pokemonVarietiesProvider((id: slot.pokemonId, gen: null)))
+        .asData
+        ?.value;
+    final formsData = ref
+        .watch(pokemonFormsProvider((id: slot.pokemonId, gen: null)))
+        .asData
+        ?.value;
+
+    final cosmeticForms = resolved?.cosmeticForms ?? [];
+    final slotMoves = [slot.move1, slot.move2, slot.move3, slot.move4];
+
+    final megaVariety = (mechanics?.hasMegaStone == true && slot.isMegaEvolved)
+        ? varietiesData?.where((v) {
+            if (v.isMega != true) return false;
+            if (v.associatedItem != null &&
+                slot.heldItemName == v.associatedItem) { return true; }
+            if (v.associatedMove != null &&
+                slotMoves.contains(v.associatedMove)) { return true; }
+            return false;
+          }).firstOrNull
+        : null;
+
+    final gmaxVariety = (mechanics?.hasGigantamax == true &&
+            slot.hasGigantamax &&
+            slot.gigantamaxEnabled)
+        ? varietiesData?.where((v) => v.isGmax == true).firstOrNull
+        : null;
+
+    final isCosmeticForm =
+        slot.formName != null && cosmeticForms.any((f) => f.name == slot.formName);
+    final formVariety = (slot.formName != null && !isCosmeticForm)
+        ? varietiesData?.where((v) => v.name == slot.formName).firstOrNull
+        : null;
+    final cosmeticFullSprite = isCosmeticForm
+        ? formsData?.where((fd) => fd.name == slot.formName).firstOrNull
+        : null;
+
+    // Active sprite source: GMax > Mega > variety form > cosmetic form > base.
+    final activeSpriteSource = gmaxVariety?.spriteUrls
+        ?? megaVariety?.spriteUrls
+        ?? formVariety?.spriteUrls
+        ?? cosmeticFullSprite?.spriteUrls
+        ?? resolved?.spriteUrls;
+
+    final iconUrl = activeSpriteSource?.icon;
+    final spriteFallback = activeSpriteSource?.gameFront
+        ?? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${slot.pokemonId}.png';
+
+    // Build image at a given scale — same URL so HTTP cache is shared.
+    Widget buildImage(double scale) => CachedNetworkImage(
+          imageUrl: iconUrl ?? spriteFallback,
+          width: width * scale,
+          height: height * scale,
+          fit: BoxFit.contain,
+          memCacheWidth: (cacheWidth * scale).round(),
+          memCacheHeight: (cacheHeight * scale).round(),
+          placeholder: (_, _) =>
+              SizedBox(width: width * scale, height: height * scale),
           errorWidget: (_, _, _) => CachedNetworkImage(
             imageUrl: spriteFallback,
-            width: width,
-            height: height,
+            width: width * scale,
+            height: height * scale,
             fit: BoxFit.contain,
-            memCacheWidth: cacheWidth,
-            memCacheHeight: cacheHeight,
-            placeholder: (_, _) => placeholder,
+            memCacheWidth: (cacheWidth * scale).round(),
+            memCacheHeight: (cacheHeight * scale).round(),
+            placeholder: (_, _) =>
+                SizedBox(width: width * scale, height: height * scale),
             errorWidget: (_, _, _) => Icon(
               Icons.catching_pokemon,
               size: 60,
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
             ),
           ),
-        ),
-      ),
+        );
+
+    Widget child;
+    if (gmaxVariety != null) {
+      // GMax — magenta/red aura: blurred + colored copies stacked behind the sprite.
+      child = Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: ColorFiltered(
+              colorFilter:
+                  const ColorFilter.mode(Color(0x99FF0000), BlendMode.srcIn),
+              child: buildImage(1.35),
+            ),
+          ),
+          ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            child: ColorFiltered(
+              colorFilter:
+                  const ColorFilter.mode(Color(0xCCE91E8C), BlendMode.srcIn),
+              child: buildImage(1.18),
+            ),
+          ),
+          buildImage(1.0),
+        ],
+      );
+    } else if (megaVariety != null) {
+      // Mega — rainbow glow: sweep-gradient + blurred copy behind the sprite.
+      child = Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            child: ShaderMask(
+              shaderCallback: (bounds) => const SweepGradient(colors: [
+                Color(0xFFFF0000), Color(0xFFFF8800), Color(0xFFFFFF00),
+                Color(0xFF00FF00), Color(0xFF0000FF), Color(0xFF8800FF),
+                Color(0xFFFF0000),
+              ]).createShader(bounds),
+              blendMode: BlendMode.srcIn,
+              child: buildImage(1.2),
+            ),
+          ),
+          buildImage(1.0),
+        ],
+      );
+    } else {
+      child = buildImage(1.0);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 2),
+      child: child,
     );
   }
 }

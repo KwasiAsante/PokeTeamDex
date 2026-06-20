@@ -7,6 +7,7 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show MoveSummary;
 
 final pokemonDetailProvider =
     FutureProvider.autoDispose.family<PokemonEntry, int>((ref, id) async {
@@ -88,10 +89,10 @@ final pokemonEncountersProvider =
   return repo.fetchPokemonEncounters(id);
 });
 
-/// Each prior-evolution species' display name + raw PokeAPI moves list, oldest
-/// ancestor first. Empty for Pokémon with no prior evolutions.
+/// Each prior-evolution species' display name + moves list, oldest ancestor first.
+/// Empty for Pokémon with no prior evolutions.
 final priorEvoMoveSetsProvider = FutureProvider.autoDispose.family<
-    List<({String speciesName, List<Map<String, dynamic>> moves})>, int>(
+    List<({String speciesName, List<MoveSummary> moves})>, int>(
   (ref, pokemonId) =>
       ref.read(pokeApiRepositoryProvider).fetchPriorEvoMoveSets(pokemonId),
 );

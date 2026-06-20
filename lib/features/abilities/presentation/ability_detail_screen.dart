@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
@@ -223,21 +224,22 @@ class _PokemonListState extends State<_PokemonList> {
   }
 }
 
-class _PokemonTile extends StatelessWidget {
+class _PokemonTile extends ConsumerWidget {
   final AbilityPokemonRef pokemon;
   const _PokemonTile({required this.pokemon});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final iconUrl =
+    final sprites = ref
+        .watch(resolvedPokemonProvider((id: pokemon.pokemonId, gen: null)))
+        .asData
+        ?.value
+        .spriteUrls;
+    final iconUrl = sprites?.icon ?? sprites?.gameFront ??
         'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-        'sprites/pokemon/versions/generation-viii/icons/'
-        '${pokemon.pokemonId}.png';
-    final fallbackUrl =
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-        'sprites/pokemon/${pokemon.pokemonId}.png';
+        'sprites/pokemon/versions/generation-viii/icons/${pokemon.pokemonId}.png';
 
     return ListTile(
       dense: true,
@@ -247,15 +249,9 @@ class _PokemonTile extends StatelessWidget {
         width: 40,
         height: 30,
         fit: BoxFit.contain,
-        errorWidget: (_, _, _) => CachedNetworkImage(
-          imageUrl: fallbackUrl,
-          width: 40,
-          height: 30,
-          fit: BoxFit.contain,
-          errorWidget: (_, _, _) => Icon(Icons.catching_pokemon,
-              size: 28,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
-        ),
+        errorWidget: (_, _, _) => Icon(Icons.catching_pokemon,
+            size: 28,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
       ),
       title: Text(pokemon.displayName),
       subtitle: pokemon.isHidden

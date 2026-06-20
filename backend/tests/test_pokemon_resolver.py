@@ -6,6 +6,8 @@ that mirror the shapes produced by sync_ps_data.py.
 """
 
 import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timezone
 
 from app.services.pokemon_resolver import (
     PokemonResolverService,
@@ -849,3 +851,259 @@ class TestResolveNameOrId:
         assert "charizard-mega-x".isdigit() is False
         assert "charizard".isdigit() is False
         assert "201".isdigit() is True
+
+
+# ---------------------------------------------------------------------------
+# Schema validation — new fields (Task 1)
+# ---------------------------------------------------------------------------
+
+def test_pokemon_resolved_response_has_new_fields():
+    """PokemonResolvedResponse accepts all new fields without validation errors."""
+    from app.schemas.pokemon_resolved import (
+        PokemonResolvedResponse, AbilityInfo, MoveLearnDetail, MoveSummary,
+        SpriteUrlsFull, FlavorTextEntry, FormData
+    )
+    from datetime import datetime, timezone
+
+    data = PokemonResolvedResponse(
+        pokemon_id=6,
+        gen=9,
+        name="charizard",
+        types=["Fire", "Flying"],
+        base_stats={"hp": 78, "attack": 84, "defense": 78,
+                    "special-attack": 109, "special-defense": 85, "speed": 100},
+        abilities=[
+            AbilityInfo(name="blaze", is_hidden=False, slot=1),
+            AbilityInfo(name="solar-power", is_hidden=True, slot=3),
+        ],
+        height=17,
+        weight=905,
+        base_experience=240,
+        species_name="charizard",
+        supplement_moves=[],
+        smogon_analyses=None,
+        varieties=[],
+        forms=[
+            FormData(name="charizard", form_id=6, is_default=True,
+                     front_sprite_url="https://example.com/6.png")
+        ],
+        sprite_urls=SpriteUrlsFull(official_artwork="https://example.com/art/6.png"),
+        resolved_at=datetime.now(timezone.utc),
+        genus="Flame Pokémon",
+        generation_name="generation-i",
+        gender_rate=1,
+        evolution_chain_id=2,
+        egg_groups=["monster", "dragon"],
+        flavor_text_entries=[
+            FlavorTextEntry(text="Spits fire.", language="en", version="red")
+        ],
+    )
+    assert data.pokemon_id == 6
+    assert data.abilities[0].name == "blaze"
+    assert data.abilities[0].is_hidden is False
+    assert data.evolution_chain_id == 2
+    assert data.forms[0].is_default is True
+    assert data.flavor_text_entries[0].language == "en"
+
+
+def test_moves_response_schema():
+    from app.schemas.pokemon_resolved import MovesResponse, MoveSummary, MoveLearnDetail
+
+    data = MovesResponse(
+        pokemon_id=6,
+        name="charizard",
+        moves=[
+            MoveSummary(
+                name="flamethrower",
+                learn_details=[
+                    MoveLearnDetail(version_group="sword-shield", method="machine", level=0)
+                ],
+            )
+        ],
+    )
+    assert data.moves[0].name == "flamethrower"
+    assert data.moves[0].learn_details[0].method == "machine"
+
+
+def test_flavor_text_response_schema():
+    from app.schemas.pokemon_resolved import FlavorTextResponse, FlavorTextEntry
+
+    data = FlavorTextResponse(
+        pokemon_id=6,
+        name="charizard",
+        flavor_text_entries=[
+            FlavorTextEntry(text="Spits fire.", language="en", version="red")
+        ],
+    )
+    assert data.flavor_text_entries[0].version == "red"
+
+
+# ---------------------------------------------------------------------------
+# Integration-level tests for resolve() — mock PokéAPI, real service logic
+# ---------------------------------------------------------------------------
+
+def _make_mock_pokemon_data():
+    return {
+        "id": 6,
+        "name": "charizard",
+        "height": 17,
+        "weight": 905,
+        "base_experience": 240,
+        "species": {"name": "charizard", "url": "https://pokeapi.co/api/v2/pokemon-species/6/"},
+        "types": [
+            {"slot": 1, "type": {"name": "fire", "url": "..."}},
+            {"slot": 2, "type": {"name": "flying", "url": "..."}},
+        ],
+        "stats": [
+            {"base_stat": 78, "effort": 0, "stat": {"name": "hp", "url": "..."}},
+            {"base_stat": 84, "effort": 0, "stat": {"name": "attack", "url": "..."}},
+            {"base_stat": 78, "effort": 0, "stat": {"name": "defense", "url": "..."}},
+            {"base_stat": 109, "effort": 3, "stat": {"name": "special-attack", "url": "..."}},
+            {"base_stat": 85, "effort": 0, "stat": {"name": "special-defense", "url": "..."}},
+            {"base_stat": 100, "effort": 0, "stat": {"name": "speed", "url": "..."}},
+        ],
+        "abilities": [
+            {"ability": {"name": "blaze", "url": "..."}, "is_hidden": False, "slot": 1},
+            {"ability": {"name": "solar-power", "url": "..."}, "is_hidden": True, "slot": 3},
+        ],
+        "moves": [
+            {
+                "move": {"name": "flamethrower", "url": "..."},
+                "version_group_details": [
+                    {
+                        "level_learned_at": 0,
+                        "move_learn_method": {"name": "machine", "url": "..."},
+                        "version_group": {"name": "sword-shield", "url": "..."},
+                    }
+                ],
+            }
+        ],
+        "forms": [{"name": "charizard", "url": "..."}],
+        "sprites": {
+            "front_default": "https://example.com/6.png",
+            "other": {
+                "official-artwork": {"front_default": "https://example.com/art/6.png", "front_shiny": None},
+                "home": {"front_default": "https://example.com/home/6.png", "front_shiny": None,
+                         "front_female": None, "front_shiny_female": None},
+            },
+        },
+    }
+
+
+def _make_mock_species_data():
+    return {
+        "id": 6,
+        "name": "charizard",
+        "genera": [{"genus": "Flame Pokémon", "language": {"name": "en"}}],
+        "names": [{"name": "Charizard", "language": {"name": "en"}}],
+        "generation": {"name": "generation-i", "url": "..."},
+        "gender_rate": 1,
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "hatch_counter": 20,
+        "growth_rate": {"name": "medium-slow"},
+        "egg_groups": [{"name": "monster"}, {"name": "dragon"}],
+        "flavor_text_entries": [
+            {
+                "flavor_text": "Spits fire\nthat is hot\nenough.",
+                "language": {"name": "en"},
+                "version": {"name": "red"},
+            }
+        ],
+        "is_baby": False,
+        "is_legendary": False,
+        "is_mythical": False,
+        "evolution_chain": {"url": "https://pokeapi.co/api/v2/evolution-chain/2/"},
+        "varieties": [{"is_default": True, "pokemon": {"name": "charizard", "url": "..."}}],
+    }
+
+
+@pytest.mark.asyncio
+async def test_resolve_populates_detail_fields(async_db_session):
+    """resolve() populates height, weight, abilities as list, and species fields."""
+    from app.services.pokemon_resolver import pokemon_resolver_service
+
+    mock_pokemon = _make_mock_pokemon_data()
+    mock_species = _make_mock_species_data()
+
+    with patch.object(
+        pokemon_resolver_service, "_fetch_pokeapi",
+        new=AsyncMock(return_value=(mock_pokemon, mock_species, {"english_name": "Charizard", "gen": 1, "species_name": "charizard"})),
+    ), patch.object(
+        pokemon_resolver_service, "_fetch_varieties", new=AsyncMock(return_value=[])
+    ), patch.object(
+        pokemon_resolver_service, "_fetch_forms", new=AsyncMock(return_value=[])
+    ):
+        result = await pokemon_resolver_service.resolve(6, 9, ["moves", "flavor"], async_db_session)
+
+    assert result.height == 17
+    assert result.weight == 905
+    assert result.base_experience == 240
+    assert result.species_name == "charizard"
+    assert result.genus == "Flame Pokémon"
+    assert result.generation_name == "generation-i"
+    assert result.gender_rate == 1
+    assert result.capture_rate == 45
+    assert result.evolution_chain_id == 2
+    assert result.egg_groups == ["monster", "dragon"]
+    assert result.is_legendary is False
+    # abilities as list
+    assert len(result.abilities) == 2
+    assert result.abilities[0].name == "blaze"
+    assert result.abilities[0].is_hidden is False
+    assert result.abilities[1].name == "solar-power"
+    assert result.abilities[1].is_hidden is True
+    # moves full when includes=["moves"]
+    assert len(result.moves) == 1
+    assert result.moves[0].name == "flamethrower"
+    assert result.moves[0].learn_details[0].version_group == "sword-shield"
+    # flavor text full when includes=["flavor"]
+    assert len(result.flavor_text_entries) == 1
+    assert result.flavor_text_entries[0].language == "en"
+    assert "Spits fire" in result.flavor_text_entries[0].text
+
+
+@pytest.mark.asyncio
+async def test_resolve_slim_response_omits_moves_and_flavor(async_db_session):
+    """Slim response (no includes) sets moves=[] and flavor_text_entries=[]."""
+    from app.services.pokemon_resolver import pokemon_resolver_service
+
+    mock_pokemon = _make_mock_pokemon_data()
+    mock_species = _make_mock_species_data()
+
+    with patch.object(
+        pokemon_resolver_service, "_fetch_pokeapi",
+        new=AsyncMock(return_value=(mock_pokemon, mock_species, {"english_name": "Charizard", "gen": 1, "species_name": "charizard"})),
+    ), patch.object(
+        pokemon_resolver_service, "_fetch_varieties", new=AsyncMock(return_value=[])
+    ), patch.object(
+        pokemon_resolver_service, "_fetch_forms", new=AsyncMock(return_value=[])
+    ):
+        result = await pokemon_resolver_service.resolve(6, 9, [], async_db_session)
+
+    assert result.moves == []
+    assert result.flavor_text_entries == []
+    assert result.moves_url is not None
+    assert result.flavor_text_url is not None
+
+
+@pytest.mark.asyncio
+async def test_resolve_includes_moves_returns_full_list(async_db_session):
+    """?includes[]=moves returns full move list."""
+    from app.services.pokemon_resolver import pokemon_resolver_service
+
+    mock_pokemon = _make_mock_pokemon_data()
+    mock_species = _make_mock_species_data()
+
+    with patch.object(
+        pokemon_resolver_service, "_fetch_pokeapi",
+        new=AsyncMock(return_value=(mock_pokemon, mock_species, {"english_name": "Charizard", "gen": 1, "species_name": "charizard"})),
+    ), patch.object(
+        pokemon_resolver_service, "_fetch_varieties", new=AsyncMock(return_value=[])
+    ), patch.object(
+        pokemon_resolver_service, "_fetch_forms", new=AsyncMock(return_value=[])
+    ):
+        result = await pokemon_resolver_service.resolve(6, 9, ["moves"], async_db_session)
+
+    assert len(result.moves) == 1
+    assert result.moves[0].name == "flamethrower"

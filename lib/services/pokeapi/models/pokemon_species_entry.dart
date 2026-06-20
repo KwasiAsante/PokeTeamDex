@@ -117,6 +117,20 @@ class FlavorTextEntry {
       version: json['version']['name'] as String,
     );
   }
+
+  factory FlavorTextEntry.fromBackend(Map<String, dynamic> json) {
+    return FlavorTextEntry(
+      text: json['text'] as String,
+      language: json['language'] as String,
+      version: json['version'] as String,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'text': text,
+        'language': language,
+        'version': version,
+      };
 }
 
 // Minimal placeholder — populated by evolution-chain PR

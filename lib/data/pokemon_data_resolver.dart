@@ -6,8 +6,9 @@ import 'package:poke_team_dex/features/pokedex/models/pokedex_image_type.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show SpriteUrlsFull;
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart'
-    show cosmeticFormHomeUrl, cosmeticFormHomeShinyUrl, pokemonHomeFemaleUrl;
+    show cosmeticFormHomeUrl, pokemonHomeFemaleUrl;
 
 const _versionsBase =
     'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions';
@@ -17,23 +18,16 @@ const _spritesBase =
 class PokemonDataResolver {
   PokemonDataResolver._();
 
-  /// Resolves all sprite URLs for a Pokémon form.
+  /// Resolves the versioned sprite URL set for a Pokémon in a gen 1–5 format.
   ///
-  /// Replaces `resolveSprite()` from `sprite_resolver.dart`.
+  /// [stem] is the sprite filename stem: `'$pokemonId'` for base forms, or
+  /// `'$pokemonId-$suffix'` for cosmetic forms (e.g. `'412-sandy'`).
   ///
-  /// Pass [baseSpecies] + [formName] instead of constructing a SpriteHint —
-  /// this method handles the registry lookup internally.
-  /// For Gen 1–5 the full versioned URL set is returned.
-  /// For Gen 6+ (or useFormatSprites false) HOME/official-artwork is used.
+  /// [fallbackUrl] and [fallbackUrl2] are only non-null for Crystal: they hold
+  /// the Gold and Silver paths for the Crystal → Gold → Silver fallback chain.
   ///
-  /// [fallbackUrl] and [fallbackUrl2] are only non-null for the Crystal game
-  /// format: they hold the Gold and Silver paths for the Crystal → Gold → Silver
-  /// fallback chain (Crystal's transparent/ subfolder lacks some form-variant
-  /// sprites, e.g. Unown letter forms).
-  ///
-  /// [femaleUrl] and [femaleShinyUrl] are non-null for Gen 4+ versioned formats
-  /// where female-specific sprites exist in the PokeAPI sprites repository.
-  /// They are null for Gen 1–3 versioned formats and for the HOME/artwork path.
+  /// For gen 6+ or no-format teams, use backend `SpriteUrlsFull` fields
+  /// (`.home`, `.homeShiny`, `.homeFemale`, `.homeFemaleShiny`) directly.
   static ({
     String? defaultUrl,
     String? shinyUrl,
@@ -41,97 +35,69 @@ class PokemonDataResolver {
     String? femaleShinyUrl,
     String? fallbackUrl,
     String? fallbackUrl2,
-  }) resolveFormSprite({
-    required Map<String, dynamic>? sprites,
+  }) resolveVersionedSprite({
     required int pokemonId,
     required String pokemonName,
-    required String baseSpecies,
-    required String? formName,
-    required GameFormat? format,
-    required bool useFormatSprites,
+    required String stem,
+    required GameFormat format,
   }) {
     final registry = PokemonDataRegistry.instance;
-
-    // Build cosmetic hint internally (replaces FormDescriptor.spriteHint).
-    String? cosmeticStem;
-    String? cosmeticHome;
-    String? cosmeticHomeShiny;
-    if (formName != null) {
-      final stems = registry.cosmeticSpriteStems[baseSpecies];
-      if (stems != null && stems.containsKey(formName)) {
-        // Registry entry: stem may differ from id-suffix pattern (e.g. unown letters).
-        final s = stems[formName]!;
-        final suffix = s.split('-').last;
-        cosmeticStem = s;
-        cosmeticHome = cosmeticFormHomeUrl(pokemonId, suffix);
-        cosmeticHomeShiny = cosmeticFormHomeShinyUrl(pokemonId, suffix);
-      } else if (formName.startsWith('$baseSpecies-')) {
-        // Fallback for cosmetic species not in the registry (cherrim, frillish, etc.).
-        // The sprite naming convention is "{baseSpeciesId}-{suffix}" for all cosmetic
-        // forms, so we can derive the stem directly from the form name.
-        final suffix = formName.substring(baseSpecies.length + 1);
-        cosmeticStem = '$pokemonId-$suffix';
-        cosmeticHome = cosmeticFormHomeUrl(pokemonId, suffix);
-        cosmeticHomeShiny = cosmeticFormHomeShinyUrl(pokemonId, suffix);
-      }
-    }
-
-    final stem = cosmeticStem ?? '$pokemonId';
-    final rawDefault = '$_spritesBase$stem.png';
-    final rawShiny = '${_spritesBase}shiny/$stem.png';
-
-    if (!useFormatSprites || format == null) {
-      return _homeOrArtwork(
-        sprites, rawDefault, rawShiny,
-        cosmeticHome: cosmeticHome,
-        cosmeticHomeShiny: cosmeticHomeShiny,
-      );
-    }
-
     final gameId = format.type == FormatType.game
         ? format.id
         : registry.genToDefaultGameId[format.gen];
 
-    if (gameId != null) {
-      final versionPath = registry.gameIdToVersionPath[gameId];
-      if (versionPath != null) {
-        final gen = format.gen;
-        final isAnimated = gameId == 'bw' || gameId == 'b2w2';
-        final ext = isAnimated ? '.gif' : '.png';
-        final transparent = gen <= 2 ? 'transparent/' : '';
-        final animSeg = isAnimated ? 'animated/' : '';
-
-        final defaultUrl =
-            _versionedDefaultUrl(versionPath, animSeg, transparent, stem, ext);
-        final shinyUrl = _versionedShinyUrl(
-            versionPath, gen, animSeg, transparent, stem, ext, pokemonName);
-        final (femaleUrl, femaleShinyUrl) =
-            _versionedFemaleUrls(versionPath, gen, animSeg, stem, ext);
-
-        String? fallbackUrl;
-        String? fallbackUrl2;
-        if (gameId == 'crystal') {
-          fallbackUrl = _versionedDefaultUrl(
-              'generation-ii/gold', animSeg, transparent, stem, ext);
-          fallbackUrl2 = _versionedDefaultUrl(
-              'generation-ii/silver', animSeg, transparent, stem, ext);
-        }
-
-        return (
-          defaultUrl: defaultUrl,
-          shinyUrl: shinyUrl,
-          femaleUrl: femaleUrl,
-          femaleShinyUrl: femaleShinyUrl,
-          fallbackUrl: fallbackUrl,
-          fallbackUrl2: fallbackUrl2,
-        );
-      }
+    if (gameId == null) {
+      return (
+        defaultUrl: '$_spritesBase$stem.png',
+        shinyUrl: '${_spritesBase}shiny/$stem.png',
+        femaleUrl: null,
+        femaleShinyUrl: null,
+        fallbackUrl: null,
+        fallbackUrl2: null,
+      );
     }
 
-    return _homeOrArtwork(
-      sprites, rawDefault, rawShiny,
-      cosmeticHome: cosmeticHome,
-      cosmeticHomeShiny: cosmeticHomeShiny,
+    final versionPath = registry.gameIdToVersionPath[gameId];
+    if (versionPath == null) {
+      return (
+        defaultUrl: '$_spritesBase$stem.png',
+        shinyUrl: '${_spritesBase}shiny/$stem.png',
+        femaleUrl: null,
+        femaleShinyUrl: null,
+        fallbackUrl: null,
+        fallbackUrl2: null,
+      );
+    }
+
+    final gen = format.gen;
+    final isAnimated = gameId == 'bw' || gameId == 'b2w2';
+    final ext = isAnimated ? '.gif' : '.png';
+    final transparent = gen <= 2 ? 'transparent/' : '';
+    final animSeg = isAnimated ? 'animated/' : '';
+
+    final defaultUrl =
+        _versionedDefaultUrl(versionPath, animSeg, transparent, stem, ext);
+    final shinyUrl = _versionedShinyUrl(
+        versionPath, gen, animSeg, transparent, stem, ext, pokemonName);
+    final (femaleUrl, femaleShinyUrl) =
+        _versionedFemaleUrls(versionPath, gen, animSeg, stem, ext);
+
+    String? fallbackUrl;
+    String? fallbackUrl2;
+    if (gameId == 'crystal') {
+      fallbackUrl = _versionedDefaultUrl(
+          'generation-ii/gold', animSeg, transparent, stem, ext);
+      fallbackUrl2 = _versionedDefaultUrl(
+          'generation-ii/silver', animSeg, transparent, stem, ext);
+    }
+
+    return (
+      defaultUrl: defaultUrl,
+      shinyUrl: shinyUrl,
+      femaleUrl: femaleUrl,
+      femaleShinyUrl: femaleShinyUrl,
+      fallbackUrl: fallbackUrl,
+      fallbackUrl2: fallbackUrl2,
     );
   }
 
@@ -163,26 +129,45 @@ class PokemonDataResolver {
     required PokemonEntry? formEntry,
     required PokemonFormEntry? cosmeticEntry,
     required PokedexFilter? filter,
+    SpriteUrlsFull? spriteUrls,
+    SpriteUrlsFull? formSpriteUrls,
+    SpriteUrlsFull? varietySpriteUrls,
   }) {
     final registry = PokemonDataRegistry.instance;
 
     if (selectedFormName != null) {
       if (cosmeticEntry != null) {
+        final isFemaleForm = cosmeticEntry.formName == 'female';
         if (imageType == PokedexImageType.artwork) {
           final override =
               registry.cosmeticFormHomeUrlOverrides[cosmeticEntry.name];
           if (override != null) return override;
-          // Female HOME artwork lives at home/female/{id}.png — not {id}-female.png.
-          if (cosmeticEntry.formName == 'female') {
-            return pokemonHomeFemaleUrl(pokemonId);
+          // Female: prefer official_artwork_female (future-proof) then home_female.
+          if (isFemaleForm) {
+            return spriteUrls?.officialArtworkFemale ??
+                spriteUrls?.homeFemale ??
+                formSpriteUrls?.home ??
+                pokemonHomeFemaleUrl(pokemonId);
           }
+          final formHome = formSpriteUrls?.home;
+          if (formHome != null) return formHome;
           if (cosmeticEntry.name.startsWith('$baseSpecies-')) {
             final suffix =
                 cosmeticEntry.name.substring(baseSpecies.length + 1);
             return cosmeticFormHomeUrl(pokemonId, suffix);
           }
         }
-        if (cosmeticEntry.formName == 'female') {
+        if (imageType == null) {
+          // Compact mode: female form uses the dedicated female icon path.
+          if (isFemaleForm) {
+            return spriteUrls?.iconFemale ??
+                formSpriteUrls?.icon ??
+                '${_spritesBase}female/$pokemonId.png';
+          }
+          final formIcon = formSpriteUrls?.icon;
+          if (formIcon != null) return formIcon;
+        }
+        if (isFemaleForm) {
           return '${_spritesBase}female/$pokemonId.png';
         }
         return cosmeticEntry.spriteUrl ?? '$_spritesBase$pokemonId.png';
@@ -200,8 +185,10 @@ class PokemonDataResolver {
           return (formEntry.sprites?['front_default'] as String?) ??
               '$_spritesBase$pokemonId.png';
         }
-        // compact (null imageType)
-        return '${_spritesBase}versions/generation-viii/icons/${formEntry.id}.png';
+        // compact (null imageType): prefer backend-resolved icon (handles
+        // female varieties like Indeedee-female whose variety ID has no icon).
+        return varietySpriteUrls?.icon ??
+            '${_spritesBase}versions/generation-viii/icons/${formEntry.id}.png';
       }
     }
 
@@ -209,18 +196,24 @@ class PokemonDataResolver {
       imageType != PokedexImageType.sprite || filter != null,
       'filter must be non-null when imageType is PokedexImageType.sprite',
     );
+    final baseHomeOverride = PokemonDataRegistry.instance
+        .baseFormCosmeticHomeUrls[baseSpecies];
     return switch (imageType) {
       PokedexImageType.artwork =>
+        baseHomeOverride?.homeUrl ??
         '${_spritesBase}other/official-artwork/$pokemonId.png',
-      // sprite: filter-aware icon (same as _compactIconUrl in list tile).
-      // Grid card sprite mode also uses this path — with the default filter
-      // the subpath is null, so this degrades to the plain pokemonId.png fallback.
+      // sprite: filter-aware versioned game sprite.
+      // compactIconUrl returns the versioned path for known gens (1–7, 9)
+      // and falls back to the plain front sprite for unmapped gens (8).
+      // Never use the icon-sized sprite here — it's 40x30 and looks wrong
+      // at the 64x64 sprite view size.
       PokedexImageType.sprite => compactIconUrl(pokemonId, filter!),
-      null => '${_spritesBase}versions/generation-viii/icons/$pokemonId.png',
+      null => spriteUrls?.icon ??
+          '${_spritesBase}versions/generation-viii/icons/$pokemonId.png',
     };
   }
 
-  /// Fallback URL for list tile compact mode.
+  /// Fallback URL used when the primary image URL fails to load.
   static String resolvePokedexFallbackUrl({
     required int pokemonId,
     required PokedexImageType? imageType,
@@ -228,7 +221,7 @@ class PokemonDataResolver {
     required PokemonEntry? formEntry,
     required PokemonFormEntry? cosmeticEntry,
   }) {
-    if (imageType == null && selectedFormName != null) {
+    if (selectedFormName != null) {
       final formSprite = cosmeticEntry?.spriteUrl ??
           (formEntry?.sprites?['front_default'] as String?);
       if (formSprite != null) return formSprite;
@@ -246,40 +239,6 @@ class PokemonDataResolver {
     String ext,
   ) =>
       '$_versionsBase/$versionPath/$animSeg$transparent$stem$ext';
-
-  static ({
-    String? defaultUrl,
-    String? shinyUrl,
-    String? femaleUrl,
-    String? femaleShinyUrl,
-    String? fallbackUrl,
-    String? fallbackUrl2,
-  }) _homeOrArtwork(
-    Map<String, dynamic>? sprites,
-    String rawDefault,
-    String rawShiny, {
-    String? cosmeticHome,
-    String? cosmeticHomeShiny,
-  }) {
-    final home =
-        sprites == null ? null : _nav(sprites['other'], ['home']);
-    final artwork =
-        sprites == null ? null : _nav(sprites['other'], ['official-artwork']);
-    return (
-      defaultUrl: cosmeticHome ??
-          home?['front_default'] as String? ??
-          artwork?['front_default'] as String? ??
-          rawDefault,
-      shinyUrl: cosmeticHomeShiny ??
-          home?['front_shiny'] as String? ??
-          artwork?['front_shiny'] as String? ??
-          rawShiny,
-      femaleUrl: home?['front_female'] as String?,
-      femaleShinyUrl: home?['front_shiny_female'] as String?,
-      fallbackUrl: null,
-      fallbackUrl2: null,
-    );
-  }
 
   static String _versionedShinyUrl(
     String versionPath,
@@ -320,12 +279,4 @@ class PokemonDataResolver {
     );
   }
 
-  static Map<String, dynamic>? _nav(dynamic root, List<String> path) {
-    dynamic cur = root;
-    for (final key in path) {
-      if (cur is! Map) return null;
-      cur = cur[key];
-    }
-    return cur is Map ? cur.cast<String, dynamic>() : null;
-  }
 }
