@@ -9,8 +9,8 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/features/pokedex/models/pokedex_filter.dart';
-import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_list_provider.dart';
+import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
@@ -340,8 +340,11 @@ class _PickerTile extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final detailAsync = ref.watch(pokemonDetailProvider(entry.id));
-    final displayName = detailAsync.asData?.value.displaySpeciesName ??
+    // resolvedPokemonProvider is keepAlive — sharing the Pokédex's cache means
+    // this picker (which scrolls the same full species list) avoids
+    // re-fetching/re-resolving species the user has already browsed.
+    final resolvedAsync = ref.watch(resolvedPokemonProvider((id: entry.id, gen: null)));
+    final displayName = resolvedAsync.asData?.value.displaySpeciesName ??
         entry.name.toCapitalCase();
 
     return ListTile(

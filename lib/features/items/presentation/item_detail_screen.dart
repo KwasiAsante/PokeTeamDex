@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/features/items/providers/items_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
@@ -393,9 +394,7 @@ class _HeldByTileState extends ConsumerState<_HeldByTile> {
         ?.value
         .spriteUrls;
     final iconUrl = sprites?.icon ?? sprites?.gameFront ??
-        'https://raw.githubusercontent.com/PokeAPI/sprites/master/'
-        'sprites/pokemon/versions/generation-viii/icons/'
-        '${widget.heldBy.pokemonId}.png';
+        PokemonDataResolver.genViiiIconFallbackUrl(widget.heldBy.pokemonId);
 
     final maxRarity = widget.heldBy.versionDetails.isEmpty
         ? 0

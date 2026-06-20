@@ -32,15 +32,19 @@ class PokeApiRepository {
 
   /// Same memoization as [_pokemonById] for the other detail-screen fetches —
   /// `fetchPokemonSpecies`/`fetchAbility`/`fetchEvolutionChain`/
-  /// `fetchPokemonForm` had no in-memory layer, so every `.autoDispose`
-  /// provider rebuild (and every internal helper that calls them, e.g.
-  /// `fetchForwardEvolutionInfo` + `fetchBackwardEvolutionInfo` both fetching
-  /// the same species/chain back to back) re-ran `fromJson` on the cached
-  /// Hive payload from scratch.
+  /// `fetchPokemonForm`/`fetchMove`/`fetchItem` had no in-memory layer, so
+  /// every `.autoDispose` provider rebuild (and every internal helper that
+  /// calls them, e.g. `fetchForwardEvolutionInfo` + `fetchBackwardEvolutionInfo`
+  /// both fetching the same species/chain back to back) re-ran `fromJson` on
+  /// the cached Hive payload from scratch. `fetchMove`/`fetchItem` are
+  /// particularly hot — the same move/item name is looked up from the global
+  /// Moves/Items lists, every Pokémon's moveset tab, and team slot screens.
   final Map<int, PokemonSpeciesEntry> _speciesById = {};
   final Map<String, AbilityEntry> _abilityByName = {};
   final Map<int, EvolutionNode> _evolutionChainById = {};
   final Map<String, PokemonFormEntry> _formByName = {};
+  final Map<String, MoveEntry> _moveByName = {};
+  final Map<String, ItemEntry> _itemByName = {};
 
   Future<List<PokemonListEntry>> fetchPokemonList({bool include = false}) async {
     try {
@@ -486,10 +490,14 @@ class PokeApiRepository {
   }
 
   Future<MoveEntry> fetchMove(String name) async {
+    final memoized = _moveByName[name];
+    if (memoized != null) return memoized;
     final cacheKey = 'move_$name';
     final cached = _pokeApiCache.getIfValid(cacheKey);
     if (cached is Map<String, dynamic>) {
-      return MoveEntry.fromJson(cached);
+      final entry = MoveEntry.fromJson(cached);
+      _moveByName[name] = entry;
+      return entry;
     }
     final response = await _pokeApiClient.client.get('/move/$name');
     if (response.statusCode != 200) {
@@ -497,7 +505,9 @@ class PokeApiRepository {
     }
     final data = Map<String, dynamic>.from(response.data);
     _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
-    return MoveEntry.fromJson(data);
+    final entry = MoveEntry.fromJson(data);
+    _moveByName[name] = entry;
+    return entry;
   }
 
   /// Returns the set of national dex IDs (1–1025) that belong to [typeName].
@@ -624,10 +634,14 @@ class PokeApiRepository {
   }
 
   Future<ItemEntry> fetchItem(String name) async {
+    final memoized = _itemByName[name];
+    if (memoized != null) return memoized;
     final cacheKey = 'item_$name';
     final cached = _pokeApiCache.getIfValid(cacheKey);
     if (cached is Map<String, dynamic>) {
-      return ItemEntry.fromJson(cached);
+      final entry = ItemEntry.fromJson(cached);
+      _itemByName[name] = entry;
+      return entry;
     }
     final response = await _pokeApiClient.client.get('/item/$name');
     if (response.statusCode != 200) {
@@ -635,7 +649,9 @@ class PokeApiRepository {
     }
     final data = Map<String, dynamic>.from(response.data);
     _pokeApiCache.putWithTTL(cacheKey, data, const Duration(days: 7));
-    return ItemEntry.fromJson(data);
+    final entry = ItemEntry.fromJson(data);
+    _itemByName[name] = entry;
+    return entry;
   }
 
   Future<TypeEntry> fetchType(String name) async {

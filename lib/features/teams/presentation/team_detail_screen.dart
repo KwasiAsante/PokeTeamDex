@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
+import 'package:poke_team_dex/features/items/providers/items_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
@@ -807,7 +808,7 @@ class _FilledSlotCard extends ConsumerWidget {
     final formsData = ref.watch(pokemonFormsProvider((id: slot.pokemonId, gen: formatGen))).asData?.value;
     final varietiesData = ref.watch(pokemonVarietiesProvider((id: slot.pokemonId, gen: formatGen))).asData?.value;
     final itemAsync = slot.heldItemName != null
-        ? ref.watch(slotItemDetailProvider(slot.heldItemName!))
+        ? ref.watch(itemProvider(slot.heldItemName!))
         : null;
 
     final colorScheme = Theme.of(context).colorScheme;

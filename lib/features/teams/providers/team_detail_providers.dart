@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
-import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 
 final teamSlotsProvider =
@@ -16,10 +15,6 @@ final teamByIdProvider =
   return (db.select(db.teams)..where((t) => t.id.equals(teamId)))
       .watchSingleOrNull();
 });
-
-final slotItemDetailProvider =
-    FutureProvider.autoDispose.family<ItemEntry, String>((ref, name) =>
-        ref.read(pokeApiRepositoryProvider).fetchItem(name));
 
 // ── Pokemon Instance providers ────────────────────────────────────────────────
 
