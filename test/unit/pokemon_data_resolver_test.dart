@@ -13,178 +13,88 @@ void main() {
     await PokemonDataRegistry.initialize();
   });
 
-  // ── resolveFormSprite ─────────────────────────────────────────────────────
+  // ── resolveVersionedSprite ────────────────────────────────────────────────
+  //
+  // resolveFormSprite was removed; sprite URLs now come from backend
+  // SpriteUrlsFull data.  resolveVersionedSprite is the sole remaining
+  // client-side URL constructor for gen 1-5 versioned sprites.
 
-  group('resolveFormSprite — no format (HOME/artwork path)', () {
-    test('uses HOME url from sprites when present', () {
-      final sprites = {
-        'other': {
-          'home': {
-            'front_default': 'https://example.com/home/6.png',
-            'front_shiny': 'https://example.com/home/shiny/6.png',
-          }
-        }
-      };
-      final result = PokemonDataResolver.resolveFormSprite(
-        sprites: sprites,
-        pokemonId: 6,
-        pokemonName: 'charizard',
-        baseSpecies: 'charizard',
-        formName: null,
-        format: null,
-        useFormatSprites: false,
-      );
-      expect(result.defaultUrl, 'https://example.com/home/6.png');
-      expect(result.shinyUrl, 'https://example.com/home/shiny/6.png');
-    });
-
-    test('uses official-artwork when HOME is absent', () {
-      final sprites = {
-        'other': {
-          'official-artwork': {
-            'front_default': 'https://example.com/artwork/6.png',
-          }
-        }
-      };
-      final result = PokemonDataResolver.resolveFormSprite(
-        sprites: sprites,
-        pokemonId: 6,
-        pokemonName: 'charizard',
-        baseSpecies: 'charizard',
-        formName: null,
-        format: null,
-        useFormatSprites: false,
-      );
-      expect(result.defaultUrl, 'https://example.com/artwork/6.png');
-    });
-
-    test('cosmetic form: homeUrl built from registry cosmeticSpriteStems', () {
-      // burmy-sandy is in cosmeticSpriteStems['burmy'] with stem '412-sandy'
-      final result = PokemonDataResolver.resolveFormSprite(
-        sprites: null,
-        pokemonId: 412,
-        pokemonName: 'burmy-sandy',
-        baseSpecies: 'burmy',
-        formName: 'burmy-sandy',
-        format: null,
-        useFormatSprites: false,
-      );
-      expect(result.defaultUrl,
-          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/412-sandy.png');
-      expect(result.shinyUrl,
-          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/412-sandy.png');
-    });
-
-    test('cosmetic form not in registry but name follows baseSpecies-suffix pattern: uses suffix-based HOME url', () {
-      // cherrim-sunshine is NOT in cosmeticSpriteStems (only 7 species are),
-      // but its name starts with 'cherrim-' so the fallback must kick in.
-      final result = PokemonDataResolver.resolveFormSprite(
-        sprites: null,
-        pokemonId: 421,
-        pokemonName: 'cherrim-sunshine',
-        baseSpecies: 'cherrim',
-        formName: 'cherrim-sunshine',
-        format: null,
-        useFormatSprites: false,
-      );
-      expect(result.defaultUrl,
-          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/421-sunshine.png');
-    });
-
-    test('no sprites and no cosmetic match: raw front sprite fallback', () {
-      final result = PokemonDataResolver.resolveFormSprite(
-        sprites: null,
-        pokemonId: 6,
-        pokemonName: 'charizard',
-        baseSpecies: 'charizard',
-        formName: null,
-        format: null,
-        useFormatSprites: false,
-      );
-      expect(result.defaultUrl, contains('/sprites/pokemon/6.png'));
-    });
-  });
-
-  group('resolveFormSprite — Gen 1 (no shiny mechanic)', () {
+  group('resolveVersionedSprite — Gen 1 Yellow', () {
     const gen1 = GameFormat(
       id: 'yellow', name: 'Yellow', short: 'Yel',
       type: FormatType.game, gen: 1,
     );
 
-    test('shinyUrl equals defaultUrl', () {
-      final result = PokemonDataResolver.resolveFormSprite(
-        sprites: null, pokemonId: 6, pokemonName: 'charizard',
-        baseSpecies: 'charizard', formName: null,
-        format: gen1, useFormatSprites: true,
+    test('defaultUrl uses transparent/ subfolder and .png extension', () {
+      final result = PokemonDataResolver.resolveVersionedSprite(
+        pokemonId: 6, pokemonName: 'charizard', stem: '6', format: gen1,
+      );
+      expect(result.defaultUrl, contains('transparent/'));
+      expect(result.defaultUrl, endsWith('.png'));
+    });
+
+    test('shinyUrl equals defaultUrl — no shinies in Gen 1', () {
+      final result = PokemonDataResolver.resolveVersionedSprite(
+        pokemonId: 6, pokemonName: 'charizard', stem: '6', format: gen1,
       );
       expect(result.shinyUrl, equals(result.defaultUrl));
     });
 
-    test('femaleUrl is null', () {
-      final result = PokemonDataResolver.resolveFormSprite(
-        sprites: null, pokemonId: 6, pokemonName: 'charizard',
-        baseSpecies: 'charizard', formName: null,
-        format: gen1, useFormatSprites: true,
+    test('femaleUrl is null — no gender sprites before Gen 4', () {
+      final result = PokemonDataResolver.resolveVersionedSprite(
+        pokemonId: 6, pokemonName: 'charizard', stem: '6', format: gen1,
       );
       expect(result.femaleUrl, isNull);
     });
   });
 
-  group('resolveFormSprite — Gen 5 BW animated sprites', () {
+  group('resolveVersionedSprite — Gen 5 BW animated', () {
     const bw = GameFormat(
       id: 'bw', name: 'BW', short: 'BW',
       type: FormatType.game, gen: 5,
     );
 
     test('defaultUrl uses .gif extension and animated/ subfolder', () {
-      final result = PokemonDataResolver.resolveFormSprite(
-        sprites: null, pokemonId: 6, pokemonName: 'charizard',
-        baseSpecies: 'charizard', formName: null,
-        format: bw, useFormatSprites: true,
+      final result = PokemonDataResolver.resolveVersionedSprite(
+        pokemonId: 6, pokemonName: 'charizard', stem: '6', format: bw,
       );
       expect(result.defaultUrl, endsWith('.gif'));
       expect(result.defaultUrl, contains('animated/'));
     });
 
-    test('cosmetic form: stem from registry used in BW path', () {
-      final result = PokemonDataResolver.resolveFormSprite(
-        sprites: null, pokemonId: 412, pokemonName: 'burmy-sandy',
-        baseSpecies: 'burmy', formName: 'burmy-sandy',
-        format: bw, useFormatSprites: true,
+    test('stem appears in URL (cosmetic form suffix)', () {
+      final result = PokemonDataResolver.resolveVersionedSprite(
+        pokemonId: 412, pokemonName: 'burmy', stem: '412-sandy', format: bw,
       );
       expect(result.defaultUrl, contains('412-sandy'));
       expect(result.defaultUrl, endsWith('.gif'));
     });
   });
 
-  group('resolveFormSprite — Gen 2 crystal fallback chain', () {
+  group('resolveVersionedSprite — Gen 2 Crystal fallback chain', () {
     const crystal = GameFormat(
       id: 'crystal', name: 'Crystal', short: 'Crys',
       type: FormatType.game, gen: 2,
     );
 
     test('fallbackUrl points to gold, fallbackUrl2 to silver', () {
-      final result = PokemonDataResolver.resolveFormSprite(
-        sprites: null, pokemonId: 201, pokemonName: 'unown',
-        baseSpecies: 'unown', formName: null,
-        format: crystal, useFormatSprites: true,
+      final result = PokemonDataResolver.resolveVersionedSprite(
+        pokemonId: 201, pokemonName: 'unown', stem: '201-a', format: crystal,
       );
       expect(result.fallbackUrl, contains('generation-ii/gold'));
       expect(result.fallbackUrl2, contains('generation-ii/silver'));
     });
   });
 
-  group('resolveFormSprite — Gen 4 female URLs', () {
+  group('resolveVersionedSprite — Gen 4 female URLs', () {
     const dp = GameFormat(
       id: 'dp', name: 'DP', short: 'DP',
       type: FormatType.game, gen: 4,
     );
 
-    test('femaleUrl and femaleShinyUrl are non-null for Gen 4', () {
-      final result = PokemonDataResolver.resolveFormSprite(
-        sprites: null, pokemonId: 521, pokemonName: 'unfezant',
-        baseSpecies: 'unfezant', formName: null,
-        format: dp, useFormatSprites: true,
+    test('femaleUrl and femaleShinyUrl are non-null for Gen 4+', () {
+      final result = PokemonDataResolver.resolveVersionedSprite(
+        pokemonId: 521, pokemonName: 'unfezant', stem: '521', format: dp,
       );
       expect(result.femaleUrl, isNotNull);
       expect(result.femaleShinyUrl, isNotNull);
@@ -192,24 +102,17 @@ void main() {
     });
   });
 
-  group('resolveFormSprite — useFormatSprites: false ignores format', () {
-    const bw = GameFormat(
-      id: 'bw', name: 'BW', short: 'BW',
-      type: FormatType.game, gen: 5,
+  group('resolveVersionedSprite — unsupported gen falls back to plain sprite', () {
+    const swsh = GameFormat(
+      id: 'swsh', name: 'SwSh', short: 'SS',
+      type: FormatType.game, gen: 8,
     );
 
-    test('falls back to HOME/artwork when useFormatSprites is false', () {
-      final sprites = {
-        'other': {
-          'home': {'front_default': 'https://example.com/home/6.png'}
-        }
-      };
-      final result = PokemonDataResolver.resolveFormSprite(
-        sprites: sprites, pokemonId: 6, pokemonName: 'charizard',
-        baseSpecies: 'charizard', formName: null,
-        format: bw, useFormatSprites: false,
+    test('returns sprites/pokemon/{id}.png when no versioned path exists', () {
+      final result = PokemonDataResolver.resolveVersionedSprite(
+        pokemonId: 6, pokemonName: 'charizard', stem: '6', format: swsh,
       );
-      expect(result.defaultUrl, 'https://example.com/home/6.png');
+      expect(result.defaultUrl, contains('/sprites/pokemon/6.png'));
     });
   });
 

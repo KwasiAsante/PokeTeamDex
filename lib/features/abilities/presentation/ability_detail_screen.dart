@@ -233,7 +233,7 @@ class _PokemonTile extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final sprites = ref
-        .watch(resolvedPokemonProvider(pokemon.pokemonId))
+        .watch(resolvedPokemonProvider((id: pokemon.pokemonId, gen: null)))
         .asData
         ?.value
         .spriteUrls;

@@ -57,6 +57,7 @@ final pokemonMovesProvider =
 final pokemonVarietiesProvider =
     FutureProvider.family<List<VarietyBackendData>, ({int id, int? gen})>(
         (ref, args) async {
+  ref.keepAlive(); // keep in memory so teams screen reads instantly after team_detail loads it
   final id = args.id;
   final gen = args.gen;
   final cache = ref.read(pokemonResolvedCacheProvider);
@@ -96,6 +97,7 @@ final pokemonVarietiesProvider =
 final pokemonFormsProvider =
     FutureProvider.family<List<FormBackendData>, ({int id, int? gen})>(
         (ref, args) async {
+  ref.keepAlive(); // keep in memory so teams screen reads instantly after team_detail loads it
   final id = args.id;
   final gen = args.gen;
   final cache = ref.read(pokemonResolvedCacheProvider);

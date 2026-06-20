@@ -3,9 +3,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart'
     show teamRepositoryProvider, teamSlotRepositoryProvider;
+import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
+import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
+import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
@@ -15,28 +19,24 @@ import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/services/format/format_service.dart';
 import 'package:poke_team_dex/services/pokeapi/models/encounter_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart'
-    show MoveSummary, FormBackendData, VarietyBackendData;
+    show MoveSummary, FormBackendData;
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
     show pokemonMovesProvider, pokemonFlavorTextProvider,
          pokemonFormsProvider, pokemonVarietiesProvider;
-import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
-import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
+import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
+import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
-import 'package:poke_team_dex/shared/utils/snack_bar.dart';
-import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/stat_bar.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
-import 'package:poke_team_dex/data/pokemon_data_registry.dart';
-import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
-import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
-import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 
 /// Derives a display label from a PokéAPI cosmetic form name.
 /// e.g. "red-flower" → "Red Flower", "sandy" → "Sandy", "a" → "A".
@@ -126,7 +126,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    final resolvedAsync = ref.watch(resolvedPokemonProvider(widget.pokemonId));
+    final resolvedAsync = ref.watch(resolvedPokemonProvider((id: widget.pokemonId, gen: null)));
     final formAsync = _selectedFormName != null
         ? ref.watch(pokemonByNameProvider(_selectedFormName!))
         : null;
@@ -156,7 +156,7 @@ class _PokemonDetailScreenState extends ConsumerState<PokemonDetailScreen>
         appBar: AppBar(leading: BackButton(onPressed: () => context.pop())),
         body: ErrorState(
           error: e,
-          onRetry: () => ref.invalidate(resolvedPokemonProvider(widget.pokemonId)),
+          onRetry: () => ref.invalidate(resolvedPokemonProvider((id: widget.pokemonId, gen: null))),
         ),
       ),
       data: (resolved) {

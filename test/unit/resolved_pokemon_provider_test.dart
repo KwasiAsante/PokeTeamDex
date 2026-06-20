@@ -9,6 +9,7 @@
 //   • noCosmeticFormsPokemon: cosmetic forms are skipped entirely (no API call)
 //   • Single-form species: cosmeticForms is empty (provider short-circuits)
 //   • keepAlive: provider is not autoDispose
+//   • gen parameter: provider accepts ({int id, int? gen}) named-record parameter
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,7 +70,7 @@ ProviderContainer _container(_MockRepo repo) {
   final backendRepo = _MockBackendRepo();
   final cache = _MockCache();
   when(() => cache.getIfValid(any())).thenReturn(null);
-  when(() => backendRepo.fetchResolved(any()))
+  when(() => backendRepo.fetchResolved(any(), gen: any(named: 'gen')))
       .thenThrow(Exception('test: backend disabled'));
   return ProviderContainer(
     overrides: [
@@ -108,7 +109,7 @@ void main() {
       when(() => repo.fetchPokemonByName('bulbasaur'))
           .thenAnswer((_) async => detailEntry);
 
-      final resolved = await container.read(resolvedPokemonProvider(1).future);
+      final resolved = await container.read(resolvedPokemonProvider((id: 1, gen: null)).future);
 
       expect(resolved, isA<ResolvedPokemon>());
       expect(resolved.detail, same(detailEntry));
@@ -139,7 +140,7 @@ void main() {
           .thenAnswer((_) async => _form('shellos-east-sea', 'east-sea',
               spriteUrl: 'https://example.com/east-sea.png'));
 
-      final resolved = await container.read(resolvedPokemonProvider(422).future);
+      final resolved = await container.read(resolvedPokemonProvider((id: 422, gen: null)).future);
 
       expect(resolved.cosmeticForms, hasLength(1));
       expect(resolved.cosmeticForms.first.name, 'shellos-east-sea');
@@ -169,7 +170,7 @@ void main() {
       when(() => repo.fetchPokemonForm('frillish-female'))
           .thenAnswer((_) async => _form('frillish-female', 'female', spriteUrl: null));
 
-      final resolved = await container.read(resolvedPokemonProvider(id).future);
+      final resolved = await container.read(resolvedPokemonProvider((id: id, gen: null)).future);
 
       expect(resolved.cosmeticForms, hasLength(1));
       final femaleEntry = resolved.cosmeticForms.first;
@@ -201,7 +202,7 @@ void main() {
       when(() => repo.fetchPokemonByName(genderDiffName))
           .thenAnswer((_) async => pokemonEntry);
 
-      final resolved = await container.read(resolvedPokemonProvider(id).future);
+      final resolved = await container.read(resolvedPokemonProvider((id: id, gen: null)).future);
 
       // The synthetic female entry must be present.
       expect(resolved.cosmeticForms, hasLength(1));
@@ -231,7 +232,7 @@ void main() {
       when(() => repo.fetchPokemon(id)).thenAnswer((_) async => pokemonEntry);
       when(() => repo.fetchPokemonSpecies(id)).thenAnswer((_) async => speciesEntry);
 
-      final resolved = await container.read(resolvedPokemonProvider(id).future);
+      final resolved = await container.read(resolvedPokemonProvider((id: id, gen: null)).future);
 
       expect(resolved.cosmeticForms, isEmpty);
       // fetchPokemonByName must NOT be called — the noCosmeticFormsPokemon
@@ -255,11 +256,11 @@ void main() {
           .thenAnswer((_) async => pokemonEntry);
 
       // First resolution — warms the cache.
-      await container.read(resolvedPokemonProvider(1).future);
+      await container.read(resolvedPokemonProvider((id: 1, gen: null)).future);
 
       // Re-read without a listener: a keepAlive provider returns the cached
       // AsyncData immediately without re-fetching.
-      final second = container.read(resolvedPokemonProvider(1));
+      final second = container.read(resolvedPokemonProvider((id: 1, gen: null)));
       expect(second, isA<AsyncData<ResolvedPokemon>>());
 
       // Repository was called exactly once per method — no re-fetch.

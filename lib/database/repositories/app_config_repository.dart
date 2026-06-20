@@ -1,7 +1,9 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 
+bool debugMode = false;
 const _kApiBaseUrl = 'api_base_url';
 const _kUseFormatSprites = 'use_format_sprites';
 const _kSeedColor = 'seed_color';
@@ -18,6 +20,18 @@ const kMaxBoxSizeLimit = 60;
 class AppConfigRepository {
   AppConfigRepository(this._db);
   final AppDatabase _db;
+
+  String getBaseUrl() {
+    if (!kDebugMode) {
+      debugMode = false;
+    }
+
+    if (debugMode) {
+      return 'http://localhost:8000';
+    } else {
+      return kDefaultApiBaseUrl;
+    }
+  }
 
   // ── Generic get / set ──────────────────────────────────────────────────────
 
@@ -45,12 +59,12 @@ class AppConfigRepository {
   // ── Typed accessors ────────────────────────────────────────────────────────
 
   Future<String> getApiBaseUrl() async =>
-      (await get(_kApiBaseUrl)) ?? kDefaultApiBaseUrl;
+      (await get(_kApiBaseUrl)) ?? getBaseUrl();
 
   Future<void> setApiBaseUrl(String url) => set(_kApiBaseUrl, url);
 
   Stream<String> watchApiBaseUrl() =>
-      watch(_kApiBaseUrl).map((v) => v ?? kDefaultApiBaseUrl);
+      watch(_kApiBaseUrl).map((v) => v ?? getBaseUrl());
 
   // ── Sprite style ──────────────────────────────────────────────────────────
 

@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:poke_team_dex/services/api/api_client.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_backend_repository.dart';
-import 'package:poke_team_dex/services/pokemon_resolved/models.dart';
 
 class MockDio extends Mock implements Dio {}
 class MockApiClient extends Mock implements ApiClient {}

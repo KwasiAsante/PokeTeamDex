@@ -631,7 +631,7 @@ class _PokemonListTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final sprites = ref
-        .watch(resolvedPokemonProvider(pokemon.id))
+        .watch(resolvedPokemonProvider((id: pokemon.id, gen: null)))
         .asData
         ?.value
         .spriteUrls;

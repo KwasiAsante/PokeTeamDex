@@ -93,7 +93,7 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
     final filter = ref.watch(pokedexFilterProvider);
     final isCompact = widget.imageType == null;
 
-    final resolvedAsync = ref.watch(resolvedPokemonProvider(widget.pokemon.id));
+    final resolvedAsync = ref.watch(resolvedPokemonProvider((id: widget.pokemon.id, gen: null)));
     final resolved = resolvedAsync.asData?.value;
     final basePokemon = resolved?.detail;
     final cosmeticFormEntries = resolved?.cosmeticForms ?? const <PokemonFormEntry>[];

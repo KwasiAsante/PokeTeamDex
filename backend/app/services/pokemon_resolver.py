@@ -192,8 +192,9 @@ def _build_pokeapi_sprite_url(
         else:
             parts = [_POKEAPI_SPRITES, game_path, f"{sprite_id}.{ext}"]
     if female:
-        # Female variants: insert "female" before filename (non-standard; best effort)
-        return None
+        if gen < 4:
+            return None  # female versioned sprites only exist from gen 4
+        parts.insert(-1, "female")
     return "/".join(parts)
 
 
@@ -226,12 +227,16 @@ def _build_icon_url(pokemon_id: int | str, gen: int, female: bool = False) -> st
       gen == 7  → generation-vii/icons/{id}.png   (female/ subdir if female=True)
       gen <= 6  → plain front sprite (no icon directories; female/ subdir for female=True)
     """
-    if gen >= 8:
+    if gen is None or gen >= 8:
         subdir = "female/" if female else ""
         return f"{_POKEAPI_SPRITES}/generation-viii/icons/{subdir}{pokemon_id}.png"
     elif gen >= 7:
         subdir = "female/" if female else ""
         return f"{_POKEAPI_SPRITES}/generation-vii/icons/{subdir}{pokemon_id}.png"
+    elif gen == 5:
+        # Gen 5 icons use "{id}-female.png" suffix, not a female/ subdirectory
+        suffix = "-female" if female else ""
+        return f"{_POKEAPI_SPRITES}/generation-v/icons/{pokemon_id}{suffix}.png"
     else:
         subdir = "female/" if female else ""
         return f"{_POKEAPI_PLAIN_SPRITES}/{subdir}{pokemon_id}.png"
@@ -492,27 +497,54 @@ class PokemonResolverService:
         artwork = other.get("official-artwork") or {}
         home = other.get("home") or {}
 
-        # Gen-specific game sprite: PokeAPI/sprites versioned (primary) or Showdown (fallback)
+        # Gen-specific game sprites: use versioned URLs when a gen was explicitly
+        # requested; fall back to the plain root sprites when gen=None (Pokédex,
+        # no-format teams) so we never return a constructed URL that may 404.
         sprite_id = gen_sprite_id_override or str(variety_id)
-        game_front = (
-            _build_pokeapi_sprite_url(sprite_id, gen)
-            or _build_showdown_sprite_url(ps_name, gen)
-        )
-        game_front_shiny = (
-            _build_pokeapi_sprite_url(sprite_id, gen, shiny=True)
-            or _build_showdown_sprite_url(ps_name, gen, shiny=True)
-        )
+        game_front = game_front_shiny = game_front_female = game_front_female_shiny = None
+        if gen is not None and gen in _GEN_SPRITE_CONFIG:
+            gpath, subdir, _, _ = _GEN_SPRITE_CONFIG[gen]
+            gen_key, game_key = gpath.split("/", 1)
+            versioned = ((sprites.get("versions") or {})
+                         .get(gen_key, {})
+                         .get(game_key, {}))
+            pool = versioned.get(subdir, {}) if subdir else versioned
+            game_front = (
+                pool.get("front_default")
+                or _build_pokeapi_sprite_url(sprite_id, gen)
+                or _build_showdown_sprite_url(ps_name, gen)
+            )
+            game_front_shiny = (
+                pool.get("front_shiny")
+                or _build_pokeapi_sprite_url(sprite_id, gen, shiny=True)
+                or _build_showdown_sprite_url(ps_name, gen, shiny=True)
+            )
+            game_front_female = (
+                pool.get("front_female")
+                or _build_pokeapi_sprite_url(sprite_id, gen, female=True)
+            )
+            game_front_female_shiny = (
+                pool.get("front_shiny_female")
+                or pool.get("front_female_shiny")
+                or _build_pokeapi_sprite_url(sprite_id, gen, shiny=True, female=True)
+            )
+        else:
+            # gen=None (no gen in request): use root sprites — always non-null
+            # for existing Pokémon and represent the canonical current-gen artwork.
+            game_front = sprites.get("front_default")
+            game_front_shiny = sprites.get("front_shiny")
+            game_front_female = sprites.get("front_female")
+            game_front_female_shiny = (sprites.get("front_shiny_female")
+                                       or sprites.get("front_female_shiny"))
 
         has_female_home = bool(home.get("front_female"))
 
         # Icon: prefer PokéAPI's own icon URL from the sprites object.
         # Fall back to overrides and constructed paths when the API returns null.
-        gen8_icon_api = (
-            (sprites.get("versions") or {})
-            .get("generation-viii", {})
-            .get("icons", {})
-            .get("front_default")
-        )
+        icons_versions = sprites.get("versions") or {}
+        gen8_icon_api = icons_versions.get("generation-viii", {}).get("icons", {}).get("front_default")
+        # Gen 5 female icons use "{id}-female.png" suffix; read from response to avoid constructing wrong URL.
+        gen5_icon_female_api = icons_versions.get("generation-v", {}).get("icons", {}).get("front_female")
         icon_override_id = _VARIETY_ICON_ID_OVERRIDES.get(variety_name)
         if gen8_icon_api:
             icon = gen8_icon_api
@@ -537,11 +569,14 @@ class PokemonResolverService:
             home_female_shiny=home.get("front_female_shiny") or home.get("front_shiny_female"),
             game_front=game_front,
             game_front_shiny=game_front_shiny,
-            game_front_female=None,
-            game_front_female_shiny=None,
+            game_front_female=game_front_female,
+            game_front_female_shiny=game_front_female_shiny,
             icon=icon,
             icon_shiny=game_front_shiny,
-            icon_female=_build_icon_url(variety_id, gen, female=True) if has_female_home else None,
+            icon_female=(
+                gen5_icon_female_api  # PokéAPI response (gen 5 "{id}-female.png" naming)
+                or (_build_icon_url(variety_id, gen, female=True) if has_female_home else None)
+            ),
             icon_female_shiny=None,
         )
 
@@ -955,14 +990,18 @@ class PokemonResolverService:
     # ------------------------------------------------------------------
 
     async def resolve(
-        self, pokemon_id: int, gen: int, includes: list[str], db: AsyncSession,
+        self, pokemon_id: int, gen: int | None, includes: list[str], db: AsyncSession,
         base_url: str = "",
     ) -> PokemonResolvedResponse:
+        # gen=None means "no specific gen requested" — use gen 9 accuracy for
+        # types/stats but skip versioned game sprites (use plain root sprites instead).
+        data_gen = gen if gen is not None else 9
+
         # 1. Cache hit (full data always stored)
         result = await db.execute(
             select(PokemonResolved).where(
                 PokemonResolved.pokemon_id == pokemon_id,
-                PokemonResolved.gen == gen,
+                PokemonResolved.gen == data_gen,
                 PokemonResolved.resolved_at
                 + text("(ttl_days * interval '1 day')")
                 > func.now(),
@@ -971,7 +1010,7 @@ class PokemonResolverService:
         row = result.scalar_one_or_none()
         if row:
             response = PokemonResolvedResponse(**row.data, resolved_at=row.resolved_at)
-            return self._trim_response(response, includes, gen)
+            return self._trim_response(response, includes, data_gen)
 
         # 2. Fetch from PokéAPI
         try:
@@ -989,7 +1028,7 @@ class PokemonResolverService:
         species_gen: int = species_info["gen"]
         species_name: str = species_info["species_name"]
 
-        if gen < species_gen:
+        if data_gen < species_gen:
             raise HTTPException(
                 404,
                 detail=f"{english_species_name} was not introduced until Gen {species_gen}",
@@ -1005,7 +1044,7 @@ class PokemonResolverService:
         ps_stats = ps_entry.get("baseStats", raw_stats)
         ps_abilities_raw = ps_entry.get("abilities", {})
         ps_abilities = ps_abilities_raw if ps_abilities_raw else raw_abilities
-        types, base_stats, abilities = self._apply_gen_overrides(ps_id, ps_types, ps_stats, ps_abilities, gen)
+        types, base_stats, abilities = self._apply_gen_overrides(ps_id, ps_types, ps_stats, ps_abilities, data_gen)
 
         # --- New fields ---
         # abilities as typed list — use gen-overridden names, keep is_hidden from PokéAPI.
@@ -1105,6 +1144,11 @@ class PokemonResolverService:
             if first_form and len(all_forms) > 1
             else None
         )
+        # "male"/"female" don't appear in versioned front sprite filenames —
+        # gender-variant Pokémon use the plain ID with a female/ subdirectory.
+        # (-female suffix exists only in gen-5 icons, handled by _build_icon_url.)
+        if first_form_suffix in {"male", "female"}:
+            first_form_suffix = None
         gen_sprite_id = f"{pokemon_id}-{first_form_suffix}" if first_form_suffix else None
         sprite_urls = self._build_base_sprite_urls(
             pokemon_data.get("sprites") or {}, ps_sprite_name, pokemon_id, gen,
@@ -1113,20 +1157,20 @@ class PokemonResolverService:
 
         # 8. Varieties (always fetched on cache miss, trimmed at response time)
         raw_varieties = species_data.get("varieties", [])
-        varieties = await self._fetch_varieties(raw_varieties, species_name, gen, base_url, base_pokemon_id=pokemon_id)
+        varieties = await self._fetch_varieties(raw_varieties, species_name, data_gen, base_url, base_pokemon_id=pokemon_id)
         # When resolving a variety directly (e.g. charizard-mega-x = 10034),
         # the species varieties list includes the pokemon itself — exclude it.
         varieties = [v for v in varieties if v.pokemon_id != pokemon_id]
 
         # 9. Forms (form-entry cosmetics)
         form_names = [f["name"] for f in pokemon_data.get("forms", [])]
-        forms = await self._fetch_forms(form_names, pokemon_id, species_name, gen)
+        forms = await self._fetch_forms(form_names, pokemon_id, species_name, data_gen)
 
         # 10. Build full response (cache always stores this)
         now = datetime.now(timezone.utc)
         response = PokemonResolvedResponse(
             pokemon_id=pokemon_id,
-            gen=gen,
+            gen=data_gen,
             name=pokemon_name,
             types=types,
             base_stats=base_stats,
@@ -1179,7 +1223,7 @@ class PokemonResolverService:
             pg_insert(PokemonResolved)
             .values(
                 pokemon_id=pokemon_id,
-                gen=gen,
+                gen=data_gen,
                 data=data_dict,
                 resolved_at=now,
                 ttl_days=7,
@@ -1193,7 +1237,7 @@ class PokemonResolverService:
         await db.commit()
 
         # 12. Trim and return
-        return self._trim_response(response, includes)
+        return self._trim_response(response, includes, data_gen)
 
     # ------------------------------------------------------------------
     # Name-or-ID resolution + convenience endpoints

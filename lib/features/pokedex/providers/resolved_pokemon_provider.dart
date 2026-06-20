@@ -27,24 +27,29 @@ const _kBase =
 /// battle varieties) remains a separate autoDispose provider — those are
 /// on-demand fetches, not baseline data.
 final resolvedPokemonProvider =
-    FutureProvider.family<ResolvedPokemon, int>((ref, id) async {
+    FutureProvider.family<ResolvedPokemon, ({int id, int? gen})>((ref, params) async {
+  final id = params.id;
+  final gen = params.gen;
   final cache = ref.read(pokemonResolvedCacheProvider);
 
+  // Cache key includes gen so gen-specific sprite data is stored separately.
+  final cacheKey = gen != null ? 'resolved_${id}_g$gen' : 'resolved_$id';
+
   // 1. Hive cache hit
-  final cached = cache.getIfValid('resolved_$id');
+  final cached = cache.getIfValid(cacheKey);
   if (cached != null) {
-    AppLogger().d('[resolved] Hive cache hit id=$id');
+    AppLogger().d('[resolved] Hive cache hit id=$id gen=$gen');
     final response = PokemonResolvedBackendResponse.fromJson(cached);
     return _fromBackendResponse(response);
   }
 
   // 2. Backend fetch (returns fast on Postgres hit)
   try {
-    AppLogger().d('[resolved] fetching from backend id=$id');
+    AppLogger().d('[resolved] fetching from backend id=$id gen=$gen');
     final repo = ref.read(pokemonBackendRepositoryProvider);
-    final response = await repo.fetchResolved(id);
+    final response = await repo.fetchResolved(id, gen: gen);
     AppLogger().d('[resolved] backend ok id=$id name=${response.name}');
-    cache.putWithTTL('resolved_$id', response.toJson(), const Duration(days: 7));
+    cache.putWithTTL(cacheKey, response.toJson(), const Duration(days: 7));
     return _fromBackendResponse(response);
   } catch (e) {
     AppLogger().w('[resolved] backend failed id=$id, falling back to PokéAPI', error: e);

@@ -70,7 +70,7 @@ void main() {
         .thenThrow(Exception('test: backend disabled'));
   });
 
-  List<dynamic> _overrides() => [
+  List<dynamic> overrides() => [
         pokeApiRepositoryProvider.overrideWithValue(mockApi),
         pokemonBackendRepositoryProvider.overrideWithValue(mockBackend),
         pokemonResolvedCacheProvider.overrideWithValue(mockCache),
@@ -84,7 +84,7 @@ void main() {
         tester,
         const PokemonDetailScreen(pokemonId: 25),
         db: db,
-        extraOverrides: _overrides(),
+        extraOverrides: overrides(),
       );
       await tester.pumpAndSettle();
 
@@ -104,7 +104,7 @@ void main() {
         tester,
         const PokemonDetailScreen(pokemonId: 25),
         db: db,
-        extraOverrides: _overrides(),
+        extraOverrides: overrides(),
       );
       await tester.pumpAndSettle();
 
@@ -122,7 +122,7 @@ void main() {
         tester,
         const PokemonDetailScreen(pokemonId: 25),
         db: db,
-        extraOverrides: _overrides(),
+        extraOverrides: overrides(),
       );
       await tester.pumpAndSettle();
 
@@ -141,7 +141,7 @@ void main() {
         tester,
         const PokemonDetailScreen(pokemonId: 25),
         db: db,
-        extraOverrides: _overrides(),
+        extraOverrides: overrides(),
       );
       await tester.pumpAndSettle();
 

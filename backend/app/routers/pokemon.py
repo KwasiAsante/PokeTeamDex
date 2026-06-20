@@ -133,7 +133,7 @@ async def get_resolved_pokemon(
     request: Request,
     name_or_id: str,
     db: DB,
-    gen: int = 9,
+    gen: int | None = None,
     includes: list[str] = Query(default=[]),
 ) -> PokemonResolvedResponse:
     """
@@ -142,9 +142,9 @@ async def get_resolved_pokemon(
 
     - **name_or_id**: PokéAPI pokemon name ("charizard", "charizard-mega-x") or
       numeric ID (6, 10034). Form variants have their own names and IDs.
-    - **gen**: Generation to resolve for (1–9, default 9).
-      Types and base stats reflect gen-accurate values from Showdown's
-      historical data (e.g. Clefairy is Normal-type in gen ≤ 5).
+    - **gen**: Generation to resolve for (1–9). When omitted, types and base stats
+      use gen 9 accuracy and game_front uses the plain PokéAPI front sprite
+      (sprites/pokemon/{id}.png) rather than a versioned game directory.
     - **includes**: Comma-separated list of fields to expand.
       - `varieties` — embed types, base_stats, abilities, sprite_urls per variety
       - `forms` — embed sprite_urls per cosmetic form
@@ -154,7 +154,7 @@ async def get_resolved_pokemon(
     Navigation URLs (`smogon_url`, `varieties_url`, `forms_url`) are absolute
     so the client can follow them directly without constructing paths.
     """
-    if not 1 <= gen <= 9:
+    if gen is not None and not 1 <= gen <= 9:
         raise HTTPException(status_code=400, detail="gen must be between 1 and 9")
     pokemon_id = await pokemon_resolver_service._resolve_name_or_id(name_or_id)
     normalised = []

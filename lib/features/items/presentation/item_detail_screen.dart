@@ -388,7 +388,7 @@ class _HeldByTileState extends ConsumerState<_HeldByTile> {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final sprites = ref
-        .watch(resolvedPokemonProvider(widget.heldBy.pokemonId))
+        .watch(resolvedPokemonProvider((id: widget.heldBy.pokemonId, gen: null)))
         .asData
         ?.value
         .spriteUrls;

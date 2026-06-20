@@ -92,7 +92,7 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final resolvedAsync = ref.watch(resolvedPokemonProvider(widget.pokemon.id));
+    final resolvedAsync = ref.watch(resolvedPokemonProvider((id: widget.pokemon.id, gen: null)));
     final resolved = resolvedAsync.asData?.value;
     final basePokemon = resolved?.detail;
     final cosmeticFormEntries = resolved?.cosmeticForms ?? const <PokemonFormEntry>[];

@@ -26,6 +26,8 @@ class AppLogger {
   late final Logger _consoleLogger;
   late final LogsServerOutput _serverOutput;
 
+  static bool _debugMode = true;
+
   static PrettyPrinter get _printer => PrettyPrinter(
     methodCount: 0,
     errorMethodCount: 5,
@@ -57,12 +59,18 @@ class AppLogger {
   }
 
   AppLogger._internal() {
-    _serverOutput = LogsServerOutput();
+    if (!kDebugMode) {
+      _debugMode = false;
+    }
+
+    if (!_debugMode) {
+      _serverOutput = LogsServerOutput();
+    }
 
     final outputs = <LogOutput>[
       if (kDebugMode) ConsoleOutput(),
       if (!kIsWeb) _FileLogOutput(),
-      _serverOutput,
+      if (!_debugMode) _serverOutput,
     ];
 
     _logger = Logger(
@@ -84,12 +92,16 @@ class AppLogger {
 
   /// Update the backend URL at runtime (called after DB loads).
   static void configure(String url) {
-    _instance._serverOutput.updateLogsUrl(url);
+    if (!_debugMode) {
+      _instance._serverOutput.updateLogsUrl(url);
+    }
   }
 
   /// Update the auth token at runtime (call after login/logout).
   static void configureToken(String? token) {
-    _instance._serverOutput.updateToken(token);
+    if (!_debugMode) {
+      _instance._serverOutput.updateToken(token);
+    }
   }
 
   void d(String message, {Object? error, StackTrace? stackTrace}) =>
