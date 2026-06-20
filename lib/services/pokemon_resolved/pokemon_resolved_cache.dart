@@ -4,7 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 /// Bump this whenever the backend response schema changes in a way that makes
 /// existing Hive entries unreadable or stale (new fields, renamed keys, etc.).
 /// The next app start clears the cache automatically.
-const kResolvedCacheVersion = 8;
+const kResolvedCacheVersion = 10;
 
 class PokemonResolvedCache {
   static final PokemonResolvedCache _instance = PokemonResolvedCache._internal();

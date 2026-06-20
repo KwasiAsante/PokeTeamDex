@@ -87,13 +87,14 @@ _SHOWDOWN_GEN_SHINY_DIRS: dict[int, str] = {
 _ROMAN = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5,
           "vi": 6, "vii": 7, "viii": 8, "ix": 9}
 
-# Variety name → icon sprite_id override.
-# Used when the sprites repo icon file uses a different suffix than the variety
-# name and neither the variety ID nor base_id-variety_suffix works.
-# Calyrex riders: variety names are calyrex-ice/shadow but icons are 898-ice-rider/shadow-rider.
-_VARIETY_ICON_ID_OVERRIDES: dict[str, str] = {
-    "calyrex-ice":    "898-ice-rider",
-    "calyrex-shadow": "898-shadow-rider",
+# Fallback for when pokemon_registry.json is absent (should not happen in prod).
+_VARIETY_ICON_ID_OVERRIDES_DEFAULT: dict[str, str] = {
+    "calyrex-ice":                "898-ice-rider",
+    "calyrex-shadow":             "898-shadow-rider",
+    "toxtricity-amped-gmax":      "849-gmax",
+    "toxtricity-low-key-gmax":    "849-gmax",
+    "urshifu-single-strike-gmax": "892-gmax",
+    "urshifu-rapid-strike":       "892",       # no dedicated icon; shares 892.png with base
 }
 
 # PokéAPI form name suffix → PokeAPI/sprites repo suffix.
@@ -278,6 +279,8 @@ class PokemonResolverService:
         self._mega_form_to_move: dict[str, str] = {}
         # form name → required ability (from abilityGatingRules)
         self._form_to_ability: dict[str, str] = {}
+        # variety name → icon sprite_id override (loaded from pokemon_registry.json)
+        self._variety_icon_id_overrides: dict[str, str] = dict(_VARIETY_ICON_ID_OVERRIDES_DEFAULT)
         self._smogon_sets: dict[str, dict] = {}
         self._smogon_analyses: dict[str, dict] = {}
         self._smogon_loaded = False
@@ -332,6 +335,9 @@ class PokemonResolverService:
             }
             self._mega_form_to_move = registry.get("megaFormMoveRequirements", {})
             self._form_to_ability = registry.get("abilityGatingRules", {})
+            self._variety_icon_id_overrides = registry.get(
+                "varietyIconIdOverrides", dict(_VARIETY_ICON_ID_OVERRIDES_DEFAULT)
+            )
             logger.info("Loaded pokemon_registry.json (%d PS form exceptions)", len(self._ps_exceptions))
         else:
             logger.warning("pokemon_registry.json not found in static/ — copy from assets/data/")
@@ -545,7 +551,7 @@ class PokemonResolverService:
         gen8_icon_api = icons_versions.get("generation-viii", {}).get("icons", {}).get("front_default")
         # Gen 5 female icons use "{id}-female.png" suffix; read from response to avoid constructing wrong URL.
         gen5_icon_female_api = icons_versions.get("generation-v", {}).get("icons", {}).get("front_female")
-        icon_override_id = _VARIETY_ICON_ID_OVERRIDES.get(variety_name)
+        icon_override_id = self._variety_icon_id_overrides.get(variety_name)
         if gen8_icon_api:
             icon = gen8_icon_api
         elif icon_override_id:

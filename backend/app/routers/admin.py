@@ -2,10 +2,13 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, Query, status
 from pydantic import BaseModel
+from sqlalchemy import delete
 
 from app.core.config import settings
+from app.core.deps import DB
+from app.models.pokemon_resolved import PokemonResolved
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +23,11 @@ _latest_release_url: str = ""
 class NotifyUpdateRequest(BaseModel):
     version: str
     release_url: str
+
+
+def _require_admin_secret(secret: str) -> None:
+    if not settings.notify_update_secret or secret != settings.notify_update_secret:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid secret")
 
 
 def _get_fcm_app() -> Any | None:
@@ -51,8 +59,7 @@ async def notify_update(
     body: NotifyUpdateRequest,
     x_notify_secret: str = Header(default=""),
 ) -> dict:
-    if not settings.notify_update_secret or x_notify_secret != settings.notify_update_secret:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid secret")
+    _require_admin_secret(x_notify_secret)
 
     global _latest_version, _latest_release_url
     _latest_version = body.version.lstrip("v")
@@ -69,6 +76,34 @@ async def get_version() -> dict:
         "latest_version": _latest_version,
         "release_url": _latest_release_url,
     }
+
+
+@router.delete("/cache/pokemon", status_code=status.HTTP_200_OK)
+async def clear_pokemon_cache(
+    db: DB,
+    ids: list[int] = Query(default=[], description="Pokémon IDs to evict (species or variety IDs)."),
+    clear_all: bool = Query(default=False, alias="all", description="Evict every cached entry."),
+    x_admin_secret: str = Header(default=""),
+) -> dict:
+    """Evict rows from the pokemon_resolved cache table.
+
+    Resolved data (incl. nested varieties) is cached for ttl_days=7. After
+    fixing a sprite/registry override, the affected pokemon_id(s) must be
+    evicted here for the fix to show up before the TTL expires.
+    """
+    _require_admin_secret(x_admin_secret)
+    if not ids and not clear_all:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide ?ids=<id> (repeatable) or ?all=true",
+        )
+
+    stmt = delete(PokemonResolved)
+    if ids:
+        stmt = stmt.where(PokemonResolved.pokemon_id.in_(ids))
+    result = await db.execute(stmt)
+    await db.commit()
+    return {"status": "ok", "deleted": result.rowcount}
 
 
 def _send_fcm_notification(version: str, release_url: str) -> None:

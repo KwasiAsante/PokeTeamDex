@@ -1,11 +1,18 @@
 {
   "psFormExceptions": {
-    "ogerpon-teal":        "ogerpon-teal-mask",
-    "ogerpon-wellspring":  "ogerpon-wellspring-mask",
+    "ogerpon-teal": "ogerpon-teal-mask",
+    "ogerpon-wellspring": "ogerpon-wellspring-mask",
     "ogerpon-hearthflame": "ogerpon-hearthflame-mask",
     "ogerpon-cornerstone": "ogerpon-cornerstone-mask"
   },
-
+  "varietyIconIdOverrides": {
+    "calyrex-ice": "898-ice-rider",
+    "calyrex-shadow": "898-shadow-rider",
+    "toxtricity-amped-gmax": "849-gmax",
+    "toxtricity-low-key-gmax": "849-gmax",
+    "urshifu-single-strike-gmax": "892-gmax",
+    "urshifu-rapid-strike": "892"
+  },
   "cosmeticSpriteStems": {
     "burmy": {
       "burmy-sandy": "412-sandy",
@@ -32,344 +39,657 @@
       "sawsbuck-winter": "586-winter"
     },
     "unown": {
-      "unown-a": "201-a", "unown-b": "201-b", "unown-c": "201-c",
-      "unown-d": "201-d", "unown-e": "201-e", "unown-f": "201-f",
-      "unown-g": "201-g", "unown-h": "201-h", "unown-i": "201-i",
-      "unown-j": "201-j", "unown-k": "201-k", "unown-l": "201-l",
-      "unown-m": "201-m", "unown-n": "201-n", "unown-o": "201-o",
-      "unown-p": "201-p", "unown-q": "201-q", "unown-r": "201-r",
-      "unown-s": "201-s", "unown-t": "201-t", "unown-u": "201-u",
-      "unown-v": "201-v", "unown-w": "201-w", "unown-x": "201-x",
-      "unown-y": "201-y", "unown-z": "201-z",
+      "unown-a": "201-a",
+      "unown-b": "201-b",
+      "unown-c": "201-c",
+      "unown-d": "201-d",
+      "unown-e": "201-e",
+      "unown-f": "201-f",
+      "unown-g": "201-g",
+      "unown-h": "201-h",
+      "unown-i": "201-i",
+      "unown-j": "201-j",
+      "unown-k": "201-k",
+      "unown-l": "201-l",
+      "unown-m": "201-m",
+      "unown-n": "201-n",
+      "unown-o": "201-o",
+      "unown-p": "201-p",
+      "unown-q": "201-q",
+      "unown-r": "201-r",
+      "unown-s": "201-s",
+      "unown-t": "201-t",
+      "unown-u": "201-u",
+      "unown-v": "201-v",
+      "unown-w": "201-w",
+      "unown-x": "201-x",
+      "unown-y": "201-y",
+      "unown-z": "201-z",
       "unown-exclamation": "201-exclamation",
-      "unown-question":    "201-question"
+      "unown-question": "201-question"
     }
   },
-
   "abilityGatingRules": {
-    "aegislash-blade":       "stance-change",
-    "darmanitan-zen":        "zen-mode",
-    "darmanitan-galar-zen":  "zen-mode",
-    "wishiwashi-school":     "schooling",
-    "cherrim-sunshine":      "flower-gift",
-    "morpeko-hangry":        "hunger-switch",
-    "mimikyu-busted":        "disguise",
-    "minior-red-core":       "shields-down",
-    "minior-orange-core":    "shields-down",
-    "minior-yellow-core":    "shields-down",
-    "minior-green-core":     "shields-down",
-    "minior-blue-core":      "shields-down",
-    "minior-indigo-core":    "shields-down",
-    "minior-violet-core":    "shields-down",
-    "eiscue-noice":          "ice-face",
-    "palafin-hero":          "zero-to-hero"
+    "aegislash-blade": "stance-change",
+    "darmanitan-zen": "zen-mode",
+    "darmanitan-galar-zen": "zen-mode",
+    "wishiwashi-school": "schooling",
+    "cherrim-sunshine": "flower-gift",
+    "morpeko-hangry": "hunger-switch",
+    "mimikyu-busted": "disguise",
+    "minior-red-core": "shields-down",
+    "minior-orange-core": "shields-down",
+    "minior-yellow-core": "shields-down",
+    "minior-green-core": "shields-down",
+    "minior-blue-core": "shields-down",
+    "minior-indigo-core": "shields-down",
+    "minior-violet-core": "shields-down",
+    "eiscue-noice": "ice-face",
+    "palafin-hero": "zero-to-hero"
   },
-
   "itemGatingRules": {
-    "giratina-origin":      ["griseous-orb", "griseous-core"],
-    "zacian-crowned":       ["rusted-sword"],
-    "zamazenta-crowned":    ["rusted-shield"],
-    "calyrex-ice-rider":    ["reins-of-unity"],
-    "calyrex-shadow-rider": ["reins-of-unity"],
-    "dialga-origin":        ["adamant-crystal"],
-    "palkia-origin":        ["lustrous-globe"],
-    "groudon-primal":       ["red-orb"],
-    "kyogre-primal":        ["blue-orb"],
-    "arceus-fighting": ["fist-plate"],
-    "arceus-flying":   ["sky-plate"],
-    "arceus-poison":   ["toxic-plate"],
-    "arceus-ground":   ["earth-plate"],
-    "arceus-rock":     ["stone-plate"],
-    "arceus-bug":      ["insect-plate"],
-    "arceus-ghost":    ["spooky-plate"],
-    "arceus-steel":    ["iron-plate"],
-    "arceus-fire":     ["flame-plate"],
-    "arceus-water":    ["splash-plate"],
-    "arceus-grass":    ["meadow-plate"],
-    "arceus-electric": ["zap-plate"],
-    "arceus-psychic":  ["mind-plate"],
-    "arceus-ice":      ["icicle-plate"],
-    "arceus-dragon":   ["draco-plate"],
-    "arceus-dark":     ["dread-plate"],
-    "arceus-fairy":    ["pixie-plate"],
-    "silvally-fighting": ["fighting-memory"],
-    "silvally-flying":   ["flying-memory"],
-    "silvally-poison":   ["poison-memory"],
-    "silvally-ground":   ["ground-memory"],
-    "silvally-rock":     ["rock-memory"],
-    "silvally-bug":      ["bug-memory"],
-    "silvally-ghost":    ["ghost-memory"],
-    "silvally-steel":    ["steel-memory"],
-    "silvally-fire":     ["fire-memory"],
-    "silvally-water":    ["water-memory"],
-    "silvally-grass":    ["grass-memory"],
-    "silvally-electric": ["electric-memory"],
-    "silvally-psychic":  ["psychic-memory"],
-    "silvally-ice":      ["ice-memory"],
-    "silvally-dragon":   ["dragon-memory"],
-    "silvally-dark":     ["dark-memory"],
-    "silvally-fairy":    ["fairy-memory"]
+    "giratina-origin": [
+      "griseous-orb",
+      "griseous-core"
+    ],
+    "zacian-crowned": [
+      "rusted-sword"
+    ],
+    "zamazenta-crowned": [
+      "rusted-shield"
+    ],
+    "calyrex-ice-rider": [
+      "reins-of-unity"
+    ],
+    "calyrex-shadow-rider": [
+      "reins-of-unity"
+    ],
+    "dialga-origin": [
+      "adamant-crystal"
+    ],
+    "palkia-origin": [
+      "lustrous-globe"
+    ],
+    "groudon-primal": [
+      "red-orb"
+    ],
+    "kyogre-primal": [
+      "blue-orb"
+    ],
+    "arceus-fighting": [
+      "fist-plate"
+    ],
+    "arceus-flying": [
+      "sky-plate"
+    ],
+    "arceus-poison": [
+      "toxic-plate"
+    ],
+    "arceus-ground": [
+      "earth-plate"
+    ],
+    "arceus-rock": [
+      "stone-plate"
+    ],
+    "arceus-bug": [
+      "insect-plate"
+    ],
+    "arceus-ghost": [
+      "spooky-plate"
+    ],
+    "arceus-steel": [
+      "iron-plate"
+    ],
+    "arceus-fire": [
+      "flame-plate"
+    ],
+    "arceus-water": [
+      "splash-plate"
+    ],
+    "arceus-grass": [
+      "meadow-plate"
+    ],
+    "arceus-electric": [
+      "zap-plate"
+    ],
+    "arceus-psychic": [
+      "mind-plate"
+    ],
+    "arceus-ice": [
+      "icicle-plate"
+    ],
+    "arceus-dragon": [
+      "draco-plate"
+    ],
+    "arceus-dark": [
+      "dread-plate"
+    ],
+    "arceus-fairy": [
+      "pixie-plate"
+    ],
+    "silvally-fighting": [
+      "fighting-memory"
+    ],
+    "silvally-flying": [
+      "flying-memory"
+    ],
+    "silvally-poison": [
+      "poison-memory"
+    ],
+    "silvally-ground": [
+      "ground-memory"
+    ],
+    "silvally-rock": [
+      "rock-memory"
+    ],
+    "silvally-bug": [
+      "bug-memory"
+    ],
+    "silvally-ghost": [
+      "ghost-memory"
+    ],
+    "silvally-steel": [
+      "steel-memory"
+    ],
+    "silvally-fire": [
+      "fire-memory"
+    ],
+    "silvally-water": [
+      "water-memory"
+    ],
+    "silvally-grass": [
+      "grass-memory"
+    ],
+    "silvally-electric": [
+      "electric-memory"
+    ],
+    "silvally-psychic": [
+      "psychic-memory"
+    ],
+    "silvally-ice": [
+      "ice-memory"
+    ],
+    "silvally-dragon": [
+      "dragon-memory"
+    ],
+    "silvally-dark": [
+      "dark-memory"
+    ],
+    "silvally-fairy": [
+      "fairy-memory"
+    ]
   },
-
   "mutableFormSpeciesIds": [
-    421, 555, 676, 681, 746, 773, 774, 778, 875, 877, 964,
-    382, 383, 483, 484, 487, 493, 888, 889, 898,
-    585, 586
+    421,
+    555,
+    676,
+    681,
+    746,
+    773,
+    774,
+    778,
+    875,
+    877,
+    964,
+    382,
+    383,
+    483,
+    484,
+    487,
+    493,
+    888,
+    889,
+    898,
+    585,
+    586
   ],
-
   "baseFormNameOverrides": {
-    "lycanroc-midday":           "Midday",
-    "urshifu-single-strike":     "Single Strike",
-    "basculin-red-striped":      "Red-Striped",
-    "oricorio-baile":            "Baile",
-    "toxtricity-amped":          "Amped",
-    "frillish-male":             "Male",
-    "jellicent-male":            "Male",
-    "zacian":                    "Hero",
-    "zamazenta":                 "Hero",
-    "palafin-zero":              "Zero",
-    "deoxys-normal":             "Normal",
-    "giratina-altered":          "Altered",
-    "tornadus-incarnate":        "Incarnate",
-    "thundurus-incarnate":       "Incarnate",
-    "landorus-incarnate":        "Incarnate",
-    "enamorus-incarnate":        "Incarnate",
-    "aegislash-shield":          "Shield",
-    "gimmighoul-chest":          "Chest",
-    "ogerpon":                   "Teal Mask",
-    "shaymin":                   "Land",
-    "kyurem":                    "Standard",
-    "meloetta":                  "Aria",
-    "hoopa":                     "Confined",
-    "wishiwashi":                "Solo",
-    "zygarde":                   "50%",
-    "frillish":                  "Male",
-    "jellicent":                 "Male",
-    "unfezant":                  "Male",
-    "deerling":                  "Spring",
-    "sawsbuck":                  "Spring",
-    "arceus":                    "Normal",
-    "shellos":                   "West",
-    "gastrodon":                 "West",
-    "cherrim":                   "Overcast",
-    "burmy":                     "Plant",
-    "castform":                  "Normal",
-    "unown":                     "A",
-    "furfrou":                   "Natural",
-    "pumpkaboo":                 "Average",
-    "gourgeist":                 "Average",
-    "genesect":                  "Normal",
-    "vivillon":                  "Meadow",
-    "xerneas":                   "Active",
-    "flabebe":                   "Red Flower",
-    "florges":                   "Red Flower",
-    "wormadam-plant":            "Plant",
-    "squawkabilly-green-plumage":"Green Plumage",
-    "tatsugiri-curly":           "Curly",
-    "dudunsparce-two-segment":   "Two Segment",
-    "floette":                   "Red Flower",
-    "morpeko-full-belly":        "Full Belly",
-    "mimikyu-disguised":         "Disguised",
-    "minior-red-meteor":         "Meteor",
-    "eiscue-ice":                "Ice Face",
-    "maushold-family-of-four":   "Family of Four",
-    "keldeo-ordinary":           "Ordinary"
+    "lycanroc-midday": "Midday",
+    "urshifu-single-strike": "Single Strike",
+    "basculin-red-striped": "Red-Striped",
+    "oricorio-baile": "Baile",
+    "toxtricity-amped": "Amped",
+    "frillish-male": "Male",
+    "jellicent-male": "Male",
+    "zacian": "Hero",
+    "zamazenta": "Hero",
+    "palafin-zero": "Zero",
+    "deoxys-normal": "Normal",
+    "giratina-altered": "Altered",
+    "tornadus-incarnate": "Incarnate",
+    "thundurus-incarnate": "Incarnate",
+    "landorus-incarnate": "Incarnate",
+    "enamorus-incarnate": "Incarnate",
+    "aegislash-shield": "Shield",
+    "gimmighoul-chest": "Chest",
+    "ogerpon": "Teal Mask",
+    "shaymin": "Land",
+    "kyurem": "Standard",
+    "meloetta": "Aria",
+    "hoopa": "Confined",
+    "wishiwashi": "Solo",
+    "zygarde": "50%",
+    "frillish": "Male",
+    "jellicent": "Male",
+    "unfezant": "Male",
+    "deerling": "Spring",
+    "sawsbuck": "Spring",
+    "arceus": "Normal",
+    "shellos": "West",
+    "gastrodon": "West",
+    "cherrim": "Overcast",
+    "burmy": "Plant",
+    "castform": "Normal",
+    "unown": "A",
+    "furfrou": "Natural",
+    "pumpkaboo": "Average",
+    "gourgeist": "Average",
+    "genesect": "Normal",
+    "vivillon": "Meadow",
+    "xerneas": "Active",
+    "flabebe": "Red Flower",
+    "florges": "Red Flower",
+    "wormadam-plant": "Plant",
+    "squawkabilly-green-plumage": "Green Plumage",
+    "tatsugiri-curly": "Curly",
+    "dudunsparce-two-segment": "Two Segment",
+    "floette": "Red Flower",
+    "morpeko-full-belly": "Full Belly",
+    "mimikyu-disguised": "Disguised",
+    "minior-red-meteor": "Meteor",
+    "eiscue-ice": "Ice Face",
+    "maushold-family-of-four": "Family of Four",
+    "keldeo-ordinary": "Ordinary"
   },
-
   "cosmeticFormLabels": {
-    "xerneas-active":    "Neutral",
-    "minior-red":        "Red",
-    "minior-orange":     "Orange",
-    "minior-yellow":     "Yellow",
-    "minior-green":      "Green",
-    "minior-blue":       "Blue",
-    "minior-indigo":     "Indigo",
-    "minior-violet":     "Violet",
-    "eiscue-noice":      "Noice Face",
+    "xerneas-active": "Neutral",
+    "minior-red": "Red",
+    "minior-orange": "Orange",
+    "minior-yellow": "Yellow",
+    "minior-green": "Green",
+    "minior-blue": "Blue",
+    "minior-indigo": "Indigo",
+    "minior-violet": "Violet",
+    "eiscue-noice": "Noice Face",
     "magearna-original": "Original Color"
   },
-
   "cosmeticFormHomeUrlOverrides": {
-    "xerneas-active":
-      "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/716-neutral.png",
-    "mimikyu-busted":
-      "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/10143.png"
+    "xerneas-active": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/716-neutral.png",
+    "mimikyu-busted": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/10143.png"
   },
-
   "cosmeticFormHomeShinyUrlOverrides": {
-    "xerneas-active":
-      "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/716-neutral.png",
-    "mimikyu-busted":
-      "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/10143.png"
+    "xerneas-active": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/716-neutral.png",
+    "mimikyu-busted": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/10143.png"
   },
-
   "baseFormCosmeticHomeUrls": {
     "unown": {
-      "homeUrl":  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/201-a.png",
+      "homeUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/201-a.png",
       "shinyUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/201-a.png"
     }
   },
-
   "baseFormSuffixOverrides": {
     "basculin-white-striped": "hisui"
   },
-
   "regionalFormLookup": {
     "basculin-hisui": "basculin-white-striped"
   },
-
   "battleMeaningfulNames": [
-    "meowstic-female", "indeedee-female", "basculegion-female", "oinkologne-female",
+    "meowstic-female",
+    "indeedee-female",
+    "basculegion-female",
+    "oinkologne-female",
     "urshifu-rapid-strike",
-    "lycanroc-midnight", "lycanroc-dusk",
-    "oricorio-pom-pom", "oricorio-pau", "oricorio-sensu",
+    "lycanroc-midnight",
+    "lycanroc-dusk",
+    "oricorio-pom-pom",
+    "oricorio-pau",
+    "oricorio-sensu",
     "toxtricity-low-key",
-    "rotom-heat", "rotom-wash", "rotom-frost", "rotom-fan", "rotom-mow",
-    "zacian-crowned", "zamazenta-crowned",
-    "calyrex-ice", "calyrex-shadow",
+    "rotom-heat",
+    "rotom-wash",
+    "rotom-frost",
+    "rotom-fan",
+    "rotom-mow",
+    "zacian-crowned",
+    "zamazenta-crowned",
+    "calyrex-ice",
+    "calyrex-shadow",
     "palafin-hero",
-    "tauros-paldea-combat-breed", "tauros-paldea-blaze-breed", "tauros-paldea-aqua-breed",
-    "darmanitan-zen", "darmanitan-galar-standard", "darmanitan-galar-zen",
+    "tauros-paldea-combat-breed",
+    "tauros-paldea-blaze-breed",
+    "tauros-paldea-aqua-breed",
+    "darmanitan-zen",
+    "darmanitan-galar-standard",
+    "darmanitan-galar-zen",
     "basculin-white-striped",
-    "deoxys-attack", "deoxys-defense", "deoxys-speed",
+    "deoxys-attack",
+    "deoxys-defense",
+    "deoxys-speed",
     "shaymin-sky",
     "giratina-origin",
-    "dialga-origin", "palkia-origin",
-    "tornadus-therian", "thundurus-therian", "landorus-therian", "enamorus-therian",
-    "kyurem-black", "kyurem-white",
+    "dialga-origin",
+    "palkia-origin",
+    "tornadus-therian",
+    "thundurus-therian",
+    "landorus-therian",
+    "enamorus-therian",
+    "kyurem-black",
+    "kyurem-white",
     "meloetta-pirouette",
     "greninja-ash",
     "aegislash-blade",
-    "zygarde-10", "zygarde-complete",
+    "zygarde-10",
+    "zygarde-complete",
     "hoopa-unbound",
     "wishiwashi-school",
-    "necrozma-dusk", "necrozma-dawn", "necrozma-ultra",
+    "necrozma-dusk",
+    "necrozma-dawn",
+    "necrozma-ultra",
     "ursaluna-bloodmoon",
     "gimmighoul-roaming",
-    "ogerpon-wellspring-mask", "ogerpon-hearthflame-mask", "ogerpon-cornerstone-mask"
+    "ogerpon-wellspring-mask",
+    "ogerpon-hearthflame-mask",
+    "ogerpon-cornerstone-mask"
   ],
-
   "cosmeticVarietyNames": [
-    "wormadam-sandy", "wormadam-trash",
-    "squawkabilly-blue-plumage", "squawkabilly-yellow-plumage", "squawkabilly-white-plumage",
-    "tatsugiri-droopy", "tatsugiri-stretchy",
+    "wormadam-sandy",
+    "wormadam-trash",
+    "squawkabilly-blue-plumage",
+    "squawkabilly-yellow-plumage",
+    "squawkabilly-white-plumage",
+    "tatsugiri-droopy",
+    "tatsugiri-stretchy",
     "dudunsparce-three-segment",
     "basculin-blue-striped",
     "morpeko-hangry",
     "mimikyu-busted",
-    "minior-red", "minior-orange", "minior-yellow", "minior-green",
-    "minior-blue", "minior-indigo", "minior-violet",
+    "minior-red",
+    "minior-orange",
+    "minior-yellow",
+    "minior-green",
+    "minior-blue",
+    "minior-indigo",
+    "minior-violet",
     "magearna-original",
     "eiscue-noice",
     "zarude-dada",
     "maushold-family-of-three",
     "keldeo-resolute"
   ],
-
-  "noCosmeticFormsPokemon": ["mothim", "scatterbug", "spewpa"],
-
-  "cosmeticGenderDiffPokemon": ["unfezant"],
-
+  "noCosmeticFormsPokemon": [
+    "mothim",
+    "scatterbug",
+    "spewpa"
+  ],
+  "cosmeticGenderDiffPokemon": [
+    "unfezant"
+  ],
   "megaStoneMap": {
-    "venusaurite":    { "baseSpecies": "venusaur",   "megaForm": "venusaur-mega" },
-    "charizardite-x": { "baseSpecies": "charizard",  "megaForm": "charizard-mega-x" },
-    "charizardite-y": { "baseSpecies": "charizard",  "megaForm": "charizard-mega-y" },
-    "blastoisinite":  { "baseSpecies": "blastoise",  "megaForm": "blastoise-mega" },
-    "beedrillite":    { "baseSpecies": "beedrill",   "megaForm": "beedrill-mega" },
-    "pidgeotite":     { "baseSpecies": "pidgeot",    "megaForm": "pidgeot-mega" },
-    "alakazite":      { "baseSpecies": "alakazam",   "megaForm": "alakazam-mega" },
-    "slowbronite":    { "baseSpecies": "slowbro",    "megaForm": "slowbro-mega" },
-    "gengarite":      { "baseSpecies": "gengar",     "megaForm": "gengar-mega" },
-    "kangaskhanite":  { "baseSpecies": "kangaskhan", "megaForm": "kangaskhan-mega" },
-    "pinsirite":      { "baseSpecies": "pinsir",     "megaForm": "pinsir-mega" },
-    "gyaradosite":    { "baseSpecies": "gyarados",   "megaForm": "gyarados-mega" },
-    "aerodactylite":  { "baseSpecies": "aerodactyl", "megaForm": "aerodactyl-mega" },
-    "mewtwonite-x":   { "baseSpecies": "mewtwo",     "megaForm": "mewtwo-mega-x" },
-    "mewtwonite-y":   { "baseSpecies": "mewtwo",     "megaForm": "mewtwo-mega-y" },
-    "ampharosite":    { "baseSpecies": "ampharos",   "megaForm": "ampharos-mega" },
-    "steelixite":     { "baseSpecies": "steelix",    "megaForm": "steelix-mega" },
-    "scizorite":      { "baseSpecies": "scizor",     "megaForm": "scizor-mega" },
-    "heracronite":    { "baseSpecies": "heracross",  "megaForm": "heracross-mega" },
-    "houndoominite":  { "baseSpecies": "houndoom",   "megaForm": "houndoom-mega" },
-    "tyranitarite":   { "baseSpecies": "tyranitar",  "megaForm": "tyranitar-mega" },
-    "lucarionite":    { "baseSpecies": "lucario",    "megaForm": "lucario-mega" },
-    "garchompite":    { "baseSpecies": "garchomp",   "megaForm": "garchomp-mega" },
-    "abomasite":      { "baseSpecies": "abomasnow",  "megaForm": "abomasnow-mega" },
-    "sceptilite":     { "baseSpecies": "sceptile",   "megaForm": "sceptile-mega" },
-    "blazikenite":    { "baseSpecies": "blaziken",   "megaForm": "blaziken-mega" },
-    "swampertite":    { "baseSpecies": "swampert",   "megaForm": "swampert-mega" },
-    "gardevoirite":   { "baseSpecies": "gardevoir",  "megaForm": "gardevoir-mega" },
-    "sablenite":      { "baseSpecies": "sableye",    "megaForm": "sableye-mega" },
-    "mawilite":       { "baseSpecies": "mawile",     "megaForm": "mawile-mega" },
-    "aggronite":      { "baseSpecies": "aggron",     "megaForm": "aggron-mega" },
-    "medichamite":    { "baseSpecies": "medicham",   "megaForm": "medicham-mega" },
-    "manectite":      { "baseSpecies": "manectric",  "megaForm": "manectric-mega" },
-    "sharpedonite":   { "baseSpecies": "sharpedo",   "megaForm": "sharpedo-mega" },
-    "cameruptite":    { "baseSpecies": "camerupt",   "megaForm": "camerupt-mega" },
-    "altarianite":    { "baseSpecies": "altaria",    "megaForm": "altaria-mega" },
-    "banettite":      { "baseSpecies": "banette",    "megaForm": "banette-mega" },
-    "absolite":       { "baseSpecies": "absol",      "megaForm": "absol-mega" },
-    "glalitite":      { "baseSpecies": "glalie",     "megaForm": "glalie-mega" },
-    "salamencite":    { "baseSpecies": "salamence",  "megaForm": "salamence-mega" },
-    "metagrossite":   { "baseSpecies": "metagross",  "megaForm": "metagross-mega" },
-    "latiasite":      { "baseSpecies": "latias",     "megaForm": "latias-mega" },
-    "latiosite":      { "baseSpecies": "latios",     "megaForm": "latios-mega" },
-    "audinite":       { "baseSpecies": "audino",     "megaForm": "audino-mega" },
-    "lopunnite":      { "baseSpecies": "lopunny",    "megaForm": "lopunny-mega" },
-    "galladite":      { "baseSpecies": "gallade",    "megaForm": "gallade-mega" },
-    "diancite":       { "baseSpecies": "diancie",    "megaForm": "diancie-mega" }
+    "venusaurite": {
+      "baseSpecies": "venusaur",
+      "megaForm": "venusaur-mega"
+    },
+    "charizardite-x": {
+      "baseSpecies": "charizard",
+      "megaForm": "charizard-mega-x"
+    },
+    "charizardite-y": {
+      "baseSpecies": "charizard",
+      "megaForm": "charizard-mega-y"
+    },
+    "blastoisinite": {
+      "baseSpecies": "blastoise",
+      "megaForm": "blastoise-mega"
+    },
+    "beedrillite": {
+      "baseSpecies": "beedrill",
+      "megaForm": "beedrill-mega"
+    },
+    "pidgeotite": {
+      "baseSpecies": "pidgeot",
+      "megaForm": "pidgeot-mega"
+    },
+    "alakazite": {
+      "baseSpecies": "alakazam",
+      "megaForm": "alakazam-mega"
+    },
+    "slowbronite": {
+      "baseSpecies": "slowbro",
+      "megaForm": "slowbro-mega"
+    },
+    "gengarite": {
+      "baseSpecies": "gengar",
+      "megaForm": "gengar-mega"
+    },
+    "kangaskhanite": {
+      "baseSpecies": "kangaskhan",
+      "megaForm": "kangaskhan-mega"
+    },
+    "pinsirite": {
+      "baseSpecies": "pinsir",
+      "megaForm": "pinsir-mega"
+    },
+    "gyaradosite": {
+      "baseSpecies": "gyarados",
+      "megaForm": "gyarados-mega"
+    },
+    "aerodactylite": {
+      "baseSpecies": "aerodactyl",
+      "megaForm": "aerodactyl-mega"
+    },
+    "mewtwonite-x": {
+      "baseSpecies": "mewtwo",
+      "megaForm": "mewtwo-mega-x"
+    },
+    "mewtwonite-y": {
+      "baseSpecies": "mewtwo",
+      "megaForm": "mewtwo-mega-y"
+    },
+    "ampharosite": {
+      "baseSpecies": "ampharos",
+      "megaForm": "ampharos-mega"
+    },
+    "steelixite": {
+      "baseSpecies": "steelix",
+      "megaForm": "steelix-mega"
+    },
+    "scizorite": {
+      "baseSpecies": "scizor",
+      "megaForm": "scizor-mega"
+    },
+    "heracronite": {
+      "baseSpecies": "heracross",
+      "megaForm": "heracross-mega"
+    },
+    "houndoominite": {
+      "baseSpecies": "houndoom",
+      "megaForm": "houndoom-mega"
+    },
+    "tyranitarite": {
+      "baseSpecies": "tyranitar",
+      "megaForm": "tyranitar-mega"
+    },
+    "lucarionite": {
+      "baseSpecies": "lucario",
+      "megaForm": "lucario-mega"
+    },
+    "garchompite": {
+      "baseSpecies": "garchomp",
+      "megaForm": "garchomp-mega"
+    },
+    "abomasite": {
+      "baseSpecies": "abomasnow",
+      "megaForm": "abomasnow-mega"
+    },
+    "sceptilite": {
+      "baseSpecies": "sceptile",
+      "megaForm": "sceptile-mega"
+    },
+    "blazikenite": {
+      "baseSpecies": "blaziken",
+      "megaForm": "blaziken-mega"
+    },
+    "swampertite": {
+      "baseSpecies": "swampert",
+      "megaForm": "swampert-mega"
+    },
+    "gardevoirite": {
+      "baseSpecies": "gardevoir",
+      "megaForm": "gardevoir-mega"
+    },
+    "sablenite": {
+      "baseSpecies": "sableye",
+      "megaForm": "sableye-mega"
+    },
+    "mawilite": {
+      "baseSpecies": "mawile",
+      "megaForm": "mawile-mega"
+    },
+    "aggronite": {
+      "baseSpecies": "aggron",
+      "megaForm": "aggron-mega"
+    },
+    "medichamite": {
+      "baseSpecies": "medicham",
+      "megaForm": "medicham-mega"
+    },
+    "manectite": {
+      "baseSpecies": "manectric",
+      "megaForm": "manectric-mega"
+    },
+    "sharpedonite": {
+      "baseSpecies": "sharpedo",
+      "megaForm": "sharpedo-mega"
+    },
+    "cameruptite": {
+      "baseSpecies": "camerupt",
+      "megaForm": "camerupt-mega"
+    },
+    "altarianite": {
+      "baseSpecies": "altaria",
+      "megaForm": "altaria-mega"
+    },
+    "banettite": {
+      "baseSpecies": "banette",
+      "megaForm": "banette-mega"
+    },
+    "absolite": {
+      "baseSpecies": "absol",
+      "megaForm": "absol-mega"
+    },
+    "glalitite": {
+      "baseSpecies": "glalie",
+      "megaForm": "glalie-mega"
+    },
+    "salamencite": {
+      "baseSpecies": "salamence",
+      "megaForm": "salamence-mega"
+    },
+    "metagrossite": {
+      "baseSpecies": "metagross",
+      "megaForm": "metagross-mega"
+    },
+    "latiasite": {
+      "baseSpecies": "latias",
+      "megaForm": "latias-mega"
+    },
+    "latiosite": {
+      "baseSpecies": "latios",
+      "megaForm": "latios-mega"
+    },
+    "audinite": {
+      "baseSpecies": "audino",
+      "megaForm": "audino-mega"
+    },
+    "lopunnite": {
+      "baseSpecies": "lopunny",
+      "megaForm": "lopunny-mega"
+    },
+    "galladite": {
+      "baseSpecies": "gallade",
+      "megaForm": "gallade-mega"
+    },
+    "diancite": {
+      "baseSpecies": "diancie",
+      "megaForm": "diancie-mega"
+    }
   },
-
   "formatToVersionGroup": {
-    "rb":       "red-blue",
-    "yellow":   "yellow",
-    "gs":       "gold-silver",
-    "crystal":  "crystal",
-    "rs":       "ruby-sapphire",
-    "emerald":  "emerald",
-    "frlg":     "firered-leafgreen",
-    "dp":       "diamond-pearl",
+    "rb": "red-blue",
+    "yellow": "yellow",
+    "gs": "gold-silver",
+    "crystal": "crystal",
+    "rs": "ruby-sapphire",
+    "emerald": "emerald",
+    "frlg": "firered-leafgreen",
+    "dp": "diamond-pearl",
     "platinum": "platinum",
-    "hgss":     "heartgold-soulsilver",
-    "bw":       "black-white",
-    "b2w2":     "black-2-white-2",
-    "xy":       "x-y",
-    "oras":     "omega-ruby-alpha-sapphire",
-    "sm":       "sun-moon",
-    "usum":     "ultra-sun-ultra-moon",
-    "swsh":     "sword-shield",
-    "bdsp":     "brilliant-diamond-and-shining-pearl",
-    "pla":      "legends-arceus",
-    "sv":       "scarlet-violet"
+    "hgss": "heartgold-soulsilver",
+    "bw": "black-white",
+    "b2w2": "black-2-white-2",
+    "xy": "x-y",
+    "oras": "omega-ruby-alpha-sapphire",
+    "sm": "sun-moon",
+    "usum": "ultra-sun-ultra-moon",
+    "swsh": "sword-shield",
+    "bdsp": "brilliant-diamond-and-shining-pearl",
+    "pla": "legends-arceus",
+    "sv": "scarlet-violet"
   },
-
   "genToVersionGroups": {
-    "1": ["red-blue", "yellow"],
-    "2": ["gold-silver", "crystal"],
-    "3": ["ruby-sapphire", "emerald", "firered-leafgreen"],
-    "4": ["diamond-pearl", "platinum", "heartgold-soulsilver"],
-    "5": ["black-white", "black-2-white-2"],
-    "6": ["x-y", "omega-ruby-alpha-sapphire"],
-    "7": ["sun-moon", "ultra-sun-ultra-moon"],
-    "8": ["sword-shield", "brilliant-diamond-and-shining-pearl", "legends-arceus"],
-    "9": ["scarlet-violet"]
+    "1": [
+      "red-blue",
+      "yellow"
+    ],
+    "2": [
+      "gold-silver",
+      "crystal"
+    ],
+    "3": [
+      "ruby-sapphire",
+      "emerald",
+      "firered-leafgreen"
+    ],
+    "4": [
+      "diamond-pearl",
+      "platinum",
+      "heartgold-soulsilver"
+    ],
+    "5": [
+      "black-white",
+      "black-2-white-2"
+    ],
+    "6": [
+      "x-y",
+      "omega-ruby-alpha-sapphire"
+    ],
+    "7": [
+      "sun-moon",
+      "ultra-sun-ultra-moon"
+    ],
+    "8": [
+      "sword-shield",
+      "brilliant-diamond-and-shining-pearl",
+      "legends-arceus"
+    ],
+    "9": [
+      "scarlet-violet"
+    ]
   },
-
   "gameIdToVersionPath": {
-    "rb":       "generation-i/red-blue",
-    "yellow":   "generation-i/yellow",
-    "gs":       "generation-ii/gold",
-    "crystal":  "generation-ii/crystal",
-    "rs":       "generation-iii/ruby-sapphire",
-    "emerald":  "generation-iii/emerald",
-    "frlg":     "generation-iii/firered-leafgreen",
-    "dp":       "generation-iv/diamond-pearl",
+    "rb": "generation-i/red-blue",
+    "yellow": "generation-i/yellow",
+    "gs": "generation-ii/gold",
+    "crystal": "generation-ii/crystal",
+    "rs": "generation-iii/ruby-sapphire",
+    "emerald": "generation-iii/emerald",
+    "frlg": "generation-iii/firered-leafgreen",
+    "dp": "generation-iv/diamond-pearl",
     "platinum": "generation-iv/platinum",
-    "hgss":     "generation-iv/heartgold-soulsilver",
-    "bw":       "generation-v/black-white",
-    "b2w2":     "generation-v/black-white"
+    "hgss": "generation-iv/heartgold-soulsilver",
+    "bw": "generation-v/black-white",
+    "b2w2": "generation-v/black-white"
   },
-
   "genToDefaultGameId": {
     "1": "yellow",
     "2": "crystal",
@@ -377,31 +697,29 @@
     "4": "hgss",
     "5": "bw"
   },
-
   "vgToSubpath": {
-    "red-blue":                            "versions/generation-i/red-blue",
-    "yellow":                              "versions/generation-i/yellow",
-    "gold-silver":                         "versions/generation-ii/gold",
-    "crystal":                             "versions/generation-ii/crystal",
-    "ruby-sapphire":                       "versions/generation-iii/ruby-sapphire",
-    "emerald":                             "versions/generation-iii/emerald",
-    "firered-leafgreen":                   "versions/generation-iii/firered-leafgreen",
-    "diamond-pearl":                       "versions/generation-iv/diamond-pearl",
-    "platinum":                            "versions/generation-iv/platinum",
-    "heartgold-soulsilver":                "versions/generation-iv/heartgold-soulsilver",
-    "black-white":                         "versions/generation-v/black-white",
-    "black-2-white-2":                     "versions/generation-v/black-white",
-    "x-y":                                 "versions/generation-vi/x-y",
-    "omega-ruby-alpha-sapphire":           "versions/generation-vi/omegaruby-alphasapphire",
-    "sun-moon":                            "versions/generation-vii/ultra-sun-ultra-moon",
-    "ultra-sun-ultra-moon":                "versions/generation-vii/ultra-sun-ultra-moon",
-    "lets-go-pikachu-lets-go-eevee":       null,
-    "sword-shield":                        null,
+    "red-blue": "versions/generation-i/red-blue",
+    "yellow": "versions/generation-i/yellow",
+    "gold-silver": "versions/generation-ii/gold",
+    "crystal": "versions/generation-ii/crystal",
+    "ruby-sapphire": "versions/generation-iii/ruby-sapphire",
+    "emerald": "versions/generation-iii/emerald",
+    "firered-leafgreen": "versions/generation-iii/firered-leafgreen",
+    "diamond-pearl": "versions/generation-iv/diamond-pearl",
+    "platinum": "versions/generation-iv/platinum",
+    "heartgold-soulsilver": "versions/generation-iv/heartgold-soulsilver",
+    "black-white": "versions/generation-v/black-white",
+    "black-2-white-2": "versions/generation-v/black-white",
+    "x-y": "versions/generation-vi/x-y",
+    "omega-ruby-alpha-sapphire": "versions/generation-vi/omegaruby-alphasapphire",
+    "sun-moon": "versions/generation-vii/ultra-sun-ultra-moon",
+    "ultra-sun-ultra-moon": "versions/generation-vii/ultra-sun-ultra-moon",
+    "lets-go-pikachu-lets-go-eevee": null,
+    "sword-shield": null,
     "brilliant-diamond-and-shining-pearl": null,
-    "legends-arceus":                      null,
-    "scarlet-violet":                      "versions/generation-ix/scarlet-violet"
+    "legends-arceus": null,
+    "scarlet-violet": "versions/generation-ix/scarlet-violet"
   },
-
   "genToLastVg": {
     "1": "yellow",
     "2": "crystal",
