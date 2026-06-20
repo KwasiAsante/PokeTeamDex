@@ -35,10 +35,16 @@ const kItemPockets = <String, String>{
 };
 
 /// Item names for a given pocket, fetched from PokéAPI and cached.
+///
+/// "held-items" is special-cased: it's a PokéAPI item *category* nested
+/// inside the "misc" pocket, not a pocket of its own — see
+/// [PokeApiRepository.fetchItemsByCategory].
 final itemsByPocketProvider =
     FutureProvider.family<List<String>, String>((ref, pocket) async {
   final repo = ref.read(pokeApiRepositoryProvider);
-  return repo.fetchItemsByPocket(pocket);
+  return pocket == 'held-items'
+      ? repo.fetchItemsByCategory('held-items')
+      : repo.fetchItemsByPocket(pocket);
 });
 
 // ── Per-item detail (autoDispose — large family cache) ────────────────────────
