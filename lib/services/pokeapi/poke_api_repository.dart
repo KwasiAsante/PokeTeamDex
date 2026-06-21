@@ -1,3 +1,5 @@
+import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart'
+    show regionalSuffixOf;
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/encounter_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
@@ -352,12 +354,14 @@ class PokeApiRepository {
     return (ancestorSpeciesIds: ancestors, originSpeciesId: originSpeciesId);
   }
 
-  /// Returns true if [speciesId]'s varieties include a form whose name ends
-  /// with '-[formName]'. Used to determine whether a forward-evolution species
-  /// has a regional counterpart for the origin's form.
-  Future<bool> fetchSpeciesHasForm(int speciesId, String formName) async {
+  /// Returns true if [speciesId] has a variety carrying the same regional
+  /// form as [originFormName] (e.g. does Ninetales have an "-alola" variety,
+  /// given origin form "vulpix-alola"?). Used to determine whether an
+  /// evolution-chain species has a regional counterpart for the origin's form.
+  Future<bool> fetchSpeciesHasForm(int speciesId, String originFormName) async {
+    final suffix = regionalSuffixOf(originFormName) ?? originFormName;
     final species = await fetchPokemonSpecies(speciesId);
-    return species.varieties.any((v) => v.name.endsWith('-$formName'));
+    return species.varieties.any((v) => v.name.endsWith('-$suffix'));
   }
 
   Future<int> getSpeciesId(int pokemonId) => _getSpeciesIdForPokemon(pokemonId);

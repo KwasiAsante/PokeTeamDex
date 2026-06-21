@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
+import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart'
+    show regionalSuffixOf;
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 
 final teamSlotsProvider =
@@ -60,34 +62,35 @@ final linkableSlotsProvider =
   // Resolve the valid species set depending on the picker role.
   final Set<int> validSpeciesIds;
   final int originSpeciesId;
-  Set<int> speciesWithSameForm = const {};
 
   if (params.forwardDirection) {
     // Origin role → show slots of FORWARD (post-evolution) species.
     final info = await pokeApi.fetchForwardEvolutionInfo(params.originPokemonId);
     validSpeciesIds = info.forwardSpeciesIds;
     originSpeciesId = info.originSpeciesId;
-
-    // Pre-compute which forward species also carry the origin's regional form
-    // so the standard-form slot for that species is suppressed (the regional
-    // form slot appears via the pokemonId > 10000 path instead).
-    if (params.originFormName != null) {
-      final futures = validSpeciesIds
-          .where((id) => id != originSpeciesId)
-          .map((id) async {
-            final hasForm =
-                await pokeApi.fetchSpeciesHasForm(id, params.originFormName!);
-            return hasForm ? id : null;
-          });
-      final resolved = await Future.wait(futures);
-      speciesWithSameForm = resolved.whereType<int>().toSet();
-    }
   } else {
     // Child role → show slots of BACKWARD (pre-evolution / ancestor) species.
     final info = await pokeApi.fetchBackwardEvolutionInfo(params.originPokemonId);
     validSpeciesIds = info.ancestorSpeciesIds;
     originSpeciesId = info.originSpeciesId;
-    // No speciesWithSameForm needed for backward direction.
+  }
+
+  // Pre-compute which OTHER species in the valid set also carry the origin's
+  // regional form (e.g. does Ninetales have an "-alola" variety, given origin
+  // form "vulpix-alola"?) so a same-region candidate slot is matched directly
+  // by suffix below, and the bare/default-form slot of that species is
+  // suppressed in favour of it. Applies to both forward and backward lookups.
+  Set<int> speciesWithSameForm = const {};
+  if (params.originFormName != null) {
+    final futures = validSpeciesIds
+        .where((id) => id != originSpeciesId)
+        .map((id) async {
+          final hasForm =
+              await pokeApi.fetchSpeciesHasForm(id, params.originFormName!);
+          return hasForm ? id : null;
+        });
+    final resolved = await Future.wait(futures);
+    speciesWithSameForm = resolved.whereType<int>().toSet();
   }
 
   // Snapshot valid (non-deleted) team IDs to exclude orphaned slot rows.
@@ -130,19 +133,24 @@ final linkableSlotsProvider =
         // Both base-form: require matching formName AND gender (handles
         // Meowstic female vs male — both have pokemonId=678, formName=null,
         // but different permanent genders).
-        if (s.gender != params.originGender) return false;
+        if (params.originGender != null && s.gender != params.originGender) return false;
         return candidateFormName == params.originFormName;
       }
 
       // Different species (cross-evolution):
-      if (params.originFormName == null) {
-        return candidateFormName == null;
-      } else {
-        // Regional-form origin: suppress species that also carry this regional
-        // form (their form-variant slot appears via the pokemonId > 10000 path).
-        if (speciesWithSameForm.contains(candidatePokemonId)) return false;
+      final originSuffix =
+          params.originFormName != null ? regionalSuffixOf(params.originFormName!) : null;
+      if (originSuffix == null) {
         return candidateFormName == null;
       }
+      // Regional-form origin: a candidate that carries its own regional form
+      // matches by suffix (e.g. Vulpix-Alola → Ninetales-Alola). A candidate
+      // with no form of its own is only valid when this species has no
+      // region-specific counterpart at all (e.g. Galarian Meowth → Perrserker).
+      final candidateSuffix =
+          candidateFormName != null ? regionalSuffixOf(candidateFormName) : null;
+      if (candidateSuffix != null) return candidateSuffix == originSuffix;
+      return !speciesWithSameForm.contains(candidatePokemonId);
     } else {
       // Form-variant slot (pokemonId > 10000).
       final candidateSpeciesId = formVariantSpecies[candidatePokemonId];
@@ -157,11 +165,15 @@ final linkableSlotsProvider =
         return candidatePokemonId == params.originPokemonId;
       }
 
-      // Cross-species form-variant (e.g. Alolan Meowth → Alolan Persian):
+      // Cross-species form-variant (e.g. Alolan Vulpix → Alolan Ninetales):
       // must be in the valid evolution set and carry the same regional form.
+      // Compared by suffix, not literal equality — the species-name prefix
+      // differs between origin and candidate ("vulpix-alola" vs "ninetales-alola").
       if (!validSpeciesIds.contains(candidateSpeciesId)) return false;
-      if (params.originFormName == null) return false;
-      return candidateFormName == params.originFormName;
+      if (params.originFormName == null || candidateFormName == null) return false;
+      final candidateSuffix = regionalSuffixOf(candidateFormName);
+      return candidateSuffix != null &&
+          candidateSuffix == regionalSuffixOf(params.originFormName!);
     }
   }).toList();
 });
