@@ -2,8 +2,10 @@ import 'package:change_case/change_case.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
-import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
 
 /// Bottom sheet that lists every other team slot that is a valid evolution-aware
@@ -67,18 +69,17 @@ class InstancePickerSheet extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: Text(
               'Link to another Pokémon',
-              style: textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           const Divider(height: 1),
           Expanded(
             child: slotsAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (slots) {
-
                 if (slots.isEmpty) {
                   return Center(
                     child: Padding(
@@ -86,9 +87,11 @@ class InstancePickerSheet extends ConsumerWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.people_alt_outlined,
-                              size: 48,
-                              color: colorScheme.onSurfaceVariant),
+                          Icon(
+                            Icons.people_alt_outlined,
+                            size: 48,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                           const SizedBox(height: 12),
                           Text(
                             'No other slots have this Pokémon or its evolutions.',
@@ -120,8 +123,7 @@ class InstancePickerSheet extends ConsumerWidget {
                   children: [
                     for (final entry in grouped.entries) ...[
                       _TeamHeader(
-                        teamName:
-                            teamMap[entry.key] ?? 'Team ${entry.key}',
+                        teamName: teamMap[entry.key] ?? 'Team ${entry.key}',
                       ),
                       for (final slot in entry.value)
                         _SlotTile(
@@ -153,10 +155,10 @@ class _TeamHeader extends StatelessWidget {
       child: Text(
         teamName,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              letterSpacing: 0.5,
-            ),
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }
@@ -178,31 +180,96 @@ class _SlotTile extends ConsumerWidget {
         : 'Pokémon #${slot.pokemonId}';
     final hasInstance = slot.instanceId != null;
 
-    // Resolve the HOME sprite URL for the active form. Variety-based forms
-    // (Lycanroc Midnight, Alolan Sandshrew, Aegislash Blade, etc.) have their
-    // own /pokemon resource with a distinct ID — use that ID for the URL.
-    // Cosmetic forms (Burmy cloaks, Cherrim Sunshine, etc.) have no such
-    // resource so pokemonByNameProvider returns null; we fall back to the
-    // base species URL in that case.
-    final int spriteId;
-    if (slot.formName != null) {
-      final formId = ref
-          .watch(pokemonByNameProvider(slot.formName!))
+    // Resolve the HOME sprite via the backend-resolved data, mirroring
+    // _SlotSpriteFormAware in teams_screen.dart. resolved.spriteUrls is the
+    // base-species default; an active form (variety or cosmetic) overrides
+    // it when present. pokemonHomeUrl/pokemonHomeShinyUrl are the last-resort
+    // fallback, used only while backend data is loading or unavailable.
+    final resolved = ref
+        .watch(resolvedPokemonProvider((id: slot.pokemonId, gen: null)))
+        .asData
+        ?.value;
+    String? homeUrl = resolved?.spriteUrls.home;
+    String? homeShinyUrl =
+        resolved?.spriteUrls.homeShiny ?? resolved?.spriteUrls.home;
+
+    if (slot.formName != null ||
+        slot.isMegaEvolved ||
+        (slot.hasGigantamax && slot.gigantamaxEnabled)) {
+      final varietiesData = ref
+          .watch(pokemonVarietiesProvider((id: slot.pokemonId, gen: null)))
           .asData
-          ?.value
-          .id;
-      spriteId = formId ?? slot.pokemonId;
-    } else {
-      spriteId = slot.pokemonId;
+          ?.value;
+      final formsData = ref
+          .watch(pokemonFormsProvider((id: slot.pokemonId, gen: null)))
+          .asData
+          ?.value;
+
+      VarietyBackendData? formVariety;
+      FormBackendData? cosmeticFullSprite;
+      SpriteUrlsFull? activeSpriteSource;
+      if (slot.formName != null) {
+        final isCosmeticForm =
+            resolved?.cosmeticForms.any((f) => f.name == slot.formName) ??
+            false;
+        formVariety = !isCosmeticForm
+            ? varietiesData?.where((v) => v.name == slot.formName).firstOrNull
+            : null;
+        cosmeticFullSprite = isCosmeticForm
+            ? formsData?.where((fd) => fd.name == slot.formName).firstOrNull
+            : null;
+      } else if (slot.isMegaEvolved) {
+        final slotMoves = [slot.move1, slot.move2, slot.move3, slot.move4];
+        formVariety = varietiesData?.where((v) {
+          if (v.isMega != true) return false;
+          if (v.associatedItem != null && v.associatedItem == slot.heldItemName) {
+            return true;
+          }
+          if (v.associatedMove != null && slotMoves.contains(v.associatedMove)) {
+            return true;
+          }
+          return false;
+        }).firstOrNull;
+      } else {
+        formVariety = varietiesData != null
+            ? varietiesData.length > 1
+                  ? varietiesData.any(
+                          (v) =>
+                              (v.isGmax == true &&
+                              (v.name == slot.formName ||
+                                  v.name.contains("${slot.formName}"))),
+                        )
+                        ? varietiesData
+                              .where(
+                                (v) =>
+                                    v.isGmax == true &&
+                                    (v.name == slot.formName ||
+                                        v.name.contains("${slot.formName}")),
+                              )
+                              .firstOrNull
+                        : varietiesData
+                              .where((v) => v.isGmax == true)
+                              .firstOrNull
+                  : varietiesData.where((v) => v.isGmax == true).firstOrNull
+            : null;
+      }
+      activeSpriteSource =
+          formVariety?.spriteUrls ?? cosmeticFullSprite?.spriteUrls;
+      homeUrl = activeSpriteSource?.home ?? homeUrl;
+      homeShinyUrl =
+          (activeSpriteSource?.homeShiny ?? activeSpriteSource?.home) ??
+          homeShinyUrl;
     }
+    homeUrl ??= pokemonHomeUrl(slot.pokemonId);
+    homeShinyUrl ??= pokemonHomeShinyUrl(slot.pokemonId);
 
     return ListTile(
       leading: SizedBox(
         width: 40,
         height: 40,
         child: PokemonSprite(
-          defaultUrl: pokemonHomeUrl(spriteId),
-          shinyUrl: slot.isShiny ? pokemonHomeShinyUrl(spriteId) : null,
+          defaultUrl: homeUrl,
+          shinyUrl: slot.isShiny ? homeShinyUrl : null,
           shiny: slot.isShiny,
           size: 40,
         ),
@@ -215,14 +282,18 @@ class _SlotTile extends ConsumerWidget {
         'Slot ${slot.slot}'
         '${slot.level != null ? ' · Lv ${slot.level}' : ''}'
         '${slot.gender != null ? ' · ${slot.gender!.toCapitalCase()}' : ''}',
-        style:
-            textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+        style: textTheme.bodySmall?.copyWith(
+          color: colorScheme.onSurfaceVariant,
+        ),
       ),
       trailing: hasInstance
           ? Tooltip(
               message: 'Already tracked',
-              child: Icon(Icons.link_rounded,
-                  size: 18, color: colorScheme.primary),
+              child: Icon(
+                Icons.link_rounded,
+                size: 18,
+                color: colorScheme.primary,
+              ),
             )
           : null,
       onTap: onTap,
