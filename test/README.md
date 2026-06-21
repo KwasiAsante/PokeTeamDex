@@ -55,6 +55,7 @@ Pure logic tests — no Flutter, no Drift, no network.
 | `pokemon_data_registry_test.dart` | — | `PokemonDataRegistry.initialize()` — parses `assets/data/pokemon_registry.json` into the override maps |
 | `sprite_resolver_test.dart` | — | Thin-wrapper passthrough to `PokemonDataResolver` |
 | `resolved_pokemon_provider_test.dart` | — | `resolvedPokemonProvider` — Hive cache → backend → PokéAPI fallback ordering |
+| `linkable_slots_provider_test.dart` | 4 | `linkableSlotsProvider` — regional-form (Alolan/Galarian/etc.) cross-species matching by suffix, single-form branch fallback, plain same-species linking |
 
 ---
 
