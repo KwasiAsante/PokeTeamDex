@@ -179,20 +179,20 @@ class _SlotTile extends ConsumerWidget {
         : 'Pokémon #${slot.pokemonId}';
     final hasInstance = slot.instanceId != null;
 
-    // Resolve the HOME sprite for the active form via the backend-resolved
-    // varieties/forms providers (gen: null — HOME URLs are gen-agnostic),
-    // mirroring _SlotSpriteFormAware in teams_screen.dart. Variety-based forms
-    // (Lycanroc Midnight, Alolan Sandshrew, Aegislash Blade, etc.) carry their
-    // own SpriteUrlsFull from pokemonVarietiesProvider; cosmetic forms (Burmy
-    // cloaks, Cherrim Sunshine, etc.) come from pokemonFormsProvider instead.
-    // Falls back to the generic base-species URL while loading or absent.
-    String? homeUrl;
-    String? homeShinyUrl;
+    // Resolve the HOME sprite via the backend-resolved data, mirroring
+    // _SlotSpriteFormAware in teams_screen.dart. resolved.spriteUrls is the
+    // base-species default; an active form (variety or cosmetic) overrides
+    // it when present. pokemonHomeUrl/pokemonHomeShinyUrl are the last-resort
+    // fallback, used only while backend data is loading or unavailable.
+    final resolved = ref
+        .watch(resolvedPokemonProvider((id: slot.pokemonId, gen: null)))
+        .asData
+        ?.value;
+    String? homeUrl = resolved?.spriteUrls.home;
+    String? homeShinyUrl =
+        resolved?.spriteUrls.homeShiny ?? resolved?.spriteUrls.home;
+
     if (slot.formName != null) {
-      final resolved = ref
-          .watch(resolvedPokemonProvider((id: slot.pokemonId, gen: null)))
-          .asData
-          ?.value;
       final varietiesData = ref
           .watch(pokemonVarietiesProvider((id: slot.pokemonId, gen: null)))
           .asData
@@ -211,8 +211,9 @@ class _SlotTile extends ConsumerWidget {
           : null;
       final activeSpriteSource =
           formVariety?.spriteUrls ?? cosmeticFullSprite?.spriteUrls;
-      homeUrl = activeSpriteSource?.home;
-      homeShinyUrl = activeSpriteSource?.homeShiny ?? activeSpriteSource?.home;
+      homeUrl = activeSpriteSource?.home ?? homeUrl;
+      homeShinyUrl =
+          (activeSpriteSource?.homeShiny ?? activeSpriteSource?.home) ?? homeShinyUrl;
     }
     homeUrl ??= pokemonHomeUrl(slot.pokemonId);
     homeShinyUrl ??= pokemonHomeShinyUrl(slot.pokemonId);
