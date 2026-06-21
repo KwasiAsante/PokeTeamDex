@@ -2,8 +2,9 @@ import 'package:change_case/change_case.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
-import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
+import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart';
 
 /// Bottom sheet that lists every other team slot that is a valid evolution-aware
@@ -178,31 +179,51 @@ class _SlotTile extends ConsumerWidget {
         : 'Pokémon #${slot.pokemonId}';
     final hasInstance = slot.instanceId != null;
 
-    // Resolve the HOME sprite URL for the active form. Variety-based forms
-    // (Lycanroc Midnight, Alolan Sandshrew, Aegislash Blade, etc.) have their
-    // own /pokemon resource with a distinct ID — use that ID for the URL.
-    // Cosmetic forms (Burmy cloaks, Cherrim Sunshine, etc.) have no such
-    // resource so pokemonByNameProvider returns null; we fall back to the
-    // base species URL in that case.
-    final int spriteId;
+    // Resolve the HOME sprite for the active form via the backend-resolved
+    // varieties/forms providers (gen: null — HOME URLs are gen-agnostic),
+    // mirroring _SlotSpriteFormAware in teams_screen.dart. Variety-based forms
+    // (Lycanroc Midnight, Alolan Sandshrew, Aegislash Blade, etc.) carry their
+    // own SpriteUrlsFull from pokemonVarietiesProvider; cosmetic forms (Burmy
+    // cloaks, Cherrim Sunshine, etc.) come from pokemonFormsProvider instead.
+    // Falls back to the generic base-species URL while loading or absent.
+    String? homeUrl;
+    String? homeShinyUrl;
     if (slot.formName != null) {
-      final formId = ref
-          .watch(pokemonByNameProvider(slot.formName!))
+      final resolved = ref
+          .watch(resolvedPokemonProvider((id: slot.pokemonId, gen: null)))
           .asData
-          ?.value
-          .id;
-      spriteId = formId ?? slot.pokemonId;
-    } else {
-      spriteId = slot.pokemonId;
+          ?.value;
+      final varietiesData = ref
+          .watch(pokemonVarietiesProvider((id: slot.pokemonId, gen: null)))
+          .asData
+          ?.value;
+      final formsData = ref
+          .watch(pokemonFormsProvider((id: slot.pokemonId, gen: null)))
+          .asData
+          ?.value;
+      final isCosmeticForm =
+          resolved?.cosmeticForms.any((f) => f.name == slot.formName) ?? false;
+      final formVariety = !isCosmeticForm
+          ? varietiesData?.where((v) => v.name == slot.formName).firstOrNull
+          : null;
+      final cosmeticFullSprite = isCosmeticForm
+          ? formsData?.where((fd) => fd.name == slot.formName).firstOrNull
+          : null;
+      final activeSpriteSource =
+          formVariety?.spriteUrls ?? cosmeticFullSprite?.spriteUrls;
+      homeUrl = activeSpriteSource?.home;
+      homeShinyUrl = activeSpriteSource?.homeShiny ?? activeSpriteSource?.home;
     }
+    homeUrl ??= pokemonHomeUrl(slot.pokemonId);
+    homeShinyUrl ??= pokemonHomeShinyUrl(slot.pokemonId);
 
     return ListTile(
       leading: SizedBox(
         width: 40,
         height: 40,
         child: PokemonSprite(
-          defaultUrl: pokemonHomeUrl(spriteId),
-          shinyUrl: slot.isShiny ? pokemonHomeShinyUrl(spriteId) : null,
+          defaultUrl: homeUrl,
+          shinyUrl: slot.isShiny ? homeShinyUrl : null,
           shiny: slot.isShiny,
           size: 40,
         ),
