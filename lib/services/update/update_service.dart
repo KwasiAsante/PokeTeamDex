@@ -7,12 +7,15 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:poke_team_dex/services/update/update_info.dart';
 
 const _owner = 'KwasiAsante';
-const _repo = 'poke_team_dex';
+const _repo = 'PokeTeamDex';
 const _webUrl = 'https://poketeamdex.web.app';
 
 class UpdateService {
-  static const _apiUrl =
-      'https://api.github.com/repos/$_owner/$_repo/releases/latest';
+  // The dedicated /releases/latest endpoint resolves "latest" server-side and
+  // is noticeably slower and more prone to gateway timeouts (504s) than the
+  // plain list endpoint. Releases here are always published via CI in order,
+  // so the first non-draft, non-prerelease entry in the list is equivalent.
+  static const _apiUrl = 'https://api.github.com/repos/$_owner/$_repo/releases';
 
   Future<UpdateInfo?> checkForUpdate() async {
     try {
@@ -47,7 +50,13 @@ class UpdateService {
     if (response.statusCode != 200) {
       throw Exception('Update check failed (HTTP ${response.statusCode})');
     }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    final releases = (jsonDecode(response.body) as List<dynamic>).cast<Map<String, dynamic>>();
+    for (final release in releases) {
+      if (release['draft'] == false && release['prerelease'] == false) {
+        return release;
+      }
+    }
+    return null;
   }
 
   String? _findAssetUrl(List<Map<String, dynamic>> assets, String suffix) {
