@@ -348,7 +348,6 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
     final pokeRepo = ref.read(pokeApiRepositoryProvider);
     final slotRepo = ref.read(teamSlotRepositoryProvider);
     final teamRepo = ref.read(teamRepositoryProvider);
-    final syncQueue = ref.read(syncQueueRepositoryProvider);
     final configRepo = ref.read(appConfigRepositoryProvider);
     final now = DateTime.now();
 
@@ -369,6 +368,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
     }
 
     final resolveErrors = <String>[];
+    final newSlotPositions = <int>[];
     int imported = 0;
     int skipped = 0;
     bool promoted = false;
@@ -481,22 +481,16 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         updatedAt: Value(now),
       ));
 
-      await syncQueue.enqueue(PendingSyncOpsCompanion(
-        operation: const Value('upsert'),
-        entityType: const Value('team_slot'),
-        entityId: Value(teamId),
-        payload: Value(jsonEncode({
-          'team_local_id': teamId,
-          'slot': slot,
-          'pokemon_id': pokemonId,
-          'nickname': s.nickname,
-          'level': s.level.clamp(1, 100),
-        })),
-        createdAt: Value(now),
-      ));
-
+      newSlotPositions.add(slot);
       occupied.add(slot);
       imported++;
+    }
+
+    if (newSlotPositions.isNotEmpty) {
+      final allSlots = await slotRepo.getByTeam(teamId);
+      final toSave =
+          allSlots.where((s) => newSlotPositions.contains(s.slot)).toList();
+      await slotRepo.saveAll(toSave);
     }
 
     if (!mounted) return;
@@ -555,9 +549,11 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
       teamId: teamId,
       repo: repo,
       slotRepo: slotRepo,
-      syncQueue: syncQueue,
       now: now,
     );
+
+    final insertedSlots = await slotRepo.getByTeam(teamId);
+    if (insertedSlots.isNotEmpty) await slotRepo.saveAll(insertedSlots);
 
     if (!mounted) return;
     Navigator.pop(context);
@@ -582,7 +578,6 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
     required int teamId,
     required dynamic repo,
     required dynamic slotRepo,
-    required dynamic syncQueue,
     required DateTime now,
   }) async {
     final errors = <String>[];
@@ -664,20 +659,6 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         move4: Value(s.moves.length > 3 ? s.moves[3] : null),
         createdAt: Value(now),
         updatedAt: Value(now),
-      ));
-
-      await syncQueue.enqueue(PendingSyncOpsCompanion(
-        operation: const Value('upsert'),
-        entityType: const Value('team_slot'),
-        entityId: Value(teamId),
-        payload: Value(jsonEncode({
-          'team_local_id': teamId,
-          'slot': slotNumber,
-          'pokemon_id': pokemonId,
-          'nickname': s.nickname,
-          'level': s.level.clamp(1, 100),
-        })),
-        createdAt: Value(now),
       ));
     }
 
