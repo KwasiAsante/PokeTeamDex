@@ -217,8 +217,18 @@ class _TeamsList extends ConsumerWidget {
   }
 
   Future<void> _onReorderFolders(WidgetRef ref, List<TeamFolder> folders, int oldIndex, int newIndex) async {
-    if (newIndex > oldIndex) newIndex--;
     await _moveFolderTo(ref, folders, oldIndex, newIndex);
+  }
+
+  Future<void> _moveUngroupedTeamTo(WidgetRef ref, List<Team> teams, int from, int to) async {
+    final reordered = [...teams];
+    final moved = reordered.removeAt(from);
+    reordered.insert(to, moved);
+    for (int i = 0; i < reordered.length; i++) {
+      if (reordered[i].sortOrder != i) {
+        await updateTeamSortOrder(ref, reordered[i].id, i);
+      }
+    }
   }
 
   @override
@@ -260,7 +270,7 @@ class _TeamsList extends ConsumerWidget {
             if (folders.isNotEmpty)
               SliverReorderableList(
                 itemCount: folders.length,
-                onReorder: (o, n) => _onReorderFolders(ref, folders, o, n),
+                onReorderItem: (o, n) => _onReorderFolders(ref, folders, o, n),
                 itemBuilder: (_, i) => _FolderSection(
                   key: ValueKey(folders[i].id),
                   folder: folders[i],
@@ -327,10 +337,15 @@ class _TeamsList extends ConsumerWidget {
                 ),
               ),
               if (ungrouped.isNotEmpty)
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (_, i) => _TeamTile(team: ungrouped[i]),
-                    childCount: ungrouped.length,
+                SliverReorderableList(
+                  itemCount: ungrouped.length,
+                  onReorderItem: (o, n) => _moveUngroupedTeamTo(ref, ungrouped, o, n),
+                  itemBuilder: (_, i) => _TeamTile(
+                    key: ValueKey(ungrouped[i].id),
+                    team: ungrouped[i],
+                    dragIndex: i,
+                    teamCount: ungrouped.length,
+                    onMove: (from, to) => _moveUngroupedTeamTo(ref, ungrouped, from, to),
                   ),
                 ),
             ],
@@ -384,7 +399,6 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
   }
 
   Future<void> _onReorderTeams(List<Team> teams, int oldIndex, int newIndex) async {
-    if (newIndex > oldIndex) newIndex--;
     await _moveTeamTo(teams, oldIndex, newIndex);
   }
 
@@ -549,7 +563,7 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     buildDefaultDragHandles: false,
-                    onReorder: (o, n) => _onReorderTeams(teams, o, n),
+                    onReorderItem: (o, n) => _onReorderTeams(teams, o, n),
                     itemCount: teams.length,
                     itemBuilder: (_, i) => _TeamTile(
                       key: ValueKey(teams[i].id),

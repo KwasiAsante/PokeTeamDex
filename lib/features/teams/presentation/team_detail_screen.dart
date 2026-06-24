@@ -682,7 +682,6 @@ class _SlotList extends ConsumerWidget {
   }
 
   Future<void> _onReorder(WidgetRef ref, int oldIndex, int newIndex) async {
-    if (newIndex > oldIndex) newIndex--;
     final pos = _positions();
     final moved = pos.removeAt(oldIndex);
     pos.insert(newIndex, moved);
@@ -703,7 +702,7 @@ class _SlotList extends ConsumerWidget {
     return ReorderableListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       buildDefaultDragHandles: false, // explicit handles inside each card
-      onReorder: (o, n) => _onReorder(ref, o, n),
+      onReorderItem: (o, n) => _onReorder(ref, o, n),
       itemCount: maxSlots,
       itemBuilder: (_, i) {
         final slot = pos[i];
