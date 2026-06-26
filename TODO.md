@@ -293,6 +293,13 @@
 
 ## Investigations
 
+- [ ] **GMax moves shown under wrong base moves** — `resolveMaxMove()` returns the G-Max move for any non-status base move instead of only moves matching the G-Max move's type *(#248)*
+  - [ ] Extend `kGMaxMovesBySpecies` with move type data *(#259)*
+  - [ ] Update `gmaxMoveForSpecies()` return type to record *(#260)*
+  - [ ] Add type guard in `resolveMaxMove()` *(#261)*
+  - [ ] Update callers to use `.moveName` from new record type *(#262)*
+  - [ ] Update and extend `dynamax_test.dart` with type-guard tests *(#263)*
+
 - [x] **Unified Pokémon data resolution layer** — cross-source gaps (PokéAPI / Showdown / Smogon), scattered override maps, and unresiolved form data are recomputed on every request with no single cached result; investigate a unified model that does gap-filling once and caches the resolved output *(#201)*
   - [x] **Task A** — Consolidate override maps into JSON asset and `PokemonDataRegistry` singleton *(#234)*
   - [x] **Task B** — Unified sprite resolver (`PokemonDataResolver`) replacing 4 divergent sprite URL implementations *(#235)*
