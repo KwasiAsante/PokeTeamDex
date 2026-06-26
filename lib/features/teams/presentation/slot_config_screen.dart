@@ -682,7 +682,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         // ── GMax detection ─────────────────────────────────────────────────
         final canDynamax = mechanics == null || mechanics.hasGigantamax;
         final effectiveSpeciesName = formVariety?.name ?? pokemon.name;
-        final gmaxMove = gmaxMoveForSpecies(effectiveSpeciesName);
+        final gmaxMove = gmaxMoveForSpecies(effectiveSpeciesName)?.moveName;
         final canGigantamax = canDynamax && gmaxMove != null;
         final gmaxFormName = canGigantamax ? '$effectiveSpeciesName-gmax' : null;
         final gmaxPokemonAsync = (canGigantamax && _hasGigantamax && _gigantamaxEnabled)
