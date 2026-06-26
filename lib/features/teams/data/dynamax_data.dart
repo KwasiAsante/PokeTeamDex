@@ -29,51 +29,53 @@ const String kMaxGuard = 'max-guard'; // status moves → Max Guard
 
 // ── G-Max Moves (Gigantamax) ──────────────────────────────────────────────────
 
-/// Maps PokéAPI species name → G-Max move name.
+/// Maps PokéAPI species name → G-Max move name and type.
 /// Species prefixes are used so all forms of a species match
 /// (e.g. 'urshifu' covers both urshifu-single-strike and urshifu-rapid-strike).
-const Map<String, String> kGMaxMovesBySpecies = {
-  'venusaur':   'g-max-vine-lash',
-  'charizard':  'g-max-wildfire',
-  'blastoise':  'g-max-cannonade',
-  'butterfree': 'g-max-befuddle',
-  'pikachu':    'g-max-volt-crash',
-  'meowth':     'g-max-gold-rush',
-  'machamp':    'g-max-chi-strike',
-  'gengar':     'g-max-terror',
-  'kingler':    'g-max-foam-burst',
-  'lapras':     'g-max-resonance',
-  'eevee':      'g-max-cuddle',
-  'snorlax':    'g-max-replenish',
-  'garbodor':   'g-max-malodor',
-  'melmetal':   'g-max-meltdown',
-  'corviknight':'g-max-wind-rage',
-  'orbeetle':   'g-max-gravitas',
-  'drednaw':    'g-max-stonesurge',
-  'coalossal':  'g-max-volcalith',
-  'flapple':    'g-max-tartness',
-  'appletun':   'g-max-sweetness',
-  'sandaconda': 'g-max-sandblast',
-  'toxtricity': 'g-max-stun-shock',
-  'centiskorch':'g-max-centiferno',
-  'hatterene':  'g-max-smite',
-  'grimmsnarl': 'g-max-snooze',
-  'alcremie':   'g-max-finale',
-  'copperajah': 'g-max-steelsurge',
-  'duraludon':  'g-max-depletion',
+/// The type field gates display: a G-Max move only replaces the Max Move for
+/// base moves of the same type.
+const Map<String, ({String moveName, String type})> kGMaxMovesBySpecies = {
+  'venusaur':              (moveName: 'g-max-vine-lash',   type: 'grass'),
+  'charizard':             (moveName: 'g-max-wildfire',    type: 'fire'),
+  'blastoise':             (moveName: 'g-max-cannonade',   type: 'water'),
+  'butterfree':            (moveName: 'g-max-befuddle',    type: 'bug'),
+  'pikachu':               (moveName: 'g-max-volt-crash',  type: 'electric'),
+  'meowth':                (moveName: 'g-max-gold-rush',   type: 'normal'),
+  'machamp':               (moveName: 'g-max-chi-strike',  type: 'fighting'),
+  'gengar':                (moveName: 'g-max-terror',      type: 'ghost'),
+  'kingler':               (moveName: 'g-max-foam-burst',  type: 'water'),
+  'lapras':                (moveName: 'g-max-resonance',   type: 'ice'),
+  'eevee':                 (moveName: 'g-max-cuddle',      type: 'normal'),
+  'snorlax':               (moveName: 'g-max-replenish',   type: 'normal'),
+  'garbodor':              (moveName: 'g-max-malodor',     type: 'poison'),
+  'melmetal':              (moveName: 'g-max-meltdown',    type: 'steel'),
+  'corviknight':           (moveName: 'g-max-wind-rage',   type: 'flying'),
+  'orbeetle':              (moveName: 'g-max-gravitas',    type: 'psychic'),
+  'drednaw':               (moveName: 'g-max-stonesurge',  type: 'water'),
+  'coalossal':             (moveName: 'g-max-volcalith',   type: 'rock'),
+  'flapple':               (moveName: 'g-max-tartness',    type: 'grass'),
+  'appletun':              (moveName: 'g-max-sweetness',   type: 'grass'),
+  'sandaconda':            (moveName: 'g-max-sandblast',   type: 'ground'),
+  'toxtricity':            (moveName: 'g-max-stun-shock',  type: 'electric'),
+  'centiskorch':           (moveName: 'g-max-centiferno',  type: 'fire'),
+  'hatterene':             (moveName: 'g-max-smite',       type: 'fairy'),
+  'grimmsnarl':            (moveName: 'g-max-snooze',      type: 'dark'),
+  'alcremie':              (moveName: 'g-max-finale',      type: 'fairy'),
+  'copperajah':            (moveName: 'g-max-steelsurge',  type: 'steel'),
+  'duraludon':             (moveName: 'g-max-depletion',   type: 'dragon'),
   // Isle of Armor DLC additions
-  'rillaboom':  'g-max-drum-solo',
-  'cinderace':  'g-max-fireball',
-  'inteleon':   'g-max-hydrosnipe',
+  'rillaboom':             (moveName: 'g-max-drum-solo',   type: 'grass'),
+  'cinderace':             (moveName: 'g-max-fireball',    type: 'fire'),
+  'inteleon':              (moveName: 'g-max-hydrosnipe',  type: 'water'),
   // Urshifu has two forms with different G-Max moves; handled in resolveGMaxMove.
-  'urshifu-single-strike': 'g-max-one-blow',
-  'urshifu-rapid-strike':  'g-max-rapid-flow',
-  'urshifu':               'g-max-one-blow', // fallback for base form
+  'urshifu-single-strike': (moveName: 'g-max-one-blow',    type: 'dark'),
+  'urshifu-rapid-strike':  (moveName: 'g-max-rapid-flow',  type: 'water'),
+  'urshifu':               (moveName: 'g-max-one-blow',    type: 'dark'), // fallback for base form
 };
 
-/// Returns the G-Max move for [speciesName], or null if the species cannot
-/// Gigantamax.
-String? gmaxMoveForSpecies(String speciesName) {
+/// Returns the G-Max entry (moveName + type) for [speciesName], or null if
+/// the species cannot Gigantamax.
+({String moveName, String type})? gmaxMoveForSpecies(String speciesName) {
   // Exact match first (covers urshifu-single-strike etc.)
   if (kGMaxMovesBySpecies.containsKey(speciesName)) {
     return kGMaxMovesBySpecies[speciesName];
@@ -103,7 +105,7 @@ String? resolveMaxMove({
 
   if (useGMax) {
     final gmax = gmaxMoveForSpecies(speciesName);
-    if (gmax != null) return gmax;
+    if (gmax != null && moveType == gmax.type) return gmax.moveName;
   }
 
   return moveType != null ? kMaxMovesByType[moveType] : null;
