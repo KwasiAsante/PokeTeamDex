@@ -2,6 +2,22 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 
+/// Backend `base_stats` maps use Showdown-style abbreviated keys
+/// (`hp`/`atk`/`def`/`spa`/`spd`/`spe`). The rest of the app (stat preview,
+/// [PokemonEntry.stats]) expects PokéAPI-style full keys. Apply this to any
+/// backend-sourced stats map before it's consumed outside this file.
+const _statKeyMap = {
+  'atk': 'attack',
+  'def': 'defense',
+  'spa': 'special-attack',
+  'spd': 'special-defense',
+  'spe': 'speed',
+};
+
+Map<String, int> _normalizeStats(Map<String, int> stats) {
+  return stats.map((k, v) => MapEntry(_statKeyMap[k] ?? k, v));
+}
+
 class AbilityInfo {
   final String name;
   final bool isHidden;
@@ -385,18 +401,6 @@ class PokemonResolvedBackendResponse {
   /// Passes typed fields directly — [PokemonEntry] now uses the same typed
   /// representations ([List<String>] types, [Map<String, int>] stats,
   /// [List<AbilityInfo>] abilities, [List<MoveSummary>] moves).
-  static const _statKeyMap = {
-    'atk': 'attack',
-    'def': 'defense',
-    'spa': 'special-attack',
-    'spd': 'special-defense',
-    'spe': 'speed',
-  };
-
-  static Map<String, int> _normalizeStats(Map<String, int> stats) {
-    return stats.map((k, v) => MapEntry(_statKeyMap[k] ?? k, v));
-  }
-
   PokemonEntry toPokemonEntry() {
     return PokemonEntry(
       id: pokemonId,
@@ -539,30 +543,34 @@ class VarietyBackendData {
     this.associatedAbility,
   });
 
-  factory VarietyBackendData.fromJson(Map<String, dynamic> json) =>
-      VarietyBackendData(
-        name: json['name'] as String,
-        pokemonId: (json['pokemon_id'] as num).toInt(),
-        isDefault: json['is_default'] as bool? ?? false,
-        resolvedUrl: json['resolved_url'] as String?,
-        types: (json['types'] as List<dynamic>?)
-            ?.map((t) => t as String)
-            .toList(),
-        baseStats: (json['base_stats'] as Map<String, dynamic>?)
-            ?.map((k, v) => MapEntry(k, (v as num).toInt())),
-        abilities: (json['abilities'] as Map<String, dynamic>?)
-            ?.map((k, v) => MapEntry(k, v as String)),
-        spriteUrls: json['sprite_urls'] != null
-            ? SpriteUrlsFull.fromJson(
-                json['sprite_urls'] as Map<String, dynamic>)
-            : null,
-        isMega: json['is_mega'] as bool?,
-        isBattleOnly: json['is_battle_only'] as bool?,
-        isGmax: json['is_gmax'] as bool?,
-        associatedItem: json['associated_item'] as String?,
-        associatedMove: json['associated_move'] as String?,
-        associatedAbility: json['associated_ability'] as String?,
-      );
+  factory VarietyBackendData.fromJson(Map<String, dynamic> json) {
+    final rawBaseStats = (json['base_stats'] as Map<String, dynamic>?)
+        ?.map((k, v) => MapEntry(k, (v as num).toInt()));
+    return VarietyBackendData(
+      name: json['name'] as String,
+      pokemonId: (json['pokemon_id'] as num).toInt(),
+      isDefault: json['is_default'] as bool? ?? false,
+      resolvedUrl: json['resolved_url'] as String?,
+      types: (json['types'] as List<dynamic>?)
+          ?.map((t) => t as String)
+          .toList(),
+      // Backend sends Showdown-style abbreviated keys (atk/def/spa/...);
+      // normalise to PokéAPI-style full keys to match PokemonEntry.stats.
+      baseStats: rawBaseStats == null ? null : _normalizeStats(rawBaseStats),
+      abilities: (json['abilities'] as Map<String, dynamic>?)
+          ?.map((k, v) => MapEntry(k, v as String)),
+      spriteUrls: json['sprite_urls'] != null
+          ? SpriteUrlsFull.fromJson(
+              json['sprite_urls'] as Map<String, dynamic>)
+          : null,
+      isMega: json['is_mega'] as bool?,
+      isBattleOnly: json['is_battle_only'] as bool?,
+      isGmax: json['is_gmax'] as bool?,
+      associatedItem: json['associated_item'] as String?,
+      associatedMove: json['associated_move'] as String?,
+      associatedAbility: json['associated_ability'] as String?,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'name': name,

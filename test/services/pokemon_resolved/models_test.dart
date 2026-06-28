@@ -146,6 +146,42 @@ void main() {
     });
   });
 
+  group('VarietyBackendData', () {
+    test('fromJson normalises Showdown-style abbreviated stat keys', () {
+      // Backend sends base_stats with Showdown-style abbreviated keys
+      // (hp/atk/def/spa/spd/spe) for mega/form varieties, same as the
+      // species' own base_stats. They must be normalised to PokéAPI-style
+      // full keys so stat preview lookups (which use 'attack', 'special-
+      // attack', etc.) don't silently miss and fall back to 0.
+      final v = VarietyBackendData.fromJson({
+        'name': 'sceptile-mega',
+        'pokemon_id': 10063,
+        'is_default': false,
+        'base_stats': {
+          'hp': 70, 'atk': 110, 'def': 75,
+          'spa': 145, 'spd': 85, 'spe': 145,
+        },
+      });
+      expect(v.baseStats, {
+        'hp': 70,
+        'attack': 110,
+        'defense': 75,
+        'special-attack': 145,
+        'special-defense': 85,
+        'speed': 145,
+      });
+    });
+
+    test('fromJson handles missing base_stats', () {
+      final v = VarietyBackendData.fromJson({
+        'name': 'sceptile',
+        'pokemon_id': 254,
+        'is_default': true,
+      });
+      expect(v.baseStats, isNull);
+    });
+  });
+
   group('FlavorTextEntry.fromBackend', () {
     test('parses backend flavor text format', () {
       final entry = FlavorTextEntry.fromBackend({
