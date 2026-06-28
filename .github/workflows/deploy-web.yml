@@ -14,6 +14,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      # Node 24 (default on Actions runners since 2026-06-16) has a node-fetch/
+      # http.Agent regression that throws false-positive "Premature close" on
+      # keep-alive socket reuse (nodejs/node#63989). firebase-tools' apiv2
+      # client retries on that error, but the retried call is the *release*
+      # request — non-idempotent — so the retry fails with FAILED_PRECONDITION
+      # ("... is the current active version") even though the original call
+      # already succeeded. Force Node 20 for this job until action-hosting-
+      # deploy is updated to tolerate Node 24.
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     steps:
       - uses: actions/checkout@v4
