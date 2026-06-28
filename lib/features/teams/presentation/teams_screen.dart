@@ -1296,9 +1296,18 @@ class _SlotSprite extends ConsumerWidget {
         .asData
         ?.value;
 
-    final iconUrl = resolved?.spriteUrls.icon;
-    final spriteFallback = resolved?.spriteUrls.gameFront
-        ?? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${slot.pokemonId}.png';
+    // Gender-diff species (Indeedee, Pyroar, Unfezant, …) have a dedicated
+    // female icon — see CLAUDE.md "Female form URL pattern". Only species
+    // with a real visual difference have iconFemale/gameFrontFemale
+    // populated by the backend; falls through to the regular sprite for the
+    // vast majority of female Pokémon that look identical to males.
+    final isFemale = slot.gender == 'female';
+    final iconUrl = (isFemale ? resolved?.spriteUrls.iconFemale : null) ??
+        resolved?.spriteUrls.icon;
+    final spriteFallback =
+        (isFemale ? resolved?.spriteUrls.gameFrontFemale : null) ??
+            resolved?.spriteUrls.gameFront ??
+            'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${slot.pokemonId}.png';
 
     final placeholder = SizedBox(
       width: width,

@@ -189,13 +189,26 @@ class _SlotTile extends ConsumerWidget {
         .watch(resolvedPokemonProvider((id: slot.pokemonId, gen: null)))
         .asData
         ?.value;
-    String? homeUrl = resolved?.spriteUrls.home;
-    String? homeShinyUrl =
-        resolved?.spriteUrls.homeShiny ?? resolved?.spriteUrls.home;
-
-    if (slot.formName != null ||
+    final hasActiveForm = slot.formName != null ||
         slot.isMegaEvolved ||
-        (slot.hasGigantamax && slot.gigantamaxEnabled)) {
+        (slot.hasGigantamax && slot.gigantamaxEnabled);
+    // Gender-diff species (Indeedee, Pyroar, Unfezant, …) have a dedicated
+    // female sprite — see CLAUDE.md "Female form URL pattern". Only species
+    // with a real visual difference have spriteUrls.homeFemale populated by
+    // the backend; falling through to the regular sprite is intentional for
+    // the vast majority of female Pokémon that look identical to males.
+    // Forms/mega/gmax take priority over gender, same as team_detail_screen.dart.
+    final isFemale = !hasActiveForm && slot.gender == 'female';
+    String? homeUrl = (isFemale ? resolved?.spriteUrls.homeFemale : null) ??
+        resolved?.spriteUrls.home;
+    String? homeShinyUrl = (isFemale
+            ? (resolved?.spriteUrls.homeFemaleShiny ??
+                resolved?.spriteUrls.homeFemale)
+            : null) ??
+        resolved?.spriteUrls.homeShiny ??
+        resolved?.spriteUrls.home;
+
+    if (hasActiveForm) {
       final varietiesData = ref
           .watch(pokemonVarietiesProvider((id: slot.pokemonId, gen: null)))
           .asData
