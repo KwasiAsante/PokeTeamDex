@@ -188,6 +188,7 @@
 
 ### Bug Fixes & Polish Applied
 
+- [x] **Gender form sprites missing in Link selection & team screen** — `InstancePickerSheet`'s slot tile and `_SlotSprite` on the teams list never checked `slot.gender`, so gender-diff species (Indeedee, Pyroar, Unfezant, …) always showed the male/default sprite; now prefers the backend's `homeFemale`/`iconFemale` fields when present, falling through to the regular sprite for the vast majority of female Pokémon with no visual difference (#273)
 - [x] **Double navigation on startup** — main screen navigated to the Pokédex screen twice on app start/reload; root cause was `GoRouter` being rebuilt on every `authTokenProvider` change instead of once per app lifetime (#232)
 - [x] **Cross-form slot linking** — same-species Pokémon with different forms (Lycanroc Midnight/Midnight, Alolan Sandshrew, Aegislash Shield/Blade, Meowstic gender forms) could not be linked; fixed with precise same-form + mutable-species rules, gender matching, and correct form sprites in the picker and team list (#229)
 - [x] **Regional form gen gating** — Alolan/Galarian/Hisuian/Paldean form chips are now hidden when the team format's gen is below their introduction gen (7/8/9/9); uses `.contains()` so infix forms like `darmanitan-galar-zen` are also covered (#202)
