@@ -259,9 +259,23 @@ jobs:
 
       - name: Build Flatpak
         run: |
-          flatpak-builder --user --force-clean --disable-rofiles-fuse \
-            --repo=flatpak-repo \
-            flatpak-build-dir linux/flatpak/manifest.yml
+          # flatpak-builder fetches module sources (e.g. intltool from
+          # launchpad.net) over the network; transient timeouts to those
+          # external hosts shouldn't fail the whole release. --force-clean
+          # makes each attempt safe to retry from scratch.
+          for attempt in 1 2 3; do
+            if flatpak-builder --user --force-clean --disable-rofiles-fuse \
+                 --repo=flatpak-repo \
+                 flatpak-build-dir linux/flatpak/manifest.yml; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then
+              echo "flatpak-builder failed after 3 attempts" >&2
+              exit 1
+            fi
+            echo "flatpak-builder attempt $attempt failed; retrying in 30s..."
+            sleep 30
+          done
           flatpak build-bundle flatpak-repo \
             "PokeTeamDex-${{ needs.create-release.outputs.tag }}.flatpak" \
             io.github.KwasiAsante.PokeTeamDex

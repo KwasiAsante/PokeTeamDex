@@ -10,6 +10,8 @@ GitHub Actions CI/CD. Three workflows cover all automated build, deploy, and rel
 
 Builds the Flutter web target and deploys to Firebase Hosting at **https://poketeamdex.web.app**. Uses a `concurrency` group so a fast follow-up push cancels the in-progress run rather than queuing behind it.
 
+> Job sets `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true` to force Node 20 for `action-hosting-deploy@v0`. Node 24 (default on Actions runners since 2026-06-16) has a node-fetch/`http.Agent` regression ([nodejs/node#63989](https://github.com/nodejs/node/issues/63989)) that throws a false-positive "Premature close" on keep-alive socket reuse; firebase-tools retries on that error, but the retried "create release" call is non-idempotent, so it fails with `FAILED_PRECONDITION` ("... is the current active version") even though the original call already succeeded and the site was actually deployed. Remove this once `action-hosting-deploy` is updated to tolerate Node 24.
+
 **Secrets required:** `FIREBASE_SERVICE_ACCOUNT_JSON`
 
 ---
