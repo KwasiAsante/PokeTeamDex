@@ -1304,6 +1304,7 @@ class _SlotSprite extends ConsumerWidget {
     final isFemale = slot.gender == 'female';
     final iconUrl = (isFemale ? resolved?.spriteUrls.iconFemale : null) ??
         resolved?.spriteUrls.icon;
+    final iconFemaleFalback = isFemale ? resolved?.spriteUrls.icon : null;
     final spriteFallback =
         (isFemale ? resolved?.spriteUrls.gameFrontFemale : null) ??
             resolved?.spriteUrls.gameFront ??
@@ -1327,7 +1328,7 @@ class _SlotSprite extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(right: 2),
       child: CachedNetworkImage(
-        imageUrl: iconUrl ?? spriteFallback,
+        imageUrl: iconUrl ?? iconFemaleFalback ?? spriteFallback,
         width: width,
         height: height,
         fit: BoxFit.contain,
@@ -1335,17 +1336,26 @@ class _SlotSprite extends ConsumerWidget {
         memCacheHeight: cacheHeight,
         placeholder: (_, _) => placeholder,
         errorWidget: (_, _, _) => CachedNetworkImage(
-          imageUrl: spriteFallback,
+          imageUrl: iconFemaleFalback ?? spriteFallback,
           width: width,
           height: height,
           fit: BoxFit.contain,
           memCacheWidth: cacheWidth,
           memCacheHeight: cacheHeight,
           placeholder: (_, _) => placeholder,
-          errorWidget: (_, _, _) => Icon(
-            Icons.catching_pokemon,
-            size: 60,
-            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+          errorWidget: (_, _, _) => CachedNetworkImage(
+            imageUrl: spriteFallback,
+            width: width,
+            height: height,
+            fit: BoxFit.contain,
+            memCacheWidth: cacheWidth,
+            memCacheHeight: cacheHeight,
+            placeholder: (_, _) => placeholder,
+            errorWidget: (_, _, _) => Icon(
+              Icons.catching_pokemon,
+              size: 60,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+            ),
           ),
         ),
       ),
