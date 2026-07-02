@@ -959,7 +959,7 @@ def _make_mock_pokemon_data():
                     {
                         "level_learned_at": 0,
                         "move_learn_method": {"name": "machine", "url": "..."},
-                        "version_group": {"name": "sword-shield", "url": "..."},
+                        "version_group": {"name": "scarlet-violet", "url": "..."},
                     }
                 ],
             }
@@ -1042,7 +1042,7 @@ async def test_resolve_populates_detail_fields(async_db_session):
     # moves full when includes=["moves"]
     assert len(result.moves) == 1
     assert result.moves[0].name == "flamethrower"
-    assert result.moves[0].learn_details[0].version_group == "sword-shield"
+    assert result.moves[0].learn_details[0].version_group == "scarlet-violet"
     # flavor text full when includes=["flavor"]
     assert len(result.flavor_text_entries) == 1
     assert result.flavor_text_entries[0].language == "en"

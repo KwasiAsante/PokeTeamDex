@@ -24,8 +24,10 @@ class AbilityInfo(BaseModel):
 
 class MoveLearnDetail(BaseModel):
     version_group: str
-    method: str   # "level-up", "machine", "egg", "tutor"
-    level: int    # 0 for non-level-up methods
+    method: str        # "level-up", "machine", "egg", "tutor", "event"
+    level: int | None  # None for non-level-up methods
+    via_prevo: bool = False   # move is inherited from a pre-evolution
+    prevo: str | None = None  # PS ID of the pre-evolution that teaches it
 
 
 class MoveSummary(BaseModel):
@@ -42,7 +44,9 @@ class FlavorTextEntry(BaseModel):
 class MovesResponse(BaseModel):
     pokemon_id: int
     name: str
+    gen: int | None = None       # generation the moves were filtered to; None = all gens
     moves: list[MoveSummary]
+    gen_moves: dict[str, list[MoveSummary]] | None = None  # reserved for future all-gen response
 
 
 class FlavorTextResponse(BaseModel):
@@ -62,6 +66,8 @@ class EventMove(BaseModel):
     display_name: str
     generations: list[int]
     methods: list[str]  # e.g. ["event"], ["egg"], ["tutor"], ["level", "event"]
+    via_prevo: bool = False   # move is inherited from a pre-evolution
+    prevo: str | None = None  # PS ID of the pre-evolution that teaches it
 
 
 class SmogonSet(BaseModel):

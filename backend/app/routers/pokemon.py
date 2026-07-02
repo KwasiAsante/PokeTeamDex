@@ -103,13 +103,22 @@ async def get_pokemon_moves(
     request: Request,
     name_or_id: Annotated[str, Path(description="PokéAPI Pokémon name (e.g. 'charizard', 'charizard-mega-x') or numeric ID (e.g. 6, 10034).")],
     db: DB,
+    gen: int | None = Query(
+        default=None,
+        ge=1,
+        le=9,
+        description="Filter moves to this generation (1–9). Omit to return all version groups.",
+    ),
 ) -> MovesResponse:
     """
-    Return the full moves list for a Pokémon (all version groups).
-    Served from PostgreSQL cache when available; triggers a full resolve on miss.
+    Return the moves list for a Pokémon.
+
+    Without `gen`: all version groups from PokéAPI are returned (no supplement moves).
+    With `gen=N`: moves are filtered to that generation's version groups, and any moves
+    present in the Showdown learnset but absent from PokéAPI are appended.
     """
     return await pokemon_resolver_service.resolve_moves(
-        name_or_id, db, _base_url(request)
+        name_or_id, gen, db, _base_url(request)
     )
 
 
