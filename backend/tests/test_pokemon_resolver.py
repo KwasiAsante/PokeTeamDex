@@ -44,6 +44,13 @@ def _make_service(
     svc._smogon_analyses = smogon_analyses or {}
     svc._smogon_loaded = smogon_loaded
     svc._ps_exceptions = ps_exceptions or {}
+    # Default to a mocked HTTP client so no unit test accidentally makes a
+    # real network call via a HEAD probe (game_front/icon fallback paths
+    # await _probe_url). Defaults to "everything resolves" so existing
+    # assertions about constructed URLs keep passing; tests that care about
+    # probe failures override svc._pokeapi_http themselves.
+    svc._pokeapi_http = AsyncMock()
+    svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
     return svc
 
 
@@ -849,12 +856,13 @@ class TestBuildVarietySpriteUrls:
     async def test_female_variety_icon_probed_and_nulled_on_404(self):
         """-female variety entries (Basculegion-female, etc.) have no API field
         confirming a separate icon exists — probe, and return null on 404
-        rather than a guessed URL."""
+        rather than a guessed URL. gen=None so game_front's own (unrelated)
+        probing doesn't interfere with the single-probe assertion below."""
         svc = self._svc()
         svc._pokeapi_http = AsyncMock()
         svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
         result = await svc._build_variety_sprite_urls(
-            {}, "basculegion-female", 10248, 9,
+            {}, "basculegion-female", 10248, None,
             variety_name="basculegion-female", base_pokemon_id=902,
         )
         assert result.icon is None
@@ -876,11 +884,13 @@ class TestBuildVarietySpriteUrls:
     async def test_default_icon_fallback_probed_and_nulled_on_404(self):
         """Non-female varieties with no icon API field and no static override
         (e.g. Basculin-White-Striped, a Gen 8 DLC addition with no icon file
-        in the sprites repo) must also be probed rather than guessed."""
+        in the sprites repo) must also be probed rather than guessed. gen=None
+        so game_front's own (unrelated) probing doesn't interfere with the
+        single-probe assertion below."""
         svc = self._svc()
         svc._pokeapi_http = AsyncMock()
         svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
-        result = await svc._build_variety_sprite_urls({}, "basculin-white-striped", 10247, 9)
+        result = await svc._build_variety_sprite_urls({}, "basculin-white-striped", 10247, None)
         assert result.icon is None
         svc._pokeapi_http.head.assert_awaited_once()
 
@@ -958,20 +968,80 @@ class TestBuildVarietySpriteUrls:
         svc = self._svc()
         sprites = {
             **self._SPRITES,
-            "versions": {"generation-ix": {"scarlet-violet": {"front_default": "https://pokeapi/real/6.png"}}},
+            "versions": {
+                # front_shiny and the icon field are also given real data so
+                # this test's "no probing happened" assertion isn't tripped
+                # by either field's own unrelated probe-on-absent-data branch.
+                "generation-ix": {"scarlet-violet": {
+                    "front_default": "https://pokeapi/real/6.png",
+                    "front_shiny": "https://pokeapi/real/6-shiny.png",
+                }},
+                "generation-viii": {"icons": {"front_default": "https://pokeapi/icons/6.png"}},
+            },
         }
         result = await svc._build_variety_sprite_urls(sprites, "charizard", 6, 9)
         assert result.game_front == "https://pokeapi/real/6.png"
+        svc._pokeapi_http.head.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_game_front_shiny_uses_api_pool_data_over_guess(self):
         svc = self._svc()
         sprites = {
             **self._SPRITES,
-            "versions": {"generation-ix": {"scarlet-violet": {"front_shiny": "https://pokeapi/real/6-shiny.png"}}},
+            "versions": {
+                "generation-ix": {"scarlet-violet": {
+                    "front_default": "https://pokeapi/real/6.png",
+                    "front_shiny": "https://pokeapi/real/6-shiny.png",
+                }},
+                "generation-viii": {"icons": {"front_default": "https://pokeapi/icons/6.png"}},
+            },
         }
         result = await svc._build_variety_sprite_urls(sprites, "charizard", 6, 9)
         assert result.game_front_shiny == "https://pokeapi/real/6-shiny.png"
+        svc._pokeapi_http.head.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_game_front_guess_probed_and_nulled_on_404(self):
+        """When the API has no versioned sprite data for this gen, the
+        constructed PokeAPI/Showdown guess is HEAD-probed before being
+        returned — a species not yet mirrored anywhere resolves to null,
+        not a URL known to fail."""
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        result = await svc._build_variety_sprite_urls({}, "charizard", 6, 9)
+        assert result.game_front is None
+
+    @pytest.mark.asyncio
+    async def test_game_front_guess_probed_and_kept_on_200(self):
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
+        result = await svc._build_variety_sprite_urls({}, "charizard", 6, 9)
+        assert result.game_front is not None
+
+    @pytest.mark.asyncio
+    async def test_game_front_shiny_guess_probed_and_nulled_on_404(self):
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        result = await svc._build_variety_sprite_urls({}, "charizard", 6, 9)
+        assert result.game_front_shiny is None
+
+    @pytest.mark.asyncio
+    async def test_game_front_shiny_guess_probed_and_kept_on_200(self):
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
+        result = await svc._build_variety_sprite_urls({}, "charizard", 6, 9)
+        assert result.game_front_shiny is not None
+
+    @pytest.mark.asyncio
+    async def test_game_front_shiny_gen1_is_none_without_a_valid_candidate(self):
+        """Gen 1 never had shiny sprites — both the PokeAPI and Showdown
+        constructors return None, so there's no candidate to probe for
+        game_front_shiny specifically (game_front itself is still probed
+        since Gen 1 does have a non-shiny sprite directory)."""
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
+        result = await svc._build_variety_sprite_urls({}, "charizard", 6, 1)
+        assert result.game_front_shiny is None
 
     @pytest.mark.asyncio
     async def test_game_front_female_shiny_absent_returns_none(self):
@@ -1035,25 +1105,29 @@ class TestBuildVarietySpriteUrls:
 
     @pytest.mark.asyncio
     async def test_icon_uses_gen8_api_field_directly_without_probing(self):
+        """gen=None so game_front's own (unrelated) probe-on-absent-data
+        branch doesn't interfere with this test's no-probing assertion."""
         svc = self._svc()
         svc._pokeapi_http = AsyncMock()
         sprites = {"versions": {"generation-viii": {"icons": {"front_default": "https://pokeapi/icons/6.png"}}}}
-        result = await svc._build_variety_sprite_urls(sprites, "charizard", 6, 9)
+        result = await svc._build_variety_sprite_urls(sprites, "charizard", 6, None)
         assert result.icon == "https://pokeapi/icons/6.png"
         svc._pokeapi_http.head.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_icon_override_id_used_without_probing(self):
         """Static overrides (pokemon_registry.json) are pre-verified by whoever
-        curated them — trust them outright, no need to probe on every request."""
+        curated them — trust them outright, no need to probe on every request.
+        gen=None so game_front's own (unrelated) probing doesn't interfere."""
         svc = self._svc()
         svc._pokeapi_http = AsyncMock()
         svc._variety_icon_id_overrides = {"calyrex-ice": "898-ice-rider"}
         result = await svc._build_variety_sprite_urls(
-            {}, "calyrex-ice", 10193, 9, variety_name="calyrex-ice",
+            {}, "calyrex-ice", 10193, None, variety_name="calyrex-ice",
         )
         assert result.icon is not None
         assert "898-ice-rider" in result.icon
+        svc._pokeapi_http.head.assert_not_called()
         svc._pokeapi_http.head.assert_not_called()
 
     # -- icon_shiny always mirrors game_front_shiny, including the null case --
@@ -1105,32 +1179,32 @@ class TestBuildVarietySpriteUrls:
 
 
 class TestBuildFormSpriteUrls:
+    """_build_form_sprite_urls is a pure assembler now — every URL it places
+    into SpriteUrlsFull is a caller-supplied, already-HEAD-probed value (see
+    _fetch_forms). It does no construction and no guessing of its own, so
+    these tests are all passthrough/null-default checks. The probing and
+    URL-construction logic itself is covered by TestFetchFormsSpriteProbeWiring
+    below, since that's where it now actually lives."""
+
     def _svc(self):
         return _make_service()
 
     def test_no_official_artwork(self):
         svc = self._svc()
-        result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 9)
+        result = svc._build_form_sprite_urls()
         assert result.official_artwork is None
 
-    def test_home_uses_showdown(self):
+    def test_official_artwork_passes_through_when_probed(self):
         svc = self._svc()
-        result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 9)
-        assert result.home is not None
-        assert "home/unown-b.png" in result.home
+        result = svc._build_form_sprite_urls(pokeapi_oa="https://pokeapi/oa/201-b.png")
+        assert result.official_artwork == "https://pokeapi/oa/201-b.png"
 
-    def test_gen2_game_front_uses_pokeapi_sprites(self):
+    def test_official_artwork_shiny_always_none(self):
+        """Form-entry cosmetics never get shiny official artwork (there is no
+        pokeapi_oa_shiny probe/param) — must be null, never guessed."""
         svc = self._svc()
-        result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 2)
-        assert result.game_front is not None
-        # Should use PokeAPI/sprites path with 201-b
-        assert "201-b" in result.game_front
-
-    def test_gen9_game_front_uses_showdown_dex(self):
-        svc = self._svc()
-        result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 9)
-        assert result.game_front is not None
-        assert "dex/unown-b.png" in result.game_front
+        result = svc._build_form_sprite_urls(pokeapi_oa="https://pokeapi/oa/201-b.png")
+        assert result.official_artwork_shiny is None
 
     def test_icon_is_null_when_not_probed(self):
         """icon is caller-supplied (pre-verified via HEAD probe in
@@ -1138,80 +1212,67 @@ class TestBuildFormSpriteUrls:
         groups (Alcremie's 63 flavors, Pumpkaboo's sizes) share one icon
         across all variants and 404 on a constructed per-suffix path."""
         svc = self._svc()
-        result = svc._build_form_sprite_urls("alcremie-ruby-cream-strawberry-sweet", 869, "alcremie", "alcremie", 9)
+        result = svc._build_form_sprite_urls()
         assert result.icon is None
 
     def test_icon_passes_through_when_probed(self):
         svc = self._svc()
-        result = svc._build_form_sprite_urls(
-            "unown-b", 201, "unown", "unown-b", 9,
-            pokeapi_icon="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-viii/icons/201-b.png",
-        )
-        assert result.icon == "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-viii/icons/201-b.png"
+        result = svc._build_form_sprite_urls(pokeapi_icon="https://pokeapi/icons/201-b.png")
+        assert result.icon == "https://pokeapi/icons/201-b.png"
 
-    def test_official_artwork_shiny_always_none(self):
-        """Form-entry cosmetics never get shiny official artwork (there is no
-        pokeapi_oa_shiny probe/param) — must be null, never guessed."""
+    def test_home_is_null_when_not_probed(self):
         svc = self._svc()
-        result = svc._build_form_sprite_urls(
-            "unown-b", 201, "unown", "unown-b", 9,
-            pokeapi_oa="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/201-b.png",
-        )
-        assert result.official_artwork_shiny is None
+        result = svc._build_form_sprite_urls()
+        assert result.home is None
+        assert result.home_shiny is None
 
     def test_home_uses_probed_value_when_present(self):
-        """When the caller's HEAD probe confirmed a PokeAPI HOME URL, use it
-        directly rather than falling back to the unverified Showdown guess."""
+        """home/home_shiny only ever hold a value the caller already
+        HEAD-probed (from either PokeAPI or Showdown) — no fallback
+        construction happens at this layer anymore."""
         svc = self._svc()
-        result = svc._build_form_sprite_urls(
-            "unown-b", 201, "unown", "unown-b", 9,
-            pokeapi_home="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/201-b.png",
-        )
-        assert result.home == "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/201-b.png"
+        result = svc._build_form_sprite_urls(pokeapi_home="https://pokeapi/home/201-b.png")
+        assert result.home == "https://pokeapi/home/201-b.png"
 
     def test_home_shiny_uses_probed_value_when_present(self):
         svc = self._svc()
-        result = svc._build_form_sprite_urls(
-            "unown-b", 201, "unown", "unown-b", 9,
-            pokeapi_home_shiny="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/201-b.png",
-        )
-        assert result.home_shiny == "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/201-b.png"
-
-    def test_home_shiny_falls_back_to_showdown_when_probe_absent(self):
-        svc = self._svc()
-        result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 9)
-        assert result.home_shiny is not None
-        assert "home-shiny/unown-b.png" in result.home_shiny
+        result = svc._build_form_sprite_urls(pokeapi_home_shiny="https://pokeapi/home/shiny/201-b.png")
+        assert result.home_shiny == "https://pokeapi/home/shiny/201-b.png"
 
     def test_home_female_always_none(self):
         """Form-entry cosmetics never expose gendered HOME art through this
         builder — gendered form entries are represented via the `icon`
         female-subdir path, not home_female."""
         svc = self._svc()
-        result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 9)
+        result = svc._build_form_sprite_urls()
         assert result.home_female is None
         assert result.home_female_shiny is None
 
+    def test_game_front_is_null_when_not_probed(self):
+        svc = self._svc()
+        result = svc._build_form_sprite_urls()
+        assert result.game_front is None
+        assert result.game_front_shiny is None
+
+    def test_game_front_uses_probed_value_when_present(self):
+        svc = self._svc()
+        result = svc._build_form_sprite_urls(pokeapi_game_front="https://pokeapi/versions/201-b.png")
+        assert result.game_front == "https://pokeapi/versions/201-b.png"
+
     def test_game_front_female_always_none(self):
         svc = self._svc()
-        result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 9)
+        result = svc._build_form_sprite_urls()
         assert result.game_front_female is None
         assert result.game_front_female_shiny is None
 
-    def test_game_front_shiny_gen1_returns_none(self):
-        svc = self._svc()
-        result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 1)
-        assert result.game_front_shiny is None
-
     def test_icon_shiny_mirrors_game_front_shiny(self):
         svc = self._svc()
-        result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 9)
-        assert result.icon_shiny == result.game_front_shiny
-        assert result.icon_shiny is not None
+        result = svc._build_form_sprite_urls(pokeapi_game_front_shiny="https://pokeapi/versions/shiny/201-b.png")
+        assert result.icon_shiny == result.game_front_shiny == "https://pokeapi/versions/shiny/201-b.png"
 
-    def test_icon_shiny_is_none_when_gen1_has_no_shiny(self):
+    def test_icon_shiny_is_none_when_game_front_shiny_not_probed(self):
         svc = self._svc()
-        result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 1)
+        result = svc._build_form_sprite_urls()
         assert result.game_front_shiny is None
         assert result.icon_shiny is None
 
@@ -1273,10 +1334,48 @@ class TestFetchVarietiesSpriteProbeWiring:
         assert len(result) == 1
         assert result[0].sprite_urls.icon is not None
 
+    @pytest.mark.asyncio
+    async def test_game_front_guess_404_flows_to_null(self):
+        """A variety with no versioned sprite data for this gen (sprites={})
+        forces the constructed-guess path in _build_variety_sprite_urls —
+        confirm a 404 on that guess reaches the returned VarietyData as null."""
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.get = AsyncMock(return_value=self._variety_response("basculin-white-striped", 10247))
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+
+        varieties = [{
+            "is_default": False,
+            "pokemon": {"name": "basculin-white-striped", "url": "https://pokeapi.co/api/v2/pokemon/10247/"},
+        }]
+        result = await svc._fetch_varieties(varieties, "basculin", 9)
+
+        assert len(result) == 1
+        assert result[0].sprite_urls.game_front is None
+
+    @pytest.mark.asyncio
+    async def test_game_front_guess_200_flows_to_populated_value(self):
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.get = AsyncMock(return_value=self._variety_response("basculin-blue-striped", 10016))
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
+
+        varieties = [{
+            "is_default": False,
+            "pokemon": {"name": "basculin-blue-striped", "url": "https://pokeapi.co/api/v2/pokemon/10016/"},
+        }]
+        result = await svc._fetch_varieties(varieties, "basculin", 9)
+
+        assert len(result) == 1
+        assert result[0].sprite_urls.game_front is not None
+
 
 class TestFetchFormsSpriteProbeWiring:
-    """Confirms a 404'd HEAD probe for a form-entry icon (Alcremie-style
-    shared/missing icon) flows through _fetch_forms into a null icon."""
+    """Confirms 404'd/200'd HEAD probes for every form-entry sprite field
+    (icon, home, home_shiny, game_front, game_front_shiny) flow through
+    _fetch_forms correctly. This is also where the URL-construction logic
+    for game_front/game_front_shiny/home's PokeAPI-vs-Showdown fallback now
+    lives (moved out of _build_form_sprite_urls, which is a pure assembler)."""
 
     def _svc(self):
         return _make_service()
@@ -1290,6 +1389,17 @@ class TestFetchFormsSpriteProbeWiring:
             "sprites": {"front_default": f"https://pokeapi/plain/{name}.png"},
         }
         return resp
+
+    @staticmethod
+    def _head_side_effect(rules: dict[str, int], default: int = 404):
+        """Return a HEAD-probe side_effect: first rule whose key is a
+        substring of the requested URL wins; unmatched URLs get `default`."""
+        async def _side_effect(url, **kwargs):
+            for substr, code in rules.items():
+                if substr in url:
+                    return MagicMock(status_code=code)
+            return MagicMock(status_code=default)
+        return _side_effect
 
     @pytest.mark.asyncio
     async def test_shared_icon_form_404_flows_to_null_icon(self):
@@ -1318,6 +1428,94 @@ class TestFetchFormsSpriteProbeWiring:
 
         assert len(result) == 1
         assert result[0].sprite_urls.icon is not None
+
+    @pytest.mark.asyncio
+    async def test_game_front_gen2_uses_pokeapi_versioned_dir_when_probe_succeeds(self):
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.get = AsyncMock(return_value=self._form_response("unown-b", 201))
+        svc._pokeapi_http.head = AsyncMock(side_effect=self._head_side_effect({"generation-ii": 200}))
+
+        result = await svc._fetch_forms(["unown", "unown-b"], 201, "unown", 2)
+
+        assert result[0].sprite_urls.game_front is not None
+        assert "generation-ii" in result[0].sprite_urls.game_front
+
+    @pytest.mark.asyncio
+    async def test_game_front_gen8_uses_showdown_dex_when_probe_succeeds(self):
+        """Gen 8 has no versioned PokeAPI sprite directory at all (per
+        _GEN_SPRITE_CONFIG) — Showdown's dex is the only candidate probed."""
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.get = AsyncMock(return_value=self._form_response("unown-b", 201))
+        svc._pokeapi_http.head = AsyncMock(side_effect=self._head_side_effect({"dex/unown-b.png": 200}))
+
+        result = await svc._fetch_forms(["unown", "unown-b"], 201, "unown", 8)
+
+        assert result[0].sprite_urls.game_front is not None
+        assert "dex/unown-b.png" in result[0].sprite_urls.game_front
+
+    @pytest.mark.asyncio
+    async def test_game_front_null_when_probe_404s(self):
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.get = AsyncMock(return_value=self._form_response("unown-b", 201))
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+
+        result = await svc._fetch_forms(["unown", "unown-b"], 201, "unown", 2)
+
+        assert result[0].sprite_urls.game_front is None
+
+    @pytest.mark.asyncio
+    async def test_game_front_shiny_gen1_is_none_without_a_valid_candidate(self):
+        """Gen 1 never had shiny sprites — no candidate URL exists to probe
+        at all, so this must resolve to None even though every other probe
+        in the same batch succeeds."""
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.get = AsyncMock(return_value=self._form_response("unown-b", 201))
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
+
+        result = await svc._fetch_forms(["unown", "unown-b"], 201, "unown", 1)
+
+        assert result[0].sprite_urls.game_front_shiny is None
+
+    @pytest.mark.asyncio
+    async def test_home_prefers_pokeapi_over_showdown_when_both_succeed(self):
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.get = AsyncMock(return_value=self._form_response("unown-b", 201))
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
+
+        result = await svc._fetch_forms(["unown", "unown-b"], 201, "unown", 9)
+
+        assert result[0].sprite_urls.home is not None
+        assert "raw.githubusercontent.com" in result[0].sprite_urls.home
+
+    @pytest.mark.asyncio
+    async def test_home_falls_back_to_showdown_when_pokeapi_probe_404s(self):
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.get = AsyncMock(return_value=self._form_response("unown-b", 201))
+        svc._pokeapi_http.head = AsyncMock(
+            side_effect=self._head_side_effect({"play.pokemonshowdown.com/sprites/home/": 200})
+        )
+
+        result = await svc._fetch_forms(["unown", "unown-b"], 201, "unown", 9)
+
+        assert result[0].sprite_urls.home is not None
+        assert "play.pokemonshowdown.com" in result[0].sprite_urls.home
+
+    @pytest.mark.asyncio
+    async def test_home_null_when_both_pokeapi_and_showdown_404(self):
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.get = AsyncMock(return_value=self._form_response("unown-b", 201))
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+
+        result = await svc._fetch_forms(["unown", "unown-b"], 201, "unown", 9)
+
+        assert result[0].sprite_urls.home is None
 
 
 # ---------------------------------------------------------------------------

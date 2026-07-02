@@ -515,16 +515,21 @@ class PokemonResolverService:
                          .get(gen_key, {})
                          .get(game_key, {}))
             pool = versioned.get(subdir, {}) if subdir else versioned
-            game_front = (
-                pool.get("front_default")
-                or _build_pokeapi_sprite_url(sprite_id, gen)
-                or _build_showdown_sprite_url(ps_name, gen)
-            )
-            game_front_shiny = (
-                pool.get("front_shiny")
-                or _build_pokeapi_sprite_url(sprite_id, gen, shiny=True)
-                or _build_showdown_sprite_url(ps_name, gen, shiny=True)
-            )
+            # Trust the API's own data first. Only when it's absent do we fall
+            # back to a constructed guess — and that guess is HEAD-probed
+            # before being returned, same as the icon fields, so we never
+            # hand back a URL we haven't confirmed resolves.
+            game_front = pool.get("front_default")
+            if game_front is None:
+                guess = _build_pokeapi_sprite_url(sprite_id, gen) or _build_showdown_sprite_url(ps_name, gen)
+                game_front = await _probe_url(self._pokeapi_http, guess) if guess else None
+            game_front_shiny = pool.get("front_shiny")
+            if game_front_shiny is None:
+                guess_shiny = (
+                    _build_pokeapi_sprite_url(sprite_id, gen, shiny=True)
+                    or _build_showdown_sprite_url(ps_name, gen, shiny=True)
+                )
+                game_front_shiny = await _probe_url(self._pokeapi_http, guess_shiny) if guess_shiny else None
             # Female game sprites: unlike game_front/game_front_shiny (which exist
             # for every Pokémon in every gen it appeared in), a female-specific
             # sprite only exists for species with a visible gender difference.
@@ -599,68 +604,35 @@ class PokemonResolverService:
 
     def _build_form_sprite_urls(
         self,
-        form_name: str,
-        base_id: int,
-        species_name: str,
-        ps_name: str,
-        gen: int,
-        is_default_form: bool = False,
         pokeapi_home: str | None = None,
         pokeapi_home_shiny: str | None = None,
         pokeapi_oa: str | None = None,
         pokeapi_icon: str | None = None,
+        pokeapi_game_front: str | None = None,
+        pokeapi_game_front_shiny: str | None = None,
     ) -> SpriteUrlsFull:
         """Build full sprite URLs for a cosmetic form-entry (no /pokemon resource).
 
-        is_default_form=True: the form IS the base Pokémon (index 0 in forms[]).
-        PokeAPI root sprites and Showdown HOME/dex directories store the default
-        form under the base name — NOT the suffixed name:
-          sprites/pokemon/201-a.png  → 404   sprites/pokemon/201.png  → ✓
-          home/unown-a.png           → 404   home/unown.png           → ✓
+        home/home_shiny/icon/game_front/game_front_shiny/official_artwork are
+        all pre-verified via HEAD probe by the caller (_fetch_forms, batched
+        in one parallel asyncio.gather) — this function only assembles the
+        already-confirmed values into a SpriteUrlsFull. None here means no
+        candidate URL (PokeAPI versioned dir or Showdown CDN) resolved.
 
-        However, the versioned PokeAPI sprite directories (gen 2 Crystal animated,
-        gen 5 BW animated) DO use the suffixed ID, so those paths keep the suffix
-        regardless of is_default_form:
-          crystal/animated/201-a.gif → ✓   crystal/animated/201.gif → 404
-
-        Non-default forms (B–Z, !, ? for Unown) are unaffected — suffixed paths
-        work consistently across all directories for those.
+        See _fetch_forms's _form_game_sprite_url/_form_showdown_home_paths for
+        the compatibility quirks these candidates account for (e.g. Unown's
+        default-form suffix inconsistency between HOME/dex and the versioned
+        PokeAPI sprite directories).
         """
-        suffix = _extract_form_suffix(form_name, species_name)
-        # Use the remapped suffix for PokeAPI sprites repo paths (icons, versioned
-        # game sprites). The sprites repo uses shorter names for some forms.
-        repo_suffix = _SPRITE_SUFFIX_REMAP.get(suffix, suffix)
-        sprite_id = f"{base_id}-{repo_suffix}" if repo_suffix else str(base_id)
-
-        # HOME and dex Showdown paths: default form uses base species name.
-        home_ps_name = species_name if is_default_form else ps_name
-
-        # Versioned PokeAPI sprites (primary) still use the suffixed sprite_id —
-        # crystal/animated/201-a.gif is correct even for the default/A form.
-        # Showdown fallback uses home_ps_name (base name for default form).
-        game_front = (
-            _build_pokeapi_sprite_url(sprite_id, gen)
-            or _build_showdown_sprite_url(home_ps_name, gen)
-        )
-        game_front_shiny = (
-            _build_pokeapi_sprite_url(sprite_id, gen, shiny=True)
-            or _build_showdown_sprite_url(home_ps_name, gen, shiny=True)
-        )
-
-        # Prefer PokeAPI CDN (no CORS on web). Fall back to Showdown (works on
-        # mobile/desktop but blocked by CORS policy in browsers).
-        home_url = pokeapi_home or f"{_SHOWDOWN_CDN}/home/{home_ps_name}.png"
-        home_shiny_url = pokeapi_home_shiny or f"{_SHOWDOWN_CDN}/home-shiny/{home_ps_name}.png"
-
         return SpriteUrlsFull(
             official_artwork=pokeapi_oa,
             official_artwork_shiny=None,
-            home=home_url,
-            home_shiny=home_shiny_url,
+            home=pokeapi_home,
+            home_shiny=pokeapi_home_shiny,
             home_female=None,
             home_female_shiny=None,
-            game_front=game_front,
-            game_front_shiny=game_front_shiny,
+            game_front=pokeapi_game_front,
+            game_front_shiny=pokeapi_game_front_shiny,
             game_front_female=None,
             game_front_female_shiny=None,
             # Per-form icons aren't guaranteed to exist — some cosmetic groups
@@ -669,7 +641,7 @@ class PokemonResolverService:
             # per-suffix path). pokeapi_icon is pre-verified via HEAD probe by
             # the caller; null here means no dedicated icon exists.
             icon=pokeapi_icon,
-            icon_shiny=game_front_shiny,
+            icon_shiny=pokeapi_game_front_shiny,
         )
 
     async def _build_base_sprite_urls(
@@ -848,8 +820,9 @@ class PokemonResolverService:
                 f"{_POKEAPI_HOME}/shiny/{home_id}.png",
             )
 
-        # Batch: form-data fetches + PokeAPI sprite CDN probes (home, home_shiny,
-        # official-artwork, icon). All run in parallel; probes are HEAD-only, cheap.
+        # Batch: form-data fetches + PokeAPI/Showdown sprite CDN probes (home,
+        # home_shiny, official-artwork, icon, game_front, game_front_shiny).
+        # All run in parallel; probes are HEAD-only, cheap.
         def _form_oa_url(fn: str) -> str:
             sfx = _extract_form_suffix(fn, species_name)
             mapped = _SPRITE_SUFFIX_REMAP.get(sfx, sfx)
@@ -866,19 +839,51 @@ class PokemonResolverService:
             icon_id = f"{base_id}-{mapped}" if mapped else str(base_id)
             return _build_icon_url(icon_id, gen)
 
+        def _form_showdown_home_paths(fn: str) -> tuple[str, str]:
+            ps_name = _to_showdown_name(fn, self._ps_exceptions)
+            return (
+                f"{_SHOWDOWN_CDN}/home/{ps_name}.png",
+                f"{_SHOWDOWN_CDN}/home-shiny/{ps_name}.png",
+            )
+
+        def _form_game_sprite_url(fn: str, shiny: bool = False) -> str | None:
+            sfx = _extract_form_suffix(fn, species_name)
+            mapped = _SPRITE_SUFFIX_REMAP.get(sfx, sfx)
+            f_sprite_id = f"{base_id}-{mapped}" if mapped else str(base_id)
+            f_ps_name = _to_showdown_name(fn, self._ps_exceptions)
+            return (
+                _build_pokeapi_sprite_url(f_sprite_id, gen, shiny=shiny)
+                or _build_showdown_sprite_url(f_ps_name, gen, shiny=shiny)
+            )
+
+        async def _probe_maybe(url: str | None) -> str | None:
+            # Some candidates are legitimately None (e.g. gen 1 has no shinies) —
+            # skip the network call rather than probing a URL we already know
+            # doesn't apply.
+            if url is None:
+                return None
+            return await _probe_url(self._pokeapi_http, url)
+
         async def _fetch_form(name: str) -> httpx.Response:
             async with self._pokeapi_semaphore:
                 return await self._pokeapi_http.get(f"{_POKEAPI_BASE}/pokemon-form/{name}")
 
         _home_paths = [_form_home_paths(n) for n in non_defaults]
+        _showdown_home_paths = [_form_showdown_home_paths(n) for n in non_defaults]
         form_tasks = [_fetch_form(n) for n in non_defaults]
         home_tasks = [_probe_url(self._pokeapi_http, p[0]) for p in _home_paths]
         home_shiny_tasks = [_probe_url(self._pokeapi_http, p[1]) for p in _home_paths]
+        home_showdown_tasks = [_probe_url(self._pokeapi_http, p[0]) for p in _showdown_home_paths]
+        home_shiny_showdown_tasks = [_probe_url(self._pokeapi_http, p[1]) for p in _showdown_home_paths]
         oa_tasks = [_probe_url(self._pokeapi_http, _form_oa_url(n)) for n in non_defaults]
         icon_tasks = [_probe_url(self._pokeapi_http, _form_icon_url(n)) for n in non_defaults]
+        game_front_tasks = [_probe_maybe(_form_game_sprite_url(n)) for n in non_defaults]
+        game_front_shiny_tasks = [_probe_maybe(_form_game_sprite_url(n, shiny=True)) for n in non_defaults]
 
         all_results = await asyncio.gather(
-            *form_tasks, *home_tasks, *home_shiny_tasks, *oa_tasks, *icon_tasks,
+            *form_tasks, *home_tasks, *home_shiny_tasks, *home_showdown_tasks,
+            *home_shiny_showdown_tasks, *oa_tasks, *icon_tasks,
+            *game_front_tasks, *game_front_shiny_tasks,
             return_exceptions=True,
         )
 
@@ -886,8 +891,12 @@ class PokemonResolverService:
         form_responses = all_results[:_n]
         home_results = all_results[_n:2 * _n]
         home_shiny_results = all_results[2 * _n:3 * _n]
-        oa_results = all_results[3 * _n:4 * _n]
-        icon_results = all_results[4 * _n:]
+        home_showdown_results = all_results[3 * _n:4 * _n]
+        home_shiny_showdown_results = all_results[4 * _n:5 * _n]
+        oa_results = all_results[5 * _n:6 * _n]
+        icon_results = all_results[6 * _n:7 * _n]
+        game_front_results = all_results[7 * _n:8 * _n]
+        game_front_shiny_results = all_results[8 * _n:]
 
         result: list[FormData] = []
         for i, form_name in enumerate(non_defaults):
@@ -904,20 +913,30 @@ class PokemonResolverService:
             else:
                 fallback_front = f"{_POKEAPI_PLAIN_SPRITES}/{sprite_id}.png"
 
-            pokeapi_home = home_results[i] if not isinstance(home_results[i], Exception) else None
-            pokeapi_home_shiny = home_shiny_results[i] if not isinstance(home_shiny_results[i], Exception) else None
-            pokeapi_oa = oa_results[i] if not isinstance(oa_results[i], Exception) else None
-            pokeapi_icon = icon_results[i] if not isinstance(icon_results[i], Exception) else None
+            def _first_ok(results: list) -> str | None:
+                v = results[i]
+                return None if isinstance(v, Exception) else v
+
+            # Prefer PokeAPI CDN (no CORS on web) over Showdown (works on
+            # mobile/desktop but blocked by CORS policy in browsers) — both
+            # were probed, so either being None here means neither exists.
+            pokeapi_home = _first_ok(home_results) or _first_ok(home_showdown_results)
+            pokeapi_home_shiny = _first_ok(home_shiny_results) or _first_ok(home_shiny_showdown_results)
+            pokeapi_oa = _first_ok(oa_results)
+            pokeapi_icon = _first_ok(icon_results)
+            pokeapi_game_front = _first_ok(game_front_results)
+            pokeapi_game_front_shiny = _first_ok(game_front_shiny_results)
 
             if isinstance(resp, Exception) or resp.status_code != 200:
                 logger.warning("Failed to fetch form %s: %s", form_name, resp)
                 # Even without form-API data we may have probed home sprites successfully.
                 sprite_urls = self._build_form_sprite_urls(
-                    form_name, base_id, species_name, ps_name, gen,
                     pokeapi_home=pokeapi_home,
                     pokeapi_home_shiny=pokeapi_home_shiny,
                     pokeapi_oa=pokeapi_oa,
                     pokeapi_icon=pokeapi_icon,
+                    pokeapi_game_front=pokeapi_game_front,
+                    pokeapi_game_front_shiny=pokeapi_game_front_shiny,
                 )
                 result.append(FormData(
                     name=form_name, form_id=base_id, is_default=False,
@@ -930,11 +949,12 @@ class PokemonResolverService:
             api_front = (form_data_json.get("sprites") or {}).get("front_default") or pokeapi_home or fallback_front
             form_id = form_data_json.get("id", base_id)
             sprite_urls = self._build_form_sprite_urls(
-                form_name, base_id, species_name, ps_name, gen,
                 pokeapi_home=pokeapi_home,
                 pokeapi_home_shiny=pokeapi_home_shiny,
                 pokeapi_oa=pokeapi_oa,
                 pokeapi_icon=pokeapi_icon,
+                pokeapi_game_front=pokeapi_game_front,
+                pokeapi_game_front_shiny=pokeapi_game_front_shiny,
             )
             result.append(FormData(
                 name=form_name,
