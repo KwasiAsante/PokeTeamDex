@@ -22,6 +22,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.pokemon_resolved import PokemonResolved
+from app.services.learnset_service import LearnsetService
 from app.schemas.pokemon_resolved import (
     AbilityInfo,
     EventMove,
@@ -277,7 +278,7 @@ async def _probe_url(client: httpx.AsyncClient, url: str) -> str | None:
 
 class PokemonResolverService:
     def __init__(self) -> None:
-        self._event_learnsets: dict[str, dict] = {}
+        self._learnset_service = LearnsetService()
         self._moves_index: dict[str, dict] = {}
         self._ps_pokedex: dict[str, dict] = {}
         self._ps_pokedex_overrides: dict[str, dict[str, dict]] = {}
@@ -311,10 +312,7 @@ class PokemonResolverService:
 
     def load_ps_data(self) -> None:
         """Load PS data files from disk into memory. Called synchronously at startup."""
-        # PS data files live in PS_DATA_DIR (shared/ps_data/ at the project root).
-        # event_learnsets.json is no longer generated — learnset_N.json files replace
-        # it (loaded by the LearnsetService in sub-issue B). Until then, the supplement
-        # path uses an empty dict.
+        self._learnset_service.load(_PS_DATA_DIR)
         for fname, attr in [
             ("moves.json", "_moves_index"),
             ("pokedex.json", "_ps_pokedex"),
@@ -422,39 +420,48 @@ class PokemonResolverService:
     # Move supplementation
     # ------------------------------------------------------------------
 
-    def _get_supplement_moves(
-        self, ps_name: str, pokeapi_move_slugs: set[str]
-    ) -> list[EventMove]:
-        """Return moves from Showdown that are absent from PokéAPI's list.
+    # Maps learnset method strings to the values used in EventMove.methods.
+    _LEARNSET_METHOD_LABEL: dict[str, str] = {
+        "level_up": "level",
+        "machine": "machine",
+        "egg": "egg",
+        "tutor": "tutor",
+        "relearn": "relearn",
+        "event": "event",
+        "transfer": "transfer",
+        "other": "other",
+    }
 
-        Covers event distributions (S), but also egg (E) and tutor (T) moves
-        that PokéAPI omits for older generations.
+    def _get_supplement_moves(
+        self, ps_name: str, gen: int, pokeapi_move_slugs: set[str]
+    ) -> list[EventMove]:
+        """Return moves from Showdown's gen-N learnset absent from PokéAPI's list.
+
+        Covers event distributions, egg moves, and tutor moves that PokéAPI
+        omits for some Pokémon or older generations. Moves inherited via
+        pre-evolution (via_prevo) are included — PokéAPI may not list them on
+        the evolved form.
         """
-        entry = self._event_learnsets.get(ps_name)
-        if not entry:
+        learnset = self._learnset_service.get_learnset(ps_name, gen)
+        if not learnset:
             return []
-        learnset = entry.get("learnset", {})
         known_ps_ids = {slug.replace("-", "") for slug in pokeapi_move_slugs}
         result: list[EventMove] = []
         for move_id, sources in learnset.items():
             if move_id in known_ps_ids:
                 continue
-            gen_methods: dict[int, set[str]] = {}
+            methods: set[str] = set()
             for src in sources:
-                if not src or not src[0].isdigit():
-                    continue
-                gen_n = int(src[0])
-                method_code = src[1].upper() if len(src) >= 2 else "L"
-                method = _SOURCE_METHOD.get(method_code, "level")
-                gen_methods.setdefault(gen_n, set()).add(method)
-            if not gen_methods:
+                raw = src.get("method", "other")
+                methods.add(self._LEARNSET_METHOD_LABEL.get(raw, raw))
+            if not methods:
                 continue
             move_info = self._moves_index.get(move_id, {})
             result.append(EventMove(
                 name=move_id,
                 display_name=move_info.get("name", move_id),
-                generations=sorted(gen_methods.keys()),
-                methods=sorted({m for methods in gen_methods.values() for m in methods}),
+                generations=[gen],
+                methods=sorted(methods),
             ))
         return result
 
@@ -1137,7 +1144,7 @@ class PokemonResolverService:
 
         # 5. Move supplementation
         move_slugs: set[str] = {m["move"]["name"] for m in pokemon_data.get("moves", [])}
-        supplement_moves = self._get_supplement_moves(ps_id, move_slugs)
+        supplement_moves = self._get_supplement_moves(ps_id, data_gen, move_slugs)
 
         # 6. Smogon analyses
         display_name = _smogon_display_name(pokemon_name, english_species_name)

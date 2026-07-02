@@ -28,7 +28,7 @@ from app.schemas.pokemon_resolved import SpriteUrlsFull
 def _make_service(
     pokedex: dict | None = None,
     overrides: dict | None = None,
-    event_learnsets: dict | None = None,
+    learnsets: dict | None = None,
     moves_index: dict | None = None,
     smogon_sets: dict | None = None,
     smogon_analyses: dict | None = None,
@@ -38,7 +38,8 @@ def _make_service(
     svc = PokemonResolverService()
     svc._ps_pokedex = pokedex or {}
     svc._ps_pokedex_overrides = overrides or {}
-    svc._event_learnsets = event_learnsets or {}
+    if learnsets:
+        svc._learnset_service._learnsets = learnsets
     svc._moves_index = moves_index or {}
     svc._smogon_sets = smogon_sets or {}
     svc._smogon_analyses = smogon_analyses or {}
@@ -276,21 +277,31 @@ class TestApplyGenOverrides:
 # ---------------------------------------------------------------------------
 
 class TestGetSupplementMoves:
-    _EVENT_LEARNSETS = {
-        "dratini": {
-            "learnset": {
-                # extremespeed only exists as a Gen 2 event ("2S1") — not in PokéAPI
-                "extremespeed": ["2S1"],
+    # Per-gen learnsets in the new LearnsetService format.
+    # Each gen key maps ps_id → {move_id: [{method: ...}]}.
+    _LEARNSETS: dict[int, dict] = {
+        2: {
+            "dratini": {
+                # extremespeed only exists as a Gen 2 event — not in PokéAPI
+                "extremespeed": [{"method": "event"}],
                 # wrap is in PokéAPI's normal learnset
-                "wrap": ["1L1", "2L1"],
-                # bind appears only via normal level-up methods
-                "bind": ["3L20", "4L20"],
-                # eggmove is an egg move PokéAPI is missing
-                "eggmove": ["4E"],
-                # tutormove is a tutor move PokéAPI is missing
-                "tutormove": ["5T"],
+                "wrap": [{"method": "level_up"}],
             }
-        }
+        },
+        4: {
+            "dratini": {
+                # bind appears only via level-up — PokéAPI may omit it
+                "bind": [{"method": "level_up"}],
+                # eggmove is an egg move PokéAPI is missing
+                "eggmove": [{"method": "egg"}],
+            }
+        },
+        5: {
+            "dratini": {
+                # tutormove is a tutor move PokéAPI is missing
+                "tutormove": [{"method": "tutor"}],
+            }
+        },
     }
     _MOVES_INDEX = {
         "extremespeed": {"name": "Extreme Speed", "gen": 1},
@@ -300,115 +311,90 @@ class TestGetSupplementMoves:
     }
 
     def test_event_move_returned(self):
-        svc = _make_service(
-            event_learnsets=self._EVENT_LEARNSETS,
-            moves_index=self._MOVES_INDEX,
-        )
-        result = svc._get_supplement_moves("dratini", {"wrap", "bind"})
+        svc = _make_service(learnsets=self._LEARNSETS, moves_index=self._MOVES_INDEX)
+        result = svc._get_supplement_moves("dratini", 2, {"wrap"})
         names = [m.name for m in result]
         assert "extremespeed" in names
 
     def test_egg_move_returned_when_not_in_pokeapi(self):
-        svc = _make_service(
-            event_learnsets=self._EVENT_LEARNSETS,
-            moves_index=self._MOVES_INDEX,
-        )
-        result = svc._get_supplement_moves("dratini", set())
+        svc = _make_service(learnsets=self._LEARNSETS, moves_index=self._MOVES_INDEX)
+        result = svc._get_supplement_moves("dratini", 4, set())
         names = [m.name for m in result]
         assert "eggmove" in names
 
     def test_tutor_move_returned_when_not_in_pokeapi(self):
-        svc = _make_service(
-            event_learnsets=self._EVENT_LEARNSETS,
-            moves_index=self._MOVES_INDEX,
-        )
-        result = svc._get_supplement_moves("dratini", set())
+        svc = _make_service(learnsets=self._LEARNSETS, moves_index=self._MOVES_INDEX)
+        result = svc._get_supplement_moves("dratini", 5, set())
         names = [m.name for m in result]
         assert "tutormove" in names
 
     def test_wrap_excluded_because_pokeapi_has_it(self):
-        svc = _make_service(
-            event_learnsets=self._EVENT_LEARNSETS,
-            moves_index=self._MOVES_INDEX,
-        )
-        result = svc._get_supplement_moves("dratini", {"wrap"})
+        svc = _make_service(learnsets=self._LEARNSETS, moves_index=self._MOVES_INDEX)
+        result = svc._get_supplement_moves("dratini", 2, {"wrap"})
         names = [m.name for m in result]
         assert "wrap" not in names
 
     def test_bind_included_when_absent_from_pokeapi(self):
         """bind has only level-up sources, but if PokéAPI doesn't list it, we include it.
         The supplement includes ALL moves Showdown has that PokéAPI is missing."""
-        svc = _make_service(
-            event_learnsets=self._EVENT_LEARNSETS,
-            moves_index=self._MOVES_INDEX,
-        )
-        result = svc._get_supplement_moves("dratini", set())
+        svc = _make_service(learnsets=self._LEARNSETS, moves_index=self._MOVES_INDEX)
+        result = svc._get_supplement_moves("dratini", 4, set())
         names = [m.name for m in result]
         assert "bind" in names
 
     def test_bind_excluded_when_pokeapi_has_it(self):
         """If PokéAPI already lists bind, don't include it in supplement."""
-        svc = _make_service(
-            event_learnsets=self._EVENT_LEARNSETS,
-            moves_index=self._MOVES_INDEX,
-        )
-        result = svc._get_supplement_moves("dratini", {"bind"})
+        svc = _make_service(learnsets=self._LEARNSETS, moves_index=self._MOVES_INDEX)
+        result = svc._get_supplement_moves("dratini", 4, {"bind"})
         names = [m.name for m in result]
         assert "bind" not in names
 
     def test_event_move_has_event_method(self):
-        svc = _make_service(
-            event_learnsets=self._EVENT_LEARNSETS,
-            moves_index=self._MOVES_INDEX,
-        )
-        result = svc._get_supplement_moves("dratini", set())
+        svc = _make_service(learnsets=self._LEARNSETS, moves_index=self._MOVES_INDEX)
+        result = svc._get_supplement_moves("dratini", 2, set())
         extremespeed = next(m for m in result if m.name == "extremespeed")
         assert "event" in extremespeed.methods
         assert extremespeed.generations == [2]
 
     def test_egg_move_has_egg_method(self):
-        svc = _make_service(
-            event_learnsets=self._EVENT_LEARNSETS,
-            moves_index=self._MOVES_INDEX,
-        )
-        result = svc._get_supplement_moves("dratini", set())
+        svc = _make_service(learnsets=self._LEARNSETS, moves_index=self._MOVES_INDEX)
+        result = svc._get_supplement_moves("dratini", 4, set())
         eggmove = next(m for m in result if m.name == "eggmove")
         assert "egg" in eggmove.methods
 
     def test_tutor_move_has_tutor_method(self):
-        svc = _make_service(
-            event_learnsets=self._EVENT_LEARNSETS,
-            moves_index=self._MOVES_INDEX,
-        )
-        result = svc._get_supplement_moves("dratini", set())
+        svc = _make_service(learnsets=self._LEARNSETS, moves_index=self._MOVES_INDEX)
+        result = svc._get_supplement_moves("dratini", 5, set())
         tutormove = next(m for m in result if m.name == "tutormove")
         assert "tutor" in tutormove.methods
 
     def test_display_name_from_moves_index(self):
-        svc = _make_service(
-            event_learnsets=self._EVENT_LEARNSETS,
-            moves_index=self._MOVES_INDEX,
-        )
-        result = svc._get_supplement_moves("dratini", set())
+        svc = _make_service(learnsets=self._LEARNSETS, moves_index=self._MOVES_INDEX)
+        result = svc._get_supplement_moves("dratini", 2, set())
         extremespeed = next(m for m in result if m.name == "extremespeed")
         assert extremespeed.display_name == "Extreme Speed"
 
     def test_pokeapi_slug_with_hyphen_excluded_correctly(self):
-        learnsets = {"bulbasaur": {"learnset": {"acidspray": ["5S0"]}}}
-        svc = _make_service(event_learnsets=learnsets)
-        result = svc._get_supplement_moves("bulbasaur", {"acid-spray"})
+        learnsets = {5: {"bulbasaur": {"acidspray": [{"method": "event"}]}}}
+        svc = _make_service(learnsets=learnsets)
+        result = svc._get_supplement_moves("bulbasaur", 5, {"acid-spray"})
         assert result == []
 
     def test_returns_empty_for_unknown_pokemon(self):
-        svc = _make_service(event_learnsets=self._EVENT_LEARNSETS)
-        assert svc._get_supplement_moves("unknownmon", set()) == []
+        svc = _make_service(learnsets=self._LEARNSETS)
+        assert svc._get_supplement_moves("unknownmon", 2, set()) == []
 
-    def test_multi_gen_event_move(self):
-        learnsets = {"mew": {"learnset": {"transform": ["1S0", "3S1", "7S2"]}}}
-        svc = _make_service(event_learnsets=learnsets)
-        result = svc._get_supplement_moves("mew", set())
-        assert len(result) == 1
-        assert sorted(result[0].generations) == [1, 3, 7]
+    def test_generations_reflects_queried_gen(self):
+        """generations in the returned EventMove always equals [gen] — one entry per gen call."""
+        learnsets = {
+            1: {"mew": {"transform": [{"method": "event"}]}},
+            3: {"mew": {"transform": [{"method": "event"}]}},
+        }
+        svc = _make_service(learnsets=learnsets)
+        result_g1 = svc._get_supplement_moves("mew", 1, set())
+        result_g3 = svc._get_supplement_moves("mew", 3, set())
+        assert result_g1[0].generations == [1]
+        assert result_g3[0].generations == [3]
 
 
 # ---------------------------------------------------------------------------
@@ -1165,19 +1151,19 @@ class TestLoadPsData:
 
         assert svc._ps_pokedex_overrides == self._OVERRIDES
 
-    def test_missing_event_learnsets_does_not_crash(self, tmp_path):
-        """event_learnsets.json is no longer generated — load_ps_data must not crash."""
+    def test_missing_learnset_files_do_not_crash(self, tmp_path):
+        """load_ps_data must not crash when learnset_N.json files are absent."""
         ps_dir = tmp_path / "ps_data"
         ps_dir.mkdir()
         self._write(ps_dir, "moves.json", self._MOVES)
         self._write(ps_dir, "pokedex.json", self._POKEDEX)
-        # event_learnsets.json deliberately absent
+        # learnset_N.json files deliberately absent
 
         svc = PokemonResolverService()
         with patch("app.services.pokemon_resolver._PS_DATA_DIR", str(ps_dir)):
             svc.load_ps_data()  # must not raise
 
-        assert svc._event_learnsets == {}
+        assert svc._learnset_service._learnsets == {}
 
     def test_missing_ps_data_files_leave_attributes_empty(self, tmp_path):
         """Graceful degradation when PS data dir exists but files are missing."""
