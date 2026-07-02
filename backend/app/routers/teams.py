@@ -30,9 +30,8 @@ async def get_slot_by_id(slot_id: int, current_user: CurrentUser, db: DB) -> Slo
 
 # ── Teams ─────────────────────────────────────────────────────────────────────
 
-@router.get("", response_model=list[TeamResponse], summary="List teams")
+@router.get("", response_model=list[TeamResponse])
 async def list_teams(current_user: CurrentUser, db: DB) -> list[TeamResponse]:
-    """Return all non-deleted teams belonging to the authenticated user."""
     result = await db.execute(
         select(Team).where(
             Team.user_id == current_user.id,
@@ -42,9 +41,8 @@ async def list_teams(current_user: CurrentUser, db: DB) -> list[TeamResponse]:
     return [TeamResponse.model_validate(t) for t in result.scalars()]
 
 
-@router.post("", response_model=TeamResponse, status_code=status.HTTP_201_CREATED, summary="Create team")
+@router.post("", response_model=TeamResponse, status_code=status.HTTP_201_CREATED)
 async def create_team(body: TeamCreate, current_user: CurrentUser, db: DB) -> TeamResponse:
-    """Create a new team, optionally assigning it to an existing folder."""
     if body.folder_id is not None:
         await _get_owned_folder(body.folder_id, current_user.id, db)
     team = Team(user_id=current_user.id, folder_id=body.folder_id, name=body.name)
@@ -54,14 +52,13 @@ async def create_team(body: TeamCreate, current_user: CurrentUser, db: DB) -> Te
     return TeamResponse.model_validate(team)
 
 
-@router.get("/{team_id}", response_model=TeamResponse, summary="Get team")
+@router.get("/{team_id}", response_model=TeamResponse)
 async def get_team(team_id: int, current_user: CurrentUser, db: DB) -> TeamResponse:
-    """Return a single team by ID, verifying ownership."""
     team = await _get_owned_team(team_id, current_user.id, db)
     return TeamResponse.model_validate(team)
 
 
-@router.patch("/{team_id}", response_model=TeamResponse, summary="Rename team")
+@router.patch("/{team_id}", response_model=TeamResponse)
 async def rename_team(
     team_id: int, body: TeamUpdate, current_user: CurrentUser, db: DB
 ) -> TeamResponse:
@@ -72,9 +69,8 @@ async def rename_team(
     return TeamResponse.model_validate(team)
 
 
-@router.delete("/{team_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete team")
+@router.delete("/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_team(team_id: int, current_user: CurrentUser, db: DB) -> None:
-    """Soft-delete a team and cascade the deletion to all its slots."""
     team = await _get_owned_team(team_id, current_user.id, db)
     team.is_deleted = True
 
@@ -90,9 +86,8 @@ async def delete_team(team_id: int, current_user: CurrentUser, db: DB) -> None:
 
 # ── Slots ─────────────────────────────────────────────────────────────────────
 
-@router.get("/{team_id}/slots", response_model=list[SlotResponse], summary="List slots")
+@router.get("/{team_id}/slots", response_model=list[SlotResponse])
 async def list_slots(team_id: int, current_user: CurrentUser, db: DB) -> list[SlotResponse]:
-    """Return all non-deleted slots for a team, verifying team ownership."""
     await _get_owned_team(team_id, current_user.id, db)
     result = await db.execute(
         select(TeamSlot).where(
@@ -103,7 +98,7 @@ async def list_slots(team_id: int, current_user: CurrentUser, db: DB) -> list[Sl
     return [SlotResponse.model_validate(s) for s in result.scalars()]
 
 
-@router.get("/{team_id}/slots/{slot_number}", response_model=SlotResponse, summary="Get slot")
+@router.get("/{team_id}/slots/{slot_number}", response_model=SlotResponse)
 async def get_slot(
     team_id: int, slot_number: int, current_user: CurrentUser, db: DB
 ) -> SlotResponse:
@@ -121,11 +116,10 @@ async def get_slot(
     return SlotResponse.model_validate(slot)
 
 
-@router.put("/{team_id}/slots/{slot_number}", response_model=SlotResponse, summary="Upsert slot")
+@router.put("/{team_id}/slots/{slot_number}", response_model=SlotResponse)
 async def upsert_slot(
     team_id: int, slot_number: int, body: SlotUpsert, current_user: CurrentUser, db: DB
 ) -> SlotResponse:
-    """Create or replace the Pokémon in a given slot position (1-indexed)."""
     await _get_owned_team(team_id, current_user.id, db)
 
     result = await db.execute(
@@ -186,9 +180,8 @@ async def upsert_slot(
     return SlotResponse.model_validate(slot)
 
 
-@router.delete("/{team_id}/slots/{slot_number}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete slot")
+@router.delete("/{team_id}/slots/{slot_number}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_slot(team_id: int, slot_number: int, current_user: CurrentUser, db: DB) -> None:
-    """Soft-delete the Pokémon in a given slot position."""
     await _get_owned_team(team_id, current_user.id, db)
     result = await db.execute(
         select(TeamSlot).where(
