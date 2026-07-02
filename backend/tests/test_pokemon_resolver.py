@@ -762,39 +762,115 @@ class TestBuildVarietySpriteUrls:
     def _svc(self):
         return _make_service()
 
-    def test_official_artwork_extracted(self):
+    @pytest.mark.asyncio
+    async def test_official_artwork_extracted(self):
         svc = self._svc()
-        result = svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
+        result = await svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
         assert result.official_artwork == "https://pokeapi/artwork/6.png"
         assert result.official_artwork_shiny == "https://pokeapi/artwork/shiny/6.png"
 
-    def test_home_extracted(self):
+    @pytest.mark.asyncio
+    async def test_home_extracted(self):
         svc = self._svc()
-        result = svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
+        result = await svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
         assert result.home == "https://pokeapi/home/6.png"
 
-    def test_gen9_uses_showdown_dex(self):
+    @pytest.mark.asyncio
+    async def test_gen9_uses_showdown_dex(self):
         svc = self._svc()
-        result = svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
+        result = await svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
         assert result.game_front is not None
         assert "dex/charizard.png" in result.game_front
 
-    def test_gen5_uses_pokeapi_animated(self):
+    @pytest.mark.asyncio
+    async def test_gen5_uses_pokeapi_animated(self):
         svc = self._svc()
-        result = svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 5)
+        result = await svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 5)
         assert result.game_front is not None
         assert "animated/6.gif" in result.game_front
 
-    def test_gen1_no_shiny(self):
+    @pytest.mark.asyncio
+    async def test_gen1_no_shiny(self):
         svc = self._svc()
-        result = svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 1)
+        result = await svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 1)
         assert result.game_front_shiny is None
 
-    def test_empty_sprites(self):
+    @pytest.mark.asyncio
+    async def test_empty_sprites(self):
         svc = self._svc()
-        result = svc._build_variety_sprite_urls({}, "charizard", 6, 9)
+        result = await svc._build_variety_sprite_urls({}, "charizard", 6, 9)
         assert result.official_artwork is None
         assert result.home is None
+
+    @pytest.mark.asyncio
+    async def test_game_front_female_absent_returns_null_not_guessed_url(self):
+        """A species with no female game sprite for this gen must not get a
+        constructed guess — only an authoritative API field may populate this."""
+        svc = self._svc()
+        result = await svc._build_variety_sprite_urls(self._SPRITES, "squirtle", 7, 4)
+        assert result.game_front_female is None
+
+    @pytest.mark.asyncio
+    async def test_game_front_female_present_uses_api_field(self):
+        svc = self._svc()
+        sprites = {
+            **self._SPRITES,
+            "versions": {
+                "generation-iv": {
+                    "heartgold-soulsilver": {"front_default": "x", "front_female": "https://pokeapi/gen4/6-f.png"},
+                },
+            },
+        }
+        result = await svc._build_variety_sprite_urls(sprites, "charizard", 6, 4)
+        assert result.game_front_female == "https://pokeapi/gen4/6-f.png"
+
+    @pytest.mark.asyncio
+    async def test_icon_female_absent_returns_null_not_guessed_url(self):
+        """Having female HOME art (front_female in self._SPRITES) must not be
+        used as a signal that a female icon exists — only the icon-specific
+        API field may populate icon_female."""
+        svc = self._svc()
+        result = await svc._build_variety_sprite_urls(self._SPRITES, "venusaur", 3, 9)
+        assert result.icon_female is None
+
+    @pytest.mark.asyncio
+    async def test_icon_female_present_uses_api_field(self):
+        svc = self._svc()
+        sprites = {
+            **self._SPRITES,
+            "versions": {
+                "generation-viii": {"icons": {"front_female": "https://pokeapi/icons/female/3.png"}},
+            },
+        }
+        result = await svc._build_variety_sprite_urls(sprites, "venusaur", 3, 9)
+        assert result.icon_female == "https://pokeapi/icons/female/3.png"
+
+    @pytest.mark.asyncio
+    async def test_female_variety_icon_probed_and_nulled_on_404(self):
+        """-female variety entries (Basculegion-female, etc.) have no API field
+        confirming a separate icon exists — probe, and return null on 404
+        rather than a guessed URL."""
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        result = await svc._build_variety_sprite_urls(
+            {}, "basculegion-female", 10248, 9,
+            variety_name="basculegion-female", base_pokemon_id=902,
+        )
+        assert result.icon is None
+        svc._pokeapi_http.head.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_female_variety_icon_probed_and_kept_on_200(self):
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
+        result = await svc._build_variety_sprite_urls(
+            {}, "meowstic-female", 10025, 9,
+            variety_name="meowstic-female", base_pokemon_id=678,
+        )
+        assert result.icon is not None
+        assert "female/678" in result.icon
 
 
 class TestBuildFormSpriteUrls:

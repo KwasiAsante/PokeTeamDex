@@ -482,7 +482,7 @@ class PokemonResolverService:
     # Sprite URL builders
     # ------------------------------------------------------------------
 
-    def _build_variety_sprite_urls(
+    async def _build_variety_sprite_urls(
         self,
         sprites: dict,
         ps_name: str,
@@ -525,14 +525,15 @@ class PokemonResolverService:
                 or _build_pokeapi_sprite_url(sprite_id, gen, shiny=True)
                 or _build_showdown_sprite_url(ps_name, gen, shiny=True)
             )
-            game_front_female = (
-                pool.get("front_female")
-                or _build_pokeapi_sprite_url(sprite_id, gen, female=True)
-            )
+            # Female game sprites: unlike game_front/game_front_shiny (which exist
+            # for every Pokémon in every gen it appeared in), a female-specific
+            # sprite only exists for species with a visible gender difference.
+            # Trust the API field as authoritative — most Pokémon have no female
+            # variant, so constructing a guessed URL here 404s far more often
+            # than it succeeds (confirmed e.g. for Squirtle in Gen 4).
+            game_front_female = pool.get("front_female")
             game_front_female_shiny = (
-                pool.get("front_shiny_female")
-                or pool.get("front_female_shiny")
-                or _build_pokeapi_sprite_url(sprite_id, gen, shiny=True, female=True)
+                pool.get("front_shiny_female") or pool.get("front_female_shiny")
             )
         else:
             # gen=None (no gen in request): use root sprites — always non-null
@@ -543,12 +544,16 @@ class PokemonResolverService:
             game_front_female_shiny = (sprites.get("front_shiny_female")
                                        or sprites.get("front_female_shiny"))
 
-        has_female_home = bool(home.get("front_female"))
-
         # Icon: prefer PokéAPI's own icon URL from the sprites object.
         # Fall back to overrides and constructed paths when the API returns null.
         icons_versions = sprites.get("versions") or {}
         gen8_icon_api = icons_versions.get("generation-viii", {}).get("icons", {}).get("front_default")
+        # Female icons: read the authoritative field per gen tier instead of
+        # guessing from an unrelated signal (e.g. whether HOME female art
+        # exists) — a species can have female HOME/game art without a
+        # separate female icon (confirmed e.g. for Venusaur).
+        gen8_icon_female_api = icons_versions.get("generation-viii", {}).get("icons", {}).get("front_female")
+        gen7_icon_female_api = icons_versions.get("generation-vii", {}).get("icons", {}).get("front_female")
         # Gen 5 female icons use "{id}-female.png" suffix; read from response to avoid constructing wrong URL.
         gen5_icon_female_api = icons_versions.get("generation-v", {}).get("icons", {}).get("front_female")
         icon_override_id = self._variety_icon_id_overrides.get(variety_name)
@@ -560,7 +565,11 @@ class PokemonResolverService:
             # (e.g. calyrex-ice → 898-ice-rider, not 898-ice or 10193).
             icon = _build_icon_url(icon_override_id, gen)
         elif variety_name.endswith("-female") and base_pokemon_id is not None:
-            icon = _build_icon_url(base_pokemon_id, gen, female=True)
+            # No PokéAPI field confirms whether a separate female icon exists
+            # for these varieties (their own icons.front_default is always
+            # null) — some do (Meowstic-female, Indeedee-female), some don't
+            # (Basculegion-female, Oinkologne-female). Probe rather than guess.
+            icon = await _probe_url(self._pokeapi_http, _build_icon_url(base_pokemon_id, gen, female=True))
         else:
             icon = _build_icon_url(variety_id, gen)
 
@@ -579,10 +588,7 @@ class PokemonResolverService:
             game_front_female_shiny=game_front_female_shiny,
             icon=icon,
             icon_shiny=game_front_shiny,
-            icon_female=(
-                gen5_icon_female_api  # PokéAPI response (gen 5 "{id}-female.png" naming)
-                or (_build_icon_url(variety_id, gen, female=True) if has_female_home else None)
-            ),
+            icon_female=gen8_icon_female_api or gen7_icon_female_api or gen5_icon_female_api,
             icon_female_shiny=None,
         )
 
@@ -658,7 +664,7 @@ class PokemonResolverService:
             icon_shiny=game_front_shiny,
         )
 
-    def _build_base_sprite_urls(
+    async def _build_base_sprite_urls(
         self,
         sprites: dict,
         ps_name: str,
@@ -692,7 +698,7 @@ class PokemonResolverService:
         PokeAPI/sprites repo to confirm which ID exists in the animated/ subdir
         for the gens supported by _GEN_SPRITE_CONFIG before passing an override.
         """
-        return self._build_variety_sprite_urls(
+        return await self._build_variety_sprite_urls(
             sprites, ps_name, pokemon_id, gen,
             gen_sprite_id_override=gen_sprite_id,
         )
@@ -763,7 +769,7 @@ class PokemonResolverService:
                 ps_id, ps_types, ps_stats, ps_abilities, gen
             )
 
-            sprite_urls = self._build_variety_sprite_urls(
+            sprite_urls = await self._build_variety_sprite_urls(
                 data.get("sprites") or {}, ps_sprite_name, variety_id, gen,
                 variety_name=variety_name, base_pokemon_id=base_pokemon_id,
             )
@@ -1156,7 +1162,7 @@ class PokemonResolverService:
         if first_form_suffix in {"male", "female"}:
             first_form_suffix = None
         gen_sprite_id = f"{pokemon_id}-{first_form_suffix}" if first_form_suffix else None
-        sprite_urls = self._build_base_sprite_urls(
+        sprite_urls = await self._build_base_sprite_urls(
             pokemon_data.get("sprites") or {}, ps_sprite_name, pokemon_id, gen,
             gen_sprite_id=gen_sprite_id,
         )
