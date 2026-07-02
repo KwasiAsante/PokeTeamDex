@@ -1191,21 +1191,21 @@ class TestLoadPsData:
         assert svc._moves_index == {}
         assert svc._ps_pokedex == {}
 
-    def test_registry_still_read_from_static_dir(self, tmp_path):
-        """pokemon_registry.json lives in static/, not PS_DATA_DIR."""
+    def test_registry_read_from_shared_dir(self, tmp_path):
+        """pokemon_registry.json lives in shared/, not PS_DATA_DIR or static/."""
         ps_dir = tmp_path / "ps_data"
-        static_dir = tmp_path / "static"
+        shared_dir = tmp_path / "shared"
         ps_dir.mkdir()
-        static_dir.mkdir()
+        shared_dir.mkdir()
 
         self._write(ps_dir, "moves.json", self._MOVES)
         self._write(ps_dir, "pokedex.json", self._POKEDEX)
         registry = {"psFormExceptions": {"charizard-mega-x": "charizardmegax"}}
-        self._write(static_dir, "pokemon_registry.json", registry)
+        self._write(shared_dir, "pokemon_registry.json", registry)
 
         svc = PokemonResolverService()
         with patch("app.services.pokemon_resolver._PS_DATA_DIR", str(ps_dir)), \
-             patch("app.services.pokemon_resolver._STATIC_DIR", str(static_dir)):
+             patch("app.services.pokemon_resolver._SHARED_DIR", str(shared_dir)):
             svc.load_ps_data()
 
         assert svc._ps_exceptions == {"charizard-mega-x": "charizardmegax"}

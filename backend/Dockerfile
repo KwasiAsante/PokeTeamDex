@@ -7,8 +7,8 @@ WORKDIR /app
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy shared PS data so the backend can read it at startup.
-COPY shared/ps_data/ /app/shared/ps_data/
+# Copy shared data (PS learnsets, pokedex, moves, etc. + pokemon_registry.json).
+COPY shared/ /app/shared/
 
 # Copy the backend application.
 COPY backend/ /app/

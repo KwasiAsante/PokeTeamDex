@@ -30,13 +30,14 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: 43200
       DEBUG: "true"
       PS_DATA_DIR: /app/shared/ps_data
+      SHARED_DIR: /app/shared
     depends_on:
       db:
         condition: service_healthy
     command: sh /app/start.sh --reload
     volumes:
       - .:/app
-      - ../shared/ps_data:/app/shared/ps_data
+      - ../shared:/app/shared
 
 volumes:
   postgres_data:
