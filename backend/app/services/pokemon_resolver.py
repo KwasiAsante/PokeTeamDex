@@ -3,7 +3,7 @@ pokemon_resolver.py — Backend aggregation service for GET /pokemon/{id}/resolv
 
 Merges:
   - PokéAPI  (types, stats, abilities, forms, sprites)
-  - Showdown event_learnsets  (moves PokéAPI doesn't know about)
+  - Showdown learnset_N.json  (moves PokéAPI doesn't know about — loaded by LearnsetService in sub-issue B)
   - Showdown pokedex / gen-overrides  (gen-accurate types & stats)
   - Smogon pkmn.github.io  (competitive sets, fetched in background)
 """
@@ -40,6 +40,15 @@ from app.schemas.pokemon_resolved import (
 logger = logging.getLogger(__name__)
 
 _STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
+
+# SHARED_DIR env var points to shared/ at the project root.
+# Default "../shared" works when running uvicorn from backend/ locally.
+# In Docker the env var is set explicitly to /app/shared.
+_SHARED_DIR = os.environ.get("SHARED_DIR", "../shared")
+
+# PS_DATA_DIR env var points to shared/ps_data/ at the project root.
+# Default derives from SHARED_DIR so a single env var covers both.
+_PS_DATA_DIR = os.environ.get("PS_DATA_DIR", os.path.join(_SHARED_DIR, "ps_data"))
 
 _SMOGON_FORMATS = [
     "gen1ou", "gen1ubers",
@@ -301,13 +310,16 @@ class PokemonResolverService:
     # ------------------------------------------------------------------
 
     def load_ps_data(self) -> None:
-        """Load PS static files from disk into memory. Called synchronously at startup."""
+        """Load PS data files from disk into memory. Called synchronously at startup."""
+        # PS data files live in PS_DATA_DIR (shared/ps_data/ at the project root).
+        # event_learnsets.json is no longer generated — learnset_N.json files replace
+        # it (loaded by the LearnsetService in sub-issue B). Until then, the supplement
+        # path uses an empty dict.
         for fname, attr in [
-            ("event_learnsets.json", "_event_learnsets"),
             ("moves.json", "_moves_index"),
             ("pokedex.json", "_ps_pokedex"),
         ]:
-            path = os.path.join(_STATIC_DIR, fname)
+            path = os.path.join(_PS_DATA_DIR, fname)
             if os.path.exists(path):
                 with open(path, encoding="utf-8") as f:
                     setattr(self, attr, json.load(f))
@@ -315,7 +327,7 @@ class PokemonResolverService:
             else:
                 logger.warning("%s not found — run scripts/sync_ps_data.py", fname)
 
-        overrides_path = os.path.join(_STATIC_DIR, "pokedex-gen-overrides.json")
+        overrides_path = os.path.join(_PS_DATA_DIR, "pokedex-gen-overrides.json")
         if os.path.exists(overrides_path):
             with open(overrides_path, encoding="utf-8") as f:
                 self._ps_pokedex_overrides = json.load(f)
@@ -323,7 +335,7 @@ class PokemonResolverService:
         else:
             logger.warning("pokedex-gen-overrides.json not found")
 
-        registry_path = os.path.join(_STATIC_DIR, "pokemon_registry.json")
+        registry_path = os.path.join(_SHARED_DIR, "pokemon_registry.json")
         if os.path.exists(registry_path):
             with open(registry_path, encoding="utf-8") as f:
                 registry = json.load(f)
@@ -340,7 +352,7 @@ class PokemonResolverService:
             )
             logger.info("Loaded pokemon_registry.json (%d PS form exceptions)", len(self._ps_exceptions))
         else:
-            logger.warning("pokemon_registry.json not found in static/ — copy from assets/data/")
+            logger.warning("pokemon_registry.json not found in shared/ — run sync or check SHARED_DIR")
 
     async def load_smogon_data(self) -> None:
         """Fetch Smogon sets + analyses for curated formats. Runs as background task."""
