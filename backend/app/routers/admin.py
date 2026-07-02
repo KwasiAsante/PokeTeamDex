@@ -54,22 +54,11 @@ def _get_fcm_app() -> Any | None:
         return None
 
 
-@router.post(
-    "/notify-update",
-    status_code=status.HTTP_200_OK,
-    summary="Notify new app release",
-)
+@router.post("/notify-update", status_code=status.HTTP_200_OK)
 async def notify_update(
     body: NotifyUpdateRequest,
     x_notify_secret: str = Header(default=""),
 ) -> dict:
-    """
-    Called by CI after a new GitHub release is published.
-
-    Updates the in-memory latest version and release URL, then sends an FCM
-    push notification to the `app-updates` topic so devices are alerted
-    immediately. Requires `X-Notify-Secret` header.
-    """
     _require_admin_secret(x_notify_secret)
 
     global _latest_version, _latest_release_url
@@ -81,22 +70,15 @@ async def notify_update(
     return {"status": "ok", "version": _latest_version}
 
 
-@router.get("/version", summary="Get latest app version")
+@router.get("/version")
 async def get_version() -> dict:
-    """
-    Returns the most-recently-notified app version and its release URL.
-
-    Polled by the Flutter app at startup to decide whether to prompt the
-    user to update. Falls back to the server's `APP_VERSION` env var
-    until `POST /admin/notify-update` is called for the first time.
-    """
     return {
         "latest_version": _latest_version,
         "release_url": _latest_release_url,
     }
 
 
-@router.delete("/cache/pokemon", status_code=status.HTTP_200_OK, summary="Evict Pokémon cache entries")
+@router.delete("/cache/pokemon", status_code=status.HTTP_200_OK)
 async def clear_pokemon_cache(
     db: DB,
     ids: list[int] = Query(default=[], description="Pokémon IDs to evict (species or variety IDs)."),

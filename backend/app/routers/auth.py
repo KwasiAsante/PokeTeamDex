@@ -9,9 +9,8 @@ from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserR
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED, summary="Register a new account")
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest, db: DB) -> TokenResponse:
-    """Create a new user account and return a JWT bearer token."""
     existing = await db.execute(select(User).where(User.email == body.email))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
@@ -25,9 +24,8 @@ async def register(body: RegisterRequest, db: DB) -> TokenResponse:
     return TokenResponse(access_token=token)
 
 
-@router.post("/login", response_model=TokenResponse, summary="Log in and get a JWT")
+@router.post("/login", response_model=TokenResponse)
 async def login(body: LoginRequest, db: DB) -> TokenResponse:
-    """Authenticate with email and password and return a JWT bearer token."""
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
 
@@ -41,7 +39,6 @@ async def login(body: LoginRequest, db: DB) -> TokenResponse:
     return TokenResponse(access_token=token)
 
 
-@router.get("/me", response_model=UserResponse, summary="Get current user")
+@router.get("/me", response_model=UserResponse)
 async def me(current_user: CurrentUser) -> UserResponse:
-    """Return the profile of the authenticated user."""
     return UserResponse.model_validate(current_user)
