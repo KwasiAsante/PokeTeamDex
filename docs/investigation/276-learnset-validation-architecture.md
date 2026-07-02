@@ -282,16 +282,83 @@ This replaces the inline `buildLearnsetForFormat(...)` call in `slot_config_scre
 **Other provider fixes:**
 - `pokemonVarietiesProvider` and `pokemonFormsProvider` currently return `[]` on error — replace with PokéAPI fallback or a meaningful throw. No silent empty fallbacks.
 
+### 4.7 Items, Moves, and Abilities — New Standalone Endpoints
+
+Three pairs of endpoints, one pair per resource. Each consolidates PokéAPI (base) + PS TypeScript source (supplement). All results cached in PostgreSQL DB with 7-day TTL (same pattern as resolved Pokémon data).
+
+#### Data sources
+
+PS TS source replaces the remaining compiled endpoints in `sync_ps_data.py`:
+
+| Current file | Current source | New source |
+|---|---|---|
+| `moves.json` | `play.pokemonshowdown.com/data/moves.json` | `data/moves.ts` |
+| `items.json` | `play.pokemonshowdown.com/data/items.js` | `data/items.ts` |
+| `abilities.json` | `play.pokemonshowdown.com/data/abilities.js` | `data/abilities.ts` |
+
+All three use the existing `fetch_js_endpoint()` pattern — no special handling needed.
+
+**Move transform — new fields from `data/moves.ts`:**
+- `priority` (int)
+- `flags` (object — `contact`, `protect`, `sound`, `mirror`, `heal`, etc.)
+- `secondary` (secondary effect detail — chance, stat changes, status conditions)
+- `z_move_base` (move name this Z-move is based on, if applicable)
+- `max_move_base` (move name this Max/G-Max move is based on, if applicable)
+
+Item and ability transforms already capture the fields we need from the TS source.
+
+#### Endpoints
+
+**Moves:**
+- `GET /moves` — paginated list; optional query params: `gen`, `damage_class` (physical/special/status), `contest_type`, `is_z_move` (bool), `is_max_move` (bool)
+- `GET /moves/{id_or_name}` — single move; consolidated PokéAPI + PS
+
+**Items:**
+- `GET /items` — paginated list; optional query params: `gen`, `category` (PokéAPI item-category taxonomy), PS flag params: `is_mega_stone`, `is_z_crystal`, `is_berry`, `is_plate`, `is_memory`
+- `GET /items/{id_or_name}` — single item; consolidated PokéAPI + PS
+
+**Abilities:**
+- `GET /abilities` — paginated list; optional query params: `gen`, `pokemon` (name or id — returns the full ability models for each of that Pokémon's abilities, including which slot: 1, 2, or hidden)
+- `GET /abilities/{id_or_name}` — single ability; consolidated PokéAPI + PS
+
+#### Caching scope
+
+PostgreSQL DB caching is applied to **all** data endpoints — both new and existing:
+
+| Endpoint | Cached? |
+|---|---|
+| `GET /pokemon/{id}/resolved` | ✅ existing |
+| `GET /pokemon/moves/{id}` | extend to DB |
+| `GET /pokemon/varieties/{id}` | extend to DB |
+| `GET /pokemon/forms/{id}` | extend to DB |
+| `GET /pokemon/smogon/{id}` | extend to DB |
+| `GET /pokemon/flavor-text/{id}` | extend to DB |
+| `GET /moves` / `GET /moves/{id}` | new, DB-cached |
+| `GET /items` / `GET /items/{id}` | new, DB-cached |
+| `GET /abilities` / `GET /abilities/{id}` | new, DB-cached |
+
+#### Frontend migration scope
+
+Once the backend endpoints exist, the frontend migrates away from local PS data for all three resources:
+
+- **Pickers** (slot config): item picker, move picker, ability picker → call backend list endpoints with local PS data fallback
+- **List screens**: moves list, items list, abilities list → call backend paginated endpoints
+- **Detail screens**: move detail, item detail, ability detail → call backend single-entry endpoints
+- **`FormatService` methods** `itemsForGen()`, `movesForGen()`, `abilitiesForGen()` → replaced by backend calls; local PS data retained as offline fallback only
+
 ---
 
 ## 5. Sub-Issues
 
 | # | Title | Scope |
 |---|---|---|
-| A | `sync_ps_data.py`: generate `learnset_1–9.json` (gen-specific, not cumulative) + add `prevo`/`evos` to pokedex transform | Script only |
+| A | `sync_ps_data.py`: generate `learnset_1–9.json` + update pokedex transform (`prevo`/`evos`) + switch moves/items/abilities from compiled endpoints to TS source + add new move fields | Script only |
 | B | Backend: learnset service + PS ID normalization + prevo chain traversal | New service, no endpoint changes |
-| C | Backend: update `/pokemon/moves` with `gen` param + full consolidation logic + new schemas | Endpoint + schemas |
+| C | Backend: update `/pokemon/moves` with `gen` param + full consolidation + new learnset schemas | Endpoint + schemas |
 | D | Frontend: update move models, `pokemonMovesProvider`, `validLearnsetProvider`, slot validator refactor, `pokemon_detail_screen.dart` Moves tab audit | Flutter only |
+| E | Backend: new `/items`, `/moves`, `/abilities` list + single-entry endpoints with PokéAPI+PS consolidation | New endpoints + schemas |
+| F | Backend: extend PostgreSQL DB caching to `/pokemon/moves`, `/pokemon/varieties`, `/pokemon/forms`, `/pokemon/smogon`, `/pokemon/flavor-text`, and all new endpoints from sub-issue E | Backend infra |
+| G | Frontend: migrate item/move/ability pickers + list/detail screens to backend endpoints with offline fallback; retire `FormatService` gen-gating methods | Flutter only |
 
 Sub-issues are created after this investigation PR is merged.
 
@@ -300,7 +367,4 @@ Sub-issues are created after this investigation PR is merged.
 ## 6. Open Items (Deferred)
 
 - **`eventData` detail:** Not currently consumed anywhere. Dropped with `event_learnsets.json`. If a future feature needs event distribution details (OT, shininess, pokeball), generate a separate `event_data.json` at that point.
-- **moves/items/abilities TS source:** Evaluate whether `data/moves.ts`, `data/items.ts`, `data/abilities.ts` give fields the compiled endpoints don't (move flags, item fling power, etc.). Separate investigation.
-- **Ability and item gen-gating on backend:** Simple integer comparison; low priority for backend migration.
 - **Side-game allowlist:** Formal definition of which PS version groups are in scope. Initial blocklist: `scarlet-violet-zero` (Champions), `colosseum`, `xd`, `stadium`, `stadium-2`.
-- **`learnsets-g6-allowlist.json`:** Evaluate whether `learnset_6.json` fully replaces this, or whether the G6 allowlist covers transfer-legal moves that a gen-6-only file would miss.
