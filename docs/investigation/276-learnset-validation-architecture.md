@@ -24,7 +24,7 @@ The supplement path in `_get_supplement_moves()` is intentionally narrow: it onl
 ```
 pokemonMovesProvider(id)
   → GET /pokemon/moves/{id}      (backend, prefers cache)
-  → fallback: pokemonDetailProvider(id).moves  (direct PokéAPI call)
+  → fallback: pokemonDetailProvider(id).moves  (direct PokéAPI call, no consolidation)
 ```
 
 Result: `List<MoveSummary>` with full `learn_details` (version_group, method, level) per move. This is exactly what PokéAPI returns, proxied through the backend with no filtering.
@@ -52,19 +52,60 @@ Note: Freeze-Dry on Ninetales-Alola IS legal in Gen 9 competitive (Vulpix-Alola 
 
 ## 2. The Current PS Data Files
 
-### 2.1 `learnsets.json` (gen-bucketed, lossy)
+### 2.1 `learnsets.json` (gen-bucketed, lossy) — **to be eliminated**
 
 - **Fetch source:** `play.pokemonshowdown.com/data/learnsets.json` (compiled endpoint)
 - **Transform:** Strips method letter and level; keeps only the leading generation digit
 - **Used by:** Frontend only — `learnsetForGen()` → Pass 2 supplementation
 - **Cannot distinguish:** game within a generation, how a move is learned, or whether a move is a carry-over vs directly learnable
+- **Status:** Redundant once `learnset_N.json` files replace it. Remove from sync script and Hive.
 
-### 2.2 `event_learnsets.json` (full source codes + eventData)
+### 2.2 `event_learnsets.json` (full source codes + eventData) — **to be eliminated**
 
 - **Fetch source:** `data/learnsets.ts` + all `data/mods/gen{1–9}/learnsets.ts`, merged
 - **Transform:** Keeps full source code strings (`9L48`, `7E`, `8T`, `9M`, `2S1`) and `eventData` records
-- **Used by:** Backend — `_get_supplement_moves()` (moves absent from PokéAPI entirely); Frontend — `eventMovesForGen()` (S-coded + eventData only)
+- **Used by:** Backend — `_get_supplement_moves()` (moves absent from PokéAPI entirely); Frontend — `eventMovesForGen()` (S-coded sources only; `eventData` records are never actually read)
 - **Critical:** Contains ALL moves for ALL Pokémon with full method codes — not just event moves despite the name
+- **What transfers to `learnset_N.json`:** All learnset/source-code data. The new per-gen files capture the same information in structured form (method strings, level integers) — no data is lost.
+- **What does NOT transfer:** `eventData` records (specific event distribution details — OT, shininess, pokeball, moveset per distribution). These are not currently consumed by any part of the app. They are dropped. If a future feature needs them (e.g. showing event legality detail), a separate `event_data.json` can be generated then.
+- **Status:** Eliminated once `learnset_N.json` files are in place and the backend consolidation is updated.
+
+### 2.3 `learnset_N.json` files (new, gen-specific, pre-processed) — **to be generated**
+
+One file per generation (1–9). **Each file covers only that generation's native moves** — i.e., entries whose PS source codes begin with that generation's digit. Not cumulative.
+
+`learnset_9.json` contains only moves learnable in gen 9 games (source codes `9L…`, `9T`, `9E`, `9M`, `9S…`). It does not include gen 7 egg moves or gen 8 tutors for the same Pokémon — those live in `learnset_7.json` and `learnset_8.json` respectively. The backend (or frontend fallback) combines the relevant gen files based on the format's transfer rules.
+
+Format:
+```json
+{
+  "ninetalesalola": {
+    "freezedry": [{"method": "level_up", "level": 1}],
+    "auroraveil": [{"method": "level_up", "level": 1}],
+    "blizzard":   [{"method": "machine"}]
+  }
+}
+```
+
+Source code → method mapping:
+
+| PS code | `method` | Notes |
+|---|---|---|
+| `9L48` | `"level_up"`, `level: 48` | Level-up at 48 in gen 9 |
+| `9L1` | `"level_up"`, `level: 1` | Pre-evo inherit marker — backend detects this + prevo chain = `via_prevo` |
+| `9T` | `"tutor"` | |
+| `9E` | `"egg"` | |
+| `9M` | `"machine"` | |
+| `9S0` | `"event"` | |
+
+A move can have multiple entries if learnable by multiple methods in the same gen:
+```json
+"tackle": [{"method": "level_up", "level": 1}, {"method": "egg"}]
+```
+
+`via_prevo` detection happens at **backend consolidation time**, not in the script. A level-1 entry for an evolved form whose pre-evo can learn the same move in the same gen at a higher level is flagged `via_prevo` by the backend using `pokedex.json`'s `prevo` field.
+
+**File destinations:** Per-gen files are written to BOTH `assets/data/ps/` and `backend/app/static/` — the same pattern already used for `moves.json`, `items.json`, etc. Flutter downloads updated files via `/ps-data/file/:name` and stores them in Hive. The backend loads them at startup. Both sides read identically formatted files from the same generation of data.
 
 ### Key finding: `learnsets.json` is a lossy subset of `event_learnsets.json`
 
@@ -98,41 +139,26 @@ All validation runs on the frontend against multi-megabyte in-memory maps parsed
 
 Generate `learnset_1.json` through `learnset_9.json` from the existing `event_learnsets.json` data (no new fetches needed — source codes are already in hand).
 
-**Generation rule:** `learnset_N.json` is cumulative — it includes every move entry where the source code's leading digit is ≤ N. A Pokémon introduced in gen 7 (e.g. Ninetales-Alola) appears in `learnset_7.json` through `learnset_9.json`.
+**Generation rule:** `learnset_N.json` is **gen-N specific** — it includes only move entries where the source code's leading digit equals N. A Pokémon introduced in gen 7 (e.g. Ninetales-Alola) has `learnset_7.json` entries (gen 7 moves), `learnset_8.json` entries (gen 8 moves), and `learnset_9.json` entries (gen 9 moves) as three separate files. Cross-gen transfer logic (e.g. "what moves can this Pokémon have in gen 9 via home transfer from gen 7?") is handled by the backend combining relevant gen files based on format rules.
 
-**Pre-processing rule:** Convert raw PS source codes to structured entries. Each move becomes an array of `{gen, method, level}` objects:
+**Pre-processing rule:** Convert raw PS source codes to structured entries. Each move becomes an array of `{method, level?}` objects (no gen field needed since the file itself names the gen):
 
 ```json
 {
   "ninetalesalola": {
-    "freezedry": [
-      { "gen": 7, "method": "egg",      "level": null },
-      { "gen": 8, "method": "egg",      "level": null },
-      { "gen": 9, "method": "level_up", "level": 1    }
-    ],
-    "icebeam": [
-      { "gen": 7, "method": "machine",  "level": null },
-      { "gen": 9, "method": "level_up", "level": 45   }
-    ]
+    "freezedry": [{"method": "level_up", "level": 1}],
+    "icebeam":   [{"method": "machine"}]
   }
 }
 ```
 
-Source code → method mapping:
-
-| PS code letter | method |
-|---|---|
-| `L` | `level_up` (level extracted from the number; `L1` on an evolved form is handled by backend pre-evo detection) |
-| `E` | `egg` |
-| `T` | `tutor` |
-| `M` | `machine` |
-| `S` | `event` |
-
-A helper function in the script handles the conversion with fallback for unknown codes.
+A helper function handles the conversion; unknown codes are mapped to `"other"` and logged.
 
 **Also update `transform_pokedex`** to preserve the `prevo` field (and `evos` for completeness). Currently these are stripped; the backend needs `prevo` for evolution chain traversal without PokéAPI calls.
 
-**File destinations:** Per-gen files go to `backend/app/static/` only (not served to Flutter via `/ps-data/file/:name` and not bundled as Flutter assets — these are backend-only). `learnsets.json` remains for frontend offline fallback for now; it can be removed once the frontend fallback is updated to use `event_learnsets.json` source codes directly.
+**File destinations:** All per-gen files go to `assets/data/ps/` AND `backend/app/static/`. They are added to the `served_files` list and the `version.json` SHA manifest. Flutter downloads them via `/ps-data/file/:name` for Hive refresh; the backend loads them at startup. Both sides read identically formatted files.
+
+Remove the compiled `learnsets.json` fetch and the `transform_learnsets` function from the script once the frontend fallback (§4.6) no longer needs it.
 
 ### 4.2 Backend — Learnset Service
 
@@ -140,7 +166,7 @@ A new `LearnsetService` (or methods on the existing resolver) loaded at startup:
 
 - Loads `learnset_1.json` through `learnset_9.json` into memory
 - Loads the updated `pokedex.json` (now includes `prevo`)
-- Provides `get_learnset(ps_name, gen)` → the pre-processed entry for that Pokémon in that gen
+- Provides `get_learnset(ps_name, gen)` → the pre-processed entry for that Pokémon in that gen file
 - Provides `get_prevo_chain(ps_name)` → ordered list of pre-evo PS names by walking `prevo` pointers up the chain
 
 **PS ID fallback normalization** — when a lookup fails, try these variants in order:
@@ -156,15 +182,15 @@ A single `_normalize_ps_id(name)` helper returns a list of candidates to try.
 
 ### 4.3 Backend — Updated `/pokemon/moves/{id}` Endpoint
 
-Add an optional `gen` query parameter (integer, 1–9). The existing `resolve_moves()` flow is replaced by a consolidation routine:
+**No new endpoint.** Add an optional `gen` query parameter (integer, 1–9) to the existing `GET /pokemon/moves/{id}`.
 
-**With `?gen=N`:**
-1. Get PokéAPI moves from DB cache (or resolve fresh if not cached)
-2. Filter PokéAPI moves to version groups belonging to gen N; for each keep the best `version_group` and `method`/`level` detail
-3. Supplement with `learnset_N.json`: for each move in the PS file not already in the PokéAPI result, add it (PokéAPI is always the primary source — PS only fills genuine gaps)
-4. Build pre-evo chain via `get_prevo_chain(ps_name)`; get each ancestor's gen-N learnset; any move present in an ancestor but not in the Pokémon's direct PokéAPI+PS learnset is marked `via_prevo: true, prevo: "<ancestor_name>"`
-5. Return:
+**Consolidation logic (with `?gen=N`):**
 
+1. **Primary — PokéAPI `version_group_details`:** Map the requested gen to its version groups (via hardcoded `gen → version_group` map). Filter `version_group_details` to those groups. This is the authoritative source. Side-game version groups (`scarlet-violet-zero` / Champions, `colosseum`, `xd`, `stadium`, `stadium-2`) are excluded from the filter.
+2. **Supplement — `learnset_N.json`:** For any move in the PS gen-N file that PokéAPI has **no record of at all** for any version group for this Pokémon, add it as a supplement (PS fills genuine PokéAPI gaps, not game-level exclusions).
+3. **Pre-evo detection:** Walk `get_prevo_chain(ps_name)`. For each level-1 move in the consolidated list, check if the immediate pre-evo can learn the same move in gen N at a higher level. If yes, flag `via_prevo: true, prevo: "<ps_id>"`.
+
+**With `?gen=N` response:**
 ```json
 {
   "pokemon_id": 38,
@@ -180,25 +206,12 @@ Add an optional `gen` query parameter (integer, 1–9). The existing `resolve_mo
         "via_prevo": true,
         "prevo": "vulpix-alola"
       }
-    },
-    {
-      "name": "icebeam",
-      "learn_details": {
-        "version_group": "scarlet-violet",
-        "method": "machine",
-        "level": null,
-        "via_prevo": false,
-        "prevo": null
-      }
     }
   ]
 }
 ```
 
-**Without `gen` parameter:**
-- Run the same consolidation for each generation 1–9
-- Return `moves: []` and populate `gen_moves`:
-
+**Without `gen` parameter** — run consolidation for each gen 1–9 and return keyed by gen:
 ```json
 {
   "pokemon_id": 38,
@@ -206,18 +219,14 @@ Add an optional `gen` query parameter (integer, 1–9). The existing `resolve_mo
   "gen": null,
   "moves": [],
   "gen_moves": {
-    "9": [ /* same structure as above */ ],
+    "9": [ ... ],
     "8": [ ... ],
     "7": [ ... ]
   }
 }
 ```
 
-The same gen param behaviour applies to `/pokemon/{id}/resolved?gen=N&includes[]=moves`.
-
 ### 4.4 Backend — Updated Schemas
-
-Extend `MoveLearnDetail` and `MoveSummary` in `schemas/pokemon_resolved.py`:
 
 ```python
 class MoveLearnDetail(BaseModel):
@@ -235,7 +244,7 @@ class MovesResponse(BaseModel):
     pokemon_id: int
     name: str
     gen: int | None
-    moves: list[MoveSummary]           # populated when gen is provided
+    moves: list[MoveSummary]                             # populated when gen is provided
     gen_moves: dict[str, list[MoveSummary]] | None = None  # populated when gen is omitted
 ```
 
@@ -244,14 +253,34 @@ class MovesResponse(BaseModel):
 - Update `MoveLearnDetail` in `models.dart` to add `via_prevo` (bool) and `prevo` (String?)
 - Update `pokemonMovesProvider` to accept and forward an optional gen parameter
 - Update `MoveSummary.fromJson` / `MoveLearnDetail.fromJson` for the new schema
-- Update `slot_config_screen.dart` to pass the active format's gen to `pokemonMovesProvider`
+- Update `slot_config_screen.dart` and `pokemon_detail_screen.dart` to pass the active format's gen to `pokemonMovesProvider`
 
-### 4.6 Frontend — Slot Validator Refactor
+### 4.6 Frontend — Slot Validator and Offline Fallback Refactor
 
+**Backend path (happy path):**
 - Remove Pass 2 PS gen-bucket supplementation (`learnsetForGen` call) — the backend now handles this
-- The backend `moves` response already contains `via_prevo` moves so no separate pre-evo comparison needed on the frontend
-- Offline fallback (backend unavailable + empty cache): fall back to local validation using `event_learnsets.json` source codes with method-aware filtering (not gen-bucket). Specifically: skip adding a move via PS if it already appears in `pokemonMoves` from PokéAPI — this alone fixes the Ninetales bug in the offline path
-- Ability and item validation (gen-gating) remain local for now; they are simple integer comparisons and not worth a network round-trip
+- The backend `moves` response already contains `via_prevo` moves so no separate pre-evo comparison is needed on the frontend
+
+**New `validLearnsetProvider(pokemonId, gen)`** — wraps the backend call and enforces the fallback chain:
+```
+try:
+  GET /pokemon/moves/{id}?gen=N   (backend, 7-day cache)
+catch (backend unreachable):
+  check Hive cache (allow up to 24h expired)
+  if cache hit: return cached
+  if no cache + internet available:
+    PokéAPI version_group_details + learnset_N.json (local) consolidation
+    cache result with 24-hour TTL (flagged as fallback-sourced)
+  if no cache + no internet:
+    throw user-visible error ("Could not load move data — check your connection")
+```
+
+This replaces the inline `buildLearnsetForFormat(...)` call in `slot_config_screen.dart`. No inline consolidation in screens.
+
+**Offline fallback consolidation** replicates backend logic locally using the per-gen files in Hive. Key rule: skip adding a PS move if PokéAPI already lists it for this Pokémon in any version group — this alone fixes the Ninetales/Freeze-Dry bug in the offline path.
+
+**Other provider fixes:**
+- `pokemonVarietiesProvider` and `pokemonFormsProvider` currently return `[]` on error — replace with PokéAPI fallback or a meaningful throw. No silent empty fallbacks.
 
 ---
 
@@ -259,10 +288,10 @@ class MovesResponse(BaseModel):
 
 | # | Title | Scope |
 |---|---|---|
-| A | `sync_ps_data.py`: generate `learnset_1–9.json` + add `prevo`/`evos` to pokedex transform | Script only |
+| A | `sync_ps_data.py`: generate `learnset_1–9.json` (gen-specific, not cumulative) + add `prevo`/`evos` to pokedex transform | Script only |
 | B | Backend: learnset service + PS ID normalization + prevo chain traversal | New service, no endpoint changes |
 | C | Backend: update `/pokemon/moves` with `gen` param + full consolidation logic + new schemas | Endpoint + schemas |
-| D | Frontend: update move models, `pokemonMovesProvider`, and slot validator | Flutter only |
+| D | Frontend: update move models, `pokemonMovesProvider`, `validLearnsetProvider`, slot validator refactor, `pokemon_detail_screen.dart` Moves tab audit | Flutter only |
 
 Sub-issues are created after this investigation PR is merged.
 
@@ -270,7 +299,8 @@ Sub-issues are created after this investigation PR is merged.
 
 ## 6. Open Items (Deferred)
 
-- **moves/items/abilities TS source:** Evaluate whether `data/moves.ts`, `data/items.ts`, `data/abilities.ts` give fields the compiled endpoints don't (move flags, item fling power, etc.). Separate investigation or folded into a future task.
+- **`eventData` detail:** Not currently consumed anywhere. Dropped with `event_learnsets.json`. If a future feature needs event distribution details (OT, shininess, pokeball), generate a separate `event_data.json` at that point.
+- **moves/items/abilities TS source:** Evaluate whether `data/moves.ts`, `data/items.ts`, `data/abilities.ts` give fields the compiled endpoints don't (move flags, item fling power, etc.). Separate investigation.
 - **Ability and item gen-gating on backend:** Simple integer comparison; low priority for backend migration.
-- **Side-game allowlist:** Formal definition of which PS version groups are in scope (excludes Stadium, Colosseum, XD, Champions). Needed eventually to prevent out-of-scope version groups from polluting supplements.
-- **`learnsets.json` removal from frontend:** Once the offline fallback is updated to use `event_learnsets.json` source codes directly, `learnsets.json` can be dropped from Hive and the Flutter asset bundle.
+- **Side-game allowlist:** Formal definition of which PS version groups are in scope. Initial blocklist: `scarlet-violet-zero` (Champions), `colosseum`, `xd`, `stadium`, `stadium-2`.
+- **`learnsets-g6-allowlist.json`:** Evaluate whether `learnset_6.json` fully replaces this, or whether the G6 allowlist covers transfer-legal moves that a gen-6-only file would miss.

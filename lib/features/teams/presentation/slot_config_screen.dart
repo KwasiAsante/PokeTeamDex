@@ -727,10 +727,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               )
             : effectivePokemonMoves.map((m) => m.name).toSet();
         final effectiveLearnableMoves = effectiveLearnableMoveSet.toList()..sort();
-        final priorEvoMoveSetsAsync =
-            ref.watch(priorEvoMoveSetsProvider(slot.pokemonId));
-        final effectivePriorEvoMoves =
-            priorEvoMoveSetsAsync.whenOrNull(data: (sets) {
+        final priorEvoMoveSetsAsync = ref.watch(priorEvoMoveSetsProvider(formVariety != null ? formVariety.pokemonId : slot.pokemonId));
+        final effectivePriorEvoMoves = priorEvoMoveSetsAsync.whenOrNull(data: (sets) {
           if (sets.isEmpty) return const <String>{};
           if (format == null) {
             final ancestorAll = <String>{};
