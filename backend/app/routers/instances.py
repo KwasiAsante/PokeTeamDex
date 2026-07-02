@@ -8,8 +8,9 @@ from app.schemas.team import InstanceResponse, InstanceUpdate
 router = APIRouter(prefix="/instances", tags=["instances"])
 
 
-@router.get("", response_model=list[InstanceResponse])
+@router.get("", response_model=list[InstanceResponse], summary="List Pokémon instances")
 async def list_instances(current_user: CurrentUser, db: DB) -> list[InstanceResponse]:
+    """Return all non-deleted Pokémon instances belonging to the authenticated user."""
     result = await db.execute(
         select(PokemonInstance).where(
             PokemonInstance.user_id == current_user.id,
@@ -19,13 +20,14 @@ async def list_instances(current_user: CurrentUser, db: DB) -> list[InstanceResp
     return [InstanceResponse.model_validate(i) for i in result.scalars()]
 
 
-@router.get("/{instance_id}", response_model=InstanceResponse)
+@router.get("/{instance_id}", response_model=InstanceResponse, summary="Get Pokémon instance")
 async def get_instance(instance_id: int, current_user: CurrentUser, db: DB) -> InstanceResponse:
+    """Return a single Pokémon instance by ID, verifying ownership."""
     instance = await _get_owned_instance(instance_id, current_user.id, db)
     return InstanceResponse.model_validate(instance)
 
 
-@router.patch("/{instance_id}", response_model=InstanceResponse)
+@router.patch("/{instance_id}", response_model=InstanceResponse, summary="Update Pokémon instance")
 async def update_instance(
     instance_id: int, body: InstanceUpdate, current_user: CurrentUser, db: DB
 ) -> InstanceResponse:
@@ -39,8 +41,9 @@ async def update_instance(
     return InstanceResponse.model_validate(instance)
 
 
-@router.delete("/{instance_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{instance_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete Pokémon instance")
 async def delete_instance(instance_id: int, current_user: CurrentUser, db: DB) -> None:
+    """Soft-delete a Pokémon instance by ID."""
     instance = await _get_owned_instance(instance_id, current_user.id, db)
     instance.is_deleted = True
     await db.commit()

@@ -20,6 +20,62 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="PokeTeamDex API",
     version="1.0.0",
+    description=(
+        "Backend for the PokeTeamDex Flutter app.\n\n"
+        "Provides Pokémon data aggregation (PokéAPI + Pokémon Showdown + Smogon), "
+        "team/folder/slot CRUD, cross-device sync, and PS data distribution.\n\n"
+        "**Authentication**: JWT bearer tokens — obtain one via `POST /auth/login` "
+        "or `POST /auth/register`, then pass `Authorization: Bearer <token>` on "
+        "all protected endpoints."
+    ),
+    openapi_tags=[
+        {"name": "auth", "description": "Register, log in, and identify the current user."},
+        {"name": "teams", "description": "Create and manage Pokémon teams and their metadata."},
+        {"name": "slots", "description": "Read or write individual Pokémon slots within a team."},
+        {"name": "folders", "description": "Organise teams into named folders."},
+        {
+            "name": "instances",
+            "description": (
+                "Pokémon instances — individual caught/bred Pokémon that carry "
+                "lineage, nickname aliases, and ribbon history across teams."
+            ),
+        },
+        {
+            "name": "sync",
+            "description": (
+                "Bidirectional offline-first sync. Pull returns the full server state "
+                "(optionally delta-filtered by `since`). Push applies a batch of typed "
+                "ops (create/update/delete) atomically and returns server-assigned IDs."
+            ),
+        },
+        {
+            "name": "pokemon",
+            "description": (
+                "Aggregate Pokémon data from PokéAPI, Pokémon Showdown, and Smogon "
+                "with 7-day PostgreSQL caching. Covers resolved details, varieties, "
+                "cosmetic forms, competitive analyses, moves, and Pokédex flavor text."
+            ),
+        },
+        {
+            "name": "ps-data",
+            "description": (
+                "Serve versioned Pokémon Showdown data files (moves, learnsets, items, "
+                "abilities) so the Flutter client can refresh its local cache on demand."
+            ),
+        },
+        {
+            "name": "logs",
+            "description": "Ingest structured log lines from Flutter devices and forward to Loki.",
+        },
+        {
+            "name": "admin",
+            "description": (
+                "Internal admin operations. All endpoints require either "
+                "`X-Notify-Secret` or `X-Admin-Secret` header matching the server "
+                "secret — not authenticated via JWT."
+            ),
+        },
+    ],
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
     openapi_url="/openapi.json" if settings.debug else None,

@@ -17,12 +17,19 @@ from app.schemas.team import (
 router = APIRouter(prefix="/sync", tags=["sync"])
 
 
-@router.get("/pull", response_model=SyncPullResponse)
+@router.get("/pull", response_model=SyncPullResponse, summary="Pull server records")
 async def pull(
     current_user: CurrentUser,
     db: DB,
     since: Optional[datetime] = Query(None, description="ISO 8601 timestamp; return records updated after this time"),
 ) -> SyncPullResponse:
+    """
+    Return all folders, teams, instances, and slots for the authenticated user.
+
+    Pass `?since=<ISO 8601 timestamp>` to fetch only records updated after that
+    time (delta sync). Omit it for a full pull. Instances are returned in
+    ascending ID order so parent–child links can be resolved in a single pass.
+    """
     folder_q = select(TeamFolder).where(TeamFolder.user_id == current_user.id)
     team_q = select(Team).where(Team.user_id == current_user.id)
     instance_q = select(PokemonInstance).where(PokemonInstance.user_id == current_user.id)
@@ -55,7 +62,7 @@ async def pull(
     )
 
 
-@router.post("/push", response_model=SyncPushResponse)
+@router.post("/push", response_model=SyncPushResponse, summary="Push queued client operations")
 async def push(body: SyncPushRequest, current_user: CurrentUser, db: DB) -> SyncPushResponse:
     """Process all queued client operations in a single atomic batch.
 
