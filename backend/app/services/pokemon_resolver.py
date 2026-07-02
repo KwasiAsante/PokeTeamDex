@@ -571,7 +571,12 @@ class PokemonResolverService:
             # (Basculegion-female, Oinkologne-female). Probe rather than guess.
             icon = await _probe_url(self._pokeapi_http, _build_icon_url(base_pokemon_id, gen, female=True))
         else:
-            icon = _build_icon_url(variety_id, gen)
+            # No authoritative field and no static override — this variety's
+            # own icon data is null, meaning it may not have a dedicated icon
+            # at all (confirmed e.g. for Basculin-White-Striped, a Gen 8 DLC
+            # addition with no icon file in the sprites repo). Probe rather
+            # than guess so newly-added varieties without icons yet don't 404.
+            icon = await _probe_url(self._pokeapi_http, _build_icon_url(variety_id, gen))
 
         return SpriteUrlsFull(
             official_artwork=artwork.get("front_default"),
@@ -603,6 +608,7 @@ class PokemonResolverService:
         pokeapi_home: str | None = None,
         pokeapi_home_shiny: str | None = None,
         pokeapi_oa: str | None = None,
+        pokeapi_icon: str | None = None,
     ) -> SpriteUrlsFull:
         """Build full sprite URLs for a cosmetic form-entry (no /pokemon resource).
 
@@ -657,10 +663,12 @@ class PokemonResolverService:
             game_front_shiny=game_front_shiny,
             game_front_female=None,
             game_front_female_shiny=None,
-            # Female form entries live at icons/female/{base_id}.png, not
-            # icons/{base_id}-female.png — use the female=True path for those.
-            icon=_build_icon_url(base_id, gen, female=True) if repo_suffix == "female"
-                 else _build_icon_url(sprite_id, gen),
+            # Per-form icons aren't guaranteed to exist — some cosmetic groups
+            # share one icon across all variants (Alcremie's 63 flavor combos,
+            # Pumpkaboo's sizes, Sinistea-Antique all 404 on a constructed
+            # per-suffix path). pokeapi_icon is pre-verified via HEAD probe by
+            # the caller; null here means no dedicated icon exists.
+            icon=pokeapi_icon,
             icon_shiny=game_front_shiny,
         )
 
@@ -841,12 +849,22 @@ class PokemonResolverService:
             )
 
         # Batch: form-data fetches + PokeAPI sprite CDN probes (home, home_shiny,
-        # official-artwork). All run in parallel; probes are HEAD-only, cheap.
+        # official-artwork, icon). All run in parallel; probes are HEAD-only, cheap.
         def _form_oa_url(fn: str) -> str:
             sfx = _extract_form_suffix(fn, species_name)
             mapped = _SPRITE_SUFFIX_REMAP.get(sfx, sfx)
             oa_id = f"{base_id}-{mapped}" if mapped else str(base_id)
             return f"{_POKEAPI_OA}/{oa_id}.png"
+
+        def _form_icon_url(fn: str) -> str:
+            # Female form entries live at icons/female/{base_id}.png, not
+            # icons/{base_id}-female.png — same subdirectory pattern as HOME.
+            sfx = _extract_form_suffix(fn, species_name)
+            mapped = _SPRITE_SUFFIX_REMAP.get(sfx, sfx)
+            if mapped == "female":
+                return _build_icon_url(base_id, gen, female=True)
+            icon_id = f"{base_id}-{mapped}" if mapped else str(base_id)
+            return _build_icon_url(icon_id, gen)
 
         async def _fetch_form(name: str) -> httpx.Response:
             async with self._pokeapi_semaphore:
@@ -857,9 +875,10 @@ class PokemonResolverService:
         home_tasks = [_probe_url(self._pokeapi_http, p[0]) for p in _home_paths]
         home_shiny_tasks = [_probe_url(self._pokeapi_http, p[1]) for p in _home_paths]
         oa_tasks = [_probe_url(self._pokeapi_http, _form_oa_url(n)) for n in non_defaults]
+        icon_tasks = [_probe_url(self._pokeapi_http, _form_icon_url(n)) for n in non_defaults]
 
         all_results = await asyncio.gather(
-            *form_tasks, *home_tasks, *home_shiny_tasks, *oa_tasks,
+            *form_tasks, *home_tasks, *home_shiny_tasks, *oa_tasks, *icon_tasks,
             return_exceptions=True,
         )
 
@@ -867,7 +886,8 @@ class PokemonResolverService:
         form_responses = all_results[:_n]
         home_results = all_results[_n:2 * _n]
         home_shiny_results = all_results[2 * _n:3 * _n]
-        oa_results = all_results[3 * _n:]
+        oa_results = all_results[3 * _n:4 * _n]
+        icon_results = all_results[4 * _n:]
 
         result: list[FormData] = []
         for i, form_name in enumerate(non_defaults):
@@ -887,6 +907,7 @@ class PokemonResolverService:
             pokeapi_home = home_results[i] if not isinstance(home_results[i], Exception) else None
             pokeapi_home_shiny = home_shiny_results[i] if not isinstance(home_shiny_results[i], Exception) else None
             pokeapi_oa = oa_results[i] if not isinstance(oa_results[i], Exception) else None
+            pokeapi_icon = icon_results[i] if not isinstance(icon_results[i], Exception) else None
 
             if isinstance(resp, Exception) or resp.status_code != 200:
                 logger.warning("Failed to fetch form %s: %s", form_name, resp)
@@ -896,6 +917,7 @@ class PokemonResolverService:
                     pokeapi_home=pokeapi_home,
                     pokeapi_home_shiny=pokeapi_home_shiny,
                     pokeapi_oa=pokeapi_oa,
+                    pokeapi_icon=pokeapi_icon,
                 )
                 result.append(FormData(
                     name=form_name, form_id=base_id, is_default=False,
@@ -912,6 +934,7 @@ class PokemonResolverService:
                 pokeapi_home=pokeapi_home,
                 pokeapi_home_shiny=pokeapi_home_shiny,
                 pokeapi_oa=pokeapi_oa,
+                pokeapi_icon=pokeapi_icon,
             )
             result.append(FormData(
                 name=form_name,

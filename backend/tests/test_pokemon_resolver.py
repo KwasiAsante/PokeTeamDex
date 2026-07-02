@@ -872,6 +872,27 @@ class TestBuildVarietySpriteUrls:
         assert result.icon is not None
         assert "female/678" in result.icon
 
+    @pytest.mark.asyncio
+    async def test_default_icon_fallback_probed_and_nulled_on_404(self):
+        """Non-female varieties with no icon API field and no static override
+        (e.g. Basculin-White-Striped, a Gen 8 DLC addition with no icon file
+        in the sprites repo) must also be probed rather than guessed."""
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        result = await svc._build_variety_sprite_urls({}, "basculin-white-striped", 10247, 9)
+        assert result.icon is None
+        svc._pokeapi_http.head.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_default_icon_fallback_probed_and_kept_on_200(self):
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
+        result = await svc._build_variety_sprite_urls({}, "basculin-blue-striped", 10016, 9)
+        assert result.icon is not None
+        assert "10016" in result.icon
+
 
 class TestBuildFormSpriteUrls:
     def _svc(self):
@@ -900,6 +921,23 @@ class TestBuildFormSpriteUrls:
         result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 9)
         assert result.game_front is not None
         assert "dex/unown-b.png" in result.game_front
+
+    def test_icon_is_null_when_not_probed(self):
+        """icon is caller-supplied (pre-verified via HEAD probe in
+        _fetch_forms_data) — it must not be guessed inline here. Some cosmetic
+        groups (Alcremie's 63 flavors, Pumpkaboo's sizes) share one icon
+        across all variants and 404 on a constructed per-suffix path."""
+        svc = self._svc()
+        result = svc._build_form_sprite_urls("alcremie-ruby-cream-strawberry-sweet", 869, "alcremie", "alcremie", 9)
+        assert result.icon is None
+
+    def test_icon_passes_through_when_probed(self):
+        svc = self._svc()
+        result = svc._build_form_sprite_urls(
+            "unown-b", 201, "unown", "unown-b", 9,
+            pokeapi_icon="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-viii/icons/201-b.png",
+        )
+        assert result.icon == "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-viii/icons/201-b.png"
 
 
 # ---------------------------------------------------------------------------
