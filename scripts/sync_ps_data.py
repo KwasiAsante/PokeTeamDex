@@ -2,11 +2,18 @@
 """
 sync_ps_data.py — Download and trim Pokémon Showdown data for offline use.
 
-Fetches learnsets, moves, items, and abilities from PS TypeScript source on
-GitHub, strips fields the app doesn't need, and writes trimmed JSON to
-shared/ps_data/ at the project root.  Both Flutter (via pubspec.yaml asset
-directory) and the backend (via PS_DATA_DIR env var) read from this single
-location — no copy step needed.
+Sources used per file type:
+  learnsets / pokedex / pokedex-mods / formats-data
+      → raw TypeScript on GitHub (PS_GITHUB_RAW) via json5 — richest data.
+  moves.json
+      → compiled JSON endpoint (PS_COMPILED_BASE) — TS source has JS callbacks
+        that json5 cannot parse; compiled JSON is identical minus the callbacks.
+  items.js / abilities.js
+      → compiled JS exports (PS_COMPILED_BASE) — same reason as moves.
+
+Output goes to shared/ps_data/ at the project root.  Both Flutter (via
+pubspec.yaml asset directory) and the backend (via PS_DATA_DIR env var) read
+from this single location — no copy step needed.
 
 Usage:
     pip install requests json5
@@ -41,9 +48,9 @@ logger = logging.getLogger(__name__)
 # Config
 # ---------------------------------------------------------------------------
 
-# Raw TypeScript source on GitHub — richer than compiled endpoints:
-# full per-move source codes, eventData, prevo/evos chains, new move fields.
 PS_GITHUB_RAW = "https://raw.githubusercontent.com/smogon/pokemon-showdown/master"
+# Compiled JS/JSON endpoints — no JS callbacks, safe for json5 / json.loads.
+PS_COMPILED_BASE = "https://play.pokemonshowdown.com/data"
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "shared", "ps_data")
 os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -54,15 +61,14 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 def fetch_js_endpoint(path: str, base: str = PS_GITHUB_RAW) -> dict:
     """
-    Fetch a JS/TS data file containing a single object-literal export and parse
-    it via json5. Handles both PS's compiled format
-    ('use strict';\nexports.BattleX={unquotedKey:{...},...};) and raw TypeScript
-    source (export const Learnsets: SomeType = {unquotedKey:{...},...};) — in
-    both cases we just locate the first '{' and hand the rest to json5, which
-    tolerates unquoted keys, single-quoted strings, and trailing commas.
+    Fetch a JS/TS data file whose body is a single object literal and parse it
+    via json5.  Works for PS's compiled format (exports.BattleX={…};) and raw
+    TS source files that contain only data (no JS method shorthands).  Files
+    with embedded JS callbacks (moves.ts, items.ts, abilities.ts) must be
+    fetched via fetch_compiled_json / the compiled JS endpoints instead.
 
-    Extra step: json5 does not support bare numeric property keys (e.g. `0:`,
-    `1:`), which PS uses for ability slots.  We quote them before parsing.
+    Extra step: json5 does not support bare numeric property keys (e.g. `0:`),
+    which PS uses for ability slots.  We quote them before parsing.
     """
     url = f"{base}/{path}"
     print(f"  GET {url}")
@@ -71,9 +77,17 @@ def fetch_js_endpoint(path: str, base: str = PS_GITHUB_RAW) -> dict:
     text = r.text.strip()
     start = text.index("{")
     js_str = text[start:].rstrip(";").strip()
-    # Quote bare numeric keys: `0: ` → `"0": ` (json5 requires string/identifier keys).
     js_str = re.sub(r'\b(\d+)\s*:', r'"\1":', js_str)
     return json5.loads(js_str)
+
+
+def fetch_compiled_json(filename: str) -> dict:
+    """Fetch a plain-JSON file from the compiled PS endpoint."""
+    url = f"{PS_COMPILED_BASE}/{filename}"
+    print(f"  GET {url}")
+    r = requests.get(url, timeout=60)
+    r.raise_for_status()
+    return r.json()
 
 
 # ---------------------------------------------------------------------------
@@ -109,12 +123,25 @@ def _get_prevo_chain(ps_id: str, pokedex: dict) -> list[str]:
     return chain
 
 
+_warned_source_codes: set[str] = set()
+
+
 def _parse_source_entry(code: str, gen: int) -> dict | None:
     """
     Parse one PS source-code string into a {method, level?} dict for gen N.
 
     Returns None if the code does not belong to this generation.
-    Unknown method letters map to "other" and are logged once.
+    Unknown method letters map to "other" and are logged once per unique code.
+
+    Known PS source suffixes:
+        L<n>  level-up at level n (n=1 means learnt at level 1, possible via_prevo)
+        T     move tutor
+        E     egg move
+        M     TM/HM/TR
+        S<n>  event/distribution
+        R     Move Reminder (relearner)
+        D     Dream World (Gen 5 Wi-Fi event)
+        V     Virtual Console transfer (Gen 7 Bank move)
     """
     if not code or not code[0].isdigit():
         return None
@@ -137,7 +164,15 @@ def _parse_source_entry(code: str, gen: int) -> dict | None:
         return {"method": "machine"}
     if tail.startswith('S'):
         return {"method": "event"}
-    logger.warning("Unknown PS source code %r for gen %d — mapped to 'other'", code, gen)
+    if tail == 'R':
+        return {"method": "relearn"}
+    if tail == 'D':
+        return {"method": "event"}
+    if tail == 'V':
+        return {"method": "transfer"}
+    if code not in _warned_source_codes:
+        _warned_source_codes.add(code)
+        logger.warning("Unknown PS source code %r for gen %d — mapped to 'other'", code, gen)
     return {"method": "other"}
 
 
@@ -443,16 +478,16 @@ def main() -> None:
         )
         print(f"  gen {gen}: {len(gen_data)} Pokémon, {via_prevo_count} via_prevo entries")
 
-    print("\nMoves (raw TS source on GitHub)…")
-    moves = transform_moves(fetch_js_endpoint("data/moves.ts"))
+    print("\nMoves (compiled PS endpoint)…")
+    moves = transform_moves(fetch_compiled_json("moves.json"))
     mv_sha = write_json("moves.json", moves)
 
-    print("\nItems (raw TS source on GitHub)…")
-    items = transform_items(fetch_js_endpoint("data/items.ts"))
+    print("\nItems (compiled PS endpoint)…")
+    items = transform_items(fetch_js_endpoint("items.js", base=PS_COMPILED_BASE))
     it_sha = write_json("items.json", items)
 
-    print("\nAbilities (raw TS source on GitHub)…")
-    abilities = transform_abilities(fetch_js_endpoint("data/abilities.ts"))
+    print("\nAbilities (compiled PS endpoint)…")
+    abilities = transform_abilities(fetch_js_endpoint("abilities.js", base=PS_COMPILED_BASE))
     ab_sha = write_json("abilities.json", abilities)
 
     print("\nPokédex gen overrides (raw TS mods on GitHub)…")

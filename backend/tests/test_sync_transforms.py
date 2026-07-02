@@ -13,10 +13,13 @@ import pytest
 # Make scripts/ importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
 
+import logging
+
 from sync_ps_data import (
     _normalize_ps_id,
     _get_prevo_chain,
     _parse_source_entry,
+    _warned_source_codes,
     generate_learnset_by_gen,
     transform_pokedex,
     transform_pokedex_mods,
@@ -156,6 +159,37 @@ class TestParseSourceEntry:
 
     def test_older_gen_code_returns_none_for_newer_gen(self):
         assert _parse_source_entry("7T", 9) is None
+
+    def test_relearn_method(self):
+        assert _parse_source_entry("3R", 3) == {"method": "relearn"}
+
+    def test_relearn_gen4(self):
+        assert _parse_source_entry("4R", 4) == {"method": "relearn"}
+
+    def test_dream_world_method(self):
+        assert _parse_source_entry("5D", 5) == {"method": "event"}
+
+    def test_virtual_console_method(self):
+        assert _parse_source_entry("7V", 7) == {"method": "transfer"}
+
+    def test_relearn_wrong_gen_returns_none(self):
+        assert _parse_source_entry("4R", 9) is None
+
+    def test_dream_world_wrong_gen_returns_none(self):
+        assert _parse_source_entry("5D", 9) is None
+
+    def test_unknown_code_warns_once(self, caplog):
+        """Same unknown code must emit a warning only on the first call."""
+        _warned_source_codes.discard("9Z")
+        with caplog.at_level(logging.WARNING, logger="sync_ps_data"):
+            r1 = _parse_source_entry("9Z", 9)
+            r2 = _parse_source_entry("9Z", 9)
+        assert r1 == {"method": "other"}
+        assert r2 == {"method": "other"}
+        warnings_for_code = [
+            r for r in caplog.records if "9Z" in r.message
+        ]
+        assert len(warnings_for_code) == 1
 
 
 # ---------------------------------------------------------------------------
