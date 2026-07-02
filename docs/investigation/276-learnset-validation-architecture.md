@@ -210,9 +210,11 @@ A single `_normalize_ps_id(name)` helper returns a list of candidates to try.
 
 **Version group → generation mapping** hardcoded in the backend (mirrors `PokemonDataRegistry.genToVersionGroups` on the frontend).
 
-### 4.3 Backend — Updated `/pokemon/moves/{id}` Endpoint
+### 4.3 Backend — Updated `/pokemon/moves/{id}` and `/pokemon/{id}/resolved` Endpoints
 
 **No new endpoint.** Add an optional `gen` query parameter (integer, 1–9) to the existing `GET /pokemon/moves/{id}`.
+
+Apply the same gen-aware consolidation logic to `GET /pokemon/{id}/resolved?gen=N&includes[]=moves`. Currently the resolved endpoint's `moves` list is unfiltered (all version-group details across all gens are returned); after sub-issue C it must filter to the version groups that belong to the requested gen, matching the behaviour of `/pokemon/moves/{id}?gen=N`.
 
 **Consolidation logic (with `?gen=N`):**
 
@@ -389,7 +391,7 @@ Once the backend endpoints exist, the frontend migrates away from local PS data 
 |---|---|---|
 | A | `sync_ps_data.py` + infra: create `shared/ps_data/` folder; update Dockerfile build context + docker-compose; generate `learnset_1–9.json` with `via_prevo` pre-computed; update pokedex transform (`prevo`/`evos`); switch moves/items/abilities to TS source; add new move fields; update `pubspec.yaml`; remove `learnsets.json` + `learnsets-g6-allowlist.json` | Script + infra |
 | B | Backend: learnset service — load per-gen files from `PS_DATA_DIR`, PS ID normalization; no prevo chain logic needed (`via_prevo` is in the JSON) | New service, no endpoint changes |
-| C | Backend: update `/pokemon/moves` with `gen` param + full consolidation logic + new learnset schemas (`MoveLearnDetail` with `via_prevo`/`prevo`) | Endpoint + schemas |
+| C | Backend: update `/pokemon/moves` with `gen` param + full consolidation logic + new learnset schemas (`MoveLearnDetail` with `via_prevo`/`prevo`); apply the same gen-aware consolidation to `GET /pokemon/{id}/resolved?gen=N&includes[]=moves` so `moves` in the resolved response is also filtered to the requested gen | Endpoint + schemas |
 | D | Frontend: update move models, `pokemonMovesProvider`, `validLearnsetProvider` (using `withBackendFallback`), slot validator refactor, `pokemon_detail_screen.dart` Moves tab audit | Flutter only |
 | E | Backend: new `/items`, `/moves`, `/abilities` list + single-entry endpoints with PokéAPI+PS consolidation | New endpoints + schemas |
 | F | Backend: extend PostgreSQL DB caching to `/pokemon/moves`, `/pokemon/varieties`, `/pokemon/forms`, `/pokemon/smogon`, `/pokemon/flavor-text`, and all endpoints from sub-issue E | Backend infra |
