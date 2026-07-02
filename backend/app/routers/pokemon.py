@@ -149,6 +149,8 @@ async def get_resolved_pokemon(
       - `varieties` — embed types, base_stats, abilities, sprite_urls per variety
       - `forms` — embed sprite_urls per cosmetic form
       - `smogon` — embed full competitive sets (moves, EVs, items, etc.)
+      - `moves` — embed the full move list (all version groups)
+      - `flavor` — embed Pokédex flavor text entries
       Default (omitted): slim entries; no extra API calls.
 
     Navigation URLs (`smogon_url`, `varieties_url`, `forms_url`) are absolute
