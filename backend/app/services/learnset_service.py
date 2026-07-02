@@ -2,7 +2,10 @@
 learnset_service.py — In-memory per-gen learnset index from shared/ps_data/.
 
 Loaded at startup by PokemonResolverService.load_ps_data().
-Provides get_learnset(ps_name, gen) for supplement-move lookups.
+Provides get_learnset(ps_name, gen) for supplement-move lookups and
+version_group_to_gen(vg) for mapping PokéAPI version-group slugs to gens.
+The version-group→gen map is derived from genToVersionGroups in
+pokemon_registry.json rather than hardcoded, so the two stay in sync.
 """
 
 import json
@@ -12,42 +15,10 @@ import re
 
 logger = logging.getLogger(__name__)
 
-# Maps PokéAPI version-group slugs to their generation number.
-# Mirrors PokemonDataRegistry.genToVersionGroups on the Flutter frontend.
-VERSION_GROUP_TO_GEN: dict[str, int] = {
-    # Gen 1
-    "red-blue": 1,
-    "yellow": 1,
-    # Gen 2
-    "gold-silver": 2,
-    "crystal": 2,
-    # Gen 3
-    "ruby-sapphire": 3,
-    "emerald": 3,
-    "firered-leafgreen": 3,
-    "colosseum": 3,
-    "xd": 3,
-    # Gen 4
-    "diamond-pearl": 4,
-    "platinum": 4,
-    "heartgold-soulsilver": 4,
-    # Gen 5
-    "black-white": 5,
-    "black-2-white-2": 5,
-    # Gen 6
-    "x-y": 6,
-    "omega-ruby-alpha-sapphire": 6,
-    # Gen 7
-    "sun-moon": 7,
-    "ultra-sun-ultra-moon": 7,
-    "lets-go-pikachu-lets-go-eevee": 7,
-    # Gen 8
-    "sword-shield": 8,
-    "brilliant-diamond-and-shining-pearl": 8,
-    "legends-arceus": 8,
-    # Gen 9
-    "scarlet-violet": 9,
-}
+# Points to shared/ at the project root.
+# Default "../shared" works when running uvicorn from backend/ locally.
+# In Docker the env var is set explicitly to /app/shared.
+_SHARED_DIR = os.environ.get("SHARED_DIR", "../shared")
 
 # Canonical form of regional adjectives as they appear as learnset key suffixes.
 # Maps both the bare region name and its adjectival form to the canonical suffix.
@@ -103,11 +74,6 @@ def normalize_ps_id(name: str) -> list[str]:
     return result
 
 
-def version_group_to_gen(version_group: str) -> int | None:
-    """Return the generation for a PokéAPI version-group slug, or None if unknown."""
-    return VERSION_GROUP_TO_GEN.get(version_group)
-
-
 class LearnsetService:
     """Holds all per-gen learnset data loaded from learnset_1.json … learnset_9.json.
 
@@ -122,14 +88,44 @@ class LearnsetService:
 
     ``via_prevo`` is pre-computed by the sync script so no chain traversal is
     needed at query time.
+
+    The version-group→gen map is derived from ``genToVersionGroups`` in
+    ``pokemon_registry.json`` rather than hardcoded here.
     """
 
     def __init__(self) -> None:
         # _learnsets[gen] = {ps_id: {move_id: [source_dict, …]}}
         self._learnsets: dict[int, dict[str, dict[str, list[dict]]]] = {}
+        # version_group_slug → gen number (populated by load())
+        self._vg_to_gen: dict[str, int] = {}
 
     def load(self, ps_data_dir: str) -> None:
-        """Load learnset_1.json … learnset_9.json from ps_data_dir into memory."""
+        """Load learnset_1.json … learnset_9.json and derive the VG→gen map from the registry."""
+        self._load_vg_map()
+        self._load_learnset_files(ps_data_dir)
+
+    def _load_vg_map(self) -> None:
+        registry_path = os.path.join(_SHARED_DIR, "pokemon_registry.json")
+        if not os.path.exists(registry_path):
+            logger.warning(
+                "pokemon_registry.json not found at %s — version_group_to_gen will return None for all inputs",
+                registry_path,
+            )
+            return
+        try:
+            with open(registry_path, encoding="utf-8") as f:
+                registry = json.load(f)
+            vg_map: dict[str, int] = {}
+            for gen_str, vg_list in registry.get("genToVersionGroups", {}).items():
+                gen = int(gen_str)
+                for vg in vg_list:
+                    vg_map[vg] = gen
+            self._vg_to_gen = vg_map
+            logger.info("Derived version-group→gen map (%d entries) from registry", len(vg_map))
+        except (json.JSONDecodeError, ValueError, OSError) as exc:
+            logger.warning("Failed to load genToVersionGroups from registry: %s", exc)
+
+    def _load_learnset_files(self, ps_data_dir: str) -> None:
         loaded = 0
         for gen in range(1, 10):
             path = os.path.join(ps_data_dir, f"learnset_{gen}.json")
@@ -145,6 +141,10 @@ class LearnsetService:
                     "learnset_%d.json not found — run scripts/sync_ps_data.py", gen
                 )
         logger.info("LearnsetService ready: %d/9 gen files loaded", loaded)
+
+    def version_group_to_gen(self, version_group: str) -> int | None:
+        """Return the generation for a PokéAPI version-group slug, or None if unknown."""
+        return self._vg_to_gen.get(version_group)
 
     def get_learnset(self, ps_name: str, gen: int) -> dict[str, list[dict]]:
         """Return the learnset entry for ps_name in gen, or {} if not found.
