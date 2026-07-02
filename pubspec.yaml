@@ -107,8 +107,9 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/data/pokemon_registry.json
     - assets/data/ps/
+    - shared/ps_data/
+    - shared/pokemon_registry.json
     # Tray icons — reuse existing platform icons (no new files needed)
     - windows/runner/resources/app_icon.ico
     - macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png

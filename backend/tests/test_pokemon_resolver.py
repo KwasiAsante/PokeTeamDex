@@ -1107,3 +1107,105 @@ async def test_resolve_includes_moves_returns_full_list(async_db_session):
 
     assert len(result.moves) == 1
     assert result.moves[0].name == "flamethrower"
+
+
+# ---------------------------------------------------------------------------
+# load_ps_data — reads from PS_DATA_DIR, not static/
+# ---------------------------------------------------------------------------
+
+class TestLoadPsData:
+    """load_ps_data() must read PS files from _PS_DATA_DIR, not the old static/ dir.
+
+    Uses tmp_path to create throwaway directories so no real files are needed.
+    """
+
+    _MOVES = {"tackle": {"name": "Tackle", "gen": 1}}
+    _POKEDEX = {"bulbasaur": {"num": 1, "name": "Bulbasaur", "types": ["Grass"]}}
+    _OVERRIDES = {"gen1": {"clefairy": {"types": ["Normal"]}}}
+
+    def _write(self, directory, filename, data):
+        import json
+        path = directory / filename
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+    def test_reads_moves_from_ps_data_dir(self, tmp_path):
+        ps_dir = tmp_path / "ps_data"
+        ps_dir.mkdir()
+        self._write(ps_dir, "moves.json", self._MOVES)
+        self._write(ps_dir, "pokedex.json", self._POKEDEX)
+
+        svc = PokemonResolverService()
+        with patch("app.services.pokemon_resolver._PS_DATA_DIR", str(ps_dir)):
+            svc.load_ps_data()
+
+        assert svc._moves_index == self._MOVES
+
+    def test_reads_pokedex_from_ps_data_dir(self, tmp_path):
+        ps_dir = tmp_path / "ps_data"
+        ps_dir.mkdir()
+        self._write(ps_dir, "moves.json", self._MOVES)
+        self._write(ps_dir, "pokedex.json", self._POKEDEX)
+
+        svc = PokemonResolverService()
+        with patch("app.services.pokemon_resolver._PS_DATA_DIR", str(ps_dir)):
+            svc.load_ps_data()
+
+        assert svc._ps_pokedex == self._POKEDEX
+
+    def test_reads_overrides_from_ps_data_dir(self, tmp_path):
+        ps_dir = tmp_path / "ps_data"
+        ps_dir.mkdir()
+        self._write(ps_dir, "moves.json", self._MOVES)
+        self._write(ps_dir, "pokedex.json", self._POKEDEX)
+        self._write(ps_dir, "pokedex-gen-overrides.json", self._OVERRIDES)
+
+        svc = PokemonResolverService()
+        with patch("app.services.pokemon_resolver._PS_DATA_DIR", str(ps_dir)):
+            svc.load_ps_data()
+
+        assert svc._ps_pokedex_overrides == self._OVERRIDES
+
+    def test_missing_event_learnsets_does_not_crash(self, tmp_path):
+        """event_learnsets.json is no longer generated — load_ps_data must not crash."""
+        ps_dir = tmp_path / "ps_data"
+        ps_dir.mkdir()
+        self._write(ps_dir, "moves.json", self._MOVES)
+        self._write(ps_dir, "pokedex.json", self._POKEDEX)
+        # event_learnsets.json deliberately absent
+
+        svc = PokemonResolverService()
+        with patch("app.services.pokemon_resolver._PS_DATA_DIR", str(ps_dir)):
+            svc.load_ps_data()  # must not raise
+
+        assert svc._event_learnsets == {}
+
+    def test_missing_ps_data_files_leave_attributes_empty(self, tmp_path):
+        """Graceful degradation when PS data dir exists but files are missing."""
+        ps_dir = tmp_path / "empty_ps"
+        ps_dir.mkdir()
+
+        svc = PokemonResolverService()
+        with patch("app.services.pokemon_resolver._PS_DATA_DIR", str(ps_dir)):
+            svc.load_ps_data()  # must not raise
+
+        assert svc._moves_index == {}
+        assert svc._ps_pokedex == {}
+
+    def test_registry_read_from_shared_dir(self, tmp_path):
+        """pokemon_registry.json lives in shared/, not PS_DATA_DIR or static/."""
+        ps_dir = tmp_path / "ps_data"
+        shared_dir = tmp_path / "shared"
+        ps_dir.mkdir()
+        shared_dir.mkdir()
+
+        self._write(ps_dir, "moves.json", self._MOVES)
+        self._write(ps_dir, "pokedex.json", self._POKEDEX)
+        registry = {"psFormExceptions": {"charizard-mega-x": "charizardmegax"}}
+        self._write(shared_dir, "pokemon_registry.json", registry)
+
+        svc = PokemonResolverService()
+        with patch("app.services.pokemon_resolver._PS_DATA_DIR", str(ps_dir)), \
+             patch("app.services.pokemon_resolver._SHARED_DIR", str(shared_dir)):
+            svc.load_ps_data()
+
+        assert svc._ps_exceptions == {"charizard-mega-x": "charizardmegax"}
