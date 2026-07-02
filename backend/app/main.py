@@ -29,6 +29,7 @@ app = FastAPI(
         "all protected endpoints."
     ),
     openapi_tags=[
+        {"name": "health", "description": "Liveness probe — no auth required."},
         {"name": "auth", "description": "Register, log in, and identify the current user."},
         {"name": "teams", "description": "Create and manage Pokémon teams and their metadata."},
         {"name": "slots", "description": "Read or write individual Pokémon slots within a team."},
@@ -144,6 +145,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     )
 
 
-@app.get("/health")
+@app.get("/health", summary="Health check", tags=["health"])
 async def health() -> dict:
+    """Returns 200 OK when the server is up. Used by load balancers and uptime monitors."""
     return {"status": "ok"}

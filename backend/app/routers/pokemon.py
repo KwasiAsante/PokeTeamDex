@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, Query, Request
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Path, Query, Request
 
 from app.core.deps import DB
 from app.schemas.pokemon_resolved import (
@@ -28,7 +30,7 @@ def _base_url(request: Request) -> str:
 @router.get("/varieties/{name_or_id}", response_model=VarietiesResponse, summary="Get Pokémon varieties")
 async def get_pokemon_varieties(
     request: Request,
-    name_or_id: str,
+    name_or_id: Annotated[str, Path(description="PokéAPI Pokémon name (e.g. 'charizard', 'charizard-mega-x') or numeric ID (e.g. 6, 10034).")],
     db: DB,
     gen: int = 9,
 ) -> VarietiesResponse:
@@ -52,7 +54,7 @@ async def get_pokemon_varieties(
 @router.get("/forms/{name_or_id}", response_model=FormsResponse, summary="Get cosmetic forms")
 async def get_pokemon_forms(
     request: Request,
-    name_or_id: str,
+    name_or_id: Annotated[str, Path(description="PokéAPI Pokémon name (e.g. 'charizard', 'charizard-mega-x') or numeric ID (e.g. 6, 10034).")],
     db: DB,
     gen: int = 9,
 ) -> FormsResponse:
@@ -76,7 +78,7 @@ async def get_pokemon_forms(
 @router.get("/smogon/{name_or_id}", response_model=SmogonResponse, summary="Get Smogon analyses")
 async def get_pokemon_smogon(
     request: Request,
-    name_or_id: str,
+    name_or_id: Annotated[str, Path(description="PokéAPI Pokémon name (e.g. 'charizard', 'charizard-mega-x') or numeric ID (e.g. 6, 10034).")],
     db: DB,
     gen: int | None = None,
 ) -> SmogonResponse:
@@ -99,7 +101,7 @@ async def get_pokemon_smogon(
 @router.get("/moves/{name_or_id}", response_model=MovesResponse, summary="Get Pokémon moves")
 async def get_pokemon_moves(
     request: Request,
-    name_or_id: str,
+    name_or_id: Annotated[str, Path(description="PokéAPI Pokémon name (e.g. 'charizard', 'charizard-mega-x') or numeric ID (e.g. 6, 10034).")],
     db: DB,
 ) -> MovesResponse:
     """
@@ -114,7 +116,7 @@ async def get_pokemon_moves(
 @router.get("/flavor-text/{name_or_id}", response_model=FlavorTextResponse, summary="Get Pokédex flavor text")
 async def get_pokemon_flavor_text(
     request: Request,
-    name_or_id: str,
+    name_or_id: Annotated[str, Path(description="PokéAPI Pokémon name (e.g. 'charizard', 'charizard-mega-x') or numeric ID (e.g. 6, 10034).")],
     db: DB,
     lang: str | None = None,
 ) -> FlavorTextResponse:
@@ -131,7 +133,7 @@ async def get_pokemon_flavor_text(
 @router.get("/{name_or_id}/resolved", response_model=PokemonResolvedResponse, summary="Get resolved Pokémon data")
 async def get_resolved_pokemon(
     request: Request,
-    name_or_id: str,
+    name_or_id: Annotated[str, Path(description="PokéAPI Pokémon name (e.g. 'charizard', 'charizard-mega-x') or numeric ID (e.g. 6, 10034).")],
     db: DB,
     gen: int | None = None,
     includes: list[str] = Query(default=[]),

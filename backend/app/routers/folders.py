@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Path, status
 from sqlalchemy import select
 
 from app.core.deps import CurrentUser, DB
@@ -31,7 +33,7 @@ async def create_folder(body: FolderCreate, current_user: CurrentUser, db: DB) -
 
 
 @router.get("/{folder_id}", response_model=FolderResponse, summary="Get folder")
-async def get_folder(folder_id: int, current_user: CurrentUser, db: DB) -> FolderResponse:
+async def get_folder(folder_id: Annotated[int, Path(description="Database ID of the folder.")], current_user: CurrentUser, db: DB) -> FolderResponse:
     """Return a single folder by ID, verifying ownership."""
     folder = await _get_owned_folder(folder_id, current_user.id, db)
     return FolderResponse.model_validate(folder)
@@ -39,7 +41,7 @@ async def get_folder(folder_id: int, current_user: CurrentUser, db: DB) -> Folde
 
 @router.patch("/{folder_id}", response_model=FolderResponse, summary="Rename folder")
 async def rename_folder(
-    folder_id: int, body: FolderUpdate, current_user: CurrentUser, db: DB
+    folder_id: Annotated[int, Path(description="Database ID of the folder.")], body: FolderUpdate, current_user: CurrentUser, db: DB
 ) -> FolderResponse:
     folder = await _get_owned_folder(folder_id, current_user.id, db)
     folder.name = body.name
@@ -49,7 +51,7 @@ async def rename_folder(
 
 
 @router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete folder")
-async def delete_folder(folder_id: int, current_user: CurrentUser, db: DB) -> None:
+async def delete_folder(folder_id: Annotated[int, Path(description="Database ID of the folder.")], current_user: CurrentUser, db: DB) -> None:
     """Soft-delete a folder and cascade the deletion to all its teams and their slots."""
     folder = await _get_owned_folder(folder_id, current_user.id, db)
     folder.is_deleted = True
@@ -70,7 +72,7 @@ async def delete_folder(folder_id: int, current_user: CurrentUser, db: DB) -> No
     await db.commit()
 
 
-async def _get_owned_folder(folder_id: int, user_id: int, db: DB) -> TeamFolder:
+async def _get_owned_folder(folder_id: Annotated[int, Path(description="Database ID of the folder.")], user_id: int, db: DB) -> TeamFolder:
     result = await db.execute(
         select(TeamFolder).where(
             TeamFolder.id == folder_id,

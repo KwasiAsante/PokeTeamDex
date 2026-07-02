@@ -1,7 +1,9 @@
 import json
 import os
 
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Path
 from fastapi.responses import FileResponse
 
 router = APIRouter(prefix="/ps-data", tags=["ps-data"])
@@ -48,7 +50,9 @@ async def get_ps_data_version() -> dict:
 
 
 @router.get("/file/{filename}", summary="Download a PS data file")
-async def get_ps_data_file(filename: str) -> FileResponse:
+async def get_ps_data_file(
+    filename: Annotated[str, Path(description="Name of the PS data file to download (e.g. 'moves.json', 'learnset_1.json'). Must be in the published file set.")],
+) -> FileResponse:
     """
     Serves a single PS data JSON file so the Flutter app can refresh its cache
     when /ps-data/version reports a changed sha. Restricted to the known set of

@@ -12,8 +12,8 @@ async def device_logs(
     request: Request,
     current_user: CurrentUser,
     app_name: str = Query(default="poketeamdex"),
-    x_device_id: str = Header(...),
-    x_level: str = Header(default="UNKNOWN"),
+    x_device_id: str = Header(..., description="Unique identifier for the sending device (max 64 characters). Used as a Loki label."),
+    x_level: str = Header(default="UNKNOWN", description="Log level of the batch: DEBUG, INFO, WARNING, ERROR, or CRITICAL."),
 ) -> dict:
     """Accept a JSON array of log lines from a Flutter device and push to Loki."""
     if len(x_device_id) > 64:
