@@ -8,8 +8,9 @@ from app.schemas.team import FolderCreate, FolderResponse, FolderUpdate
 router = APIRouter(prefix="/folders", tags=["folders"])
 
 
-@router.get("", response_model=list[FolderResponse])
+@router.get("", response_model=list[FolderResponse], summary="List folders")
 async def list_folders(current_user: CurrentUser, db: DB) -> list[FolderResponse]:
+    """Return all non-deleted folders belonging to the authenticated user."""
     result = await db.execute(
         select(TeamFolder).where(
             TeamFolder.user_id == current_user.id,
@@ -19,8 +20,9 @@ async def list_folders(current_user: CurrentUser, db: DB) -> list[FolderResponse
     return [FolderResponse.model_validate(f) for f in result.scalars()]
 
 
-@router.post("", response_model=FolderResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=FolderResponse, status_code=status.HTTP_201_CREATED, summary="Create folder")
 async def create_folder(body: FolderCreate, current_user: CurrentUser, db: DB) -> FolderResponse:
+    """Create a new team folder for the authenticated user."""
     folder = TeamFolder(user_id=current_user.id, name=body.name)
     db.add(folder)
     await db.commit()
@@ -28,13 +30,14 @@ async def create_folder(body: FolderCreate, current_user: CurrentUser, db: DB) -
     return FolderResponse.model_validate(folder)
 
 
-@router.get("/{folder_id}", response_model=FolderResponse)
+@router.get("/{folder_id}", response_model=FolderResponse, summary="Get folder")
 async def get_folder(folder_id: int, current_user: CurrentUser, db: DB) -> FolderResponse:
+    """Return a single folder by ID, verifying ownership."""
     folder = await _get_owned_folder(folder_id, current_user.id, db)
     return FolderResponse.model_validate(folder)
 
 
-@router.patch("/{folder_id}", response_model=FolderResponse)
+@router.patch("/{folder_id}", response_model=FolderResponse, summary="Rename folder")
 async def rename_folder(
     folder_id: int, body: FolderUpdate, current_user: CurrentUser, db: DB
 ) -> FolderResponse:
@@ -45,8 +48,9 @@ async def rename_folder(
     return FolderResponse.model_validate(folder)
 
 
-@router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete folder")
 async def delete_folder(folder_id: int, current_user: CurrentUser, db: DB) -> None:
+    """Soft-delete a folder and cascade the deletion to all its teams and their slots."""
     folder = await _get_owned_folder(folder_id, current_user.id, db)
     folder.is_deleted = True
 

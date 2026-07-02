@@ -1,0 +1,50 @@
+# Flutter / Dart artifacts — not needed in the Docker image
+lib/
+test/
+android/
+ios/
+macos/
+windows/
+linux/
+web/
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+pubspec.yaml
+analysis_options.yaml
+devtools_options.yaml
+
+# Assets (bundled into Flutter build, not needed by the backend)
+assets/
+
+# Scripts — only the backend is included
+scripts/
+
+# Docs
+docs/
+
+# Git / CI
+.git/
+.github/
+.gitignore
+
+# Project-root config files not needed in the image
+*.md
+firebase.json
+postman/
+
+# Secrets and local dev config (never bake into the image)
+.env
+.env.prod
+*firebase-adminsdk*.json
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/

@@ -73,7 +73,7 @@ class PokemonDataRegistry {
   });
 
   static Future<void> initialize() async {
-    final raw = await rootBundle.loadString('assets/data/pokemon_registry.json');
+    final raw = await rootBundle.loadString('shared/pokemon_registry.json');
     final j = jsonDecode(raw) as Map<String, dynamic>;
     _instance = PokemonDataRegistry._(
       psFormExceptions: _strMap(j['psFormExceptions']),

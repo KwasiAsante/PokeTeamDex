@@ -7,7 +7,7 @@ from app.core.loki import push_async
 router = APIRouter(prefix="/logs", tags=["logs"])
 
 
-@router.post("/device")
+@router.post("/device", summary="Forward device logs to Loki")
 async def device_logs(
     request: Request,
     current_user: CurrentUser,
