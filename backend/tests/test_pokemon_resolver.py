@@ -752,6 +752,20 @@ class TestFormDataFrontSprite:
 
 
 class TestBuildVarietySpriteUrls:
+    """Every field either reads an authoritative PokeAPI value directly, or
+    (when that value is absent) constructs the conventional URL and
+    HEAD-probes it before returning — never a guess that skips verification.
+
+    Two fixtures cover this uniformly:
+      _SPRITES_FULL: authoritative data for every field. Combined with a
+        `.head` mock that always 404s, a field resolving to its authoritative
+        value (not None) proves it never needed to probe.
+      {} (empty): no authoritative data anywhere. Combined with a blanket
+        200 or 404 `.head` mock, every constructible field resolves to a
+        populated URL or None respectively — proving the construct-then-probe
+        fallback runs for every field that has one.
+    """
+
     _SPRITES = {
         "other": {
             "official-artwork": {
@@ -766,28 +780,180 @@ class TestBuildVarietySpriteUrls:
         }
     }
 
+    _SPRITES_FULL = {
+        "other": {
+            "official-artwork": {
+                "front_default": "https://pokeapi/oa/default.png",
+                "front_shiny": "https://pokeapi/oa/shiny.png",
+                "front_female": "https://pokeapi/oa/female.png",
+                "front_shiny_female": "https://pokeapi/oa/shiny-female.png",
+            },
+            "home": {
+                "front_default": "https://pokeapi/home/default.png",
+                "front_shiny": "https://pokeapi/home/shiny.png",
+                "front_female": "https://pokeapi/home/female.png",
+                "front_female_shiny": "https://pokeapi/home/female-shiny.png",
+            },
+        },
+        "versions": {
+            "generation-ix": {"scarlet-violet": {
+                "front_default": "https://pokeapi/gen9/default.png",
+                "front_shiny": "https://pokeapi/gen9/shiny.png",
+                "front_female": "https://pokeapi/gen9/female.png",
+                "front_shiny_female": "https://pokeapi/gen9/shiny-female.png",
+            }},
+            "generation-viii": {"icons": {
+                "front_default": "https://pokeapi/icons/default.png",
+                "front_female": "https://pokeapi/icons/female.png",
+            }},
+        },
+    }
+
     def _svc(self):
         return _make_service()
 
-    @pytest.mark.asyncio
-    async def test_official_artwork_extracted(self):
-        svc = self._svc()
-        result = await svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
-        assert result.official_artwork == "https://pokeapi/artwork/6.png"
-        assert result.official_artwork_shiny == "https://pokeapi/artwork/shiny/6.png"
+    # -- Authoritative data always wins, and never needs a probe to prove it:
+    # every probe in these tests is mocked to 404, yet every field below
+    # still resolves to its real value. --
 
     @pytest.mark.asyncio
-    async def test_home_extracted(self):
+    async def test_authoritative_data_used_without_probing(self):
         svc = self._svc()
-        result = await svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
-        assert result.home == "https://pokeapi/home/6.png"
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        result = await svc._build_variety_sprite_urls(self._SPRITES_FULL, "charizard", 6, 9)
+
+        assert result.official_artwork == "https://pokeapi/oa/default.png"
+        assert result.official_artwork_shiny == "https://pokeapi/oa/shiny.png"
+        assert result.official_artwork_female == "https://pokeapi/oa/female.png"
+        assert result.official_artwork_female_shiny == "https://pokeapi/oa/shiny-female.png"
+        assert result.home == "https://pokeapi/home/default.png"
+        assert result.home_shiny == "https://pokeapi/home/shiny.png"
+        assert result.home_female == "https://pokeapi/home/female.png"
+        assert result.home_female_shiny == "https://pokeapi/home/female-shiny.png"
+        assert result.game_front == "https://pokeapi/gen9/default.png"
+        assert result.game_front_shiny == "https://pokeapi/gen9/shiny.png"
+        assert result.game_front_female == "https://pokeapi/gen9/female.png"
+        assert result.game_front_female_shiny == "https://pokeapi/gen9/shiny-female.png"
+        assert result.icon == "https://pokeapi/icons/default.png"
+        assert result.icon_female == "https://pokeapi/icons/female.png"
+
+    @pytest.mark.asyncio
+    async def test_icon_override_id_used_without_probing(self):
+        """Static overrides (pokemon_registry.json) are pre-verified by whoever
+        curated them — trust them outright, no need to probe. Uses {} sprites
+        (no gen8 icon data) so the earlier gen8_icon_api branch doesn't win
+        first and mask the override branch under test."""
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        svc._variety_icon_id_overrides = {"calyrex-ice": "898-ice-rider"}
+        result = await svc._build_variety_sprite_urls(
+            {}, "calyrex-ice", 10193, 9, variety_name="calyrex-ice",
+        )
+        assert "898-ice-rider" in result.icon
+
+    # -- Every constructible field falls back to a HEAD-probed guess when its
+    # authoritative field is absent — populated on 200, null on 404. --
+
+    @pytest.mark.asyncio
+    async def test_every_constructible_field_probed_and_nulled_on_404(self):
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        result = await svc._build_variety_sprite_urls({}, "charizard", 6, 9)
+
+        assert result.official_artwork is None
+        assert result.official_artwork_shiny is None
+        assert result.official_artwork_female is None
+        assert result.official_artwork_female_shiny is None
+        assert result.home is None
+        assert result.home_shiny is None
+        assert result.home_female is None
+        assert result.home_female_shiny is None
+        assert result.game_front is None
+        assert result.game_front_shiny is None
+        assert result.game_front_female is None
+        assert result.game_front_female_shiny is None
+        assert result.icon is None
+        assert result.icon_female is None
+
+    @pytest.mark.asyncio
+    async def test_every_constructible_field_probed_and_populated_on_200(self):
+        """gen=4, not 9: gen 9's PokeAPI/sprites directory has no shiny subdir
+        at all (per _GEN_SPRITE_CONFIG), and there's no reliable Showdown
+        equivalent for the shiny+female combination specifically — so
+        game_front_female_shiny genuinely has no candidate to probe at gen 9.
+        Gen 4 supports the full shiny+female path, isolating this test to
+        "does construct-then-probe work" rather than "does gen 9 support
+        every sprite kind" (it doesn't, and that's a separate, correct fact)."""
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
+        result = await svc._build_variety_sprite_urls({}, "charizard", 6, 4)
+
+        assert result.official_artwork is not None
+        assert result.official_artwork_shiny is not None
+        assert result.official_artwork_female is not None
+        assert result.official_artwork_female_shiny is not None
+        assert result.home is not None
+        assert result.home_shiny is not None
+        assert result.home_female is not None
+        assert result.home_female_shiny is not None
+        assert result.game_front is not None
+        assert result.game_front_shiny is not None
+        assert result.game_front_female is not None
+        assert result.game_front_female_shiny is not None
+        assert result.icon is not None
+        assert result.icon_female is not None
+
+    @pytest.mark.asyncio
+    async def test_default_icon_fallback_probed_and_nulled_on_404(self):
+        """Non-female varieties with no icon API field and no static override
+        (e.g. Basculin-White-Striped, a Gen 8 DLC addition with no icon file
+        in the sprites repo) must also be probed rather than guessed."""
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        result = await svc._build_variety_sprite_urls({}, "basculin-white-striped", 10247, 9)
+        assert result.icon is None
+
+    @pytest.mark.asyncio
+    async def test_default_icon_fallback_probed_and_kept_on_200(self):
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
+        result = await svc._build_variety_sprite_urls({}, "basculin-blue-striped", 10016, 9)
+        assert result.icon is not None
+        assert "10016" in result.icon
+
+    @pytest.mark.asyncio
+    async def test_female_variety_icon_probed_and_nulled_on_404(self):
+        """-female variety entries (Basculegion-female, etc.) have no API field
+        confirming a separate icon exists — probe, and return null on 404
+        rather than a guessed URL."""
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        result = await svc._build_variety_sprite_urls(
+            {}, "basculegion-female", 10248, 9,
+            variety_name="basculegion-female", base_pokemon_id=902,
+        )
+        assert result.icon is None
+
+    @pytest.mark.asyncio
+    async def test_female_variety_icon_probed_and_kept_on_200(self):
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
+        result = await svc._build_variety_sprite_urls(
+            {}, "meowstic-female", 10025, 9,
+            variety_name="meowstic-female", base_pokemon_id=678,
+        )
+        assert result.icon is not None
+        assert "female/678" in result.icon
+
+    # -- game_front/game_front_shiny: construction detail (which URL gets
+    # built and probed) per gen tier --
 
     @pytest.mark.asyncio
     async def test_gen9_uses_showdown_dex(self):
         svc = self._svc()
         result = await svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
         assert result.game_front is not None
-        assert "dex/charizard.png" in result.game_front
+        assert "generation-ix" in result.game_front
 
     @pytest.mark.asyncio
     async def test_gen5_uses_pokeapi_animated(self):
@@ -803,236 +969,6 @@ class TestBuildVarietySpriteUrls:
         assert result.game_front_shiny is None
 
     @pytest.mark.asyncio
-    async def test_empty_sprites(self):
-        svc = self._svc()
-        result = await svc._build_variety_sprite_urls({}, "charizard", 6, 9)
-        assert result.official_artwork is None
-        assert result.home is None
-
-    @pytest.mark.asyncio
-    async def test_game_front_female_absent_returns_null_not_guessed_url(self):
-        """A species with no female game sprite for this gen must not get a
-        constructed guess — only an authoritative API field may populate this."""
-        svc = self._svc()
-        result = await svc._build_variety_sprite_urls(self._SPRITES, "squirtle", 7, 4)
-        assert result.game_front_female is None
-
-    @pytest.mark.asyncio
-    async def test_game_front_female_present_uses_api_field(self):
-        svc = self._svc()
-        sprites = {
-            **self._SPRITES,
-            "versions": {
-                "generation-iv": {
-                    "heartgold-soulsilver": {"front_default": "x", "front_female": "https://pokeapi/gen4/6-f.png"},
-                },
-            },
-        }
-        result = await svc._build_variety_sprite_urls(sprites, "charizard", 6, 4)
-        assert result.game_front_female == "https://pokeapi/gen4/6-f.png"
-
-    @pytest.mark.asyncio
-    async def test_icon_female_absent_returns_null_not_guessed_url(self):
-        """Having female HOME art (front_female in self._SPRITES) must not be
-        used as a signal that a female icon exists — only the icon-specific
-        API field may populate icon_female."""
-        svc = self._svc()
-        result = await svc._build_variety_sprite_urls(self._SPRITES, "venusaur", 3, 9)
-        assert result.icon_female is None
-
-    @pytest.mark.asyncio
-    async def test_icon_female_present_uses_api_field(self):
-        svc = self._svc()
-        sprites = {
-            **self._SPRITES,
-            "versions": {
-                "generation-viii": {"icons": {"front_female": "https://pokeapi/icons/female/3.png"}},
-            },
-        }
-        result = await svc._build_variety_sprite_urls(sprites, "venusaur", 3, 9)
-        assert result.icon_female == "https://pokeapi/icons/female/3.png"
-
-    @pytest.mark.asyncio
-    async def test_female_variety_icon_probed_and_nulled_on_404(self):
-        """-female variety entries (Basculegion-female, etc.) have no API field
-        confirming a separate icon exists — probe, and return null on 404
-        rather than a guessed URL. gen=None so game_front's own (unrelated)
-        probing doesn't interfere with the single-probe assertion below."""
-        svc = self._svc()
-        svc._pokeapi_http = AsyncMock()
-        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
-        result = await svc._build_variety_sprite_urls(
-            {}, "basculegion-female", 10248, None,
-            variety_name="basculegion-female", base_pokemon_id=902,
-        )
-        assert result.icon is None
-        svc._pokeapi_http.head.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_female_variety_icon_probed_and_kept_on_200(self):
-        svc = self._svc()
-        svc._pokeapi_http = AsyncMock()
-        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
-        result = await svc._build_variety_sprite_urls(
-            {}, "meowstic-female", 10025, 9,
-            variety_name="meowstic-female", base_pokemon_id=678,
-        )
-        assert result.icon is not None
-        assert "female/678" in result.icon
-
-    @pytest.mark.asyncio
-    async def test_default_icon_fallback_probed_and_nulled_on_404(self):
-        """Non-female varieties with no icon API field and no static override
-        (e.g. Basculin-White-Striped, a Gen 8 DLC addition with no icon file
-        in the sprites repo) must also be probed rather than guessed. gen=None
-        so game_front's own (unrelated) probing doesn't interfere with the
-        single-probe assertion below."""
-        svc = self._svc()
-        svc._pokeapi_http = AsyncMock()
-        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
-        result = await svc._build_variety_sprite_urls({}, "basculin-white-striped", 10247, None)
-        assert result.icon is None
-        svc._pokeapi_http.head.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_default_icon_fallback_probed_and_kept_on_200(self):
-        svc = self._svc()
-        svc._pokeapi_http = AsyncMock()
-        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
-        result = await svc._build_variety_sprite_urls({}, "basculin-blue-striped", 10016, 9)
-        assert result.icon is not None
-        assert "10016" in result.icon
-
-    # -- Direct API passthrough fields: absent data must return null, never a guess --
-
-    @pytest.mark.asyncio
-    async def test_official_artwork_female_absent_returns_none(self):
-        svc = self._svc()
-        result = await svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
-        assert result.official_artwork_female is None
-        assert result.official_artwork_female_shiny is None
-
-    @pytest.mark.asyncio
-    async def test_official_artwork_female_present_is_passed_through(self):
-        svc = self._svc()
-        sprites = {
-            "other": {
-                "official-artwork": {
-                    "front_default": "https://pokeapi/artwork/3.png",
-                    "front_female": "https://pokeapi/artwork/female/3.png",
-                    "front_shiny_female": "https://pokeapi/artwork/shiny-female/3.png",
-                },
-            },
-        }
-        result = await svc._build_variety_sprite_urls(sprites, "venusaur", 3, 9)
-        assert result.official_artwork_female == "https://pokeapi/artwork/female/3.png"
-        assert result.official_artwork_female_shiny == "https://pokeapi/artwork/shiny-female/3.png"
-
-    @pytest.mark.asyncio
-    async def test_home_shiny_absent_returns_none(self):
-        svc = self._svc()
-        result = await svc._build_variety_sprite_urls({"other": {"home": {}}}, "charizard", 6, 9)
-        assert result.home_shiny is None
-
-    @pytest.mark.asyncio
-    async def test_home_female_absent_returns_none(self):
-        svc = self._svc()
-        result = await svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
-        assert result.home_female is None
-
-    @pytest.mark.asyncio
-    async def test_home_female_shiny_absent_returns_none(self):
-        svc = self._svc()
-        result = await svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
-        assert result.home_female_shiny is None
-
-    @pytest.mark.asyncio
-    async def test_home_female_shiny_uses_front_female_shiny_key(self):
-        svc = self._svc()
-        sprites = {"other": {"home": {"front_female_shiny": "https://pokeapi/home/female-shiny-a/3.png"}}}
-        result = await svc._build_variety_sprite_urls(sprites, "venusaur", 3, 9)
-        assert result.home_female_shiny == "https://pokeapi/home/female-shiny-a/3.png"
-
-    @pytest.mark.asyncio
-    async def test_home_female_shiny_uses_front_shiny_female_key(self):
-        """PokeAPI has used both field-name spellings historically — either must work."""
-        svc = self._svc()
-        sprites = {"other": {"home": {"front_shiny_female": "https://pokeapi/home/female-shiny-b/3.png"}}}
-        result = await svc._build_variety_sprite_urls(sprites, "venusaur", 3, 9)
-        assert result.home_female_shiny == "https://pokeapi/home/female-shiny-b/3.png"
-
-    # -- game_front/game_front_shiny: real API data must win over any guess --
-
-    @pytest.mark.asyncio
-    async def test_game_front_uses_api_pool_data_over_guess(self):
-        svc = self._svc()
-        sprites = {
-            **self._SPRITES,
-            "versions": {
-                # front_shiny and the icon field are also given real data so
-                # this test's "no probing happened" assertion isn't tripped
-                # by either field's own unrelated probe-on-absent-data branch.
-                "generation-ix": {"scarlet-violet": {
-                    "front_default": "https://pokeapi/real/6.png",
-                    "front_shiny": "https://pokeapi/real/6-shiny.png",
-                }},
-                "generation-viii": {"icons": {"front_default": "https://pokeapi/icons/6.png"}},
-            },
-        }
-        result = await svc._build_variety_sprite_urls(sprites, "charizard", 6, 9)
-        assert result.game_front == "https://pokeapi/real/6.png"
-        svc._pokeapi_http.head.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_game_front_shiny_uses_api_pool_data_over_guess(self):
-        svc = self._svc()
-        sprites = {
-            **self._SPRITES,
-            "versions": {
-                "generation-ix": {"scarlet-violet": {
-                    "front_default": "https://pokeapi/real/6.png",
-                    "front_shiny": "https://pokeapi/real/6-shiny.png",
-                }},
-                "generation-viii": {"icons": {"front_default": "https://pokeapi/icons/6.png"}},
-            },
-        }
-        result = await svc._build_variety_sprite_urls(sprites, "charizard", 6, 9)
-        assert result.game_front_shiny == "https://pokeapi/real/6-shiny.png"
-        svc._pokeapi_http.head.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_game_front_guess_probed_and_nulled_on_404(self):
-        """When the API has no versioned sprite data for this gen, the
-        constructed PokeAPI/Showdown guess is HEAD-probed before being
-        returned — a species not yet mirrored anywhere resolves to null,
-        not a URL known to fail."""
-        svc = self._svc()
-        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
-        result = await svc._build_variety_sprite_urls({}, "charizard", 6, 9)
-        assert result.game_front is None
-
-    @pytest.mark.asyncio
-    async def test_game_front_guess_probed_and_kept_on_200(self):
-        svc = self._svc()
-        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
-        result = await svc._build_variety_sprite_urls({}, "charizard", 6, 9)
-        assert result.game_front is not None
-
-    @pytest.mark.asyncio
-    async def test_game_front_shiny_guess_probed_and_nulled_on_404(self):
-        svc = self._svc()
-        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
-        result = await svc._build_variety_sprite_urls({}, "charizard", 6, 9)
-        assert result.game_front_shiny is None
-
-    @pytest.mark.asyncio
-    async def test_game_front_shiny_guess_probed_and_kept_on_200(self):
-        svc = self._svc()
-        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
-        result = await svc._build_variety_sprite_urls({}, "charizard", 6, 9)
-        assert result.game_front_shiny is not None
-
-    @pytest.mark.asyncio
     async def test_game_front_shiny_gen1_is_none_without_a_valid_candidate(self):
         """Gen 1 never had shiny sprites — both the PokeAPI and Showdown
         constructors return None, so there's no candidate to probe for
@@ -1043,39 +979,8 @@ class TestBuildVarietySpriteUrls:
         result = await svc._build_variety_sprite_urls({}, "charizard", 6, 1)
         assert result.game_front_shiny is None
 
-    @pytest.mark.asyncio
-    async def test_game_front_female_shiny_absent_returns_none(self):
-        svc = self._svc()
-        result = await svc._build_variety_sprite_urls(self._SPRITES, "squirtle", 7, 4)
-        assert result.game_front_female_shiny is None
-
-    @pytest.mark.asyncio
-    async def test_game_front_female_shiny_uses_front_shiny_female_key(self):
-        svc = self._svc()
-        sprites = {
-            "versions": {
-                "generation-iv": {
-                    "heartgold-soulsilver": {"front_shiny_female": "https://pokeapi/gen4/6-fs-a.png"},
-                },
-            },
-        }
-        result = await svc._build_variety_sprite_urls(sprites, "charizard", 6, 4)
-        assert result.game_front_female_shiny == "https://pokeapi/gen4/6-fs-a.png"
-
-    @pytest.mark.asyncio
-    async def test_game_front_female_shiny_uses_front_female_shiny_key(self):
-        svc = self._svc()
-        sprites = {
-            "versions": {
-                "generation-iv": {
-                    "heartgold-soulsilver": {"front_female_shiny": "https://pokeapi/gen4/6-fs-b.png"},
-                },
-            },
-        }
-        result = await svc._build_variety_sprite_urls(sprites, "charizard", 6, 4)
-        assert result.game_front_female_shiny == "https://pokeapi/gen4/6-fs-b.png"
-
-    # -- gen=None branch (Pokédex / no-format teams): root sprites only, no guessing --
+    # -- gen=None branch (Pokédex / no-format teams): root sprites are already
+    # PokeAPI's canonical URL, no separate construction target exists --
 
     @pytest.mark.asyncio
     async def test_gen_none_game_front_absent_returns_none(self):
@@ -1101,36 +1006,80 @@ class TestBuildVarietySpriteUrls:
         assert result.game_front_female == "https://pokeapi/root/6-f.png"
         assert result.game_front_female_shiny == "https://pokeapi/root/6-fs.png"
 
-    # -- icon: authoritative/override branches must not probe at all --
+    # -- home_female_shiny / game_front_female_shiny: two possible PokeAPI
+    # field-name spellings, either must be read as authoritative --
 
     @pytest.mark.asyncio
-    async def test_icon_uses_gen8_api_field_directly_without_probing(self):
-        """gen=None so game_front's own (unrelated) probe-on-absent-data
-        branch doesn't interfere with this test's no-probing assertion."""
+    async def test_home_female_shiny_uses_front_female_shiny_key(self):
         svc = self._svc()
-        svc._pokeapi_http = AsyncMock()
-        sprites = {"versions": {"generation-viii": {"icons": {"front_default": "https://pokeapi/icons/6.png"}}}}
-        result = await svc._build_variety_sprite_urls(sprites, "charizard", 6, None)
-        assert result.icon == "https://pokeapi/icons/6.png"
-        svc._pokeapi_http.head.assert_not_called()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        sprites = {"other": {"home": {"front_female_shiny": "https://pokeapi/home/female-shiny-a/3.png"}}}
+        result = await svc._build_variety_sprite_urls(sprites, "venusaur", 3, 9)
+        assert result.home_female_shiny == "https://pokeapi/home/female-shiny-a/3.png"
 
     @pytest.mark.asyncio
-    async def test_icon_override_id_used_without_probing(self):
-        """Static overrides (pokemon_registry.json) are pre-verified by whoever
-        curated them — trust them outright, no need to probe on every request.
-        gen=None so game_front's own (unrelated) probing doesn't interfere."""
+    async def test_home_female_shiny_uses_front_shiny_female_key(self):
+        """PokeAPI has used both field-name spellings historically — either must work."""
         svc = self._svc()
-        svc._pokeapi_http = AsyncMock()
-        svc._variety_icon_id_overrides = {"calyrex-ice": "898-ice-rider"}
-        result = await svc._build_variety_sprite_urls(
-            {}, "calyrex-ice", 10193, None, variety_name="calyrex-ice",
-        )
-        assert result.icon is not None
-        assert "898-ice-rider" in result.icon
-        svc._pokeapi_http.head.assert_not_called()
-        svc._pokeapi_http.head.assert_not_called()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        sprites = {"other": {"home": {"front_shiny_female": "https://pokeapi/home/female-shiny-b/3.png"}}}
+        result = await svc._build_variety_sprite_urls(sprites, "venusaur", 3, 9)
+        assert result.home_female_shiny == "https://pokeapi/home/female-shiny-b/3.png"
 
-    # -- icon_shiny always mirrors game_front_shiny, including the null case --
+    @pytest.mark.asyncio
+    async def test_game_front_female_shiny_uses_front_shiny_female_key(self):
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        sprites = {
+            "versions": {
+                "generation-iv": {
+                    "heartgold-soulsilver": {"front_shiny_female": "https://pokeapi/gen4/6-fs-a.png"},
+                },
+            },
+        }
+        result = await svc._build_variety_sprite_urls(sprites, "charizard", 6, 4)
+        assert result.game_front_female_shiny == "https://pokeapi/gen4/6-fs-a.png"
+
+    @pytest.mark.asyncio
+    async def test_game_front_female_shiny_uses_front_female_shiny_key(self):
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        sprites = {
+            "versions": {
+                "generation-iv": {
+                    "heartgold-soulsilver": {"front_female_shiny": "https://pokeapi/gen4/6-fs-b.png"},
+                },
+            },
+        }
+        result = await svc._build_variety_sprite_urls(sprites, "charizard", 6, 4)
+        assert result.game_front_female_shiny == "https://pokeapi/gen4/6-fs-b.png"
+
+    # -- icon_female: gen priority order --
+
+    @pytest.mark.asyncio
+    async def test_icon_female_gen7_field_used_when_gen8_absent(self):
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        sprites = {"versions": {"generation-vii": {"icons": {"front_female": "https://pokeapi/icons/gen7-female/3.png"}}}}
+        result = await svc._build_variety_sprite_urls(sprites, "venusaur", 3, 9)
+        assert result.icon_female == "https://pokeapi/icons/gen7-female/3.png"
+
+    @pytest.mark.asyncio
+    async def test_icon_female_prefers_gen8_over_gen7_and_gen5(self):
+        svc = self._svc()
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+        sprites = {
+            "versions": {
+                "generation-viii": {"icons": {"front_female": "https://pokeapi/icons/gen8-female.png"}},
+                "generation-vii": {"icons": {"front_female": "https://pokeapi/icons/gen7-female.png"}},
+                "generation-v": {"icons": {"front_female": "https://pokeapi/icons/gen5-female.png"}},
+            },
+        }
+        result = await svc._build_variety_sprite_urls(sprites, "venusaur", 3, 9)
+        assert result.icon_female == "https://pokeapi/icons/gen8-female.png"
+
+    # -- icon_shiny/icon_female_shiny: no path convention exists anywhere in
+    # the sprites repo for these (verified) — nothing to construct or probe --
 
     @pytest.mark.asyncio
     async def test_icon_shiny_mirrors_game_front_shiny(self):
@@ -1146,35 +1095,11 @@ class TestBuildVarietySpriteUrls:
         assert result.game_front_shiny is None
         assert result.icon_shiny is None
 
-    # -- icon_female: gen priority order and the always-null shiny field --
-
-    @pytest.mark.asyncio
-    async def test_icon_female_gen7_field_used_when_gen8_absent(self):
-        svc = self._svc()
-        sprites = {"versions": {"generation-vii": {"icons": {"front_female": "https://pokeapi/icons/gen7-female/3.png"}}}}
-        result = await svc._build_variety_sprite_urls(sprites, "venusaur", 3, 9)
-        assert result.icon_female == "https://pokeapi/icons/gen7-female/3.png"
-
-    @pytest.mark.asyncio
-    async def test_icon_female_prefers_gen8_over_gen7_and_gen5(self):
-        svc = self._svc()
-        sprites = {
-            "versions": {
-                "generation-viii": {"icons": {"front_female": "https://pokeapi/icons/gen8-female.png"}},
-                "generation-vii": {"icons": {"front_female": "https://pokeapi/icons/gen7-female.png"}},
-                "generation-v": {"icons": {"front_female": "https://pokeapi/icons/gen5-female.png"}},
-            },
-        }
-        result = await svc._build_variety_sprite_urls(sprites, "venusaur", 3, 9)
-        assert result.icon_female == "https://pokeapi/icons/gen8-female.png"
-
     @pytest.mark.asyncio
     async def test_icon_female_shiny_always_none(self):
-        """No dedicated shiny female icon sprites exist anywhere in PokeAPI's
-        sprite set — this field must always be null, never guessed."""
         svc = self._svc()
-        sprites = {"versions": {"generation-viii": {"icons": {"front_female": "https://pokeapi/icons/female.png"}}}}
-        result = await svc._build_variety_sprite_urls(sprites, "venusaur", 3, 9)
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
+        result = await svc._build_variety_sprite_urls(self._SPRITES_FULL, "venusaur", 3, 9)
         assert result.icon_female_shiny is None
 
 
@@ -1199,12 +1124,15 @@ class TestBuildFormSpriteUrls:
         result = svc._build_form_sprite_urls(pokeapi_oa="https://pokeapi/oa/201-b.png")
         assert result.official_artwork == "https://pokeapi/oa/201-b.png"
 
-    def test_official_artwork_shiny_always_none(self):
-        """Form-entry cosmetics never get shiny official artwork (there is no
-        pokeapi_oa_shiny probe/param) — must be null, never guessed."""
+    def test_official_artwork_shiny_is_null_when_not_probed(self):
         svc = self._svc()
         result = svc._build_form_sprite_urls(pokeapi_oa="https://pokeapi/oa/201-b.png")
         assert result.official_artwork_shiny is None
+
+    def test_official_artwork_shiny_passes_through_when_probed(self):
+        svc = self._svc()
+        result = svc._build_form_sprite_urls(pokeapi_oa_shiny="https://pokeapi/oa/shiny/201-b.png")
+        assert result.official_artwork_shiny == "https://pokeapi/oa/shiny/201-b.png"
 
     def test_icon_is_null_when_not_probed(self):
         """icon is caller-supplied (pre-verified via HEAD probe in
@@ -1516,6 +1444,29 @@ class TestFetchFormsSpriteProbeWiring:
         result = await svc._fetch_forms(["unown", "unown-b"], 201, "unown", 9)
 
         assert result[0].sprite_urls.home is None
+
+    @pytest.mark.asyncio
+    async def test_official_artwork_shiny_null_when_probe_404s(self):
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.get = AsyncMock(return_value=self._form_response("unown-b", 201))
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=404))
+
+        result = await svc._fetch_forms(["unown", "unown-b"], 201, "unown", 9)
+
+        assert result[0].sprite_urls.official_artwork_shiny is None
+
+    @pytest.mark.asyncio
+    async def test_official_artwork_shiny_populated_when_probe_succeeds(self):
+        svc = self._svc()
+        svc._pokeapi_http = AsyncMock()
+        svc._pokeapi_http.get = AsyncMock(return_value=self._form_response("unown-b", 201))
+        svc._pokeapi_http.head = AsyncMock(return_value=MagicMock(status_code=200))
+
+        result = await svc._fetch_forms(["unown", "unown-b"], 201, "unown", 9)
+
+        assert result[0].sprite_urls.official_artwork_shiny is not None
+        assert "official-artwork/shiny/201-b.png" in result[0].sprite_urls.official_artwork_shiny
 
 
 # ---------------------------------------------------------------------------

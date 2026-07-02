@@ -266,6 +266,24 @@ async def _probe_url(client: httpx.AsyncClient, url: str) -> str | None:
         return None
 
 
+async def _probe_construct(
+    client: httpx.AsyncClient, value: str | None, guess: str | None
+) -> str | None:
+    """Return an already-authoritative value verbatim; otherwise HEAD-probe a
+    constructed guess and return it only if it resolves.
+
+    Used everywhere a PokeAPI response field might be null even though the
+    asset actually exists (the field being empty is metadata, not proof of
+    absence) — we still build the conventional URL and verify it rather than
+    giving up as soon as the field is missing.
+    """
+    if value is not None:
+        return value
+    if guess is None:
+        return None
+    return await _probe_url(client, guess)
+
+
 class PokemonResolverService:
     def __init__(self) -> None:
         self._event_learnsets: dict[str, dict] = {}
@@ -502,12 +520,48 @@ class PokemonResolverService:
         other = sprites.get("other") or {}
         artwork = other.get("official-artwork") or {}
         home = other.get("home") or {}
+        client = self._pokeapi_http
+
+        # official-artwork / HOME: PokeAPI returns the resolved URL directly
+        # when it has it. When the field is null, that's metadata absence,
+        # not proof the asset doesn't exist — construct the conventional path
+        # and verify it before giving up.
+        official_artwork = await _probe_construct(
+            client, artwork.get("front_default"), f"{_POKEAPI_OA}/{variety_id}.png"
+        )
+        official_artwork_shiny = await _probe_construct(
+            client, artwork.get("front_shiny"), f"{_POKEAPI_OA}/shiny/{variety_id}.png"
+        )
+        # No "female" subdirectory or suffix convention exists anywhere in the
+        # sprites repo for official-artwork (verified) — official artwork is
+        # never gender-specific, unlike HOME/game/icon sprites. Still probe a
+        # best-guess path in case the repo ever adds this, rather than
+        # hardcoding None outright.
+        official_artwork_female = await _probe_construct(
+            client, artwork.get("front_female"), f"{_POKEAPI_OA}/female/{variety_id}.png"
+        )
+        official_artwork_female_shiny = await _probe_construct(
+            client, artwork.get("front_shiny_female"), f"{_POKEAPI_OA}/shiny/female/{variety_id}.png"
+        )
+        home_default = await _probe_construct(
+            client, home.get("front_default"), f"{_POKEAPI_HOME}/{variety_id}.png"
+        )
+        home_shiny = await _probe_construct(
+            client, home.get("front_shiny"), f"{_POKEAPI_HOME}/shiny/{variety_id}.png"
+        )
+        home_female = await _probe_construct(
+            client, home.get("front_female"), f"{_POKEAPI_HOME}/female/{variety_id}.png"
+        )
+        home_female_shiny = await _probe_construct(
+            client,
+            home.get("front_female_shiny") or home.get("front_shiny_female"),
+            f"{_POKEAPI_HOME}/shiny/female/{variety_id}.png",
+        )
 
         # Gen-specific game sprites: use versioned URLs when a gen was explicitly
         # requested; fall back to the plain root sprites when gen=None (Pokédex,
-        # no-format teams) so we never return a constructed URL that may 404.
+        # no-format teams).
         sprite_id = gen_sprite_id_override or str(variety_id)
-        game_front = game_front_shiny = game_front_female = game_front_female_shiny = None
         if gen is not None and gen in _GEN_SPRITE_CONFIG:
             gpath, subdir, _, _ = _GEN_SPRITE_CONFIG[gen]
             gen_key, game_key = gpath.split("/", 1)
@@ -515,34 +569,35 @@ class PokemonResolverService:
                          .get(gen_key, {})
                          .get(game_key, {}))
             pool = versioned.get(subdir, {}) if subdir else versioned
-            # Trust the API's own data first. Only when it's absent do we fall
-            # back to a constructed guess — and that guess is HEAD-probed
-            # before being returned, same as the icon fields, so we never
-            # hand back a URL we haven't confirmed resolves.
-            game_front = pool.get("front_default")
-            if game_front is None:
-                guess = _build_pokeapi_sprite_url(sprite_id, gen) or _build_showdown_sprite_url(ps_name, gen)
-                game_front = await _probe_url(self._pokeapi_http, guess) if guess else None
-            game_front_shiny = pool.get("front_shiny")
-            if game_front_shiny is None:
-                guess_shiny = (
-                    _build_pokeapi_sprite_url(sprite_id, gen, shiny=True)
-                    or _build_showdown_sprite_url(ps_name, gen, shiny=True)
-                )
-                game_front_shiny = await _probe_url(self._pokeapi_http, guess_shiny) if guess_shiny else None
-            # Female game sprites: unlike game_front/game_front_shiny (which exist
-            # for every Pokémon in every gen it appeared in), a female-specific
-            # sprite only exists for species with a visible gender difference.
-            # Trust the API field as authoritative — most Pokémon have no female
-            # variant, so constructing a guessed URL here 404s far more often
-            # than it succeeds (confirmed e.g. for Squirtle in Gen 4).
-            game_front_female = pool.get("front_female")
-            game_front_female_shiny = (
-                pool.get("front_shiny_female") or pool.get("front_female_shiny")
+            game_front = await _probe_construct(
+                client, pool.get("front_default"),
+                _build_pokeapi_sprite_url(sprite_id, gen) or _build_showdown_sprite_url(ps_name, gen),
+            )
+            game_front_shiny = await _probe_construct(
+                client, pool.get("front_shiny"),
+                _build_pokeapi_sprite_url(sprite_id, gen, shiny=True)
+                or _build_showdown_sprite_url(ps_name, gen, shiny=True),
+            )
+            # Female game sprites only exist for species with a visible gender
+            # difference — most don't, so this guess 404s far more often than
+            # it succeeds (confirmed e.g. for Squirtle in Gen 4). Still worth
+            # probing rather than trusting the field's absence outright, since
+            # a species like Venusaur DOES have one despite occasional gaps
+            # in PokeAPI's own version-specific metadata.
+            game_front_female = await _probe_construct(
+                client, pool.get("front_female"),
+                _build_pokeapi_sprite_url(sprite_id, gen, female=True),
+            )
+            game_front_female_shiny = await _probe_construct(
+                client,
+                pool.get("front_shiny_female") or pool.get("front_female_shiny"),
+                _build_pokeapi_sprite_url(sprite_id, gen, shiny=True, female=True),
             )
         else:
-            # gen=None (no gen in request): use root sprites — always non-null
-            # for existing Pokémon and represent the canonical current-gen artwork.
+            # gen=None (no gen in request): use root sprites directly. These
+            # already ARE PokeAPI's canonical current-gen URLs — there's no
+            # separate raw-repo path convention to construct and verify
+            # beyond what this field already contains.
             game_front = sprites.get("front_default")
             game_front_shiny = sprites.get("front_shiny")
             game_front_female = sprites.get("front_female")
@@ -553,10 +608,11 @@ class PokemonResolverService:
         # Fall back to overrides and constructed paths when the API returns null.
         icons_versions = sprites.get("versions") or {}
         gen8_icon_api = icons_versions.get("generation-viii", {}).get("icons", {}).get("front_default")
-        # Female icons: read the authoritative field per gen tier instead of
-        # guessing from an unrelated signal (e.g. whether HOME female art
-        # exists) — a species can have female HOME/game art without a
-        # separate female icon (confirmed e.g. for Venusaur).
+        # Female icons: read the authoritative field per gen tier first — a
+        # species can have female HOME/game art without a separate female
+        # icon (confirmed e.g. for Venusaur), so an unrelated signal like
+        # home_female can't be trusted as a proxy. Fall back to a probed
+        # construction only once every known authoritative field is absent.
         gen8_icon_female_api = icons_versions.get("generation-viii", {}).get("icons", {}).get("front_female")
         gen7_icon_female_api = icons_versions.get("generation-vii", {}).get("icons", {}).get("front_female")
         # Gen 5 female icons use "{id}-female.png" suffix; read from response to avoid constructing wrong URL.
@@ -574,31 +630,42 @@ class PokemonResolverService:
             # for these varieties (their own icons.front_default is always
             # null) — some do (Meowstic-female, Indeedee-female), some don't
             # (Basculegion-female, Oinkologne-female). Probe rather than guess.
-            icon = await _probe_url(self._pokeapi_http, _build_icon_url(base_pokemon_id, gen, female=True))
+            icon = await _probe_url(client, _build_icon_url(base_pokemon_id, gen, female=True))
         else:
             # No authoritative field and no static override — this variety's
             # own icon data is null, meaning it may not have a dedicated icon
             # at all (confirmed e.g. for Basculin-White-Striped, a Gen 8 DLC
             # addition with no icon file in the sprites repo). Probe rather
             # than guess so newly-added varieties without icons yet don't 404.
-            icon = await _probe_url(self._pokeapi_http, _build_icon_url(variety_id, gen))
+            icon = await _probe_url(client, _build_icon_url(variety_id, gen))
+        icon_female = await _probe_construct(
+            client,
+            gen8_icon_female_api or gen7_icon_female_api or gen5_icon_female_api,
+            _build_icon_url(variety_id, gen, female=True),
+        )
 
         return SpriteUrlsFull(
-            official_artwork=artwork.get("front_default"),
-            official_artwork_shiny=artwork.get("front_shiny"),
-            official_artwork_female=artwork.get("front_female"),
-            official_artwork_female_shiny=artwork.get("front_shiny_female"),
-            home=home.get("front_default"),
-            home_shiny=home.get("front_shiny"),
-            home_female=home.get("front_female"),
-            home_female_shiny=home.get("front_female_shiny") or home.get("front_shiny_female"),
+            official_artwork=official_artwork,
+            official_artwork_shiny=official_artwork_shiny,
+            official_artwork_female=official_artwork_female,
+            official_artwork_female_shiny=official_artwork_female_shiny,
+            home=home_default,
+            home_shiny=home_shiny,
+            home_female=home_female,
+            home_female_shiny=home_female_shiny,
             game_front=game_front,
             game_front_shiny=game_front_shiny,
             game_front_female=game_front_female,
             game_front_female_shiny=game_front_female_shiny,
             icon=icon,
+            # No dedicated shiny-icon directory exists anywhere in the sprites
+            # repo (verified) — mirroring game_front_shiny is the correct
+            # "best available" choice, not an unverified guess.
             icon_shiny=game_front_shiny,
-            icon_female=gen8_icon_female_api or gen7_icon_female_api or gen5_icon_female_api,
+            icon_female=icon_female,
+            # Same as icon_shiny: no shiny-female-icon path convention exists
+            # anywhere in the repo (verified), so there's nothing to construct
+            # or probe here.
             icon_female_shiny=None,
         )
 
@@ -607,17 +674,28 @@ class PokemonResolverService:
         pokeapi_home: str | None = None,
         pokeapi_home_shiny: str | None = None,
         pokeapi_oa: str | None = None,
+        pokeapi_oa_shiny: str | None = None,
         pokeapi_icon: str | None = None,
         pokeapi_game_front: str | None = None,
         pokeapi_game_front_shiny: str | None = None,
     ) -> SpriteUrlsFull:
         """Build full sprite URLs for a cosmetic form-entry (no /pokemon resource).
 
-        home/home_shiny/icon/game_front/game_front_shiny/official_artwork are
-        all pre-verified via HEAD probe by the caller (_fetch_forms, batched
-        in one parallel asyncio.gather) — this function only assembles the
-        already-confirmed values into a SpriteUrlsFull. None here means no
-        candidate URL (PokeAPI versioned dir or Showdown CDN) resolved.
+        home/home_shiny/icon/game_front/game_front_shiny/official_artwork(_shiny)
+        are all pre-verified via HEAD probe by the caller (_fetch_forms,
+        batched in one parallel asyncio.gather) — this function only
+        assembles the already-confirmed values into a SpriteUrlsFull. None
+        here means no candidate URL (PokeAPI versioned dir or Showdown CDN)
+        resolved.
+
+        home_female/home_female_shiny/game_front_female/game_front_female_shiny
+        are hardcoded None — not because they're unverified, but because the
+        concept doesn't apply to cosmetic form-entries the way it does to
+        varieties. A form that IS a "-female" suffixed entry (e.g. a
+        hypothetical Pyroar-female form) already gets routed to the female
+        subdirectory for its own home/icon/game_front (see
+        _fetch_forms's female-suffix handling) — there's no separate
+        "female variant of this form" to additionally probe for.
 
         See _fetch_forms's _form_game_sprite_url/_form_showdown_home_paths for
         the compatibility quirks these candidates account for (e.g. Unown's
@@ -626,7 +704,7 @@ class PokemonResolverService:
         """
         return SpriteUrlsFull(
             official_artwork=pokeapi_oa,
-            official_artwork_shiny=None,
+            official_artwork_shiny=pokeapi_oa_shiny,
             home=pokeapi_home,
             home_shiny=pokeapi_home_shiny,
             home_female=None,
@@ -823,11 +901,11 @@ class PokemonResolverService:
         # Batch: form-data fetches + PokeAPI/Showdown sprite CDN probes (home,
         # home_shiny, official-artwork, icon, game_front, game_front_shiny).
         # All run in parallel; probes are HEAD-only, cheap.
-        def _form_oa_url(fn: str) -> str:
+        def _form_oa_url(fn: str, shiny: bool = False) -> str:
             sfx = _extract_form_suffix(fn, species_name)
             mapped = _SPRITE_SUFFIX_REMAP.get(sfx, sfx)
             oa_id = f"{base_id}-{mapped}" if mapped else str(base_id)
-            return f"{_POKEAPI_OA}/{oa_id}.png"
+            return f"{_POKEAPI_OA}/shiny/{oa_id}.png" if shiny else f"{_POKEAPI_OA}/{oa_id}.png"
 
         def _form_icon_url(fn: str) -> str:
             # Female form entries live at icons/female/{base_id}.png, not
@@ -876,13 +954,14 @@ class PokemonResolverService:
         home_showdown_tasks = [_probe_url(self._pokeapi_http, p[0]) for p in _showdown_home_paths]
         home_shiny_showdown_tasks = [_probe_url(self._pokeapi_http, p[1]) for p in _showdown_home_paths]
         oa_tasks = [_probe_url(self._pokeapi_http, _form_oa_url(n)) for n in non_defaults]
+        oa_shiny_tasks = [_probe_url(self._pokeapi_http, _form_oa_url(n, shiny=True)) for n in non_defaults]
         icon_tasks = [_probe_url(self._pokeapi_http, _form_icon_url(n)) for n in non_defaults]
         game_front_tasks = [_probe_maybe(_form_game_sprite_url(n)) for n in non_defaults]
         game_front_shiny_tasks = [_probe_maybe(_form_game_sprite_url(n, shiny=True)) for n in non_defaults]
 
         all_results = await asyncio.gather(
             *form_tasks, *home_tasks, *home_shiny_tasks, *home_showdown_tasks,
-            *home_shiny_showdown_tasks, *oa_tasks, *icon_tasks,
+            *home_shiny_showdown_tasks, *oa_tasks, *oa_shiny_tasks, *icon_tasks,
             *game_front_tasks, *game_front_shiny_tasks,
             return_exceptions=True,
         )
@@ -894,9 +973,10 @@ class PokemonResolverService:
         home_showdown_results = all_results[3 * _n:4 * _n]
         home_shiny_showdown_results = all_results[4 * _n:5 * _n]
         oa_results = all_results[5 * _n:6 * _n]
-        icon_results = all_results[6 * _n:7 * _n]
-        game_front_results = all_results[7 * _n:8 * _n]
-        game_front_shiny_results = all_results[8 * _n:]
+        oa_shiny_results = all_results[6 * _n:7 * _n]
+        icon_results = all_results[7 * _n:8 * _n]
+        game_front_results = all_results[8 * _n:9 * _n]
+        game_front_shiny_results = all_results[9 * _n:]
 
         result: list[FormData] = []
         for i, form_name in enumerate(non_defaults):
@@ -923,6 +1003,7 @@ class PokemonResolverService:
             pokeapi_home = _first_ok(home_results) or _first_ok(home_showdown_results)
             pokeapi_home_shiny = _first_ok(home_shiny_results) or _first_ok(home_shiny_showdown_results)
             pokeapi_oa = _first_ok(oa_results)
+            pokeapi_oa_shiny = _first_ok(oa_shiny_results)
             pokeapi_icon = _first_ok(icon_results)
             pokeapi_game_front = _first_ok(game_front_results)
             pokeapi_game_front_shiny = _first_ok(game_front_shiny_results)
@@ -934,6 +1015,7 @@ class PokemonResolverService:
                     pokeapi_home=pokeapi_home,
                     pokeapi_home_shiny=pokeapi_home_shiny,
                     pokeapi_oa=pokeapi_oa,
+                    pokeapi_oa_shiny=pokeapi_oa_shiny,
                     pokeapi_icon=pokeapi_icon,
                     pokeapi_game_front=pokeapi_game_front,
                     pokeapi_game_front_shiny=pokeapi_game_front_shiny,
@@ -952,6 +1034,7 @@ class PokemonResolverService:
                 pokeapi_home=pokeapi_home,
                 pokeapi_home_shiny=pokeapi_home_shiny,
                 pokeapi_oa=pokeapi_oa,
+                pokeapi_oa_shiny=pokeapi_oa_shiny,
                 pokeapi_icon=pokeapi_icon,
                 pokeapi_game_front=pokeapi_game_front,
                 pokeapi_game_front_shiny=pokeapi_game_front_shiny,
