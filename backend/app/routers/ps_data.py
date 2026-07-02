@@ -31,7 +31,7 @@ _ALLOWED_FILES = {
 }
 
 
-@router.get("/version")
+@router.get("/version", summary="Get PS data version manifest")
 async def get_ps_data_version() -> dict:
     """
     Returns the version manifest for the bundled PS data assets.
@@ -47,7 +47,7 @@ async def get_ps_data_version() -> dict:
         return json.load(f)
 
 
-@router.get("/file/{filename}")
+@router.get("/file/{filename}", summary="Download a PS data file")
 async def get_ps_data_file(filename: str) -> FileResponse:
     """
     Serves a single PS data JSON file so the Flutter app can refresh its cache
