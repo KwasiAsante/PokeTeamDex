@@ -17,7 +17,9 @@ services:
       retries: 10
 
   api:
-    build: .
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
     container_name: poketeamdex_api
     ports:
       - "8000:8000"
@@ -27,12 +29,14 @@ services:
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 43200
       DEBUG: "true"
+      PS_DATA_DIR: /app/shared/ps_data
     depends_on:
       db:
         condition: service_healthy
     command: sh /app/start.sh --reload
     volumes:
       - .:/app
+      - ../shared/ps_data:/app/shared/ps_data
 
 volumes:
   postgres_data:
