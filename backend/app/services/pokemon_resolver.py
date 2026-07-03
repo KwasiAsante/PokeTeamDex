@@ -1483,17 +1483,55 @@ class PokemonResolverService:
     async def resolve_moves(
         self, name_or_id: str, gen: int | None, db: AsyncSession, base_url: str = ""
     ) -> "MovesResponse":
-        from app.schemas.pokemon_resolved import MovesResponse
+        from app.schemas.pokemon_resolved import MovesResponse, MoveSummary
         pokemon_id = await self._resolve_name_or_id(name_or_id)
         full = await self.resolve(pokemon_id, gen, ["moves"], db, base_url)
-        moves = list(full.moves)
+
         if gen is not None:
-            supplement_summaries = [
-                self._event_move_to_summary(ev, gen)
-                for ev in full.supplement_moves
+            # full.moves already filtered to this gen's VGs by _trim_response();
+            # full.supplement_moves pre-computed for gen (data_gen == gen here).
+            moves = list(full.moves)
+            moves.extend(self._event_move_to_summary(ev, gen) for ev in full.supplement_moves)
+            return MovesResponse(pokemon_id=pokemon_id, name=full.name, gen=gen, moves=moves)
+
+        # No-gen: group all PokéAPI learn_details by their gen, then append
+        # per-gen supplement moves for gens the learnset has data for.
+        gen_moves_raw: dict[int, dict[str, list]] = {}
+        for ms in full.moves:
+            for detail in ms.learn_details:
+                if detail.version_group in _SIDE_GAME_VGS:
+                    continue
+                g = self._learnset_service.version_group_to_gen(detail.version_group)
+                if g is None:
+                    continue
+                gen_moves_raw.setdefault(g, {}).setdefault(ms.name, []).append(detail)
+
+        gen_moves: dict[int, list[MoveSummary]] = {
+            g: [
+                MoveSummary(name=name, learn_details=details)
+                for name, details in sorted(move_dict.items())
             ]
-            moves.extend(supplement_summaries)
-        return MovesResponse(pokemon_id=pokemon_id, name=full.name, gen=gen, moves=moves)
+            for g, move_dict in sorted(gen_moves_raw.items())
+        }
+
+        ps_name = full.name.replace("-", "").lower()
+        for g in range(1, 10):
+            existing_slugs = {ms.name for ms in gen_moves.get(g, [])}
+            supplements = self._get_supplement_moves(ps_name, g, existing_slugs)
+            if supplements:
+                summaries = [self._event_move_to_summary(ev, g) for ev in supplements]
+                if g in gen_moves:
+                    gen_moves[g].extend(summaries)
+                else:
+                    gen_moves[g] = summaries
+
+        return MovesResponse(
+            pokemon_id=pokemon_id,
+            name=full.name,
+            gen=None,
+            moves=[],
+            gen_moves=gen_moves or None,
+        )
 
     async def resolve_flavor_text(
         self, name_or_id: str, lang: str | None, db: AsyncSession, base_url: str = ""
