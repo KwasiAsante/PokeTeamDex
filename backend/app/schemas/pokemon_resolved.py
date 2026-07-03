@@ -46,7 +46,7 @@ class MovesResponse(BaseModel):
     name: str
     gen: int | None = None       # generation the moves were filtered to; None = all gens
     moves: list[MoveSummary]
-    gen_moves: dict[str, list[MoveSummary]] | None = None  # reserved for future all-gen response
+    gen_moves: dict[int, list[MoveSummary]] | None = None  # keyed by generation number
 
 
 class FlavorTextResponse(BaseModel):
