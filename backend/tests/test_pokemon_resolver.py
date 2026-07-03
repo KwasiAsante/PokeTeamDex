@@ -654,11 +654,15 @@ class TestBuildPokeapiSpriteUrl:
         assert url is not None
         assert "201-b.gif" in url
 
-    def test_gen6_returns_none(self):
-        assert _build_pokeapi_sprite_url("6", 6) is None
+    def test_gen6_returns_oras_url(self):
+        url = _build_pokeapi_sprite_url("6", 6)
+        assert url is not None
+        assert "generation-vi/omegaruby-alphasapphire/6.png" in url
 
-    def test_gen9_returns_none(self):
-        assert _build_pokeapi_sprite_url("6", 9) is None
+    def test_gen9_returns_scarlet_violet_url(self):
+        url = _build_pokeapi_sprite_url("6", 9)
+        assert url is not None
+        assert "generation-ix/scarlet-violet/6.png" in url
 
 
 class TestBuildShowdownSpriteUrl:
@@ -759,11 +763,11 @@ class TestBuildVarietySpriteUrls:
         result = svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
         assert result.home == "https://pokeapi/home/6.png"
 
-    def test_gen9_uses_showdown_dex(self):
+    def test_gen9_uses_pokeapi_scarlet_violet(self):
         svc = self._svc()
         result = svc._build_variety_sprite_urls(self._SPRITES, "charizard", 6, 9)
         assert result.game_front is not None
-        assert "dex/charizard.png" in result.game_front
+        assert "generation-ix/scarlet-violet/6.png" in result.game_front
 
     def test_gen5_uses_pokeapi_animated(self):
         svc = self._svc()
@@ -805,11 +809,11 @@ class TestBuildFormSpriteUrls:
         # Should use PokeAPI/sprites path with 201-b
         assert "201-b" in result.game_front
 
-    def test_gen9_game_front_uses_showdown_dex(self):
+    def test_gen9_game_front_uses_pokeapi_scarlet_violet(self):
         svc = self._svc()
         result = svc._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 9)
         assert result.game_front is not None
-        assert "dex/unown-b.png" in result.game_front
+        assert "scarlet-violet/201-b.png" in result.game_front
 
 
 # ---------------------------------------------------------------------------
