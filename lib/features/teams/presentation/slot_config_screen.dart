@@ -721,26 +721,18 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final effectivePokemonName = formVariety?.name ?? pokemon.name;
         final effectiveLearnableMoveSet = effectivePokemonMoves.map((m) => m.name).toSet();
         final effectiveLearnableMoves = effectiveLearnableMoveSet.toList()..sort();
-        final priorEvoMoveSetsAsync = ref.watch(priorEvoMoveSetsProvider(formVariety != null ? formVariety.pokemonId : slot.pokemonId));
+        final priorEvoMoveSetsAsync = ref.watch(priorEvoMoveSetsProvider(
+          (id: formVariety != null ? formVariety.pokemonId : slot.pokemonId, gen: format?.gen),
+        ));
         final effectivePriorEvoMoves = priorEvoMoveSetsAsync.whenOrNull(data: (sets) {
           if (sets.isEmpty) return const <String>{};
-          if (format == null) {
-            final ancestorAll = <String>{};
-            for (final ancestor in sets) {
-              for (final m in ancestor.moves) {
-                ancestorAll.add(m.name);
-              }
+          final ancestorAll = <String>{};
+          for (final ancestor in sets) {
+            for (final m in ancestor.moves) {
+              ancestorAll.add(m.name);
             }
-            return ancestorAll.difference(effectiveLearnableMoveSet);
           }
-          return buildPriorEvoExclusiveMoveNames(
-            currentMoves: effectivePokemonMoves,
-            ancestorMoveSets: sets,
-            format: format,
-            pokemonName: effectivePokemonName,
-            formatService: formatService,
-            currentLearnset: effectiveLearnableMoveSet,
-          );
+          return ancestorAll.difference(effectiveLearnableMoveSet);
         }) ??
             const <String>{};
         // Event moves: surfaced for the picker's "Event" badge only.

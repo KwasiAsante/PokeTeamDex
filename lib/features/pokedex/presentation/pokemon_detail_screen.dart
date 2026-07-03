@@ -1041,6 +1041,13 @@ class _MovesTab extends ConsumerStatefulWidget {
 
 class _MovesTabState extends ConsumerState<_MovesTab> {
   String? _selectedVersion;
+  final _versionScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _versionScrollController.dispose();
+    super.dispose();
+  }
 
   static const _methodOrder = ['level-up', 'machine', 'egg', 'tutor', 'event'];
   static const _methodLabels = {
@@ -1292,7 +1299,7 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
         ? genForVersionGroup(_selectedVersion!)
         : null;
 
-    final priorEvoAsync = ref.watch(priorEvoMoveSetsProvider(widget.pokemon.id));
+    final priorEvoAsync = ref.watch(priorEvoMoveSetsProvider((id: widget.pokemon.id, gen: null)));
     final ancestorSets = priorEvoAsync.whenOrNull(data: (sets) => sets) ?? const [];
     final psIdToName = _psIdToNameMap(moves, ancestorSets);
 
@@ -1320,20 +1327,25 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
         if (versions.isNotEmpty)
           SizedBox(
             height: 44,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              children: versions.map((v) {
-                final label = v.split('-').map((s) => s.isEmpty ? '' : '${s[0].toUpperCase()}${s.substring(1)}').join(' ');
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: ChoiceChip(
-                    label: Text(label, style: const TextStyle(fontSize: 12)),
-                    selected: _selectedVersion == v,
-                    onSelected: (_) => setState(() => _selectedVersion = v),
-                  ),
-                );
-              }).toList(),
+            child: Scrollbar(
+              controller: _versionScrollController,
+              scrollbarOrientation: ScrollbarOrientation.bottom,
+              child: ListView(
+                controller: _versionScrollController,
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                children: versions.map((v) {
+                  final label = v.split('-').map((s) => s.isEmpty ? '' : '${s[0].toUpperCase()}${s.substring(1)}').join(' ');
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      label: Text(label, style: const TextStyle(fontSize: 12)),
+                      selected: _selectedVersion == v,
+                      onSelected: (_) => setState(() => _selectedVersion = v),
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
           ),
         const Divider(height: 1),

@@ -35,15 +35,18 @@ class PokemonBackendRepository {
       return genMoves.map((m) => MoveSummary.fromJson(m as Map<String, dynamic>)).toList();
     }
 
-    // All-gens: flatten across every generation, deduplicating by name.
-    final byName = <String, MoveSummary>{};
+    // All-gens: flatten across every generation, merging learnDetails per move.
+    final byName = <String, List<MoveLearnDetail>>{};
     for (final genEntry in movesRaw.values) {
       for (final m in (genEntry as List<dynamic>)) {
         final ms = MoveSummary.fromJson(m as Map<String, dynamic>);
-        byName.putIfAbsent(ms.name, () => ms);
+        byName.update(ms.name, (d) => d..addAll(ms.learnDetails),
+            ifAbsent: () => List.of(ms.learnDetails));
       }
     }
-    return byName.values.toList();
+    return byName.entries
+        .map((e) => MoveSummary(name: e.key, learnDetails: e.value))
+        .toList();
   }
 
   Future<List<VarietyBackendData>> fetchVarieties(int id, {int? gen}) async {

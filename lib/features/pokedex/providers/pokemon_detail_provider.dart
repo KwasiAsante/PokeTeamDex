@@ -8,6 +8,8 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show MoveSummary;
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
+    show pokemonMovesProvider;
 
 final pokemonDetailProvider =
     FutureProvider.autoDispose.family<PokemonEntry, int>((ref, id) async {
@@ -91,8 +93,24 @@ final pokemonEncountersProvider =
 
 /// Each prior-evolution species' display name + moves list, oldest ancestor first.
 /// Empty for Pokémon with no prior evolutions.
+///
+/// Ancestor IDs come from PokéAPI evo chain traversal; move data comes from the
+/// backend so [MoveLearnDetail] entries are present and [buildLearnsetForFormat]
+/// works correctly on the result. When [gen] is null the backend returns all
+/// version-group moves; when [gen] is N only gen-N moves are returned.
 final priorEvoMoveSetsProvider = FutureProvider.autoDispose.family<
-    List<({String speciesName, List<MoveSummary> moves})>, int>(
-  (ref, pokemonId) =>
-      ref.read(pokeApiRepositoryProvider).fetchPriorEvoMoveSets(pokemonId),
+    List<({String speciesName, List<MoveSummary> moves})>, ({int id, int? gen})>(
+  (ref, args) async {
+    final entries =
+        await ref.read(pokeApiRepositoryProvider).fetchPriorEvoEntries(args.id);
+    if (entries.isEmpty) return const [];
+    final result = <({String speciesName, List<MoveSummary> moves})>[];
+    for (final entry in entries) {
+      final moves = await ref.read(
+        pokemonMovesProvider((id: entry.pokemonId, gen: args.gen)).future,
+      );
+      result.add((speciesName: entry.speciesName, moves: moves));
+    }
+    return result;
+  },
 );

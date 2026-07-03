@@ -230,14 +230,19 @@ class SpriteUrlsFull {
 /// Flatten across all gens, deduplicating by move name (first occurrence wins).
 List<MoveSummary> _parseMoves(dynamic raw) {
   if (raw is! Map || raw.isEmpty) return const [];
-  final byName = <String, MoveSummary>{};
+  // Merge learnDetails across all gens for the same move — putIfAbsent would
+  // silently drop version-group entries from later gens for the same move name.
+  final byName = <String, List<MoveLearnDetail>>{};
   for (final genMoves in raw.values) {
     for (final m in (genMoves as List<dynamic>)) {
       final ms = MoveSummary.fromJson(m as Map<String, dynamic>);
-      byName.putIfAbsent(ms.name, () => ms);
+      byName.update(ms.name, (d) => d..addAll(ms.learnDetails),
+          ifAbsent: () => List.of(ms.learnDetails));
     }
   }
-  return byName.values.toList();
+  return byName.entries
+      .map((e) => MoveSummary(name: e.key, learnDetails: e.value))
+      .toList();
 }
 
 class PokemonResolvedBackendResponse {
