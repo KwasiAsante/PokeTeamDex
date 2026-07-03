@@ -898,17 +898,19 @@ def test_moves_response_schema():
     data = MovesResponse(
         pokemon_id=6,
         name="charizard",
-        moves=[
-            MoveSummary(
-                name="flamethrower",
-                learn_details=[
-                    MoveLearnDetail(version_group="sword-shield", method="machine", level=0)
-                ],
-            )
-        ],
+        moves={
+            8: [
+                MoveSummary(
+                    name="flamethrower",
+                    learn_details=[
+                        MoveLearnDetail(version_group="sword-shield", method="machine", level=0)
+                    ],
+                )
+            ]
+        },
     )
-    assert data.moves[0].name == "flamethrower"
-    assert data.moves[0].learn_details[0].method == "machine"
+    assert data.moves[8][0].name == "flamethrower"
+    assert data.moves[8][0].learn_details[0].method == "machine"
 
 
 def test_flavor_text_response_schema():

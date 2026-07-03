@@ -1504,31 +1504,28 @@ class PokemonResolverService:
         if gen is not None:
             # full.moves already narrowed to {gen: [...]} by _trim_response();
             # full.supplement_moves pre-computed for gen (data_gen == gen here).
-            moves = list(full.moves.get(gen, []))
-            moves.extend(self._event_move_to_summary(ev, gen) for ev in full.supplement_moves)
-            return MovesResponse(pokemon_id=pokemon_id, name=full.name, gen=gen, moves=moves)
+            gen_moves = list(full.moves.get(gen, []))
+            gen_moves.extend(self._event_move_to_summary(ev, gen) for ev in full.supplement_moves)
+            return MovesResponse(
+                pokemon_id=pokemon_id, name=full.name, gen=gen,
+                moves={gen: gen_moves} if gen_moves else {},
+            )
 
         # No-gen: full.moves is already {gen: [MoveSummary, ...]} for all gens.
         # Append per-gen supplement moves on top.
-        gen_moves: dict[int, list[MoveSummary]] = {g: list(ms) for g, ms in full.moves.items()}
+        all_moves: dict[int, list[MoveSummary]] = {g: list(ms) for g, ms in full.moves.items()}
         ps_name = full.name.replace("-", "").lower()
         for g in range(1, 10):
-            existing_slugs = {ms.name for ms in gen_moves.get(g, [])}
+            existing_slugs = {ms.name for ms in all_moves.get(g, [])}
             supplements = self._get_supplement_moves(ps_name, g, existing_slugs)
             if supplements:
                 summaries = [self._event_move_to_summary(ev, g) for ev in supplements]
-                if g in gen_moves:
-                    gen_moves[g].extend(summaries)
+                if g in all_moves:
+                    all_moves[g].extend(summaries)
                 else:
-                    gen_moves[g] = summaries
+                    all_moves[g] = summaries
 
-        return MovesResponse(
-            pokemon_id=pokemon_id,
-            name=full.name,
-            gen=None,
-            moves=[],
-            gen_moves=gen_moves or None,
-        )
+        return MovesResponse(pokemon_id=pokemon_id, name=full.name, gen=None, moves=all_moves)
 
     async def resolve_flavor_text(
         self, name_or_id: str, lang: str | None, db: AsyncSession, base_url: str = ""
