@@ -1242,7 +1242,9 @@ class PokemonResolverService:
                 pass
 
         # 5. Merge supplement moves (event/egg/tutor absent from PokéAPI) into moves_dict.
-        move_slugs: set[str] = {m["move"]["name"] for m in pokemon_data.get("moves", [])}
+        # Use only the moves PokéAPI already has for data_gen as the exclusion set —
+        # a move present in a later gen but absent from data_gen should still be included.
+        move_slugs: set[str] = {ms.name for ms in moves_dict.get(data_gen, [])}
         supplements = self._get_supplement_moves(ps_id, data_gen, move_slugs)
         if supplements:
             _existing_names = {ms.name for ms in moves_dict.get(data_gen, [])}
