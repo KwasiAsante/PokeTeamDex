@@ -230,7 +230,7 @@ class PokemonResolvedResponse(BaseModel):
     base_experience: int | None = None
     species_name: str | None = None
     form_names: list[str] = []            # derived from forms[].name for convenience
-    moves: list[MoveSummary] = []         # slim: []; full via ?includes[]=moves
+    moves: dict[int, list[MoveSummary]] = {}  # slim: {}; full via ?includes[]=moves; keyed by gen
     moves_url: str | None = None          # /pokemon/moves/{pokemon_id}
     supplement_moves: list[EventMove]
     smogon_analyses: list[SmogonFormatData] | None

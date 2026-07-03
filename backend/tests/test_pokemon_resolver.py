@@ -1039,10 +1039,11 @@ async def test_resolve_populates_detail_fields(async_db_session):
     assert result.abilities[0].is_hidden is False
     assert result.abilities[1].name == "solar-power"
     assert result.abilities[1].is_hidden is True
-    # moves full when includes=["moves"]
-    assert len(result.moves) == 1
-    assert result.moves[0].name == "flamethrower"
-    assert result.moves[0].learn_details[0].version_group == "scarlet-violet"
+    # moves full when includes=["moves"] — dict keyed by gen
+    assert 9 in result.moves
+    assert len(result.moves[9]) == 1
+    assert result.moves[9][0].name == "flamethrower"
+    assert result.moves[9][0].learn_details[0].version_group == "scarlet-violet"
     # flavor text full when includes=["flavor"]
     assert len(result.flavor_text_entries) == 1
     assert result.flavor_text_entries[0].language == "en"
@@ -1067,7 +1068,7 @@ async def test_resolve_slim_response_omits_moves_and_flavor(async_db_session):
     ):
         result = await pokemon_resolver_service.resolve(6, 9, [], async_db_session)
 
-    assert result.moves == []
+    assert result.moves == {}
     assert result.flavor_text_entries == []
     assert result.moves_url is not None
     assert result.flavor_text_url is not None
@@ -1091,8 +1092,9 @@ async def test_resolve_includes_moves_returns_full_list(async_db_session):
     ):
         result = await pokemon_resolver_service.resolve(6, 9, ["moves"], async_db_session)
 
-    assert len(result.moves) == 1
-    assert result.moves[0].name == "flamethrower"
+    assert 9 in result.moves
+    assert len(result.moves[9]) == 1
+    assert result.moves[9][0].name == "flamethrower"
 
 
 # ---------------------------------------------------------------------------
