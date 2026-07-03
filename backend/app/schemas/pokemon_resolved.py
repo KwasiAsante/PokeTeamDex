@@ -24,8 +24,10 @@ class AbilityInfo(BaseModel):
 
 class MoveLearnDetail(BaseModel):
     version_group: str
-    method: str   # "level-up", "machine", "egg", "tutor"
-    level: int    # 0 for non-level-up methods
+    method: str        # "level-up", "machine", "egg", "tutor", "event"
+    level: int | None  # None for non-level-up methods
+    via_prevo: bool = False   # move is inherited from a pre-evolution
+    prevo: str | None = None  # PS ID of the pre-evolution that teaches it
 
 
 class MoveSummary(BaseModel):
@@ -42,7 +44,8 @@ class FlavorTextEntry(BaseModel):
 class MovesResponse(BaseModel):
     pokemon_id: int
     name: str
-    moves: list[MoveSummary]
+    gen: int | None = None  # generation the moves were filtered to; None = all gens
+    moves: dict[int, list[MoveSummary]]  # keyed by gen; single-key when gen is specified
 
 
 class FlavorTextResponse(BaseModel):
@@ -62,6 +65,8 @@ class EventMove(BaseModel):
     display_name: str
     generations: list[int]
     methods: list[str]  # e.g. ["event"], ["egg"], ["tutor"], ["level", "event"]
+    via_prevo: bool = False   # move is inherited from a pre-evolution
+    prevo: str | None = None  # PS ID of the pre-evolution that teaches it
 
 
 class SmogonSet(BaseModel):
@@ -204,8 +209,8 @@ class PokemonResolvedResponse(BaseModel):
 
     `gen` reflects the generation the data was resolved for.
     `types` and `base_stats` are gen-accurate (e.g. Clefairy is Normal in gen ≤ 5).
-    `supplement_moves` fills PokéAPI gaps: event distributions, plus egg/tutor moves
-    missing for older gens.
+    Supplement moves (event distributions, egg/tutor moves missing from PokéAPI)
+    are merged directly into `moves` per gen rather than stored separately.
     `smogon_analyses` is null while the background load is in progress or when
     no Smogon data exists for this Pokémon.
     `varieties` and `forms` are slim by default; use ?includes[]=varieties,forms
@@ -224,9 +229,8 @@ class PokemonResolvedResponse(BaseModel):
     base_experience: int | None = None
     species_name: str | None = None
     form_names: list[str] = []            # derived from forms[].name for convenience
-    moves: list[MoveSummary] = []         # slim: []; full via ?includes[]=moves
+    moves: dict[int, list[MoveSummary]] = {}  # slim: {}; full via ?includes[]=moves; keyed by gen
     moves_url: str | None = None          # /pokemon/moves/{pokemon_id}
-    supplement_moves: list[EventMove]
     smogon_analyses: list[SmogonFormatData] | None
     smogon_url: str | None = None          # /pokemon/smogon/{pokemon_id}
     varieties: list[VarietyData]

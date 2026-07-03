@@ -97,6 +97,30 @@ _SHOWDOWN_GEN_SHINY_DIRS: dict[int, str] = {
 _ROMAN = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5,
           "vi": 6, "vii": 7, "viii": 8, "ix": 9}
 
+# Version groups that exist in PokéAPI but represent side games with non-standard
+# move availability. Excluded from gen-aware PokéAPI VG filtering.
+_SIDE_GAME_VGS: frozenset[str] = frozenset({"colosseum", "xd", "stadium", "stadium-2"})
+
+# Priority order for picking the "best" method when converting a supplement
+# EventMove to a MoveSummary. Lower index = higher priority.
+_SUPPLEMENT_METHOD_PRIORITY: dict[str, int] = {
+    "level": 0, "machine": 1, "egg": 2, "tutor": 3,
+    "event": 4, "relearn": 5, "transfer": 6, "other": 7,
+}
+
+# Maps PS learnset method labels (from _LEARNSET_METHOD_LABEL) to PokéAPI-style
+# method strings used in MoveLearnDetail.method.
+_SUPPLEMENT_TO_POKEAPI_METHOD: dict[str, str] = {
+    "level": "level-up",
+    "machine": "machine",
+    "egg": "egg",
+    "tutor": "tutor",
+    "event": "event",
+    "relearn": "level-up",
+    "transfer": "transfer",
+    "other": "other",
+}
+
 # Fallback for when pokemon_registry.json is absent (should not happen in prod).
 _VARIETY_ICON_ID_OVERRIDES_DEFAULT: dict[str, str] = {
     "calyrex-ice":                "898-ice-rider",
@@ -451,9 +475,14 @@ class PokemonResolverService:
             if move_id in known_ps_ids:
                 continue
             methods: set[str] = set()
+            via_prevo: bool = False
+            prevo: str | None = None
             for src in sources:
                 raw = src.get("method", "other")
                 methods.add(self._LEARNSET_METHOD_LABEL.get(raw, raw))
+                if src.get("via_prevo") and not via_prevo:
+                    via_prevo = True
+                    prevo = src["via_prevo"]
             if not methods:
                 continue
             move_info = self._moves_index.get(move_id, {})
@@ -462,8 +491,50 @@ class PokemonResolverService:
                 display_name=move_info.get("name", move_id),
                 generations=[gen],
                 methods=sorted(methods),
+                via_prevo=via_prevo,
+                prevo=prevo,
             ))
         return result
+
+    def _gen_vgs(self, gen: int) -> "frozenset[str] | None":
+        """Return the PokéAPI version-group slugs for gen, excluding side-game VGs.
+
+        Returns None when the VG map is not loaded (learnset data absent), so
+        callers skip filtering rather than silently stripping all moves.
+        """
+        if not self._learnset_service._vg_to_gen:
+            return None
+        return frozenset(
+            vg for vg, g in self._learnset_service._vg_to_gen.items()
+            if g == gen and vg not in _SIDE_GAME_VGS
+        )
+
+    def _event_move_to_summary(self, ev: "EventMove", gen: int) -> "MoveSummary":
+        """Convert a supplement EventMove to a MoveSummary for the moves endpoint."""
+        from app.schemas.pokemon_resolved import MoveLearnDetail, MoveSummary
+        best_label = min(
+            ev.methods,
+            key=lambda m: _SUPPLEMENT_METHOD_PRIORITY.get(m, 99),
+            default="event",
+        )
+        method = _SUPPLEMENT_TO_POKEAPI_METHOD.get(best_label, best_label)
+        last_vg = self._learnset_service.last_vg_for_gen(gen) or ""
+        # Normalize PS ID to PokéAPI slug: "Extreme Speed" → "extreme-speed".
+        # PS IDs are no-separator lowercase; display_name is the authoritative
+        # human-readable form from Showdown's moves index.
+        pokeapi_name = ev.display_name.lower().replace("'", "").replace(" ", "-")
+        return MoveSummary(
+            name=pokeapi_name,
+            learn_details=[
+                MoveLearnDetail(
+                    version_group=last_vg,
+                    method=method,
+                    level=None,
+                    via_prevo=ev.via_prevo,
+                    prevo=ev.prevo,
+                )
+            ],
+        )
 
     # ------------------------------------------------------------------
     # Smogon analyses
@@ -955,15 +1026,23 @@ class PokemonResolverService:
 
     @staticmethod
     def _trim_response(
-        response: "PokemonResolvedResponse", includes: list[str], gen: int | None = None
+        response: "PokemonResolvedResponse",
+        includes: list[str],
+        gen: int | None = None,
+        *,
+        filter_to_gen: int | None = None,
     ) -> "PokemonResolvedResponse":
-        """Strip expanded fields not requested via includes, and gen-gate smogon.
+        """Strip expanded fields not requested via includes, and gen-gate smogon/moves.
 
         resolved_url on VarietyData and front_sprite_url on FormData are
         always preserved — they exist specifically to support the slim response.
 
         smogon_analyses is always filtered to the requested gen (even slim
         format-id-only entries). Pass gen=None to skip filtering.
+
+        filter_to_gen: the original gen param from the request (not data_gen).
+        When provided, moves dict is narrowed to {filter_to_gen: [...]} only.
+        When None, all gens are returned.
         """
         if "varieties" not in includes:
             response = response.model_copy(update={
@@ -1005,7 +1084,12 @@ class PokemonResolverService:
             # smogon IS in includes but gen filtering changed the list
             response = response.model_copy(update={"smogon_analyses": filtered})
         if "moves" not in includes:
-            response = response.model_copy(update={"moves": []})
+            response = response.model_copy(update={"moves": {}})
+        elif filter_to_gen is not None:
+            gen_entry = response.moves.get(filter_to_gen, [])
+            response = response.model_copy(update={
+                "moves": {filter_to_gen: gen_entry} if gen_entry else {}
+            })
         if "flavor" not in includes:
             response = response.model_copy(update={"flavor_text_entries": []})
         return response
@@ -1034,8 +1118,11 @@ class PokemonResolverService:
         )
         row = result.scalar_one_or_none()
         if row:
-            response = PokemonResolvedResponse(**row.data, resolved_at=row.resolved_at)
-            return self._trim_response(response, includes, data_gen)
+            try:
+                response = PokemonResolvedResponse(**row.data, resolved_at=row.resolved_at)
+                return self._trim_response(response, includes, data_gen, filter_to_gen=gen)
+            except Exception:
+                pass  # stale cache format; fall through to re-fetch
 
         # 2. Fetch from PokéAPI
         try:
@@ -1094,21 +1181,37 @@ class PokemonResolverService:
             abilities_list.append(AbilityInfo(name=ability_slug, is_hidden=is_hidden, slot=pokeapi_slot))
         abilities_list.sort(key=lambda a: a.slot)
 
-        # moves (always built; trimmed to [] at response time unless "moves" in includes)
-        moves_list = [
-            MoveSummary(
-                name=m["move"]["name"],
-                learn_details=[
+        # Build moves as {gen: [MoveSummary, ...]}; trimmed to {} unless "moves" in includes.
+        # Side-game VGs (colosseum, xd, stadium, stadium-2) are excluded.
+        # When the VG map is not loaded (e.g. in tests), all moves fall back to data_gen.
+        _vg_map_loaded = bool(self._learnset_service._vg_to_gen)
+        _moves_by_gen: dict[int, dict[str, list[MoveLearnDetail]]] = {}
+        for _m in pokemon_data.get("moves", []):
+            _move_name: str = _m["move"]["name"]
+            for _d in _m.get("version_group_details", []):
+                _vg: str = _d["version_group"]["name"]
+                if _vg in _SIDE_GAME_VGS:
+                    continue
+                if _vg_map_loaded:
+                    _g = self._learnset_service.version_group_to_gen(_vg)
+                    if _g is None:
+                        continue
+                else:
+                    _g = data_gen
+                _moves_by_gen.setdefault(_g, {}).setdefault(_move_name, []).append(
                     MoveLearnDetail(
-                        version_group=d["version_group"]["name"],
-                        method=d["move_learn_method"]["name"],
-                        level=d.get("level_learned_at", 0),
+                        version_group=_vg,
+                        method=_d["move_learn_method"]["name"],
+                        level=_d.get("level_learned_at", 0),
                     )
-                    for d in m.get("version_group_details", [])
-                ],
-            )
-            for m in pokemon_data.get("moves", [])
-        ]
+                )
+        moves_dict: dict[int, list[MoveSummary]] = {
+            _g: [
+                MoveSummary(name=_name, learn_details=_details)
+                for _name, _details in sorted(_move_map.items())
+            ]
+            for _g, _move_map in sorted(_moves_by_gen.items())
+        }
 
         # species detail fields
         genus = next(
@@ -1142,9 +1245,21 @@ class PokemonResolverService:
             except (ValueError, IndexError):
                 pass
 
-        # 5. Move supplementation
-        move_slugs: set[str] = {m["move"]["name"] for m in pokemon_data.get("moves", [])}
-        supplement_moves = self._get_supplement_moves(ps_id, data_gen, move_slugs)
+        # 5. Merge supplement moves (event/egg/tutor absent from PokéAPI) into moves_dict.
+        # Use only the moves PokéAPI already has for data_gen as the exclusion set —
+        # a move present in a later gen but absent from data_gen should still be included.
+        move_slugs: set[str] = {ms.name for ms in moves_dict.get(data_gen, [])}
+        supplements = self._get_supplement_moves(ps_id, data_gen, move_slugs)
+        if supplements:
+            _existing_names = {ms.name for ms in moves_dict.get(data_gen, [])}
+            _extra = [
+                self._event_move_to_summary(ev, data_gen)
+                for ev in supplements
+                if ev.name not in _existing_names
+            ]
+            if _extra:
+                moves_dict = dict(moves_dict)
+                moves_dict[data_gen] = list(moves_dict.get(data_gen, [])) + _extra
 
         # 6. Smogon analyses
         display_name = _smogon_display_name(pokemon_name, english_species_name)
@@ -1204,9 +1319,8 @@ class PokemonResolverService:
             weight=pokemon_data.get("weight", 0),             # new
             base_experience=pokemon_data.get("base_experience"),  # new
             species_name=species_data.get("name"),            # new
-            moves=moves_list,                                 # new (trimmed to [] by _trim_response)
-            moves_url=f"{base_url}/pokemon/{pokemon_id}/moves",  # new
-            supplement_moves=supplement_moves,
+            moves=moves_dict,                                 # trimmed to {} by _trim_response
+            moves_url=f"{base_url}/pokemon/{pokemon_id}/moves",
             smogon_analyses=smogon_analyses,
             smogon_url=f"{base_url}/pokemon/{pokemon_id}/smogon",
             varieties=varieties,
@@ -1262,7 +1376,7 @@ class PokemonResolverService:
         await db.commit()
 
         # 12. Trim and return
-        return self._trim_response(response, includes, data_gen)
+        return self._trim_response(response, includes, data_gen, filter_to_gen=gen)
 
     # ------------------------------------------------------------------
     # Name-or-ID resolution + convenience endpoints
@@ -1396,30 +1510,35 @@ class PokemonResolverService:
         )
 
     async def resolve_moves(
-        self, name_or_id: str, db: AsyncSession, base_url: str = ""
+        self, name_or_id: str, gen: int | None, db: AsyncSession, base_url: str = ""
     ) -> "MovesResponse":
-        from app.schemas.pokemon_resolved import MovesResponse
+        from app.schemas.pokemon_resolved import MovesResponse, MoveSummary
         pokemon_id = await self._resolve_name_or_id(name_or_id)
+        full = await self.resolve(pokemon_id, gen, ["moves"], db, base_url)
 
-        result = await db.execute(
-            select(PokemonResolved).where(
-                PokemonResolved.pokemon_id == pokemon_id,
-                PokemonResolved.gen == 9,
-                PokemonResolved.resolved_at
-                + text("(ttl_days * interval '1 day')")
-                > func.now(),
-            )
-        )
-        row = result.scalar_one_or_none()
-        if row and row.data.get("moves"):
+        if gen is not None:
+            # Supplements already merged into full.moves[gen] by resolve().
+            gen_moves = list(full.moves.get(gen, []))
             return MovesResponse(
-                pokemon_id=pokemon_id,
-                name=row.data.get("name", ""),
-                moves=row.data["moves"],
+                pokemon_id=pokemon_id, name=full.name, gen=gen,
+                moves={gen: gen_moves} if gen_moves else {},
             )
 
-        full = await self.resolve(pokemon_id, 9, ["moves"], db, base_url)
-        return MovesResponse(pokemon_id=pokemon_id, name=full.name, moves=full.moves)
+        # No-gen: full.moves is already {gen: [MoveSummary, ...]} for all gens.
+        # Append per-gen supplement moves on top.
+        all_moves: dict[int, list[MoveSummary]] = {g: list(ms) for g, ms in full.moves.items()}
+        ps_name = full.name.replace("-", "").lower()
+        for g in range(1, 10):
+            existing_slugs = {ms.name for ms in all_moves.get(g, [])}
+            supplements = self._get_supplement_moves(ps_name, g, existing_slugs)
+            if supplements:
+                summaries = [self._event_move_to_summary(ev, g) for ev in supplements]
+                if g in all_moves:
+                    all_moves[g].extend(summaries)
+                else:
+                    all_moves[g] = summaries
+
+        return MovesResponse(pokemon_id=pokemon_id, name=full.name, gen=None, moves=all_moves)
 
     async def resolve_flavor_text(
         self, name_or_id: str, lang: str | None, db: AsyncSession, base_url: str = ""

@@ -98,6 +98,8 @@ class LearnsetService:
         self._learnsets: dict[int, dict[str, dict[str, list[dict]]]] = {}
         # version_group_slug → gen number (populated by load())
         self._vg_to_gen: dict[str, int] = {}
+        # gen → canonical last version-group for that gen (e.g. 9 → "scarlet-violet")
+        self._gen_to_last_vg: dict[int, str] = {}
 
     def load(self, ps_data_dir: str) -> None:
         """Load learnset_1.json … learnset_9.json and derive the VG→gen map from the registry."""
@@ -121,7 +123,15 @@ class LearnsetService:
                 for vg in vg_list:
                     vg_map[vg] = gen
             self._vg_to_gen = vg_map
-            logger.info("Derived version-group→gen map (%d entries) from registry", len(vg_map))
+            self._gen_to_last_vg = {
+                int(gen_str): vg
+                for gen_str, vg in registry.get("genToLastVg", {}).items()
+            }
+            logger.info(
+                "Derived version-group→gen map (%d entries) and gen→last-vg map (%d entries) from registry",
+                len(vg_map),
+                len(self._gen_to_last_vg),
+            )
         except (json.JSONDecodeError, ValueError, OSError) as exc:
             logger.warning("Failed to load genToVersionGroups from registry: %s", exc)
 
@@ -145,6 +155,10 @@ class LearnsetService:
     def version_group_to_gen(self, version_group: str) -> int | None:
         """Return the generation for a PokéAPI version-group slug, or None if unknown."""
         return self._vg_to_gen.get(version_group)
+
+    def last_vg_for_gen(self, gen: int) -> str | None:
+        """Return the canonical last version-group slug for a generation (e.g. 9 → 'scarlet-violet')."""
+        return self._gen_to_last_vg.get(gen)
 
     def get_learnset(self, ps_name: str, gen: int) -> dict[str, list[dict]]:
         """Return the learnset entry for ps_name in gen, or {} if not found.
