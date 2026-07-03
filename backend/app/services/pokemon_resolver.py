@@ -519,8 +519,12 @@ class PokemonResolverService:
         )
         method = _SUPPLEMENT_TO_POKEAPI_METHOD.get(best_label, best_label)
         last_vg = self._learnset_service.last_vg_for_gen(gen) or ""
+        # Normalize PS ID to PokéAPI slug: "Extreme Speed" → "extreme-speed".
+        # PS IDs are no-separator lowercase; display_name is the authoritative
+        # human-readable form from Showdown's moves index.
+        pokeapi_name = ev.display_name.lower().replace("'", "").replace(" ", "-")
         return MoveSummary(
-            name=ev.name,
+            name=pokeapi_name,
             learn_details=[
                 MoveLearnDetail(
                     version_group=last_vg,
