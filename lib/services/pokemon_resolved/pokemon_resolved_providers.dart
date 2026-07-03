@@ -15,35 +15,55 @@ final pokemonBackendRepositoryProvider = Provider<PokemonBackendRepository>(
   (ref) => PokemonBackendRepository(ref.read(apiClientProvider)),
 );
 
-/// Lazy-loaded full moves list. Checks pokemon_resolved_cache first,
-/// then backend, then falls back to PokéAPI (offline).
+/// Lazy-loaded moves list. When gen is null, returns all version groups (no
+/// supplement moves). When gen is N, returns gen-N version groups with backend
+/// supplement moves already merged.
+///
+/// Falls back to PokéAPI-sourced moves on backend failure (unfiltered by gen).
 final pokemonMovesProvider =
-    FutureProvider.family<List<MoveSummary>, int>((ref, id) async {
+    FutureProvider.family<List<MoveSummary>, ({int id, int? gen})>((ref, args) async {
+  final id = args.id;
+  final gen = args.gen;
   final cache = ref.read(pokemonResolvedCacheProvider);
-  final cached = cache.getIfValid('moves_$id');
+  final cacheKey = gen != null ? 'moves_${id}_g$gen' : 'moves_$id';
+  final cached = cache.getIfValid(cacheKey);
   if (cached != null) {
-    AppLogger().d('[moves] cache hit id=$id');
+    AppLogger().d('[moves] cache hit id=$id gen=$gen');
     return (cached['moves'] as List<dynamic>)
         .map((m) => MoveSummary.fromJson(m as Map<String, dynamic>))
         .toList();
   }
 
   try {
-    AppLogger().d('[moves] fetching from backend id=$id');
+    AppLogger().d('[moves] fetching from backend id=$id gen=$gen');
     final repo = ref.read(pokemonBackendRepositoryProvider);
-    final moves = await repo.fetchMoves(id);
-    AppLogger().d('[moves] loaded ${moves.length} moves for id=$id');
+    final moves = await repo.fetchMoves(id, gen: gen);
+    AppLogger().d('[moves] loaded ${moves.length} moves for id=$id gen=$gen');
     cache.putWithTTL(
-      'moves_$id',
+      cacheKey,
       {'moves': moves.map((m) => m.toJson()).toList()},
       const Duration(days: 7),
     );
     return moves;
   } catch (e) {
-    AppLogger().w('[moves] backend failed for id=$id, falling back to PokéAPI', error: e);
+    AppLogger().w('[moves] backend failed for id=$id gen=$gen, falling back to PokéAPI', error: e);
     final detail = await ref.read(pokemonDetailProvider(id).future);
     return detail.moves;
   }
+});
+
+/// Valid learnset for a Pokémon in a specific generation — a set of move names
+/// learnable in that gen, with backend supplement moves (event, egg, tutor)
+/// already merged.
+///
+/// Uses [pokemonMovesProvider] with gen filtering. On backend failure the
+/// fallback is the full PokéAPI moves list (all gens, unfiltered).
+final validLearnsetProvider =
+    FutureProvider.family<Set<String>, ({int id, int gen})>((ref, args) async {
+  final moves = await ref.read(
+    pokemonMovesProvider((id: args.id, gen: args.gen)).future,
+  );
+  return {for (final m in moves) m.name};
 });
 
 /// Lazy-loaded full variety data (types, base_stats, abilities, sprite_urls per variety).

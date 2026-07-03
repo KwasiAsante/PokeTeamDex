@@ -653,7 +653,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             : null;
         // Fetch variety-specific moves when a form is active.
         final formMovesAsync = formVariety != null
-            ? ref.watch(pokemonMovesProvider(formVariety.pokemonId))
+            ? ref.watch(pokemonMovesProvider((id: formVariety.pokemonId, gen: format?.gen)))
             : null;
         PokemonFormEntry? cosmeticForm;
         if (isCosmeticFormSelected) {
@@ -711,21 +711,15 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             : abilities;
 
         // ── Moves ──────────────────────────────────────────────────────────
-        // Base moves lazy-loaded from backend; variety moves via form ID.
-        final pokemonMovesAsync = ref.watch(pokemonMovesProvider(slot.pokemonId));
+        // Backend already returns gen-filtered moves with supplement moves merged
+        // when gen is specified; no client-side buildLearnsetForFormat needed.
+        final pokemonMovesAsync = ref.watch(pokemonMovesProvider((id: slot.pokemonId, gen: format?.gen)));
         final pokemonMoves = pokemonMovesAsync.asData?.value ?? pokemon.moves;
         final formMoves = formMovesAsync?.asData?.value;
         final effectivePokemonMoves =
             (formMoves != null && formMoves.isNotEmpty) ? formMoves : pokemonMoves;
         final effectivePokemonName = formVariety?.name ?? pokemon.name;
-        // Learnable set computed once; shared with prior-evo lookup below.
-        final effectiveLearnableMoveSet = format != null
-            ? buildLearnsetForFormat(
-                effectivePokemonMoves, format,
-                pokemonName: effectivePokemonName,
-                formatService: formatService,
-              )
-            : effectivePokemonMoves.map((m) => m.name).toSet();
+        final effectiveLearnableMoveSet = effectivePokemonMoves.map((m) => m.name).toSet();
         final effectiveLearnableMoves = effectiveLearnableMoveSet.toList()..sort();
         final priorEvoMoveSetsAsync = ref.watch(priorEvoMoveSetsProvider(formVariety != null ? formVariety.pokemonId : slot.pokemonId));
         final effectivePriorEvoMoves = priorEvoMoveSetsAsync.whenOrNull(data: (sets) {

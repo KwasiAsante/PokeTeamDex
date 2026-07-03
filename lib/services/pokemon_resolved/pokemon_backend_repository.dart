@@ -18,15 +18,32 @@ class PokemonBackendRepository {
         Map<String, dynamic>.from(response.data as Map));
   }
 
-  Future<List<MoveSummary>> fetchMoves(int id) async {
-    final response = await _apiClient.dio.get<dynamic>('/pokemon/moves/$id');
+  Future<List<MoveSummary>> fetchMoves(int id, {int? gen}) async {
+    final response = await _apiClient.dio.get<dynamic>(
+      '/pokemon/moves/$id',
+      queryParameters: gen != null ? {'gen': gen} : null,
+    );
     if (response.statusCode != 200) {
       throw Exception('Backend moves fetch failed for id=$id: ${response.statusCode}');
     }
     final data = Map<String, dynamic>.from(response.data as Map);
-    return (data['moves'] as List<dynamic>)
-        .map((m) => MoveSummary.fromJson(m as Map<String, dynamic>))
-        .toList();
+    final movesRaw = data['moves'] as Map<String, dynamic>? ?? {};
+
+    if (gen != null) {
+      // Gen-filtered: single key in the dict matching the requested gen.
+      final genMoves = movesRaw[gen.toString()] as List<dynamic>? ?? [];
+      return genMoves.map((m) => MoveSummary.fromJson(m as Map<String, dynamic>)).toList();
+    }
+
+    // All-gens: flatten across every generation, deduplicating by name.
+    final byName = <String, MoveSummary>{};
+    for (final genEntry in movesRaw.values) {
+      for (final m in (genEntry as List<dynamic>)) {
+        final ms = MoveSummary.fromJson(m as Map<String, dynamic>);
+        byName.putIfAbsent(ms.name, () => ms);
+      }
+    }
+    return byName.values.toList();
   }
 
   Future<List<VarietyBackendData>> fetchVarieties(int id, {int? gen}) async {

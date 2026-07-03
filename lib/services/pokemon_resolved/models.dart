@@ -53,18 +53,24 @@ class AbilityInfo {
 class MoveLearnDetail {
   final String versionGroup;
   final String method;
-  final int level;
+  final int? level;
+  final bool viaPrev;
+  final String? prevo;
 
   const MoveLearnDetail({
     required this.versionGroup,
     required this.method,
     required this.level,
+    this.viaPrev = false,
+    this.prevo,
   });
 
   factory MoveLearnDetail.fromJson(Map<String, dynamic> json) => MoveLearnDetail(
         versionGroup: json['version_group'] as String,
         method: json['method'] as String,
-        level: json['level'] as int,
+        level: json['level'] as int?,
+        viaPrev: json['via_prevo'] as bool? ?? false,
+        prevo: json['prevo'] as String?,
       );
 
   factory MoveLearnDetail.fromPokeApi(Map<String, dynamic> json) => MoveLearnDetail(
@@ -77,6 +83,8 @@ class MoveLearnDetail {
         'version_group': versionGroup,
         'method': method,
         'level': level,
+        'via_prevo': viaPrev,
+        'prevo': prevo,
       };
 }
 
@@ -218,6 +226,20 @@ class SpriteUrlsFull {
       };
 }
 
+/// Backend now returns moves keyed by generation: `{genN: [MoveSummary, ...]}`.
+/// Flatten across all gens, deduplicating by move name (first occurrence wins).
+List<MoveSummary> _parseMoves(dynamic raw) {
+  if (raw is! Map || raw.isEmpty) return const [];
+  final byName = <String, MoveSummary>{};
+  for (final genMoves in raw.values) {
+    for (final m in (genMoves as List<dynamic>)) {
+      final ms = MoveSummary.fromJson(m as Map<String, dynamic>);
+      byName.putIfAbsent(ms.name, () => ms);
+    }
+  }
+  return byName.values.toList();
+}
+
 class PokemonResolvedBackendResponse {
   final int pokemonId;
   final int gen;
@@ -313,13 +335,9 @@ class PokemonResolvedBackendResponse {
       weight: (json['weight'] as num?)?.toInt() ?? 0,
       baseExperience: (json['base_experience'] as num?)?.toInt(),
       speciesName: json['species_name'] as String?,
-      moves: (json['moves'] as List<dynamic>? ?? [])
-          .map((m) => MoveSummary.fromJson(m as Map<String, dynamic>))
-          .toList(),
+      moves: _parseMoves(json['moves']),
       movesUrl: json['moves_url'] as String?,
-      supplementMoves: (json['supplement_moves'] as List<dynamic>? ?? [])
-          .map((m) => SupplementMove.fromJson(m as Map<String, dynamic>))
-          .toList(),
+      supplementMoves: const [],
       smogonAnalyses: (json['smogon_analyses'] as List<dynamic>?)
           ?.map((e) => Map<String, dynamic>.from(e as Map))
           .toList(),
@@ -369,7 +387,6 @@ class PokemonResolvedBackendResponse {
         'species_name': speciesName,
         'moves': moves.map((m) => m.toJson()).toList(),
         'moves_url': movesUrl,
-        'supplement_moves': supplementMoves.map((s) => s.toJson()).toList(),
         'smogon_analyses': smogonAnalyses,
         'varieties': varieties,
         'forms': forms.map((f) => f.toJson()).toList(),
