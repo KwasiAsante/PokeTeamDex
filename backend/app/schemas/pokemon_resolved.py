@@ -209,8 +209,8 @@ class PokemonResolvedResponse(BaseModel):
 
     `gen` reflects the generation the data was resolved for.
     `types` and `base_stats` are gen-accurate (e.g. Clefairy is Normal in gen ≤ 5).
-    `supplement_moves` fills PokéAPI gaps: event distributions, plus egg/tutor moves
-    missing for older gens.
+    Supplement moves (event distributions, egg/tutor moves missing from PokéAPI)
+    are merged directly into `moves` per gen rather than stored separately.
     `smogon_analyses` is null while the background load is in progress or when
     no Smogon data exists for this Pokémon.
     `varieties` and `forms` are slim by default; use ?includes[]=varieties,forms
@@ -231,7 +231,6 @@ class PokemonResolvedResponse(BaseModel):
     form_names: list[str] = []            # derived from forms[].name for convenience
     moves: dict[int, list[MoveSummary]] = {}  # slim: {}; full via ?includes[]=moves; keyed by gen
     moves_url: str | None = None          # /pokemon/moves/{pokemon_id}
-    supplement_moves: list[EventMove]
     smogon_analyses: list[SmogonFormatData] | None
     smogon_url: str | None = None          # /pokemon/smogon/{pokemon_id}
     varieties: list[VarietyData]

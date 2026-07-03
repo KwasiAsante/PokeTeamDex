@@ -1241,9 +1241,19 @@ class PokemonResolverService:
             except (ValueError, IndexError):
                 pass
 
-        # 5. Move supplementation
+        # 5. Merge supplement moves (event/egg/tutor absent from PokéAPI) into moves_dict.
         move_slugs: set[str] = {m["move"]["name"] for m in pokemon_data.get("moves", [])}
-        supplement_moves = self._get_supplement_moves(ps_id, data_gen, move_slugs)
+        supplements = self._get_supplement_moves(ps_id, data_gen, move_slugs)
+        if supplements:
+            _existing_names = {ms.name for ms in moves_dict.get(data_gen, [])}
+            _extra = [
+                self._event_move_to_summary(ev, data_gen)
+                for ev in supplements
+                if ev.name not in _existing_names
+            ]
+            if _extra:
+                moves_dict = dict(moves_dict)
+                moves_dict[data_gen] = list(moves_dict.get(data_gen, [])) + _extra
 
         # 6. Smogon analyses
         display_name = _smogon_display_name(pokemon_name, english_species_name)
@@ -1304,8 +1314,7 @@ class PokemonResolverService:
             base_experience=pokemon_data.get("base_experience"),  # new
             species_name=species_data.get("name"),            # new
             moves=moves_dict,                                 # trimmed to {} by _trim_response
-            moves_url=f"{base_url}/pokemon/{pokemon_id}/moves",  # new
-            supplement_moves=supplement_moves,
+            moves_url=f"{base_url}/pokemon/{pokemon_id}/moves",
             smogon_analyses=smogon_analyses,
             smogon_url=f"{base_url}/pokemon/{pokemon_id}/smogon",
             varieties=varieties,
@@ -1502,10 +1511,8 @@ class PokemonResolverService:
         full = await self.resolve(pokemon_id, gen, ["moves"], db, base_url)
 
         if gen is not None:
-            # full.moves already narrowed to {gen: [...]} by _trim_response();
-            # full.supplement_moves pre-computed for gen (data_gen == gen here).
+            # Supplements already merged into full.moves[gen] by resolve().
             gen_moves = list(full.moves.get(gen, []))
-            gen_moves.extend(self._event_move_to_summary(ev, gen) for ev in full.supplement_moves)
             return MovesResponse(
                 pokemon_id=pokemon_id, name=full.name, gen=gen,
                 moves={gen: gen_moves} if gen_moves else {},
