@@ -314,7 +314,7 @@
   - [x] **Sub-issue A** — `sync_ps_data.py` + infra: `shared/ps_data/` folder, per-gen learnset files with `via_prevo`, TS source for moves/items/abilities, updated Dockerfile/docker-compose *(#278)*
   - [x] **Sub-issue B** — Backend: `LearnsetService` loading per-gen files from `PS_DATA_DIR` *(#276)*
   - [x] **Sub-issue C** — Backend: update `/pokemon/moves` with `gen` param + full consolidation logic *(#280)*
-  - [ ] **Sub-issue D** — Frontend: update move models, `pokemonMovesProvider`, `validLearnsetProvider`, slot validator refactor *(#276)*
+  - [x] **Sub-issue D** — Frontend: update move models, `pokemonMovesProvider`, `validLearnsetProvider`, slot validator refactor *(#281)*
   - [ ] **Sub-issue E** — Backend: new `/items`, `/moves`, `/abilities` endpoints *(#276)*
   - [ ] **Sub-issue F** — Backend: extend PostgreSQL DB caching to all data endpoints *(#276)*
   - [ ] **Sub-issue G** — Frontend: `withBackendFallback<T>` utility; migrate item/move/ability pickers + list/detail screens *(#276)*
