@@ -85,16 +85,16 @@ Backend-resolved Pokémon data infrastructure — the Flutter-side counterpart t
 
 | File | Purpose |
 | ---- | ------- |
-| `models.dart` | `AbilityInfo`, `MoveSummary`, `SupplementMove`, `SpriteUrlsFull`, `VarietyBackendData`, `FormBackendData`, `PokemonResolvedBackendResponse` — typed models for the backend response, plus `toPokemonEntry()`/`toPokemonSpeciesEntry()`/`toCosmeticForms()` converters |
+| `models.dart` | `AbilityInfo`, `MoveLearnDetail` (+ `viaPrev`/`prevo` fields), `MoveSummary`, `SupplementMove`, `SpriteUrlsFull`, `VarietyBackendData`, `FormBackendData`, `PokemonResolvedBackendResponse` — typed models for the backend response, plus `toPokemonEntry()`/`toPokemonSpeciesEntry()`/`toCosmeticForms()` converters |
 | `pokemon_resolved_cache.dart` | Hive box wrapper for backend-resolved responses (7-day TTL, versioned cache key) |
-| `pokemon_backend_repository.dart` | `PokemonBackendRepository` — HTTP calls to `GET /pokemon/{id}/resolved` and the `varieties`/`forms`/`smogon`/`moves`/`flavor-text` sub-endpoints |
-| `pokemon_resolved_providers.dart` | `pokemonResolvedCacheProvider`, `pokemonBackendRepositoryProvider`, and lazy-loaded sub-resource providers (`pokemonMovesProvider`, `pokemonVarietiesProvider`, `pokemonFormsProvider`, `pokemonFlavorTextProvider`) — each checks the Hive cache, then the backend, then falls back to PokéAPI |
+| `pokemon_backend_repository.dart` | `PokemonBackendRepository` — HTTP calls to `GET /pokemon/{id}/resolved` and the `varieties`/`forms`/`smogon`/`moves`/`flavor-text` sub-endpoints; `fetchMoves(id, {gen})` accepts an optional gen param and parses the backend's gen-keyed dict response |
+| `pokemon_resolved_providers.dart` | `pokemonResolvedCacheProvider`, `pokemonBackendRepositoryProvider`, and lazy-loaded sub-resource providers (`pokemonMovesProvider({id, gen?})`, `pokemonVarietiesProvider`, `pokemonFormsProvider`, `pokemonFlavorTextProvider`, `validLearnsetProvider({id, gen})`) — each checks the Hive cache, then the backend, then falls back to PokéAPI |
 
 ### Where `resolvedPokemonProvider` lives
 
 The provider most screens actually consume, `resolvedPokemonProvider` (`FutureProvider.family`, `keepAlive`), and its return type `ResolvedPokemon`, live in the `pokedex` feature module rather than here — see [`features/README.md` → pokedex](../features/README.md#pokedex):
 
-- `lib/features/pokedex/models/resolved_pokemon.dart` — `ResolvedPokemon`: merges `PokemonEntry` + `PokemonSpeciesEntry` + cosmetic forms + `SpriteUrlsFull` (+ optional supplement moves / Smogon analyses) into one object, kept alive for the app session
+- `lib/features/pokedex/models/resolved_pokemon.dart` — `ResolvedPokemon`: merges `PokemonEntry` + `PokemonSpeciesEntry` + cosmetic forms + `SpriteUrlsFull` (+ optional Smogon analyses) into one object, kept alive for the app session
 - `lib/features/pokedex/providers/resolved_pokemon_provider.dart` — builds a `ResolvedPokemon`:
   ```text
   resolvedPokemonProvider(id, gen)

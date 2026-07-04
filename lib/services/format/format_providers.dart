@@ -86,7 +86,7 @@ final slotValidationProvider = FutureProvider.autoDispose
 
   // Fetch prior-evo move sets and suppress move violations for exclusive moves.
   final priorEvoSets = await ref.watch(
-      priorEvoMoveSetsProvider(args.slot.pokemonId).future);
+      priorEvoMoveSetsProvider((id: args.slot.pokemonId, gen: null)).future);
   if (priorEvoSets.isEmpty) return base;
   final priorEvoMoves = buildPriorEvoExclusiveMoveNames(
     currentMoves: effectiveMoves,
