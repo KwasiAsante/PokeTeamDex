@@ -232,6 +232,15 @@ class CatalogService:
         elif raw.get("is_max_move"):
             gen = 8
 
+        # raw["z_move_base"] is a PS no-separator id (e.g. "volttackle") — convert
+        # to the same hyphenated PokéAPI-style slug used everywhere else (e.g.
+        # "volt-tackle") so it can be passed straight to GET /moves/{id_or_name}.
+        z_move_base_ps_id = raw.get("z_move_base")
+        z_move_base = None
+        if z_move_base_ps_id:
+            base_raw = self._moves_ps.get(z_move_base_ps_id)
+            z_move_base = _ps_slug(base_raw["name"]) if base_raw else z_move_base_ps_id
+
         return MoveEntry(
             name=slug,
             display_name=display_name,
@@ -244,7 +253,7 @@ class CatalogService:
             priority=raw.get("priority", 0),
             is_z_move=raw.get("is_z_move", False),
             is_max_move=raw.get("is_max_move", False),
-            z_move_base=raw.get("z_move_base"),
+            z_move_base=z_move_base,
             max_move_base=raw.get("max_move_base"),
             flags=raw.get("flags") or {},
             secondary=raw.get("secondary"),

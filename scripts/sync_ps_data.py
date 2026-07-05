@@ -259,7 +259,30 @@ def generate_learnset_by_gen(
     return result
 
 
-def transform_moves(raw: dict) -> dict:
+def _build_z_move_base_map(raw_items: dict) -> dict[str, str]:
+    """Map z-move PS id -> base-move PS id, from signature Z-crystal items.
+
+    The zMove/zMoveFrom relationship lives on the Z-CRYSTAL ITEM in PS's data,
+    not on the resulting move (data/moves.ts has no back-reference at all —
+    a previous version of this script incorrectly read `zMoveFrom` off the
+    move object, which never existed there, leaving z_move_base null for
+    every Z-move). Only the 17 signature Z-crystals (e.g. Pikanium Z:
+    zMove="Catastropika", zMoveFrom="Volt Tackle") have a real single base
+    move. The 18 generic elemental Z-crystals (e.g. Electrium Z: zMove=true,
+    zMoveType="Electric") have no single base move — any qualifying move of
+    that type triggers them — so those Z-moves are correctly absent from this
+    map and keep z_move_base=null.
+    """
+    result: dict[str, str] = {}
+    for d in raw_items.values():
+        z_move = d.get("zMove")
+        z_move_from = d.get("zMoveFrom")
+        if isinstance(z_move, str) and z_move_from:
+            result[_normalize_ps_id(z_move)] = _normalize_ps_id(z_move_from)
+    return result
+
+
+def transform_moves(raw: dict, z_move_base_map: dict[str, str]) -> dict:
     """Keep fields needed for gen-filtering, slot-config display, and validation."""
     result: dict[str, dict] = {}
     for move_id, d in raw.items():
@@ -284,8 +307,12 @@ def transform_moves(raw: dict) -> dict:
             "priority": d.get("priority", 0),
             "flags": d.get("flags") or {},
             "secondary": d.get("secondary"),
-            "z_move_base": d.get("zMoveFrom"),
-            "max_move_base": d.get("maxMoveBase"),
+            "z_move_base": z_move_base_map.get(move_id),
+            # Max Moves have no PS-modeled "base move" to report: regular Max
+            # Moves are triggered by any move matching a type+category, and
+            # G-Max moves (isMax="<Species>") are tied to a species, not a
+            # move. Always null — there is no field to read this from.
+            "max_move_base": None,
         }
     return result
 
@@ -478,13 +505,15 @@ def main() -> None:
         )
         print(f"  gen {gen}: {len(gen_data)} Pokémon, {via_prevo_count} via_prevo entries")
 
-    print("\nMoves (compiled PS endpoint)…")
-    moves = transform_moves(fetch_compiled_json("moves.json"))
-    mv_sha = write_json("moves.json", moves)
-
     print("\nItems (compiled PS endpoint)…")
-    items = transform_items(fetch_js_endpoint("items.js", base=PS_COMPILED_BASE))
+    items_raw = fetch_js_endpoint("items.js", base=PS_COMPILED_BASE)
+    z_move_base_map = _build_z_move_base_map(items_raw)
+    items = transform_items(items_raw)
     it_sha = write_json("items.json", items)
+
+    print("\nMoves (compiled PS endpoint)…")
+    moves = transform_moves(fetch_compiled_json("moves.json"), z_move_base_map)
+    mv_sha = write_json("moves.json", moves)
 
     print("\nAbilities (compiled PS endpoint)…")
     abilities = transform_abilities(fetch_js_endpoint("abilities.js", base=PS_COMPILED_BASE))
