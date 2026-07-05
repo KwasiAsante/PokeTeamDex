@@ -185,6 +185,7 @@
 - [x] **Sync failure feedback** — push failures are now surfaced; pull still runs on push failure but sync reports error instead of success
 - [x] **Connectivity button → login shortcut** — Account row in the connectivity sheet is tappable when not signed in and navigates to the login screen
 - [x] **Login screen keyboard submit** — pressing Enter/Return on the password field triggers the login attempt
+- [ ] **`sync_ps_data.py` — moves.json/abilities.json `gen` field wrong for every entry** — all moves report `gen: 1`, all abilities report `gen: 3`; PS's raw TS source doesn't carry a `gen` field to read, needs to be derived (e.g. from learnset files or PokéAPI's `generation` field) (#293)
 
 ### Bug Fixes & Polish Applied
 
