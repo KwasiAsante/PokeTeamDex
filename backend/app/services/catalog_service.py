@@ -48,6 +48,28 @@ _PS_TO_SLOT: dict[str, int] = {"0": 1, "1": 2, "H": 3}
 _SLUG_STRIP_RE = re.compile(r"[',.]")
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]")
 
+_ROMAN_TO_GEN: dict[str, int] = {
+    "i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5,
+    "vi": 6, "vii": 7, "viii": 8, "ix": 9,
+}
+
+
+def _pokeapi_gen(pokeapi_data: dict) -> int | None:
+    """Extract the introduction generation from a PokéAPI move/ability response.
+
+    shared/ps_data/moves.json and abilities.json currently have a broken `gen`
+    field (every move reports 1, every ability reports 3 — see issue #293,
+    PS's raw TS source doesn't carry a `gen` key the sync script assumed
+    existed). PokéAPI's own `generation` field is reliable and already fetched
+    during preload, so it takes priority over the PS field for these two
+    resources. Items have no equivalent PokéAPI field, but their PS `gen`
+    field is already correct, so no override is needed there.
+    """
+    gen_name = (pokeapi_data.get("generation") or {}).get("name")
+    if not gen_name:
+        return None
+    return _ROMAN_TO_GEN.get(gen_name.split("-")[-1])
+
 
 def _ps_slug(display_name: str) -> str:
     """Best-effort PokéAPI slug from a PS display name.
@@ -185,11 +207,13 @@ class CatalogService:
         display_name = raw.get("name", ps_id)
         slug = _ps_slug(display_name)
         damage_class = (raw.get("category") or "status").lower()
+        gen = raw.get("gen", 1)
         contest_type = target = effect_short = effect = None
 
         if pokeapi_data is not None:
             slug = pokeapi_data.get("name", slug)
             damage_class = (pokeapi_data.get("damage_class") or {}).get("name") or damage_class
+            gen = _pokeapi_gen(pokeapi_data) or gen
             contest_type = (pokeapi_data.get("contest_type") or {}).get("name")
             target = (pokeapi_data.get("target") or {}).get("name")
             effect_short, effect = _first_en_effect(pokeapi_data.get("effect_entries", []))
@@ -200,7 +224,7 @@ class CatalogService:
         return MoveEntry(
             name=slug,
             display_name=display_name,
-            gen=raw.get("gen", 1),
+            gen=gen,
             type=raw.get("type", "normal"),
             damage_class=damage_class,
             power=raw.get("base_power"),
@@ -253,16 +277,18 @@ class CatalogService:
     def _merge_ability(self, ps_id: str, raw: dict, pokeapi_data: dict | None) -> AbilityEntry:
         display_name = raw.get("name", ps_id)
         slug = _ps_slug(display_name)
+        gen = raw.get("gen", 1)
         effect_short = effect = None
 
         if pokeapi_data is not None:
             slug = pokeapi_data.get("name", slug)
+            gen = _pokeapi_gen(pokeapi_data) or gen
             effect_short, effect = _first_en_effect(pokeapi_data.get("effect_entries", []))
 
         return AbilityEntry(
             name=slug,
             display_name=display_name,
-            gen=raw.get("gen", 1),
+            gen=gen,
             effect_short=effect_short,
             effect=effect,
         )
