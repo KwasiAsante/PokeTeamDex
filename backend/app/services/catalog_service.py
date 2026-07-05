@@ -221,6 +221,17 @@ class CatalogService:
             if effect and effect_chance is not None:
                 effect = effect.replace("$effect_chance", str(effect_chance))
 
+        # Z-moves and Max/G-Max moves are tied to a single generation by game
+        # mechanics (Z-moves: gen 7 only; Max moves: gen 8 only — neither
+        # mechanic gained new moves after its introducing generation). This is
+        # more reliable than PokéAPI's generation field, which many Z-moves and
+        # Max moves don't even have a resource for (404) — those would
+        # otherwise fall through to the broken PS default (see issue #293).
+        if raw.get("is_z_move"):
+            gen = 7
+        elif raw.get("is_max_move"):
+            gen = 8
+
         return MoveEntry(
             name=slug,
             display_name=display_name,
