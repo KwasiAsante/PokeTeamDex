@@ -307,12 +307,12 @@ def transform_moves(raw: dict, z_move_base_map: dict[str, str]) -> dict:
             "priority": d.get("priority", 0),
             "flags": d.get("flags") or {},
             "secondary": d.get("secondary"),
+            # Only the 17 signature Z-crystals map to a single base move (see
+            # _build_z_move_base_map). No max_move_base field: Max Moves have
+            # no equivalent PS-modeled "base move" — regular Max Moves trigger
+            # on any move matching a type+category, and G-Max moves
+            # (isMax="<Species>") are tied to a species, not a move.
             "z_move_base": z_move_base_map.get(move_id),
-            # Max Moves have no PS-modeled "base move" to report: regular Max
-            # Moves are triggered by any move matching a type+category, and
-            # G-Max moves (isMax="<Species>") are tied to a species, not a
-            # move. Always null — there is no field to read this from.
-            "max_move_base": None,
         }
     return result
 

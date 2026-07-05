@@ -24,8 +24,7 @@ class MoveEntry(BaseModel):
     priority: int = 0
     is_z_move: bool = False
     is_max_move: bool = False
-    z_move_base: str | None = None
-    max_move_base: str | None = None
+    z_move_base: str | None = None     # base move slug, only for signature Z-crystals (17 of 35)
     flags: dict[str, int] = {}
     secondary: dict | None = None
     contest_type: str | None = None    # PokéAPI-only

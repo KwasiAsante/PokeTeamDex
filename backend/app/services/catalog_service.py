@@ -254,7 +254,6 @@ class CatalogService:
             is_z_move=raw.get("is_z_move", False),
             is_max_move=raw.get("is_max_move", False),
             z_move_base=z_move_base,
-            max_move_base=raw.get("max_move_base"),
             flags=raw.get("flags") or {},
             secondary=raw.get("secondary"),
             contest_type=contest_type,
