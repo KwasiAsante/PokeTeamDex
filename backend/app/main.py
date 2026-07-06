@@ -10,8 +10,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.routers import admin, auth, folders, instances, logs, ps_data, sync, teams
+from app.routers.catalog import router as catalog_router
 from app.routers.pokemon import router as pokemon_router
 from app.routers.teams import slots_router
+from app.services.catalog_service import catalog_service
 from app.services.pokemon_resolver import pokemon_resolver_service
 
 setup_logging(settings.loki_url)
@@ -65,6 +67,14 @@ app = FastAPI(
             ),
         },
         {
+            "name": "catalog",
+            "description": (
+                "Standalone move/item/ability catalog — paginated lists and single-entry "
+                "lookups, consolidated from PokéAPI + Pokémon Showdown. Backed by an "
+                "in-memory preload fetched once at startup."
+            ),
+        },
+        {
             "name": "logs",
             "description": "Ingest structured log lines from Flutter devices and forward to Loki.",
         },
@@ -101,6 +111,7 @@ app.include_router(ps_data.router)
 app.include_router(admin.router)
 app.include_router(logs.router)
 app.include_router(pokemon_router)
+app.include_router(catalog_router)
 
 
 @app.middleware("http")
@@ -121,6 +132,8 @@ async def _on_startup():
     logger.info("PokeTeamDex backend started (version=%s)", settings.app_version)
     pokemon_resolver_service.load_ps_data()
     asyncio.create_task(pokemon_resolver_service.load_smogon_data())
+    catalog_service.load_ps_data()
+    asyncio.create_task(catalog_service.preload())
 
 
 @app.on_event("shutdown")

@@ -20,6 +20,7 @@ from sync_ps_data import (
     _get_prevo_chain,
     _parse_source_entry,
     _warned_source_codes,
+    _build_z_move_base_map,
     generate_learnset_by_gen,
     transform_pokedex,
     transform_pokedex_mods,
@@ -613,7 +614,8 @@ class TestTransformMoves:
             "priority": 0,
             "flags": {"snatch": 1},
         },
-        # Z-move with zMoveFrom
+        # Z-move — z_move_base comes from the z_move_base_map param (built from
+        # the Z-crystal item's zMove/zMoveFrom fields), not from this object.
         "catastropika": {
             "num": 658,
             "name": "Catastropika",
@@ -624,11 +626,10 @@ class TestTransformMoves:
             "accuracy": True,
             "pp": 1,
             "isZ": "pikaniumz",
-            "zMoveFrom": "voltTackle",
             "priority": 0,
             "flags": {"contact": 1},
         },
-        # Max move with maxMoveBase
+        # Max move — no equivalent base-move concept exists for these
         "maxlightning": {
             "num": 779,
             "name": "Max Lightning",
@@ -669,65 +670,115 @@ class TestTransformMoves:
         },
     }
 
+    # Simulates _build_z_move_base_map(raw_items) output for a signature
+    # Z-crystal (Pikanium Z: zMove="Catastropika", zMoveFrom="Volt Tackle").
+    _Z_MOVE_BASE_MAP = {"catastropika": "volttackle"}
+
     def test_tackle_included(self):
-        result = transform_moves(self._RAW)
+        result = transform_moves(self._RAW, self._Z_MOVE_BASE_MAP)
         assert "tackle" in result
 
     def test_negative_num_excluded(self):
-        result = transform_moves(self._RAW)
+        result = transform_moves(self._RAW, self._Z_MOVE_BASE_MAP)
         assert "shadowhold" not in result
 
     def test_z_move_flag(self):
-        result = transform_moves(self._RAW)
+        result = transform_moves(self._RAW, self._Z_MOVE_BASE_MAP)
         assert result["catastropika"]["is_z_move"] is True
 
     def test_max_move_flag(self):
-        result = transform_moves(self._RAW)
+        result = transform_moves(self._RAW, self._Z_MOVE_BASE_MAP)
         assert result["maxlightning"]["is_max_move"] is True
 
     def test_always_hit_accuracy_normalised_to_none(self):
-        result = transform_moves(self._RAW)
+        result = transform_moves(self._RAW, self._Z_MOVE_BASE_MAP)
         assert result["swordsdance"]["accuracy"] is None
         assert result["catastropika"]["accuracy"] is None
 
     def test_int_accuracy_preserved(self):
-        result = transform_moves(self._RAW)
+        result = transform_moves(self._RAW, self._Z_MOVE_BASE_MAP)
         assert result["tackle"]["accuracy"] == 100
 
     def test_priority_field(self):
-        result = transform_moves(self._RAW)
+        result = transform_moves(self._RAW, self._Z_MOVE_BASE_MAP)
         assert result["tackle"]["priority"] == 0
 
     def test_flags_field(self):
-        result = transform_moves(self._RAW)
+        result = transform_moves(self._RAW, self._Z_MOVE_BASE_MAP)
         assert result["tackle"]["flags"] == {"contact": 1, "protect": 1}
 
     def test_flags_defaults_to_empty_dict_when_absent(self):
         raw = {"splash": {"num": 150, "name": "Splash", "gen": 1,
                           "type": "Normal", "category": "Status",
                           "basePower": 0, "pp": 40}}
-        result = transform_moves(raw)
+        result = transform_moves(raw, {})
         assert result["splash"]["flags"] == {}
 
     def test_secondary_effect_preserved(self):
-        result = transform_moves(self._RAW)
+        result = transform_moves(self._RAW, self._Z_MOVE_BASE_MAP)
         assert result["flamethrower"]["secondary"] == {"chance": 10, "status": "brn"}
 
     def test_secondary_none_when_absent(self):
-        result = transform_moves(self._RAW)
+        result = transform_moves(self._RAW, self._Z_MOVE_BASE_MAP)
         assert result["tackle"]["secondary"] is None
 
     def test_z_move_base_field(self):
-        result = transform_moves(self._RAW)
-        assert result["catastropika"]["z_move_base"] == "voltTackle"
+        result = transform_moves(self._RAW, self._Z_MOVE_BASE_MAP)
+        assert result["catastropika"]["z_move_base"] == "volttackle"
 
     def test_z_move_base_none_for_regular_move(self):
-        result = transform_moves(self._RAW)
+        result = transform_moves(self._RAW, self._Z_MOVE_BASE_MAP)
         assert result["tackle"]["z_move_base"] is None
 
-    def test_max_move_base_none_when_absent(self):
-        result = transform_moves(self._RAW)
-        assert result["maxlightning"]["max_move_base"] is None
+    def test_z_move_base_none_for_generic_z_move_not_in_map(self):
+        # e.g. Gigavolt Havoc / Electrium Z — zMove=true, no single base move
+        result = transform_moves(self._RAW, {})
+        assert result["catastropika"]["z_move_base"] is None
+
+    def test_max_move_has_no_base_move_field(self):
+        result = transform_moves(self._RAW, self._Z_MOVE_BASE_MAP)
+        assert "max_move_base" not in result["maxlightning"]
+
+
+# ---------------------------------------------------------------------------
+# _build_z_move_base_map
+# ---------------------------------------------------------------------------
+
+class TestBuildZMoveBaseMap:
+    _RAW_ITEMS = {
+        # Signature Z-crystal — real base move
+        "pikaniumz": {
+            "num": 806,
+            "name": "Pikanium Z",
+            "zMove": "Catastropika",
+            "zMoveFrom": "Volt Tackle",
+        },
+        # Generic elemental Z-crystal — no single base move
+        "electriumz": {
+            "num": 779,
+            "name": "Electrium Z",
+            "zMove": True,
+            "zMoveType": "Electric",
+        },
+        # Regular item — unrelated
+        "leftovers": {
+            "num": 234,
+            "name": "Leftovers",
+        },
+    }
+
+    def test_signature_crystal_mapped(self):
+        result = _build_z_move_base_map(self._RAW_ITEMS)
+        assert result["catastropika"] == "volttackle"
+
+    def test_generic_crystal_not_mapped(self):
+        result = _build_z_move_base_map(self._RAW_ITEMS)
+        assert "electriumz" not in result
+        assert not any(k for k, v in result.items() if v is True)
+
+    def test_regular_item_not_mapped(self):
+        result = _build_z_move_base_map(self._RAW_ITEMS)
+        assert len(result) == 1
 
 
 # ---------------------------------------------------------------------------
