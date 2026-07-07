@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 
 bool debugMode = false;
@@ -27,7 +28,11 @@ class AppConfigRepository {
     }
 
     if (debugMode) {
-      return 'http://localhost:8000';
+      var url = dotenv.env['DEBUG_API_URL'];
+      if (url == null || url.isEmpty) {
+        return kDefaultApiBaseUrl;
+      }
+      return url;
     } else {
       return kDefaultApiBaseUrl;
     }

@@ -30,6 +30,7 @@ import 'package:poke_team_dex/shared/theme/app_theme.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_cache.dart'
     show kResolvedCacheVersion;
 import 'package:poke_team_dex/utils/app_logger.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:poke_team_dex/shared/widgets/shutdown_dialog.dart';
 import 'package:tray_manager/tray_manager.dart';
@@ -112,6 +113,7 @@ void _workmanagerCallback() {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
 
   // Capture Flutter framework errors (widget build failures, etc.)
   FlutterError.onError = (details) {
