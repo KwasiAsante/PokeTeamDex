@@ -20,10 +20,16 @@ import logging
 import math
 import os
 import re
+from datetime import datetime, timezone
 
 import httpx
 from fastapi import HTTPException
+from sqlalchemy import func, select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import AsyncSessionLocal
+from app.models.catalog_cache import CatalogCache
 from app.schemas.catalog import (
     AbilitiesListResponse,
     AbilityEntry,
@@ -450,6 +456,156 @@ class CatalogService:
         if pokeapi_data is not None and "id" in pokeapi_data:
             id_map[pokeapi_data["id"]] = entry.name
         return entry
+
+    # ------------------------------------------------------------------
+    # PostgreSQL DB caching
+    # ------------------------------------------------------------------
+
+    async def load_from_db(self, db: AsyncSession) -> bool:
+        """Load catalog from the DB cache if all three kinds have fresh entries.
+
+        Returns True and sets _loaded=True if the full catalog was restored;
+        returns False if any kind is absent or expired (caller should preload).
+        """
+        try:
+            result = await db.execute(
+                select(CatalogCache).where(
+                    CatalogCache.fetched_at + text("(ttl_days * interval '1 day')") > func.now()
+                )
+            )
+            rows = result.scalars().all()
+        except Exception as exc:
+            logger.warning("Failed to load catalog from DB — falling back to PokéAPI preload: %s", exc)
+            return False
+
+        if not rows:
+            return False
+
+        kind_counts: dict[str, int] = {"move": 0, "item": 0, "ability": 0}
+        for row in rows:
+            if row.kind == "move":
+                try:
+                    self._moves[row.name] = MoveEntry.model_validate(row.data)
+                except Exception:
+                    continue
+                if row.pokeapi_id is not None:
+                    self._moves_by_id[row.pokeapi_id] = row.name
+                kind_counts["move"] += 1
+            elif row.kind == "item":
+                try:
+                    self._items[row.name] = ItemEntry.model_validate(row.data)
+                except Exception:
+                    continue
+                if row.pokeapi_id is not None:
+                    self._items_by_id[row.pokeapi_id] = row.name
+                kind_counts["item"] += 1
+            elif row.kind == "ability":
+                try:
+                    self._abilities[row.name] = AbilityEntry.model_validate(row.data)
+                except Exception:
+                    continue
+                if row.pokeapi_id is not None:
+                    self._abilities_by_id[row.pokeapi_id] = row.name
+                kind_counts["ability"] += 1
+
+        if all(kind_counts[k] > 0 for k in ("move", "item", "ability")):
+            self._loaded = True
+            logger.info(
+                "Catalog loaded from DB cache: %d moves, %d items, %d abilities",
+                kind_counts["move"], kind_counts["item"], kind_counts["ability"],
+            )
+            return True
+
+        # Partial load — clear what we've written and fall back to PokéAPI preload.
+        self._moves.clear()
+        self._items.clear()
+        self._abilities.clear()
+        self._moves_by_id.clear()
+        self._items_by_id.clear()
+        self._abilities_by_id.clear()
+        logger.info(
+            "Catalog DB cache incomplete (move=%d item=%d ability=%d) — falling back to PokéAPI preload",
+            kind_counts["move"], kind_counts["item"], kind_counts["ability"],
+        )
+        return False
+
+    async def _persist_to_db(self, db: AsyncSession) -> None:
+        """Batch-upsert all in-memory catalog entries to catalog_cache."""
+        move_id_for = {v: k for k, v in self._moves_by_id.items()}
+        item_id_for = {v: k for k, v in self._items_by_id.items()}
+        ability_id_for = {v: k for k, v in self._abilities_by_id.items()}
+
+        now = datetime.now(timezone.utc)
+        rows: list[dict] = []
+        for name, entry in self._moves.items():
+            rows.append({
+                "kind": "move", "name": name,
+                "pokeapi_id": move_id_for.get(name),
+                "data": entry.model_dump(mode="json"),
+                "fetched_at": now, "ttl_days": 7,
+            })
+        for name, entry in self._items.items():
+            rows.append({
+                "kind": "item", "name": name,
+                "pokeapi_id": item_id_for.get(name),
+                "data": entry.model_dump(mode="json"),
+                "fetched_at": now, "ttl_days": 7,
+            })
+        for name, entry in self._abilities.items():
+            rows.append({
+                "kind": "ability", "name": name,
+                "pokeapi_id": ability_id_for.get(name),
+                "data": entry.model_dump(mode="json"),
+                "fetched_at": now, "ttl_days": 7,
+            })
+
+        if not rows:
+            return
+
+        try:
+            _CHUNK = 500
+            for i in range(0, len(rows), _CHUNK):
+                chunk = rows[i : i + _CHUNK]
+                stmt = pg_insert(CatalogCache).values(chunk)
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=["kind", "name"],
+                    set_={
+                        "pokeapi_id": stmt.excluded.pokeapi_id,
+                        "data": stmt.excluded.data,
+                        "fetched_at": stmt.excluded.fetched_at,
+                    },
+                )
+                await db.execute(stmt)
+            await db.commit()
+            logger.info("Catalog persisted to DB: %d rows", len(rows))
+        except Exception as exc:
+            logger.error("Failed to persist catalog to DB: %s", exc)
+
+    async def preload_and_persist(self) -> None:
+        """Run PokéAPI preload then persist results to DB. Safe to use as asyncio.create_task()."""
+        await self.preload()
+        async with AsyncSessionLocal() as db:
+            await self._persist_to_db(db)
+
+    def evict(self, kinds: list[str] | None = None) -> None:
+        """Clear in-memory catalog for the given kinds (or all if kinds is None).
+
+        Called after DELETE /admin/cache/catalog so the next preload_and_persist()
+        starts from scratch rather than re-persisting stale in-memory state.
+        """
+        targets = kinds if kinds is not None else ["move", "item", "ability"]
+        for kind in targets:
+            if kind == "move":
+                self._moves.clear()
+                self._moves_by_id.clear()
+            elif kind == "item":
+                self._items.clear()
+                self._items_by_id.clear()
+            elif kind == "ability":
+                self._abilities.clear()
+                self._abilities_by_id.clear()
+        if not self._moves or not self._items or not self._abilities:
+            self._loaded = False
 
 
 catalog_service = CatalogService()

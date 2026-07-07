@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from typing import Any
@@ -8,6 +9,7 @@ from sqlalchemy import delete
 
 from app.core.config import settings
 from app.core.deps import DB
+from app.models.catalog_cache import CatalogCache
 from app.models.pokemon_resolved import PokemonResolved
 
 logger = logging.getLogger(__name__)
@@ -94,6 +96,44 @@ async def get_version() -> dict:
         "latest_version": _latest_version,
         "release_url": _latest_release_url,
     }
+
+
+@router.delete("/cache/catalog", status_code=status.HTTP_200_OK, summary="Evict catalog cache entries")
+async def clear_catalog_cache(
+    db: DB,
+    kinds: list[str] = Query(
+        default=[],
+        description="Catalog kinds to evict: 'move', 'item', 'ability' (repeatable).",
+    ),
+    clear_all: bool = Query(default=False, alias="all", description="Evict all catalog entries."),
+    x_admin_secret: str = Header(default=""),
+) -> dict:
+    """Evict rows from the catalog_cache table and reset in-memory state.
+
+    After running sync_ps_data.py with updated move/item/ability data, evict
+    the affected kinds here so the server reloads fresh data from PokéAPI
+    rather than serving the stale DB cache until TTL expires.
+    A background re-preload starts automatically after eviction.
+    """
+    from app.services.catalog_service import catalog_service
+
+    _require_admin_secret(x_admin_secret)
+    if not kinds and not clear_all:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide ?kind=move (repeatable) or ?all=true",
+        )
+
+    stmt = delete(CatalogCache)
+    if kinds:
+        stmt = stmt.where(CatalogCache.kind.in_(kinds))
+    result = await db.execute(stmt)
+    await db.commit()
+
+    catalog_service.evict(kinds if kinds else None)
+    asyncio.create_task(catalog_service.preload_and_persist())
+
+    return {"status": "ok", "deleted": result.rowcount}
 
 
 @router.delete("/cache/pokemon", status_code=status.HTTP_200_OK, summary="Evict Pokémon cache entries")

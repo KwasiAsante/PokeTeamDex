@@ -317,7 +317,7 @@
   - [x] **Sub-issue C** — Backend: update `/pokemon/moves` with `gen` param + full consolidation logic *(#280)*
   - [x] **Sub-issue D** — Frontend: update move models, `pokemonMovesProvider`, `validLearnsetProvider`, slot validator refactor *(#281)*
   - [ ] **Sub-issue E** — Backend: new `/items`, `/moves`, `/abilities` endpoints *(#276)*
-  - [ ] **Sub-issue F** — Backend: extend PostgreSQL DB caching to all data endpoints *(#276)*
+  - [x] **Sub-issue F** — Backend: extend PostgreSQL DB caching to all data endpoints *(#276)*
   - [ ] **Sub-issue G** — Frontend: `withBackendFallback<T>` utility; migrate item/move/ability pickers + list/detail screens *(#276)*
 
 ---

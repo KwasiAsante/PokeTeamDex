@@ -31,6 +31,7 @@ services:
       DEBUG: "true"
       PS_DATA_DIR: /app/shared/ps_data
       SHARED_DIR: /app/shared
+      NOTIFY_UPDATE_SECRET: dev-admin-secret
     depends_on:
       db:
         condition: service_healthy

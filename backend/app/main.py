@@ -9,6 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.database import AsyncSessionLocal
 from app.routers import admin, auth, folders, instances, logs, ps_data, sync, teams
 from app.routers.catalog import router as catalog_router
 from app.routers.pokemon import router as pokemon_router
@@ -70,8 +71,9 @@ app = FastAPI(
             "name": "catalog",
             "description": (
                 "Standalone move/item/ability catalog — paginated lists and single-entry "
-                "lookups, consolidated from PokéAPI + Pokémon Showdown. Backed by an "
-                "in-memory preload fetched once at startup."
+                "lookups, consolidated from PokéAPI + Pokémon Showdown. Backed by a "
+                "7-day PostgreSQL cache; loaded from DB on warm starts to eliminate the "
+                "startup 503 window."
             ),
         },
         {
@@ -133,7 +135,10 @@ async def _on_startup():
     pokemon_resolver_service.load_ps_data()
     asyncio.create_task(pokemon_resolver_service.load_smogon_data())
     catalog_service.load_ps_data()
-    asyncio.create_task(catalog_service.preload())
+    async with AsyncSessionLocal() as db:
+        loaded = await catalog_service.load_from_db(db)
+    if not loaded:
+        asyncio.create_task(catalog_service.preload_and_persist())
 
 
 @app.on_event("shutdown")
