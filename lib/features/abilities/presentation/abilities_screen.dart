@@ -139,9 +139,6 @@ class _AbilitiesScreenState extends ConsumerState<AbilitiesScreen> {
           error: e,
           onRetry: () {
             ref.invalidate(abilitiesListProvider);
-            if (gen != null) {
-              ref.invalidate(abilitiesByGenerationProvider(gen));
-            }
           },
         ),
         data: (names) {
