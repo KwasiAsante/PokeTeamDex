@@ -1,11 +1,25 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:poke_team_dex/services/catalog/catalog_models.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_backend_repository.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
+import 'package:poke_team_dex/utils/app_logger.dart';
 
-final itemsListProvider = FutureProvider<List<String>>((ref) async {
-  final repo = ref.read(pokeApiRepositoryProvider);
-  return repo.fetchItemList();
+/// Backend-first full item catalog. Falls back to PokéAPI name list on failure.
+final itemsListProvider = FutureProvider<List<BackendItemEntry>>((ref) async {
+  ref.keepAlive();
+  try {
+    final repo = ref.read(pokemonBackendRepositoryProvider);
+    final result = await repo.fetchCatalogItems(pageSize: 1000);
+    AppLogger().d('[catalog] items: loaded ${result.total} entries from backend');
+    return result.items;
+  } catch (e) {
+    AppLogger().w('[catalog] items backend failed, falling back to PokéAPI', error: e);
+    final names = await ref.read(pokeApiRepositoryProvider).fetchItemList();
+    return names.map(BackendItemEntry.fromName).toList();
+  }
 });
 
 // Not autoDispose — persists across tab switches.
@@ -62,28 +76,39 @@ final filteredItemsProvider = Provider<AsyncValue<List<String>>>((ref) {
   final sort   = ref.watch(itemSortProvider);
   final search = ref.watch(itemsSearchProvider).trim().toLowerCase();
 
-  // For ID sorting we need the full list order as a reference index.
-  final fullListAsync = ref.watch(itemsListProvider);
-  final fullList = fullListAsync.asData?.value ?? const [];
+  // Backend list for the no-filter case and for ID ordering.
+  final backendAsync = ref.watch(itemsListProvider);
+  final backendList = backendAsync.asData?.value ?? const <BackendItemEntry>[];
   final idOrder = <String, int>{
-    for (int i = 0; i < fullList.length; i++) fullList[i]: i,
+    for (int i = 0; i < backendList.length; i++) backendList[i].name: i,
   };
 
-  // Use pocket-specific list when filtered, otherwise the full list.
-  final AsyncValue<List<String>> listAsync = pocket != null
-      ? ref.watch(itemsByPocketProvider(pocket))
-      : fullListAsync;
+  // When pocket filter active, use PokéAPI pocket list (returns names).
+  // When no pocket filter, extract names from backend entries.
+  final AsyncValue<List<String>> namesAsync;
+  if (pocket != null) {
+    namesAsync = ref.watch(itemsByPocketProvider(pocket));
+  } else if (backendAsync is AsyncLoading) {
+    namesAsync = const AsyncValue.loading();
+  } else if (backendAsync is AsyncError) {
+    namesAsync = AsyncValue.error(
+        (backendAsync as AsyncError).error,
+        (backendAsync as AsyncError).stackTrace);
+  } else {
+    namesAsync =
+        AsyncValue.data(backendList.map((e) => e.name).toList());
+  }
 
-  if (listAsync is AsyncLoading || fullListAsync is AsyncLoading) {
+  if (namesAsync is AsyncLoading || backendAsync is AsyncLoading) {
     return const AsyncValue.loading();
   }
-  if (listAsync is AsyncError) {
+  if (namesAsync is AsyncError) {
     return AsyncValue.error(
-        (listAsync as AsyncError).error,
-        (listAsync as AsyncError).stackTrace);
+        (namesAsync as AsyncError).error,
+        (namesAsync as AsyncError).stackTrace);
   }
 
-  List<String> items = List<String>.from(listAsync.requireValue);
+  List<String> items = List<String>.from(namesAsync.requireValue);
 
   if (search.isNotEmpty) {
     items = items
