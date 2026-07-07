@@ -109,7 +109,7 @@ void main() {
     expect(filtered.requireValue, ['moody']);
   });
 
-  test('filteredAbilitiesProvider passes all entries for sentinel gen (PokéAPI fallback)', () async {
+  test('filteredAbilitiesProvider excludes sentinel entries (gen==0) when gen filter active', () async {
     when(() => mockBackend.fetchCatalogAbilities(
               page: any(named: 'page'),
               pageSize: any(named: 'pageSize'),
@@ -124,7 +124,7 @@ void main() {
     await container.read(abilitiesListProvider.future);
     container.read(abilityGenerationFilterProvider.notifier).state = 'generation-v';
     final filtered = container.read(filteredAbilitiesProvider);
-    // Sentinel entries (gen == 0) pass the gen filter
-    expect(filtered.requireValue, ['blaze']);
+    // Sentinel entries (gen == 0) are excluded by gen filter — gen==0 means unknown, not a match.
+    expect(filtered.requireValue, isEmpty);
   });
 }
