@@ -20,8 +20,8 @@ const _kGenNameToInt = <String, int>{
 };
 
 /// Backend-first full ability catalog. Falls back to PokéAPI name list on failure.
-/// Fallback entries use gen == 0 as a sentinel; the gen filter excludes them
-/// (gen==0 means "unknown generation", not a real match).
+/// Fallback entries use gen == 0 as a sentinel; the gen filter passes them through
+/// so the list stays usable when the backend is offline.
 final abilitiesListProvider =
     FutureProvider<List<BackendAbilityEntry>>((ref) async {
   ref.keepAlive();
@@ -84,7 +84,12 @@ final filteredAbilitiesProvider = Provider<AsyncValue<List<String>>>((ref) {
   if (genFilter != null) {
     final genInt = _kGenNameToInt[genFilter];
     if (genInt != null) {
-      entries = entries.where((e) => e.gen == genInt).toList();
+      // gen == 0 is the PokéAPI fallback sentinel (backend unavailable) — pass
+      // through so the list stays usable offline. With real backend data each
+      // entry has a non-zero gen and the exact-match filter works as expected.
+      entries = entries
+          .where((e) => e.gen == 0 || e.gen == genInt)
+          .toList();
     }
   }
   if (search.isNotEmpty) {

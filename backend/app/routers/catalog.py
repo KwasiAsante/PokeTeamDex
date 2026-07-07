@@ -15,7 +15,7 @@ from app.services.catalog_service import catalog_service
 router = APIRouter(tags=["catalog"])
 
 _Page = Annotated[int, Query(ge=1, description="1-indexed page number.")]
-_PageSize = Annotated[int, Query(ge=1, le=200, description="Results per page (max 200).")]
+_PageSize = Annotated[int, Query(ge=1, le=1000, description="Results per page (max 1000).")]
 _Gen = Annotated[int | None, Query(ge=1, le=9, description="Filter to a generation (1–9).")]
 
 
