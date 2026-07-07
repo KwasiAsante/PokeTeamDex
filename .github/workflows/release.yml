@@ -50,6 +50,9 @@ jobs:
           channel: ${{ env.FLUTTER_VERSION }}
           cache: true
 
+      - name: Create .env
+        run: cp .env.example .env
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -100,6 +103,10 @@ jobs:
         with:
           channel: ${{ env.FLUTTER_VERSION }}
           cache: true
+
+      - name: Create .env
+        shell: bash
+        run: cp .env.example .env
 
       - name: Install dependencies
         run: flutter pub get
@@ -190,6 +197,9 @@ jobs:
         with:
           channel: ${{ env.FLUTTER_VERSION }}
           cache: true
+
+      - name: Create .env
+        run: cp .env.example .env
 
       - name: Install dependencies
         run: flutter pub get
