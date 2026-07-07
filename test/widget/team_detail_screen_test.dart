@@ -113,6 +113,12 @@ void main() {
         ),
       );
 
+      // Use a wide screen so the icon buttons are shown directly in the AppBar
+      // (isWide requires width > 840; default test size is 800px).
+      tester.view.physicalSize = const Size(1024, 768);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
       await pumpTestApp(
         tester,
         TeamDetailScreen(teamId: teamId),
@@ -125,7 +131,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // AppBar action icons are always present in TeamDetailScreen
+      // On wide screens the edit icon appears directly in the AppBar
       expect(find.byIcon(Icons.edit_outlined), findsAny);
 
       await tester.pumpWidget(const SizedBox());

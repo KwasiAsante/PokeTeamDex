@@ -77,7 +77,7 @@ List<String> filterFormChips({
   int? gen,
 }) {
   final candidates = [
-    ...varieties,
+    ...varieties.skip(1), // first entry is the default form — never shown as a chip
     ...cosmeticForms,
   ];
   if (candidates.isEmpty) return [];
