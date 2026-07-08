@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/features/moves/providers/moves_provider.dart'
-    show contestEffectProvider, machineProvider, superContestEffectProvider;
+    show catalogMoveProvider, contestEffectProvider, machineProvider, superContestEffectProvider;
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
@@ -120,6 +120,19 @@ class _Header extends ConsumerWidget {
     ref.watch(allFormatsProvider); // ensures service is initialized; triggers rebuild when ready
     final special = classifyMoveType(ref.read(formatServiceProvider), move.name);
 
+    // The catalog may carry a richer damage class (e.g. 'varies' for universal
+    // Z-moves) that PokéAPI's own move resource doesn't expose.
+    final catalogDamageClass = ref
+        .watch(catalogMoveProvider(move.name))
+        .asData
+        ?.value
+        .damageClass;
+    final effectiveDamageClass = (catalogDamageClass != null &&
+            catalogDamageClass.isNotEmpty)
+        ? catalogDamageClass
+        : move.damageClass;
+    final categoryIcon = _categoryIconFor(effectiveDamageClass);
+
     return Container(
       width: double.infinity,
       color: typeColor.withValues(alpha: 0.12),
@@ -135,7 +148,7 @@ class _Header extends ConsumerWidget {
               shape: BoxShape.circle,
             ),
             child: Center(
-              child: Text(move.categoryIcon,
+              child: Text(categoryIcon,
                   style:
                       textTheme.headlineSmall?.copyWith(color: typeColor)),
             ),
@@ -157,7 +170,7 @@ class _Header extends ConsumerWidget {
                       TypeBadge(type: move.typeName!),
                     if (special != null) MoveTypeChip(type: special),
                     _InfoBadge(
-                      label: _categoryLabel(move.damageClass),
+                      label: _categoryLabel(effectiveDamageClass),
                       color: colorScheme.surfaceContainerHighest,
                       textColor: colorScheme.onSurfaceVariant,
                     ),
@@ -747,6 +760,14 @@ String _fmt(String s) => s
     .join(' ');
 
 String _categoryLabel(String? cat) => cat == null ? '—' : _fmt(cat);
+
+String _categoryIconFor(String? damageClass) => switch (damageClass) {
+      'physical' => '⚔',
+      'special'  => '✨',
+      'status'   => '●',
+      'varies'   => '↕',
+      _          => '—',
+    };
 
 String _genLabel(String gen) {
   const m = {

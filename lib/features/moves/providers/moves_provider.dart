@@ -88,6 +88,14 @@ final filteredMovesProvider = Provider<AsyncValue<List<BackendMoveEntry>>>((ref)
   return AsyncValue.data(entries);
 });
 
+/// Single move entry from the backend catalog — used by the detail screen to
+/// read catalog-enriched fields (e.g. damage_class='varies') that PokéAPI's
+/// own move resource doesn't carry.
+final catalogMoveProvider =
+    FutureProvider.autoDispose.family<BackendMoveEntry, String>((ref, name) {
+  return ref.read(pokemonBackendRepositoryProvider).fetchCatalogMove(name);
+});
+
 /// Fetches a machine's item name and URL by the machine's full PokéAPI URL.
 final machineProvider =
     FutureProvider.autoDispose.family<Map<String, String>, String>(
