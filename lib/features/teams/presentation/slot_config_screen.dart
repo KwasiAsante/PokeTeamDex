@@ -1834,7 +1834,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(6),
-                      onTap: () => context.push('/moves/$maxMove'),
+                      onTap: isGMax ? null : () => context.push('/moves/$maxMove'),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 6),
