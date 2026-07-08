@@ -44,27 +44,34 @@ class MoveDetailScreen extends ConsumerWidget {
           },
         ),
       ),
-      data: (move) => _MoveDetailBody(move: move),
+      data: (move) => _MoveDetailBody(move: move, moveName: moveName),
     );
   }
 }
 
 // ── Body ──────────────────────────────────────────────────────────────────────
 
-class _MoveDetailBody extends StatelessWidget {
+class _MoveDetailBody extends ConsumerWidget {
   final MoveEntry move;
-  const _MoveDetailBody({required this.move});
+  final String moveName;
+  const _MoveDetailBody({required this.move, required this.moveName});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final typeColor = move.typeName != null
         ? (PokemonTypeColors.colors[move.typeName] ?? colorScheme.primary)
         : colorScheme.primary;
+    final displayName = ref
+            .watch(catalogMoveProvider(moveName))
+            .asData
+            ?.value
+            .displayName ??
+        _fmt(moveName);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(move.displayName),
+        title: Text(displayName),
         backgroundColor: typeColor.withValues(alpha: 0.15),
         actions: [const ConnectivityStatusButton(), const SettingsButton()],
       ),
@@ -72,7 +79,7 @@ class _MoveDetailBody extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Header(move: move, typeColor: typeColor),
+            _Header(move: move, typeColor: typeColor, moveName: moveName),
             _Section(title: 'Stats', child: _StatsCard(move: move)),
             if (move.meta != null && move.meta!.hasNonTrivialData)
               _Section(
@@ -118,7 +125,8 @@ class _MoveDetailBody extends StatelessWidget {
 class _Header extends ConsumerWidget {
   final MoveEntry move;
   final Color typeColor;
-  const _Header({required this.move, required this.typeColor});
+  final String moveName;
+  const _Header({required this.move, required this.typeColor, required this.moveName});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -127,13 +135,10 @@ class _Header extends ConsumerWidget {
     ref.watch(allFormatsProvider); // ensures service is initialized; triggers rebuild when ready
     final special = classifyMoveType(ref.read(formatServiceProvider), move.name);
 
-    // The catalog may carry a richer damage class (e.g. 'varies' for universal
-    // Z-moves) that PokéAPI's own move resource doesn't expose.
-    final catalogDamageClass = ref
-        .watch(catalogMoveProvider(move.name))
-        .asData
-        ?.value
-        .damageClass;
+    // Use moveName (the catalog key) not move.name (PokéAPI slug with --physical suffix).
+    final catalogEntry = ref.watch(catalogMoveProvider(moveName)).asData?.value;
+    final catalogDamageClass = catalogEntry?.damageClass;
+    final displayName = catalogEntry?.displayName ?? _fmt(moveName);
     final effectiveDamageClass = (catalogDamageClass != null &&
             catalogDamageClass.isNotEmpty)
         ? catalogDamageClass
@@ -165,7 +170,7 @@ class _Header extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(move.displayName,
+                Text(displayName,
                     style: textTheme.headlineMedium
                         ?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
