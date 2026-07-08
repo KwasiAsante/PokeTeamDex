@@ -52,6 +52,32 @@ _POKEAPI_BASE = "https://pokeapi.co/api/v2"
 _PS_TO_SLOT: dict[str, int] = {"0": 1, "1": 2, "H": 3}
 
 _SLUG_STRIP_RE = re.compile(r"[',.()\[\]]")
+
+# The 18 universal Z-moves (one per type) whose damage class varies between
+# physical and special depending on the base move used with the Z-Crystal.
+# PokéAPI exposes them as <name>--physical and <name>--special, which is why
+# _preload_kind detects them dynamically — but load_from_db restores from a
+# cached snapshot that may pre-date that logic, so we apply the patch here too.
+_Z_VARIES_NAMES: frozenset[str] = frozenset({
+    "breakneck-blitz",
+    "all-out-pummeling",
+    "supersonic-skystrike",
+    "acid-downpour",
+    "tectonic-rage",
+    "continental-crush",
+    "savage-spin-out",
+    "never-ending-nightmare",
+    "corkscrew-crash",
+    "inferno-overdrive",
+    "hydro-vortex",
+    "bloom-doom",
+    "gigavolt-havoc",
+    "shattered-psyche",
+    "subzero-slammer",
+    "devastating-drake",
+    "black-hole-eclipse",
+    "twinkle-tackle",
+})
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]")
 
 _ROMAN_TO_GEN: dict[str, int] = {
@@ -614,6 +640,13 @@ class CatalogService:
                 kind_counts["ability"] += 1
 
         if all(kind_counts[k] > 0 for k in ("move", "item", "ability")):
+            # Ensure universal Z-moves have damage_class="varies" regardless of
+            # what was stored — DB snapshots pre-dating this logic have "physical".
+            for name in _Z_VARIES_NAMES:
+                if name in self._moves:
+                    self._moves[name] = self._moves[name].model_copy(
+                        update={"damage_class": "varies"}
+                    )
             self._loaded = True
             logger.info(
                 "Catalog loaded from DB cache: %d moves, %d items, %d abilities",
