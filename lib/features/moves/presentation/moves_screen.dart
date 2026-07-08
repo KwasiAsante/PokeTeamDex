@@ -136,8 +136,8 @@ class _DamageClassFilter extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const classes = ['physical', 'special', 'status'];
-    const icons = {'physical': '⚔', 'special': '✨', 'status': '●'};
+    const classes = ['physical', 'special', 'status', 'varies'];
+    const icons = {'physical': '⚔', 'special': '✨', 'status': '●', 'varies': '↕'};
 
     return SizedBox(
       height: 44,
@@ -367,6 +367,7 @@ String _categoryIcon(String damageClass) => switch (damageClass) {
       'physical' => '⚔',
       'special'  => '✨',
       'status'   => '●',
+      'varies'   => '↕',
       _          => '—',
     };
 

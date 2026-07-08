@@ -194,6 +194,15 @@ class CatalogService:
             )
             return
 
+        # For moves: collect base names that have --physical/--special variants.
+        # These are universal Z-moves whose damage class genuinely varies.
+        z_varies: set[str] = set()
+        if kind == "move":
+            for name in names:
+                m = re.match(r"^(.+)--(?:physical|special)$", name)
+                if m:
+                    z_varies.add(m.group(1))
+
         # Fetch PokéAPI detail for every name concurrently.
         responses = await asyncio.gather(
             *[self._fetch_pokeapi_resource(kind, name) for name in names]
@@ -236,9 +245,16 @@ class CatalogService:
                     target[entry.name] = entry
                     ps_only += 1
 
+        # Universal Z-moves that have --physical and --special PokéAPI variants
+        # can act as either damage class depending on the base move used.
+        for base_name in z_varies:
+            entry = target.get(base_name)
+            if entry is not None:
+                target[base_name] = entry.model_copy(update={"damage_class": "varies"})
+
         logger.info(
-            "Catalog preload: %s — %d PokéAPI entries (%d with PS enrichment) + %d PS-only",
-            kind, count, ps_matched, ps_only,
+            "Catalog preload: %s — %d PokéAPI entries (%d with PS enrichment) + %d PS-only (%d varies)",
+            kind, count, ps_matched, ps_only, len(z_varies),
         )
 
     async def _fetch_pokeapi_names(self, kind: str) -> list[str]:
