@@ -13,9 +13,17 @@ final movesListProvider = FutureProvider<List<BackendMoveEntry>>((ref) async {
   ref.keepAlive();
   try {
     final repo = ref.read(pokemonBackendRepositoryProvider);
-    final result = await repo.fetchCatalogMoves(pageSize: 1000);
-    AppLogger().d('[catalog] moves: loaded ${result.total} entries from backend');
-    return result.items;
+    final first = await repo.fetchCatalogMoves(pageSize: 1000);
+    var items = first.items;
+    if (first.totalPages > 1) {
+      final rest = await Future.wait([
+        for (int p = 2; p <= first.totalPages; p++)
+          repo.fetchCatalogMoves(page: p, pageSize: 1000),
+      ]);
+      items = [...items, for (final r in rest) ...r.items];
+    }
+    AppLogger().d('[catalog] moves: loaded ${items.length} entries from backend (${first.totalPages} pages)');
+    return items;
   } catch (e) {
     AppLogger().w('[catalog] moves backend failed, falling back to PokéAPI', error: e);
     final names = await ref.read(pokeApiRepositoryProvider).fetchMoveList();
