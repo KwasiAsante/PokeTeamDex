@@ -106,7 +106,7 @@ void main() {
     await container.read(abilitiesListProvider.future);
     container.read(abilityGenerationFilterProvider.notifier).state = 'generation-v';
     final filtered = container.read(filteredAbilitiesProvider);
-    expect(filtered.requireValue, ['moody']);
+    expect(filtered.requireValue.map((e) => e.name).toList(), ['moody']);
   });
 
   test('filteredAbilitiesProvider passes through sentinel entries (gen==0) when gen filter active', () async {
@@ -126,6 +126,6 @@ void main() {
     final filtered = container.read(filteredAbilitiesProvider);
     // Sentinel entries (gen == 0) pass through the gen filter so the list stays
     // usable when the backend is offline. With a real backend, gen is always > 0.
-    expect(filtered.requireValue, ['blaze']);
+    expect(filtered.requireValue.map((e) => e.name).toList(), ['blaze']);
   });
 }

@@ -103,6 +103,6 @@ void main() {
     await container.read(itemsListProvider.future);
     container.read(itemsSearchProvider.notifier).state = 'left';
     final filtered = container.read(filteredItemsProvider);
-    expect(filtered.requireValue, ['leftovers']);
+    expect(filtered.requireValue.map((e) => e.name).toList(), ['leftovers']);
   });
 }

@@ -9,6 +9,8 @@ import 'package:poke_team_dex/database/database_providers.dart'
     show teamRepositoryProvider, teamSlotRepositoryProvider;
 import 'package:poke_team_dex/features/pokedex/logic/evolution_chain_builder.dart';
 import 'package:poke_team_dex/features/pokedex/logic/form_filter.dart';
+import 'package:poke_team_dex/features/abilities/providers/abilities_provider.dart'
+    show catalogAbilityProvider;
 import 'package:poke_team_dex/features/pokedex/presentation/widget/form_picker_sheet.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
@@ -1645,7 +1647,7 @@ class _AbilityCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final abilityAsync = ref.watch(abilityProvider(name));
+    final abilityAsync = ref.watch(catalogAbilityProvider(name));
 
     return abilityAsync.when(
       loading: () => const LinearProgressIndicator(),

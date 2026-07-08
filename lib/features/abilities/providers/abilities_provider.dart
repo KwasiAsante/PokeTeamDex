@@ -65,7 +65,7 @@ const kAbilityGenerations = <String, String>{
 
 // ── Filtered + sorted list ────────────────────────────────────────────────────
 
-final filteredAbilitiesProvider = Provider<AsyncValue<List<String>>>((ref) {
+final filteredAbilitiesProvider = Provider<AsyncValue<List<BackendAbilityEntry>>>((ref) {
   final genFilter = ref.watch(abilityGenerationFilterProvider);
   final sort      = ref.watch(abilitySortProvider);
   final search    = ref.watch(abilitiesSearchProvider).trim().toLowerCase();
@@ -100,14 +100,19 @@ final filteredAbilitiesProvider = Provider<AsyncValue<List<String>>>((ref) {
         .toList();
   }
 
-  List<String> names = entries.map((e) => e.name).toList();
-
   switch (sort) {
     case AbilitySort.nameAZ:
-      names.sort();
+      entries.sort((a, b) => a.name.compareTo(b.name));
     case AbilitySort.nameZA:
-      names.sort((a, b) => b.compareTo(a));
+      entries.sort((a, b) => b.name.compareTo(a.name));
   }
 
-  return AsyncValue.data(names);
+  return AsyncValue.data(entries);
+});
+
+/// Single ability from the backend catalog — used for inline display in the
+/// Pokémon detail screen where only effect text and gen label are needed.
+final catalogAbilityProvider =
+    FutureProvider.autoDispose.family<BackendAbilityEntry, String>((ref, name) {
+  return ref.read(pokemonBackendRepositoryProvider).fetchCatalogAbility(name);
 });

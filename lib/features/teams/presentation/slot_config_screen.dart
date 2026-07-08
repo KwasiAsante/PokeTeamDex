@@ -87,8 +87,6 @@ const _kNatures = [
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
-final _itemListProvider = FutureProvider<List<String>>((ref) =>
-    ref.read(pokeApiRepositoryProvider).fetchItemList());
 
 /// Set of species names (PokéAPI format) catchable in Legends: Arceus.
 /// Fetched once, cached in Hive by the repository layer.
@@ -557,7 +555,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   @override
   Widget build(BuildContext context) {
     // Pre-load item list so the picker is instant when the user taps.
-    ref.watch(_itemListProvider);
+    ref.watch(itemsListProvider);
 
     final slotsAsync = ref.watch(teamSlotsProvider(widget.teamId));
     return slotsAsync.when(
@@ -2112,7 +2110,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     // -bag variants are true duplicates with no gameplay difference — exclude them.
     // -held variants are kept (some items only exist in held form); the display
     // strips "-held" so users see "Incinium Z" not "Incinium Z Held".
-    final items = (ref.read(_itemListProvider).asData?.value ?? [])
+    final items = (ref.read(itemsListProvider).asData?.value ?? [])
+        .map((e) => e.name)
         .where((n) => !n.endsWith('-bag'))
         .toList();
     final result = await showModalBottomSheet<String>(

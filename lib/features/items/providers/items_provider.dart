@@ -70,62 +70,72 @@ final itemProvider =
 
 // ── Filtered + sorted list ────────────────────────────────────────────────────
 
-final filteredItemsProvider = Provider<AsyncValue<List<String>>>((ref) {
+final filteredItemsProvider = Provider<AsyncValue<List<BackendItemEntry>>>((ref) {
   final pocket = ref.watch(itemPocketFilterProvider);
   final sort   = ref.watch(itemSortProvider);
   final search = ref.watch(itemsSearchProvider).trim().toLowerCase();
 
-  // Backend list for the no-filter case and for ID ordering.
   final backendAsync = ref.watch(itemsListProvider);
   final backendList = backendAsync.asData?.value ?? const <BackendItemEntry>[];
+  // Map for fast name → entry lookup (used when pocket filter is active).
+  final catalogMap = <String, BackendItemEntry>{
+    for (final e in backendList) e.name: e,
+  };
+  // ID order map for idAscending/idDescending sorts.
   final idOrder = <String, int>{
     for (int i = 0; i < backendList.length; i++) backendList[i].name: i,
   };
 
-  // When pocket filter active, use PokéAPI pocket list (returns names).
-  // When no pocket filter, extract names from backend entries.
-  final AsyncValue<List<String>> namesAsync;
+  // Determine the base list of entries to filter/sort.
+  final AsyncValue<List<BackendItemEntry>> entriesAsync;
   if (pocket != null) {
-    namesAsync = ref.watch(itemsByPocketProvider(pocket));
+    // Pocket filter uses PokéAPI name list; enrich from catalog where available.
+    final pocketAsync = ref.watch(itemsByPocketProvider(pocket));
+    if (pocketAsync is AsyncLoading || backendAsync is AsyncLoading) {
+      return const AsyncValue.loading();
+    }
+    if (pocketAsync is AsyncError) {
+      return AsyncValue.error(
+          (pocketAsync as AsyncError).error,
+          (pocketAsync as AsyncError).stackTrace);
+    }
+    final pocketNames = pocketAsync.requireValue;
+    entriesAsync = AsyncValue.data(
+      pocketNames
+          .map((n) => catalogMap[n] ?? BackendItemEntry.fromName(n))
+          .toList(),
+    );
   } else if (backendAsync is AsyncLoading) {
-    namesAsync = const AsyncValue.loading();
+    return const AsyncValue.loading();
   } else if (backendAsync is AsyncError) {
-    namesAsync = AsyncValue.error(
+    return AsyncValue.error(
         (backendAsync as AsyncError).error,
         (backendAsync as AsyncError).stackTrace);
   } else {
-    namesAsync =
-        AsyncValue.data(backendList.map((e) => e.name).toList());
+    entriesAsync = AsyncValue.data(List.of(backendList));
   }
 
-  if (namesAsync is AsyncLoading || backendAsync is AsyncLoading) {
-    return const AsyncValue.loading();
-  }
-  if (namesAsync is AsyncError) {
-    return AsyncValue.error(
-        (namesAsync as AsyncError).error,
-        (namesAsync as AsyncError).stackTrace);
-  }
-
-  List<String> items = List<String>.from(namesAsync.requireValue);
+  List<BackendItemEntry> items = List.of(entriesAsync.requireValue);
 
   if (search.isNotEmpty) {
     items = items
-        .where((n) => n.replaceAll('-', ' ').contains(search))
+        .where((e) =>
+            e.name.replaceAll('-', ' ').contains(search) ||
+            e.displayName.toLowerCase().contains(search))
         .toList();
   }
 
   switch (sort) {
     case ItemSort.nameAZ:
-      items.sort();
+      items.sort((a, b) => a.name.compareTo(b.name));
     case ItemSort.nameZA:
-      items.sort((a, b) => b.compareTo(a));
+      items.sort((a, b) => b.name.compareTo(a.name));
     case ItemSort.idAscending:
       items.sort((a, b) =>
-          (idOrder[a] ?? 999999).compareTo(idOrder[b] ?? 999999));
+          (idOrder[a.name] ?? 999999).compareTo(idOrder[b.name] ?? 999999));
     case ItemSort.idDescending:
       items.sort((a, b) =>
-          (idOrder[b] ?? 999999).compareTo(idOrder[a] ?? 999999));
+          (idOrder[b.name] ?? 999999).compareTo(idOrder[a.name] ?? 999999));
   }
 
   return AsyncValue.data(items);

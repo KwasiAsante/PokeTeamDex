@@ -141,6 +141,8 @@ class BackendItemEntry {
         displayName: _titleCase(name),
         gen: 0,
       );
+
+  String get categoryLabel => category != null ? _titleCase(category!) : '';
 }
 
 class BackendAbilityEntry {
@@ -178,6 +180,16 @@ class BackendAbilityEntry {
         displayName: _titleCase(name),
         gen: 0,
       );
+
+  static const _kGenLabels = <int, String>{
+    1: 'Gen I', 2: 'Gen II', 3: 'Gen III', 4: 'Gen IV', 5: 'Gen V',
+    6: 'Gen VI', 7: 'Gen VII', 8: 'Gen VIII', 9: 'Gen IX',
+  };
+
+  String get generationLabel => gen > 0 ? (_kGenLabels[gen] ?? '') : '';
+
+  String? get shortEffect => effectShort;
+  String? get longEffect => effect;
 }
 
 class PaginatedCatalogResponse<T> {

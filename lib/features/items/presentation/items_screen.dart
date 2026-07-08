@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/items/providers/items_provider.dart';
-import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
+import 'package:poke_team_dex/services/catalog/catalog_models.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
-import 'package:poke_team_dex/shared/widgets/skeleton_box.dart';
 
 
 class ItemsScreen extends ConsumerStatefulWidget {
@@ -134,8 +133,8 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
             if (pocket != null) ref.invalidate(itemsByPocketProvider(pocket));
           },
         ),
-        data: (names) {
-          if (names.isEmpty) {
+        data: (entries) {
+          if (entries.isEmpty) {
             return const EmptyState(
               icon: Icons.search_off,
               title: 'No items found',
@@ -154,14 +153,14 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
                   ),
-                  itemCount: names.length,
-                  itemBuilder: (_, i) => _ItemTile(name: names[i], isGrid: true),
+                  itemCount: entries.length,
+                  itemBuilder: (_, i) => _ItemGridCard(item: entries[i]),
                 );
               }
               return ListView.builder(
-                itemCount: names.length,
+                itemCount: entries.length,
                 itemExtent: 72,
-                itemBuilder: (_, i) => _ItemTile(name: names[i]),
+                itemBuilder: (_, i) => _ItemListItem(item: entries[i]),
               );
             },
           );
@@ -236,39 +235,8 @@ class _SortChip extends ConsumerWidget {
   }
 }
 
-// ── Item tile (lazy detail fetch) ─────────────────────────────────────────────
-
-class _ItemTile extends ConsumerWidget {
-  final String name;
-  final bool isGrid;
-  const _ItemTile({required this.name, this.isGrid = false});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final itemAsync = ref.watch(itemProvider(name));
-
-    return itemAsync.when(
-      loading: () => isGrid
-          ? _ItemGridCardSkeleton(name: _fmt(name))
-          : ListTile(
-              title: Text(_fmt(name)),
-              subtitle: const SkeletonBox(width: 120),
-            ),
-      error: (_, _) => isGrid
-          ? Card(margin: EdgeInsets.zero, child: Center(child: Text(_fmt(name))))
-          : ListTile(title: Text(_fmt(name)), subtitle: const Text('—')),
-      data: (item) => isGrid ? _ItemGridCard(item: item) : _ItemListItem(item: item),
-    );
-  }
-
-  static String _fmt(String s) => s
-      .split('-')
-      .map((p) => p.isEmpty ? '' : '${p[0].toUpperCase()}${p.substring(1)}')
-      .join(' ');
-}
-
 class _ItemListItem extends StatelessWidget {
-  final ItemEntry item;
+  final BackendItemEntry item;
   const _ItemListItem({required this.item});
 
   @override
@@ -281,9 +249,9 @@ class _ItemListItem extends StatelessWidget {
       leading: SizedBox(
         width: 40,
         height: 40,
-        child: item.spriteUrl != null
+        child: item.sprite != null
             ? CachedNetworkImage(
-                imageUrl: item.spriteUrl!,
+                imageUrl: item.sprite!,
                 fit: BoxFit.contain,
                 errorWidget: (_, _, _) => Icon(
                   Icons.inventory_2_outlined,
@@ -296,20 +264,9 @@ class _ItemListItem extends StatelessWidget {
               ),
       ),
       title: Text(item.displayName, style: textTheme.bodyLarge),
-      subtitle: Row(
-        children: [
-          if (item.categoryLabel.isNotEmpty)
-            _CategoryChip(label: item.categoryLabel),
-          if (item.cost != null && item.cost! > 0) ...[
-            const SizedBox(width: 8),
-            Text(
-              '₽${item.cost}',
-              style: textTheme.labelSmall
-                  ?.copyWith(color: colorScheme.onSurfaceVariant),
-            ),
-          ],
-        ],
-      ),
+      subtitle: item.categoryLabel.isNotEmpty
+          ? _CategoryChip(label: item.categoryLabel)
+          : null,
       onTap: () => context.push('/items/${item.name}'),
     );
   }
@@ -317,46 +274,8 @@ class _ItemListItem extends StatelessWidget {
 
 // ── Item grid card ────────────────────────────────────────────────────────────
 
-class _ItemGridCardSkeleton extends StatelessWidget {
-  final String name;
-  const _ItemGridCardSkeleton({required this.name});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: [
-            const SkeletonBox(width: 36, height: 36),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(name,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(fontWeight: FontWeight.w600),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 4),
-                  const SkeletonBox(width: 60, height: 14),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _ItemGridCard extends StatelessWidget {
-  final ItemEntry item;
+  final BackendItemEntry item;
   const _ItemGridCard({required this.item});
 
   @override
@@ -376,9 +295,9 @@ class _ItemGridCard extends StatelessWidget {
               SizedBox(
                 width: 36,
                 height: 36,
-                child: item.spriteUrl != null
+                child: item.sprite != null
                     ? CachedNetworkImage(
-                        imageUrl: item.spriteUrl!,
+                        imageUrl: item.sprite!,
                         fit: BoxFit.contain,
                         errorWidget: (_, _, _) => Icon(
                           Icons.inventory_2_outlined,
@@ -402,21 +321,10 @@ class _ItemGridCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        if (item.categoryLabel.isNotEmpty)
-                          _CategoryChip(label: item.categoryLabel),
-                        if (item.cost != null && item.cost! > 0) ...[
-                          const SizedBox(width: 6),
-                          Text(
-                            '₽${item.cost}',
-                            style: textTheme.labelSmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant),
-                          ),
-                        ],
-                      ],
-                    ),
+                    if (item.categoryLabel.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      _CategoryChip(label: item.categoryLabel),
+                    ],
                   ],
                 ),
               ),
