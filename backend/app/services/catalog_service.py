@@ -206,9 +206,10 @@ class CatalogService:
             if pokeapi_data is None:
                 continue
             canonical_name = pokeapi_data.get("name", name)
-            # Items: strip PokéAPI variant suffixes (--held, --bag) that don't
-            # appear in PS so the canonical key matches the PS id convention.
-            if kind == "item":
+            # Strip PokéAPI variant suffixes that don't appear in PS:
+            #   items: --held, --bag (e.g. normalium-z--held → normalium-z)
+            #   moves: --physical, --special (e.g. all-out-pummeling--physical)
+            if kind in ("item", "move"):
                 canonical_name = re.sub(r"--\w+$", "", canonical_name)
             if canonical_name in target:
                 continue  # deduplicate --held / --bag variants of the same item
@@ -281,7 +282,10 @@ class CatalogService:
         priority = raw.get("priority", 0)
 
         if pokeapi_data is not None:
-            slug = pokeapi_data.get("name", slug)
+            # Strip --physical / --special variant suffixes so all variants of
+            # a Z-move resolve to the same canonical name as the PS entry.
+            raw_name = pokeapi_data.get("name", slug)
+            slug = re.sub(r"--\w+$", "", raw_name)
             damage_class = (pokeapi_data.get("damage_class") or {}).get("name") or damage_class
             gen = _pokeapi_gen(pokeapi_data) or gen
             contest_type = (pokeapi_data.get("contest_type") or {}).get("name")
@@ -523,7 +527,7 @@ class CatalogService:
         pokeapi_data = await self._fetch_pokeapi_resource(kind, id_or_name)
         if pokeapi_data is not None:
             canonical_name = pokeapi_data.get("name", id_or_name)
-            if kind == "item":
+            if kind in ("item", "move"):
                 canonical_name = re.sub(r"--\w+$", "", canonical_name)
             ps_id = canonical_name.replace("-", "").lower()
             raw = ps_dict.get(ps_id, {"name": canonical_name.replace("-", " ").title(), "gen": 1})
