@@ -270,7 +270,9 @@ class _MoveListItem extends ConsumerWidget {
           ],
         ],
       ),
-      onTap: () => context.push('/moves/${entry.name}'),
+      onTap: entry.name.contains('g-max')
+          ? null
+          : () => context.push('/moves/${entry.name}'),
     );
   }
 }
@@ -295,7 +297,9 @@ class _MoveGridCard extends ConsumerWidget {
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => context.push('/moves/${entry.name}'),
+        onTap: entry.name.contains('g-max')
+            ? null
+            : () => context.push('/moves/${entry.name}'),
         child: Row(
           children: [
             Container(width: 4, color: typeColor),
