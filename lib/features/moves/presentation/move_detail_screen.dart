@@ -23,7 +23,11 @@ class MoveDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final moveAsync = ref.watch(moveProvider(moveName));
+    final catalogAsync = ref.watch(catalogMoveProvider(moveName));
+    // Use the PokéAPI numeric ID when available — some moves (e.g. universal
+    // Z-moves) 404 by name but are always reachable by ID.
+    final pokeApiKey = catalogAsync.asData?.value.pokeApiId?.toString() ?? moveName;
+    final moveAsync = ref.watch(moveProvider(pokeApiKey));
 
     return moveAsync.when(
       loading: () => Scaffold(
@@ -34,7 +38,10 @@ class MoveDetailScreen extends ConsumerWidget {
         appBar: AppBar(title: Text(_fmt(moveName))),
         body: ErrorState(
           error: e,
-          onRetry: () => ref.invalidate(moveProvider(moveName)),
+          onRetry: () {
+            ref.invalidate(catalogMoveProvider(moveName));
+            ref.invalidate(moveProvider(pokeApiKey));
+          },
         ),
       ),
       data: (move) => _MoveDetailBody(move: move),

@@ -13,11 +13,12 @@ from pydantic import BaseModel
 
 
 class MoveEntry(BaseModel):
+    id: int | None = None              # PokéAPI numeric ID — use this for /move/{id} lookups
     name: str                          # PokéAPI slug, e.g. "thunderbolt"
     display_name: str                  # PS display name, e.g. "Thunderbolt"
     gen: int
     type: str
-    damage_class: str                  # "physical" | "special" | "status"
+    damage_class: str                  # "physical" | "special" | "status" | "varies"
     power: int | None = None
     accuracy: int | None = None
     pp: int | None = None

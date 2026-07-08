@@ -4,6 +4,7 @@ String _titleCase(String slug) => slug
     .join(' ');
 
 class BackendMoveEntry {
+  final int? pokeApiId;
   final String name;
   final String displayName;
   final int gen;
@@ -24,6 +25,7 @@ class BackendMoveEntry {
   final String? effect;
 
   const BackendMoveEntry({
+    this.pokeApiId,
     required this.name,
     required this.displayName,
     required this.gen,
@@ -47,6 +49,7 @@ class BackendMoveEntry {
   factory BackendMoveEntry.fromJson(Map<String, dynamic> json) {
     final secondaryData = json['secondary'];
     return BackendMoveEntry(
+      pokeApiId: (json['id'] as num?)?.toInt(),
       name: json['name'] as String,
       displayName: json['display_name'] as String? ?? _titleCase(json['name'] as String),
       gen: (json['gen'] as num?)?.toInt() ?? 0,

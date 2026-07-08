@@ -344,7 +344,10 @@ class CatalogService:
             base_raw = self._moves_ps.get(z_move_base_ps_id)
             z_move_base = _ps_slug(base_raw["name"]) if base_raw else z_move_base_ps_id
 
+        pokeapi_id = pokeapi_data.get("id") if pokeapi_data is not None else None
+
         return MoveEntry(
+            id=pokeapi_id,
             name=slug,
             display_name=display_name,
             gen=gen,

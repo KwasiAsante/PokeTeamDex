@@ -483,12 +483,7 @@ class PokeApiRepository {
       _moveByName[name] = entry;
       return entry;
     }
-    var response = await _pokeApiClient.client.get('/move/$name');
-    if (response.statusCode == 404) {
-      // Universal Z-moves (e.g. all-out-pummeling) 404 by base name — PokéAPI's
-      // canonical slug for these is the --physical variant (same ID).
-      response = await _pokeApiClient.client.get('/move/$name--physical');
-    }
+    final response = await _pokeApiClient.client.get('/move/$name');
     if (response.statusCode != 200) {
       throw Exception('Failed to fetch move $name: ${response.statusCode}');
     }
