@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
+import 'package:poke_team_dex/features/abilities/providers/abilities_provider.dart'
+    show catalogAbilityProvider;
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
@@ -16,7 +18,10 @@ class AbilityDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final abilityAsync = ref.watch(abilityProvider(abilityName));
+    final catalogAsync = ref.watch(catalogAbilityProvider(abilityName));
+    final pokeApiKey =
+        catalogAsync.asData?.value.pokeApiId?.toString() ?? abilityName;
+    final abilityAsync = ref.watch(abilityProvider(pokeApiKey));
 
     return abilityAsync.when(
       loading: () => Scaffold(
@@ -27,7 +32,10 @@ class AbilityDetailScreen extends ConsumerWidget {
         appBar: AppBar(title: Text(_fmt(abilityName))),
         body: ErrorState(
           error: e,
-          onRetry: () => ref.invalidate(abilityProvider(abilityName)),
+          onRetry: () {
+            ref.invalidate(catalogAbilityProvider(abilityName));
+            ref.invalidate(abilityProvider(pokeApiKey));
+          },
         ),
       ),
       data: (ability) => _AbilityDetailBody(ability: ability),

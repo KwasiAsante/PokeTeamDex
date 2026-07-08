@@ -88,6 +88,7 @@ class BackendMoveEntry {
 }
 
 class BackendItemEntry {
+  final int? pokeApiId;
   final String name;
   final String displayName;
   final int gen;
@@ -104,6 +105,7 @@ class BackendItemEntry {
   final String? effect;
 
   const BackendItemEntry({
+    this.pokeApiId,
     required this.name,
     required this.displayName,
     required this.gen,
@@ -122,6 +124,7 @@ class BackendItemEntry {
 
   factory BackendItemEntry.fromJson(Map<String, dynamic> json) =>
       BackendItemEntry(
+        pokeApiId: (json['id'] as num?)?.toInt(),
         name: json['name'] as String,
         displayName: json['display_name'] as String? ?? _titleCase(json['name'] as String),
         gen: (json['gen'] as num?)?.toInt() ?? 0,
@@ -149,6 +152,7 @@ class BackendItemEntry {
 }
 
 class BackendAbilityEntry {
+  final int? pokeApiId;
   final String name;
   final String displayName;
   final int gen;
@@ -158,6 +162,7 @@ class BackendAbilityEntry {
   final bool isHidden;
 
   const BackendAbilityEntry({
+    this.pokeApiId,
     required this.name,
     required this.displayName,
     required this.gen,
@@ -169,6 +174,7 @@ class BackendAbilityEntry {
 
   factory BackendAbilityEntry.fromJson(Map<String, dynamic> json) =>
       BackendAbilityEntry(
+        pokeApiId: (json['id'] as num?)?.toInt(),
         name: json['name'] as String,
         displayName: json['display_name'] as String? ?? _titleCase(json['name'] as String),
         gen: (json['gen'] as num?)?.toInt() ?? 0,

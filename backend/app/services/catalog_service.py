@@ -397,6 +397,7 @@ class CatalogService:
     def _merge_item(self, ps_id: str, raw: dict, pokeapi_data: dict | None) -> ItemEntry:
         display_name = raw.get("name", ps_id)
         slug = _ps_slug(display_name)
+        pokeapi_id = None
         category = sprite = None
         fling_power = None
         effect_short = effect = None
@@ -406,12 +407,14 @@ class CatalogService:
             # catalog key is "normalium-z", not "normalium-z--held".
             raw_name = pokeapi_data.get("name", slug)
             slug = re.sub(r"--\w+$", "", raw_name)
+            pokeapi_id = pokeapi_data.get("id")
             category = (pokeapi_data.get("category") or {}).get("name")
             sprite = (pokeapi_data.get("sprites") or {}).get("default")
             fling_power = pokeapi_data.get("fling_power")
             effect_short, effect = _first_en_effect(pokeapi_data.get("effect_entries", []))
 
         return ItemEntry(
+            id=pokeapi_id,
             name=slug,
             display_name=display_name,
             gen=raw.get("gen", 1),
@@ -432,14 +435,17 @@ class CatalogService:
         display_name = raw.get("name", ps_id)
         slug = _ps_slug(display_name)
         gen = raw.get("gen", 1)
+        pokeapi_id = None
         effect_short = effect = None
 
         if pokeapi_data is not None:
             slug = pokeapi_data.get("name", slug)
             gen = _pokeapi_gen(pokeapi_data) or gen
+            pokeapi_id = pokeapi_data.get("id")
             effect_short, effect = _first_en_effect(pokeapi_data.get("effect_entries", []))
 
         return AbilityEntry(
+            id=pokeapi_id,
             name=slug,
             display_name=display_name,
             gen=gen,

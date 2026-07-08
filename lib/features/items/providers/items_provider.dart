@@ -76,6 +76,11 @@ final itemProvider =
   return repo.fetchItem(name);
 });
 
+final catalogItemProvider =
+    FutureProvider.autoDispose.family<BackendItemEntry, String>((ref, name) {
+  return ref.read(pokemonBackendRepositoryProvider).fetchCatalogItem(name);
+});
+
 // ── Filtered + sorted list ────────────────────────────────────────────────────
 
 final filteredItemsProvider = Provider<AsyncValue<List<BackendItemEntry>>>((ref) {

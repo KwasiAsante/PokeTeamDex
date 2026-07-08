@@ -35,6 +35,7 @@ class MoveEntry(BaseModel):
 
 
 class ItemEntry(BaseModel):
+    id: int | None = None              # PokéAPI numeric ID
     name: str
     display_name: str
     gen: int
@@ -52,6 +53,7 @@ class ItemEntry(BaseModel):
 
 
 class AbilityEntry(BaseModel):
+    id: int | None = None              # PokéAPI numeric ID
     name: str
     display_name: str
     gen: int
