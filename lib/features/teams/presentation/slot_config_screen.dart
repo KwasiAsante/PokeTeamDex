@@ -10,7 +10,11 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
+import 'package:poke_team_dex/features/abilities/providers/abilities_provider.dart'
+    show catalogAbilityProvider;
 import 'package:poke_team_dex/features/items/providers/items_provider.dart';
+import 'package:poke_team_dex/features/moves/providers/moves_provider.dart'
+    show catalogMoveProvider;
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
@@ -1371,7 +1375,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
     final cards = Column(
       children: abilities.map((a) {
-        final detailAsync = ref.watch(abilityProvider(a.name));
+        final abilityPokeApiKey = ref.watch(catalogAbilityProvider(a.name)).asData?.value.pokeApiId?.toString() ?? a.name;
+        final detailAsync = ref.watch(abilityProvider(abilityPokeApiKey));
         final isSelected = _abilityName == a.name;
         final colorScheme = Theme.of(context).colorScheme;
         final textTheme = Theme.of(context).textTheme;
@@ -1550,7 +1555,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     String? description;
     bool descriptionLoading = false;
     if (_heldItemName != null) {
-      final detailAsync = ref.watch(itemProvider(_heldItemName!));
+      final itemPokeApiKey = ref.watch(catalogItemProvider(_heldItemName!)).asData?.value.pokeApiId?.toString() ?? _heldItemName!;
+      final detailAsync = ref.watch(itemProvider(itemPokeApiKey));
       description = detailAsync.whenOrNull(data: (e) => e.shortEffect);
       descriptionLoading = description == null && detailAsync.isLoading;
     }
@@ -1642,7 +1648,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         MoveEntry? moveDetail;
         bool moveDetailLoading = false;
         if (_moves[i] != null) {
-          final detailAsync = ref.watch(moveProvider(_moves[i]!));
+          final movePokeApiKey = ref.watch(catalogMoveProvider(_moves[i]!)).asData?.value.pokeApiId?.toString() ?? _moves[i]!;
+          final detailAsync = ref.watch(moveProvider(movePokeApiKey));
           moveDetail = detailAsync.whenOrNull(data: (e) => e);
           moveDetailLoading = moveDetail == null && detailAsync.isLoading;
         }
@@ -3439,7 +3446,8 @@ class _MoveListTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync = ref.watch(moveProvider(moveName));
+    final movePokeApiKey = ref.watch(catalogMoveProvider(moveName)).asData?.value.pokeApiId?.toString() ?? moveName;
+    final detailAsync = ref.watch(moveProvider(movePokeApiKey));
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -3687,7 +3695,8 @@ class _ItemListTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync = ref.watch(itemProvider(itemName));
+    final itemPokeApiKey = ref.watch(catalogItemProvider(itemName)).asData?.value.pokeApiId?.toString() ?? itemName;
+    final detailAsync = ref.watch(itemProvider(itemPokeApiKey));
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
