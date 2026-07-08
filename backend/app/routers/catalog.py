@@ -24,7 +24,7 @@ async def list_moves(
     page: _Page = 1,
     page_size: _PageSize = 50,
     gen: _Gen = None,
-    damage_class: Literal["physical", "special", "status"] | None = None,
+    damage_class: Literal["physical", "special", "status", "varies"] | None = None,
     contest_type: str | None = Query(default=None, description="e.g. 'cool', 'tough' (PokéAPI contest-type name)."),
     is_z_move: bool | None = None,
     is_max_move: bool | None = None,
