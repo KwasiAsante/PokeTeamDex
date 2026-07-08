@@ -180,20 +180,77 @@ class CatalogService:
     async def _preload_kind(
         self, kind: str, ps_dict: dict[str, dict], merge_fn, target: dict, id_map: dict[int, str],
     ) -> None:
-        ps_entries = list(ps_dict.items())
-        slugs = [_ps_slug(raw.get("name", ps_id)) for ps_id, raw in ps_entries]
+        # Enumerate from PokéAPI first — this is the authoritative source for
+        # which entries exist.  PS data is used as enrichment, not enumeration.
+        names = await self._fetch_pokeapi_names(kind)
+        if not names:
+            # PokéAPI list unavailable — fall back to PS-only enumeration.
+            for ps_id, raw in ps_dict.items():
+                entry = merge_fn(ps_id, raw, None)
+                target[entry.name] = entry
+            logger.warning(
+                "Catalog preload: %s — PokéAPI list unavailable; built %d entries from PS data only",
+                kind, len(ps_dict),
+            )
+            return
+
+        # Fetch PokéAPI detail for every name concurrently.
         responses = await asyncio.gather(
-            *[self._fetch_pokeapi_resource(kind, slug) for slug in slugs]
+            *[self._fetch_pokeapi_resource(kind, name) for name in names]
         )
-        matched = 0
-        for (ps_id, raw), pokeapi_data in zip(ps_entries, responses):
+
+        # Merge each PokéAPI entry with its PS counterpart (if any).
+        covered_ps_ids: set[str] = set()
+        count = ps_matched = 0
+        for name, pokeapi_data in zip(names, responses):
+            if pokeapi_data is None:
+                continue
+            canonical_name = pokeapi_data.get("name", name)
+            # Items: strip PokéAPI variant suffixes (--held, --bag) that don't
+            # appear in PS so the canonical key matches the PS id convention.
+            if kind == "item":
+                canonical_name = re.sub(r"--\w+$", "", canonical_name)
+            if canonical_name in target:
+                continue  # deduplicate --held / --bag variants of the same item
+            ps_id = _ps_id_from_name(canonical_name)
+            covered_ps_ids.add(ps_id)
+            if ps_id in ps_dict:
+                ps_matched += 1
+            raw = ps_dict.get(ps_id, {
+                "name": canonical_name.replace("-", " ").title(),
+                "gen": 1,
+            })
             entry = merge_fn(ps_id, raw, pokeapi_data)
             target[entry.name] = entry
-            if pokeapi_data is not None:
-                matched += 1
-                if "id" in pokeapi_data:
-                    id_map[pokeapi_data["id"]] = entry.name
-        logger.info("Catalog preload: %s — %d/%d matched PokéAPI", kind, matched, len(ps_entries))
+            if "id" in pokeapi_data:
+                id_map[pokeapi_data["id"]] = entry.name
+            count += 1
+
+        # Add PS-only entries with no PokéAPI page (Z-moves, Max moves, etc.)
+        ps_only = 0
+        for ps_id, raw in ps_dict.items():
+            if ps_id not in covered_ps_ids:
+                entry = merge_fn(ps_id, raw, None)
+                if entry.name not in target:
+                    target[entry.name] = entry
+                    ps_only += 1
+
+        logger.info(
+            "Catalog preload: %s — %d PokéAPI entries (%d with PS enrichment) + %d PS-only",
+            kind, count, ps_matched, ps_only,
+        )
+
+    async def _fetch_pokeapi_names(self, kind: str) -> list[str]:
+        """Fetch the full name list for a PokéAPI resource kind (e.g. all move names)."""
+        try:
+            r = await self._pokeapi_http.get(
+                f"{_POKEAPI_BASE}/{kind}", params={"limit": 100_000, "offset": 0}
+            )
+        except Exception:
+            return []
+        if r.status_code != 200:
+            return []
+        return [e["name"] for e in r.json().get("results", [])]
 
     async def _fetch_pokeapi_resource(self, kind: str, id_or_name: str) -> dict | None:
         async with self._semaphore:
@@ -215,6 +272,13 @@ class CatalogService:
         damage_class = (raw.get("category") or "status").lower()
         gen = raw.get("gen", 1)
         contest_type = target = effect_short = effect = None
+        # PS is preferred for battle stats; PokéAPI used as fallback for
+        # entries that exist on PokéAPI but have no PS data.
+        type_ = raw.get("type")
+        power = raw.get("base_power")
+        accuracy = raw.get("accuracy")
+        pp = raw.get("pp")
+        priority = raw.get("priority", 0)
 
         if pokeapi_data is not None:
             slug = pokeapi_data.get("name", slug)
@@ -226,6 +290,19 @@ class CatalogService:
             effect_chance = pokeapi_data.get("effect_chance")
             if effect and effect_chance is not None:
                 effect = effect.replace("$effect_chance", str(effect_chance))
+            if type_ is None:
+                type_ = (pokeapi_data.get("type") or {}).get("name")
+            if power is None:
+                power = pokeapi_data.get("power")
+            if accuracy is None:
+                accuracy = pokeapi_data.get("accuracy")
+            if pp is None:
+                pp = pokeapi_data.get("pp")
+            if not priority:
+                priority = pokeapi_data.get("priority") or 0
+
+        if not type_:
+            type_ = "normal"
 
         # Z-moves and Max/G-Max moves are tied to a single generation by game
         # mechanics (Z-moves: gen 7 only; Max moves: gen 8 only — neither
@@ -251,12 +328,12 @@ class CatalogService:
             name=slug,
             display_name=display_name,
             gen=gen,
-            type=raw.get("type", "normal"),
+            type=type_,
             damage_class=damage_class,
-            power=raw.get("base_power"),
-            accuracy=raw.get("accuracy"),
-            pp=raw.get("pp"),
-            priority=raw.get("priority", 0),
+            power=power,
+            accuracy=accuracy,
+            pp=pp,
+            priority=priority,
             is_z_move=raw.get("is_z_move", False),
             is_max_move=raw.get("is_max_move", False),
             z_move_base=z_move_base,
@@ -276,7 +353,10 @@ class CatalogService:
         effect_short = effect = None
 
         if pokeapi_data is not None:
-            slug = pokeapi_data.get("name", slug)
+            # Strip PokéAPI variant suffixes (--held, --bag) — the canonical
+            # catalog key is "normalium-z", not "normalium-z--held".
+            raw_name = pokeapi_data.get("name", slug)
+            slug = re.sub(r"--\w+$", "", raw_name)
             category = (pokeapi_data.get("category") or {}).get("name")
             sprite = (pokeapi_data.get("sprites") or {}).get("default")
             fling_power = pokeapi_data.get("fling_power")
@@ -443,6 +523,8 @@ class CatalogService:
         pokeapi_data = await self._fetch_pokeapi_resource(kind, id_or_name)
         if pokeapi_data is not None:
             canonical_name = pokeapi_data.get("name", id_or_name)
+            if kind == "item":
+                canonical_name = re.sub(r"--\w+$", "", canonical_name)
             ps_id = canonical_name.replace("-", "").lower()
             raw = ps_dict.get(ps_id, {"name": canonical_name.replace("-", " ").title(), "gen": 1})
         else:
