@@ -42,7 +42,7 @@ final movesByTypeProvider =
 /// Type and damage class filters use entry metadata when available (gen > 0).
 /// Fallback entries (gen == 0, type == '') pass all filters to preserve usability
 /// when the backend is unavailable.
-final filteredMovesProvider = Provider<AsyncValue<List<String>>>((ref) {
+final filteredMovesProvider = Provider<AsyncValue<List<BackendMoveEntry>>>((ref) {
   final typeFilter = ref.watch(movesTypeFilterProvider);
   final damageClassFilter = ref.watch(movesDamageClassFilterProvider);
   final search = ref.watch(movesSearchProvider).trim().toLowerCase();
@@ -77,7 +77,7 @@ final filteredMovesProvider = Provider<AsyncValue<List<String>>>((ref) {
         .toList();
   }
 
-  return AsyncValue.data(entries.map((e) => e.name).toList());
+  return AsyncValue.data(entries);
 });
 
 /// Fetches a machine's item name and URL by the machine's full PokéAPI URL.

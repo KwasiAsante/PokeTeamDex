@@ -113,7 +113,7 @@ void main() {
     // Apply type filter
     container.read(movesTypeFilterProvider.notifier).state = 'electric';
     final filtered = container.read(filteredMovesProvider);
-    expect(filtered.requireValue, ['thunderbolt']);
+    expect(filtered.requireValue.map((e) => e.name).toList(), ['thunderbolt']);
   });
 
   test('filteredMovesProvider passes all entries when backend unavailable (sentinel type)', () async {
@@ -134,6 +134,6 @@ void main() {
     container.read(movesTypeFilterProvider.notifier).state = 'electric';
     final filtered = container.read(filteredMovesProvider);
     // Sentinel entries (type == '') pass the type filter
-    expect(filtered.requireValue, ['tackle']);
+    expect(filtered.requireValue.map((e) => e.name).toList(), ['tackle']);
   });
 }

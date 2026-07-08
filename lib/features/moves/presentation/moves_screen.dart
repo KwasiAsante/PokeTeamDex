@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/features/moves/providers/moves_provider.dart';
-import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
-import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
+import 'package:poke_team_dex/services/catalog/catalog_models.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart' show allFormatsProvider, formatServiceProvider;
-import 'package:poke_team_dex/shared/widgets/move_type_chip.dart';
-import 'package:poke_team_dex/shared/widgets/skeleton_box.dart';
+import 'package:poke_team_dex/shared/widgets/move_type_chip.dart' show MoveTypeChip, classifyMoveType;
 
 class MovesScreen extends ConsumerStatefulWidget {
   const MovesScreen({super.key});
@@ -91,15 +89,10 @@ class _MovesScreenState extends ConsumerState<MovesScreen> {
         ),
         error: (e, _) => ErrorState(
           error: e,
-          onRetry: () {
-            ref.invalidate(movesListProvider);
-            if (typeFilter != null) {
-              ref.invalidate(movesByTypeProvider(typeFilter));
-            }
-          },
+          onRetry: () => ref.invalidate(movesListProvider),
         ),
-        data: (names) {
-          if (names.isEmpty) {
+        data: (entries) {
+          if (entries.isEmpty) {
             return const EmptyState(
               icon: Icons.search_off,
               title: 'No moves found',
@@ -108,9 +101,7 @@ class _MovesScreenState extends ConsumerState<MovesScreen> {
           }
           return LayoutBuilder(
             builder: (context, constraints) {
-              // Damage class filter is applied lazily after fetch, so grid
-              // mode would leave empty cells — fall back to list when active.
-              final isGrid = constraints.maxWidth >= 600 && damageClass == null;
+              final isGrid = constraints.maxWidth >= 600;
               if (isGrid) {
                 return GridView.builder(
                   padding: const EdgeInsets.all(8),
@@ -120,14 +111,14 @@ class _MovesScreenState extends ConsumerState<MovesScreen> {
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
                   ),
-                  itemCount: names.length,
-                  itemBuilder: (_, i) => _MoveTile(name: names[i], isGrid: true),
+                  itemCount: entries.length,
+                  itemBuilder: (_, i) => _MoveTile(entry: entries[i], isGrid: true),
                 );
               }
               return ListView.builder(
-                itemCount: names.length,
-                itemExtent: (damageClass == null && typeFilter == null) ? 72.0 : null,
-                itemBuilder: (_, i) => _MoveTile(name: names[i]),
+                itemCount: entries.length,
+                itemExtent: 72.0,
+                itemBuilder: (_, i) => _MoveTile(entry: entries[i]),
               );
             },
           );
@@ -215,56 +206,30 @@ class _TypeFilter extends ConsumerWidget {
   }
 }
 
-// ── Move tile (lazy detail fetch) ─────────────────────────────────────────────
+// ── Move tile ─────────────────────────────────────────────────────────────────
 
-class _MoveTile extends ConsumerWidget {
-  final String name;
+class _MoveTile extends StatelessWidget {
+  final BackendMoveEntry entry;
   final bool isGrid;
-  const _MoveTile({required this.name, this.isGrid = false});
+  const _MoveTile({required this.entry, this.isGrid = false});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final moveAsync = ref.watch(moveProvider(name));
-    final damageClass = ref.watch(movesDamageClassFilterProvider);
-
-    return moveAsync.when(
-      loading: () => isGrid
-          ? _MoveGridCardSkeleton(name: _fmt(name))
-          : ListTile(
-              title: Text(_fmt(name)),
-              subtitle: const SkeletonBox(width: 140),
-            ),
-      error: (_, _) => isGrid
-          ? Card(margin: EdgeInsets.zero, child: Center(child: Text(_fmt(name))))
-          : ListTile(title: Text(_fmt(name)), subtitle: const Text('—')),
-      data: (move) {
-        // Client-side damage class filter (applied after lazy fetch)
-        if (damageClass != null && move.damageClass != damageClass) {
-          return const SizedBox.shrink();
-        }
-        return isGrid ? _MoveGridCard(move: move) : _MoveListItem(move: move);
-      },
-    );
-  }
-
-  static String _fmt(String s) => s
-      .split('-')
-      .map((p) => p.isEmpty ? '' : '${p[0].toUpperCase()}${p.substring(1)}')
-      .join(' ');
+  Widget build(BuildContext context) =>
+      isGrid ? _MoveGridCard(entry: entry) : _MoveListItem(entry: entry);
 }
 
 class _MoveListItem extends ConsumerWidget {
-  final MoveEntry move;
-  const _MoveListItem({required this.move});
+  final BackendMoveEntry entry;
+  const _MoveListItem({required this.entry});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(allFormatsProvider); // ensures service is initialized; triggers rebuild when ready
-    final special = classifyMoveType(ref.read(formatServiceProvider), move.name);
+    ref.watch(allFormatsProvider);
+    final special = classifyMoveType(ref.read(formatServiceProvider), entry.name);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final typeColor = move.typeName != null
-        ? (PokemonTypeColors.colors[move.typeName] ?? colorScheme.primary)
+    final typeColor = entry.type.isNotEmpty
+        ? (PokemonTypeColors.colors[entry.type] ?? colorScheme.primary)
         : colorScheme.outlineVariant;
 
     return ListTile(
@@ -272,103 +237,65 @@ class _MoveListItem extends ConsumerWidget {
       leading: CircleAvatar(
         backgroundColor: typeColor.withValues(alpha: 0.15),
         child: Text(
-          move.categoryIcon,
+          _categoryIcon(entry.damageClass),
           style: textTheme.titleSmall?.copyWith(color: typeColor),
         ),
       ),
-      title: Text(move.displayName, style: textTheme.bodyLarge),
+      title: Text(entry.displayName, style: textTheme.bodyLarge),
       subtitle: Row(
         children: [
-          if (move.typeName != null)
-            _TypeChip(type: move.typeName!, color: typeColor),
+          if (entry.type.isNotEmpty)
+            _TypeChip(type: entry.type, color: typeColor),
           if (special != null) ...[
             const SizedBox(width: 4),
             MoveTypeChip(type: special),
           ],
-          if (move.power != null) ...[
+          if (entry.power != null) ...[
             const SizedBox(width: 8),
-            Text(
-              'Pwr ${move.power}',
-              style: textTheme.labelSmall
-                  ?.copyWith(color: colorScheme.onSurfaceVariant),
-            ),
+            Text('Pwr ${entry.power}',
+                style: textTheme.labelSmall
+                    ?.copyWith(color: colorScheme.onSurfaceVariant)),
           ],
-          if (move.accuracy != null) ...[
+          if (entry.accuracy != null) ...[
             const SizedBox(width: 8),
-            Text(
-              'Acc ${move.accuracy}%',
-              style: textTheme.labelSmall
-                  ?.copyWith(color: colorScheme.onSurfaceVariant),
-            ),
+            Text('Acc ${entry.accuracy}%',
+                style: textTheme.labelSmall
+                    ?.copyWith(color: colorScheme.onSurfaceVariant)),
           ],
-          if (move.pp != null) ...[
+          if (entry.pp != null) ...[
             const SizedBox(width: 8),
-            Text(
-              'PP ${move.pp}',
-              style: textTheme.labelSmall
-                  ?.copyWith(color: colorScheme.onSurfaceVariant),
-            ),
+            Text('PP ${entry.pp}',
+                style: textTheme.labelSmall
+                    ?.copyWith(color: colorScheme.onSurfaceVariant)),
           ],
         ],
       ),
-      onTap: () => context.push('/moves/${move.name}'),
+      onTap: () => context.push('/moves/${entry.name}'),
     );
   }
 }
 
 // ── Move grid card ────────────────────────────────────────────────────────────
 
-class _MoveGridCardSkeleton extends StatelessWidget {
-  final String name;
-  const _MoveGridCardSkeleton({required this.name});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const SkeletonBox(width: 60, height: 18),
-            const SizedBox(height: 6),
-            Text(name,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(fontWeight: FontWeight.w600),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 4),
-            const SkeletonBox(width: 80, height: 12),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _MoveGridCard extends ConsumerWidget {
-  final MoveEntry move;
-  const _MoveGridCard({required this.move});
+  final BackendMoveEntry entry;
+  const _MoveGridCard({required this.entry});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(allFormatsProvider); // ensures service is initialized; triggers rebuild when ready
-    final special = classifyMoveType(ref.read(formatServiceProvider), move.name);
+    ref.watch(allFormatsProvider);
+    final special = classifyMoveType(ref.read(formatServiceProvider), entry.name);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final typeColor = move.typeName != null
-        ? (PokemonTypeColors.colors[move.typeName] ?? colorScheme.primary)
+    final typeColor = entry.type.isNotEmpty
+        ? (PokemonTypeColors.colors[entry.type] ?? colorScheme.primary)
         : colorScheme.outlineVariant;
 
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => context.push('/moves/${move.name}'),
+        onTap: () => context.push('/moves/${entry.name}'),
         child: Row(
           children: [
             Container(width: 4, color: typeColor),
@@ -382,24 +309,23 @@ class _MoveGridCard extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        if (move.typeName != null)
-                          _TypeChip(type: move.typeName!, color: typeColor),
+                        if (entry.type.isNotEmpty)
+                          _TypeChip(type: entry.type, color: typeColor),
                         if (special != null) ...[
                           const SizedBox(width: 4),
                           MoveTypeChip(type: special),
                         ],
                         const Spacer(),
                         Text(
-                          move.categoryIcon,
-                          style:
-                              textTheme.bodySmall?.copyWith(color: typeColor),
+                          _categoryIcon(entry.damageClass),
+                          style: textTheme.bodySmall?.copyWith(color: typeColor),
                         ),
                         const SizedBox(width: 8),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      move.displayName,
+                      entry.displayName,
                       style: textTheme.bodyMedium
                           ?.copyWith(fontWeight: FontWeight.w600),
                       maxLines: 1,
@@ -408,19 +334,19 @@ class _MoveGridCard extends ConsumerWidget {
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        if (move.power != null)
-                          Text('Pwr ${move.power}',
+                        if (entry.power != null)
+                          Text('Pwr ${entry.power}',
                               style: textTheme.labelSmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant)),
-                        if (move.power != null && move.accuracy != null)
+                        if (entry.power != null && entry.accuracy != null)
                           const SizedBox(width: 6),
-                        if (move.accuracy != null)
-                          Text('Acc ${move.accuracy}%',
+                        if (entry.accuracy != null)
+                          Text('Acc ${entry.accuracy}%',
                               style: textTheme.labelSmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant)),
-                        if (move.pp != null) ...[
+                        if (entry.pp != null) ...[
                           const SizedBox(width: 6),
-                          Text('PP ${move.pp}',
+                          Text('PP ${entry.pp}',
                               style: textTheme.labelSmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant)),
                         ],
@@ -436,6 +362,13 @@ class _MoveGridCard extends ConsumerWidget {
     );
   }
 }
+
+String _categoryIcon(String damageClass) => switch (damageClass) {
+      'physical' => '⚔',
+      'special'  => '✨',
+      'status'   => '●',
+      _          => '—',
+    };
 
 class _TypeChip extends StatelessWidget {
   final String type;
