@@ -51,7 +51,7 @@ _POKEAPI_BASE = "https://pokeapi.co/api/v2"
 # pokemon_resolver.py uses when building AbilityInfo from pokedex.json abilities.
 _PS_TO_SLOT: dict[str, int] = {"0": 1, "1": 2, "H": 3}
 
-_SLUG_STRIP_RE = re.compile(r"[',.]")
+_SLUG_STRIP_RE = re.compile(r"[',.()\[\]]")
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]")
 
 _ROMAN_TO_GEN: dict[str, int] = {
