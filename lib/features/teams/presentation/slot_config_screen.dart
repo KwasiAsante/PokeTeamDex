@@ -2103,6 +2103,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     // -held variants are kept (some items only exist in held form); the display
     // strips "-held" so users see "Incinium Z" not "Incinium Z Held".
     final items = (ref.read(itemsListProvider).asData?.value ?? [])
+        .where((e) => e.isBattleRelevant)
         .map((e) => e.name)
         .where((n) => !n.endsWith('-bag'))
         .toList();

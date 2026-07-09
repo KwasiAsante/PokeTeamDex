@@ -66,6 +66,7 @@ async def list_items(
     is_berry: bool | None = None,
     is_plate: bool | None = None,
     is_memory: bool | None = None,
+    is_battle_relevant: bool | None = Query(default=None, description="True = PS-sourced items only (held items, berries, stones, etc.); False = PokéAPI-only items (key items, mail, medicine, etc.)."),
 ) -> ItemsListResponse:
     """
     Paginated item catalog. Enumerated from PokéAPI (~2100 items including key
@@ -77,6 +78,7 @@ async def list_items(
         page, page_size, gen=gen, category=category,
         is_mega_stone=is_mega_stone, is_z_crystal=is_z_crystal,
         is_berry=is_berry, is_plate=is_plate, is_memory=is_memory,
+        is_battle_relevant=is_battle_relevant,
     )
 
 

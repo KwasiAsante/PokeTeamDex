@@ -425,6 +425,7 @@ class CatalogService:
             is_berry=raw.get("is_berry", False),
             is_plate=raw.get("is_plate", False),
             is_memory=raw.get("is_memory", False),
+            is_battle_relevant=ps_id in self._items_ps,
             effect_short=effect_short,
             effect=effect,
         )
@@ -482,6 +483,7 @@ class CatalogService:
         gen: int | None = None, category: str | None = None,
         is_mega_stone: bool | None = None, is_z_crystal: bool | None = None,
         is_berry: bool | None = None, is_plate: bool | None = None, is_memory: bool | None = None,
+        is_battle_relevant: bool | None = None,
     ) -> ItemsListResponse:
         if not self._loaded:
             raise HTTPException(503, detail="Item catalog is still loading; try again shortly")
@@ -500,6 +502,8 @@ class CatalogService:
             values = [i for i in values if i.is_plate == is_plate]
         if is_memory is not None:
             values = [i for i in values if i.is_memory == is_memory]
+        if is_battle_relevant is not None:
+            values = [i for i in values if i.is_battle_relevant == is_battle_relevant]
         values.sort(key=lambda i: i.name)
         page_items, total, total_pages = _paginate(values, page, page_size)
         return ItemsListResponse(items=page_items, total=total, page=page, page_size=page_size, total_pages=total_pages)
@@ -651,6 +655,11 @@ class CatalogService:
                     self._moves[name] = self._moves[name].model_copy(
                         update={"damage_class": "varies"}
                     )
+            # Backfill is_battle_relevant for cached entries that pre-date this field.
+            ps_item_names = {_ps_slug(raw.get("name", ps_id)) for ps_id, raw in self._items_ps.items()}
+            for name, entry in self._items.items():
+                if not entry.is_battle_relevant and name in ps_item_names:
+                    self._items[name] = entry.model_copy(update={"is_battle_relevant": True})
             self._loaded = True
             logger.info(
                 "Catalog loaded from DB cache: %d moves, %d items, %d abilities",

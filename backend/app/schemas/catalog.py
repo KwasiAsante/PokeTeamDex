@@ -48,6 +48,7 @@ class ItemEntry(BaseModel):
     is_berry: bool = False
     is_plate: bool = False
     is_memory: bool = False
+    is_battle_relevant: bool = False   # True when item has a PS entry (held items, berries, stones, etc.)
     effect_short: str | None = None    # PokéAPI-only
     effect: str | None = None          # PokéAPI-only
 

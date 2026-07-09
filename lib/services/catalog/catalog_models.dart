@@ -101,6 +101,7 @@ class BackendItemEntry {
   final bool isBerry;
   final bool isPlate;
   final bool isMemory;
+  final bool isBattleRelevant;
   final String? effectShort;
   final String? effect;
 
@@ -118,6 +119,7 @@ class BackendItemEntry {
     this.isBerry = false,
     this.isPlate = false,
     this.isMemory = false,
+    this.isBattleRelevant = false,
     this.effectShort,
     this.effect,
   });
@@ -138,6 +140,7 @@ class BackendItemEntry {
         isBerry: json['is_berry'] as bool? ?? false,
         isPlate: json['is_plate'] as bool? ?? false,
         isMemory: json['is_memory'] as bool? ?? false,
+        isBattleRelevant: json['is_battle_relevant'] as bool? ?? false,
         effectShort: json['effect_short'] as String?,
         effect: json['effect'] as String?,
       );
