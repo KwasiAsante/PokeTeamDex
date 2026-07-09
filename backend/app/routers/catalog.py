@@ -30,13 +30,11 @@ async def list_moves(
     is_max_move: bool | None = None,
 ) -> MovesListResponse:
     """
-    Paginated move catalog, consolidated from PokéAPI + Pokémon Showdown.
-
-    Backed by a one-time background preload at server startup (mirrors the
-    Smogon competitive-data preload) — returns `503` for a short window after
-    a cold start while PokéAPI detail is still being fetched for every move.
-    `contest_type` and `target` are PokéAPI-only and may be null for moves
-    PokéAPI has no matching resource for.
+    Paginated move catalog. Enumerated from PokéAPI (~900 moves), enriched with
+    Pokémon Showdown battle data. PS-only entries (Z-moves, Max moves) with no
+    PokéAPI page are appended. Returns `503` briefly after a cold start while the
+    background preload is running. `contest_type` and `target` may be null for
+    PS-only entries.
     """
     return catalog_service.list_moves(
         page, page_size, gen=gen, damage_class=damage_class, contest_type=contest_type,
@@ -70,13 +68,10 @@ async def list_items(
     is_memory: bool | None = None,
 ) -> ItemsListResponse:
     """
-    Paginated item catalog, consolidated from PokéAPI + Pokémon Showdown.
-
-    Scoped to Pokémon Showdown's item list (battle-relevant held items,
-    berries, mega stones, z-crystals, plates, memories) rather than PokéAPI's
-    full item list, which also includes key items, mail, etc. Backed by the
-    same background preload as `/moves` — returns `503` for a short window
-    after a cold start.
+    Paginated item catalog. Enumerated from PokéAPI (~2100 items including key
+    items, mail, medicine, etc.), enriched with Pokémon Showdown data where
+    available. Returns `503` briefly after a cold start while the background
+    preload is running.
     """
     return catalog_service.list_items(
         page, page_size, gen=gen, category=category,
@@ -113,12 +108,11 @@ async def list_abilities(
     ),
 ) -> AbilitiesListResponse:
     """
-    Paginated ability catalog, consolidated from PokéAPI + Pokémon Showdown.
-
-    With `pokemon`: returns the 2–3 abilities for that species directly (no
-    pagination, `gen` ignored) with `slot`/`is_hidden` populated per entry.
-    Without `pokemon`: paginated full catalog; `503` for a short window after
-    a cold start while the background preload is still fetching PokéAPI detail.
+    Paginated ability catalog. Enumerated from PokéAPI (~300 abilities), enriched
+    with Pokémon Showdown data. With `pokemon`: returns that species' 2–3 abilities
+    directly (no pagination, `gen` ignored) with `slot`/`is_hidden` per entry.
+    Without `pokemon`: paginated full catalog. Returns `503` briefly after a cold
+    start while the background preload is running.
     """
     return catalog_service.list_abilities(page, page_size, gen=gen, pokemon=pokemon)
 
