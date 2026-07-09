@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
-import 'package:poke_team_dex/features/items/providers/items_provider.dart';
+import 'package:poke_team_dex/features/items/providers/items_provider.dart'
+    show catalogItemProvider, itemProvider;
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
@@ -18,7 +19,10 @@ class ItemDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final itemAsync = ref.watch(itemProvider(itemName));
+    final catalogAsync = ref.watch(catalogItemProvider(itemName));
+    final pokeApiKey =
+        catalogAsync.asData?.value.pokeApiId?.toString() ?? itemName;
+    final itemAsync = ref.watch(itemProvider(pokeApiKey));
 
     return itemAsync.when(
       loading: () => Scaffold(
@@ -29,7 +33,10 @@ class ItemDetailScreen extends ConsumerWidget {
         appBar: AppBar(title: Text(_fmt(itemName))),
         body: ErrorState(
           error: e,
-          onRetry: () => ref.invalidate(itemProvider(itemName)),
+          onRetry: () {
+            ref.invalidate(catalogItemProvider(itemName));
+            ref.invalidate(itemProvider(pokeApiKey));
+          },
         ),
       ),
       data: (item) => _ItemDetailBody(item: item),

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/data/pokemon_data_resolver.dart';
 import 'package:poke_team_dex/features/moves/providers/moves_provider.dart'
-    show contestEffectProvider, machineProvider, superContestEffectProvider;
+    show catalogMoveProvider, contestEffectProvider, machineProvider, superContestEffectProvider;
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
@@ -23,7 +23,11 @@ class MoveDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final moveAsync = ref.watch(moveProvider(moveName));
+    final catalogAsync = ref.watch(catalogMoveProvider(moveName));
+    // Use the PokéAPI numeric ID when available — some moves (e.g. universal
+    // Z-moves) 404 by name but are always reachable by ID.
+    final pokeApiKey = catalogAsync.asData?.value.pokeApiId?.toString() ?? moveName;
+    final moveAsync = ref.watch(moveProvider(pokeApiKey));
 
     return moveAsync.when(
       loading: () => Scaffold(
@@ -34,30 +38,40 @@ class MoveDetailScreen extends ConsumerWidget {
         appBar: AppBar(title: Text(_fmt(moveName))),
         body: ErrorState(
           error: e,
-          onRetry: () => ref.invalidate(moveProvider(moveName)),
+          onRetry: () {
+            ref.invalidate(catalogMoveProvider(moveName));
+            ref.invalidate(moveProvider(pokeApiKey));
+          },
         ),
       ),
-      data: (move) => _MoveDetailBody(move: move),
+      data: (move) => _MoveDetailBody(move: move, moveName: moveName),
     );
   }
 }
 
 // ── Body ──────────────────────────────────────────────────────────────────────
 
-class _MoveDetailBody extends StatelessWidget {
+class _MoveDetailBody extends ConsumerWidget {
   final MoveEntry move;
-  const _MoveDetailBody({required this.move});
+  final String moveName;
+  const _MoveDetailBody({required this.move, required this.moveName});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final typeColor = move.typeName != null
         ? (PokemonTypeColors.colors[move.typeName] ?? colorScheme.primary)
         : colorScheme.primary;
+    final displayName = ref
+            .watch(catalogMoveProvider(moveName))
+            .asData
+            ?.value
+            .displayName ??
+        _fmt(moveName);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(move.displayName),
+        title: Text(displayName),
         backgroundColor: typeColor.withValues(alpha: 0.15),
         actions: [const ConnectivityStatusButton(), const SettingsButton()],
       ),
@@ -65,7 +79,7 @@ class _MoveDetailBody extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Header(move: move, typeColor: typeColor),
+            _Header(move: move, typeColor: typeColor, moveName: moveName),
             _Section(title: 'Stats', child: _StatsCard(move: move)),
             if (move.meta != null && move.meta!.hasNonTrivialData)
               _Section(
@@ -111,7 +125,8 @@ class _MoveDetailBody extends StatelessWidget {
 class _Header extends ConsumerWidget {
   final MoveEntry move;
   final Color typeColor;
-  const _Header({required this.move, required this.typeColor});
+  final String moveName;
+  const _Header({required this.move, required this.typeColor, required this.moveName});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -119,6 +134,16 @@ class _Header extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     ref.watch(allFormatsProvider); // ensures service is initialized; triggers rebuild when ready
     final special = classifyMoveType(ref.read(formatServiceProvider), move.name);
+
+    // Use moveName (the catalog key) not move.name (PokéAPI slug with --physical suffix).
+    final catalogEntry = ref.watch(catalogMoveProvider(moveName)).asData?.value;
+    final catalogDamageClass = catalogEntry?.damageClass;
+    final displayName = catalogEntry?.displayName ?? _fmt(moveName);
+    final effectiveDamageClass = (catalogDamageClass != null &&
+            catalogDamageClass.isNotEmpty)
+        ? catalogDamageClass
+        : move.damageClass;
+    final categoryIcon = _categoryIconFor(effectiveDamageClass);
 
     return Container(
       width: double.infinity,
@@ -135,7 +160,7 @@ class _Header extends ConsumerWidget {
               shape: BoxShape.circle,
             ),
             child: Center(
-              child: Text(move.categoryIcon,
+              child: Text(categoryIcon,
                   style:
                       textTheme.headlineSmall?.copyWith(color: typeColor)),
             ),
@@ -145,7 +170,7 @@ class _Header extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(move.displayName,
+                Text(displayName,
                     style: textTheme.headlineMedium
                         ?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
@@ -157,7 +182,7 @@ class _Header extends ConsumerWidget {
                       TypeBadge(type: move.typeName!),
                     if (special != null) MoveTypeChip(type: special),
                     _InfoBadge(
-                      label: _categoryLabel(move.damageClass),
+                      label: _categoryLabel(effectiveDamageClass),
                       color: colorScheme.surfaceContainerHighest,
                       textColor: colorScheme.onSurfaceVariant,
                     ),
@@ -747,6 +772,14 @@ String _fmt(String s) => s
     .join(' ');
 
 String _categoryLabel(String? cat) => cat == null ? '—' : _fmt(cat);
+
+String _categoryIconFor(String? damageClass) => switch (damageClass) {
+      'physical' => '⚔',
+      'special'  => '✨',
+      'status'   => '●',
+      'varies'   => '↕',
+      _          => '—',
+    };
 
 String _genLabel(String gen) {
   const m = {

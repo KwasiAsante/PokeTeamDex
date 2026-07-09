@@ -10,7 +10,13 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
+import 'package:poke_team_dex/features/abilities/providers/abilities_provider.dart'
+    show catalogAbilityProvider;
 import 'package:poke_team_dex/features/items/providers/items_provider.dart';
+import 'package:poke_team_dex/features/moves/providers/moves_provider.dart'
+    show catalogMoveProvider;
+import 'package:poke_team_dex/services/catalog/catalog_models.dart'
+    show BackendMoveEntry;
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
@@ -19,7 +25,6 @@ import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/services/format/format_service.dart';
 import 'package:poke_team_dex/services/format/slot_validator.dart';
-import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart'
     show MoveSummary, VarietyBackendData;
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
@@ -87,8 +92,6 @@ const _kNatures = [
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
-final _itemListProvider = FutureProvider<List<String>>((ref) =>
-    ref.read(pokeApiRepositoryProvider).fetchItemList());
 
 /// Set of species names (PokéAPI format) catchable in Legends: Arceus.
 /// Fetched once, cached in Hive by the repository layer.
@@ -557,7 +560,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   @override
   Widget build(BuildContext context) {
     // Pre-load item list so the picker is instant when the user taps.
-    ref.watch(_itemListProvider);
+    ref.watch(itemsListProvider);
 
     final slotsAsync = ref.watch(teamSlotsProvider(widget.teamId));
     return slotsAsync.when(
@@ -1355,15 +1358,6 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // ── Ability — selectable cards with descriptions ───────────────────────────
 
-  static int? _genNameToNumber(String? generationName) {
-    const map = {
-      'generation-i': 1, 'generation-ii': 2, 'generation-iii': 3,
-      'generation-iv': 4, 'generation-v': 5, 'generation-vi': 6,
-      'generation-vii': 7, 'generation-viii': 8, 'generation-ix': 9,
-    };
-    return generationName == null ? null : map[generationName];
-  }
-
   Widget _buildAbility(
     List<({String name, bool isHidden, int abilitySlot})> abilities,
     String? violation,
@@ -1373,14 +1367,13 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
     final cards = Column(
       children: abilities.map((a) {
-        final detailAsync = ref.watch(abilityProvider(a.name));
+        final catalogAsync = ref.watch(catalogAbilityProvider(a.name));
+        final catalogEntry = catalogAsync.asData?.value;
         final isSelected = _abilityName == a.name;
         final colorScheme = Theme.of(context).colorScheme;
         final textTheme = Theme.of(context).textTheme;
 
-        final description = detailAsync.whenOrNull(
-          data: (entry) => entry.shortEffect,
-        );
+        final description = catalogEntry?.effectShort;
 
         // Gen gating — two rules, always exempting the currently-selected
         // ability so the violation banner can explain any mismatch:
@@ -1388,15 +1381,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         // Rule 1 (synchronous): hidden abilities didn't exist until Gen 5
         // (Dream World). Hides e.g. Umbreon's Inner Focus in Gen 3.
         //
-        // Rule 2 (async): PS ability data lacks accurate gen info, so use
-        // PokéAPI's generationName to gate abilities not yet introduced.
+        // Rule 2: backend catalog gen field gates abilities not yet introduced.
         // Hides e.g. Super Luck (Gen 4 ability) in a Gen 3 format.
         if (format != null && !isSelected) {
           if (a.isHidden && format.gen < 5) return const SizedBox.shrink();
-          final abilityGen = detailAsync.whenOrNull(
-            data: (entry) => _genNameToNumber(entry.generationName),
-          );
-          if (abilityGen != null && abilityGen > format.gen) {
+          final abilityGen = catalogEntry?.gen;
+          if (abilityGen != null && abilityGen > 0 && abilityGen > format.gen) {
             return const SizedBox.shrink();
           }
         }
@@ -1468,7 +1458,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                           Text(description,
                               style: textTheme.bodySmall
                                   ?.copyWith(color: colorScheme.onSurfaceVariant)),
-                        ] else if (detailAsync.isLoading) ...[
+                        ] else if (catalogAsync.isLoading) ...[
                           const SizedBox(height: 6),
                           const _DescriptionLoadingBar(),
                         ],
@@ -1552,8 +1542,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     String? description;
     bool descriptionLoading = false;
     if (_heldItemName != null) {
-      final detailAsync = ref.watch(itemProvider(_heldItemName!));
-      description = detailAsync.whenOrNull(data: (e) => e.shortEffect);
+      final detailAsync = ref.watch(catalogItemProvider(_heldItemName!));
+      description = detailAsync.asData?.value.effectShort;
       descriptionLoading = description == null && detailAsync.isLoading;
     }
 
@@ -1641,11 +1631,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
     return Column(
       children: List.generate(4, (i) {
-        MoveEntry? moveDetail;
+        BackendMoveEntry? moveDetail;
         bool moveDetailLoading = false;
         if (_moves[i] != null) {
-          final detailAsync = ref.watch(moveProvider(_moves[i]!));
-          moveDetail = detailAsync.whenOrNull(data: (e) => e);
+          final detailAsync = ref.watch(catalogMoveProvider(_moves[i]!));
+          moveDetail = detailAsync.asData?.value;
           moveDetailLoading = moveDetail == null && detailAsync.isLoading;
         }
 
@@ -1697,8 +1687,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                         ),
                       // Inline type + special-move chip + stats when selected
                       if (moveDetail != null) ...[
-                        if (moveDetail.typeName != null)
-                          TypeBadge(type: moveDetail.typeName!),
+                        if (moveDetail.type.isNotEmpty)
+                          TypeBadge(type: moveDetail.type),
                         Builder(builder: (ctx) {
                           final svc = ref.read(formatServiceProvider);
                           final special = classifyMoveType(svc, moveDetail!.name);
@@ -1753,10 +1743,10 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                 ),
               ),
               // Short effect description
-              if (moveDetail?.shortEffect != null)
+              if (moveDetail?.effectShort != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
-                  child: Text(moveDetail!.shortEffect!,
+                  child: Text(moveDetail!.effectShort!,
                       style: textTheme.bodySmall
                           ?.copyWith(color: colorScheme.onSurfaceVariant)),
                 )
@@ -1772,7 +1762,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     itemId: _heldItemName!,
                     moveId: _moves[i]!,
                     pokemonName: pokemonName,
-                    moveType: moveDetail?.typeName,
+                    moveType: moveDetail?.type,
                   );
                   if (zMove == null) return const SizedBox.shrink();
                   final zDisplay = zMove
@@ -1824,7 +1814,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
               if (showMaxMoves && _moves[i] != null) ...[
                 Builder(builder: (ctx) {
                   final maxMove = resolveMaxMove(
-                    moveType: moveDetail?.typeName,
+                    moveType: moveDetail?.type,
                     moveCategory: moveDetail?.damageClass,
                     speciesName: pokemonName,
                     useGMax: useGMax,
@@ -1844,7 +1834,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                     padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(6),
-                      onTap: () => context.push('/moves/$maxMove'),
+                      onTap: isGMax ? null : () => context.push('/moves/$maxMove'),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 6),
@@ -2112,7 +2102,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     // -bag variants are true duplicates with no gameplay difference — exclude them.
     // -held variants are kept (some items only exist in held form); the display
     // strips "-held" so users see "Incinium Z" not "Incinium Z Held".
-    final items = (ref.read(_itemListProvider).asData?.value ?? [])
+    final items = (ref.read(itemsListProvider).asData?.value ?? [])
+        .where((e) => e.isBattleRelevant)
+        .map((e) => e.name)
         .where((n) => !n.endsWith('-bag'))
         .toList();
     final result = await showModalBottomSheet<String>(
@@ -3440,7 +3432,7 @@ class _MoveListTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync = ref.watch(moveProvider(moveName));
+    final detailAsync = ref.watch(catalogMoveProvider(moveName));
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -3476,7 +3468,7 @@ class _MoveListTile extends ConsumerWidget {
             data: (move) => Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (move.typeName != null) TypeBadge(type: move.typeName!),
+                if (move.type.isNotEmpty) TypeBadge(type: move.type),
                 const SizedBox(width: 6),
                 Text(
                   [
@@ -3498,8 +3490,8 @@ class _MoveListTile extends ConsumerWidget {
         ],
       ),
       subtitle: detailAsync.whenOrNull(
-        data: (move) => move.shortEffect != null
-            ? Text(move.shortEffect!,
+        data: (move) => move.effectShort != null
+            ? Text(move.effectShort!,
                 style: textTheme.bodySmall
                     ?.copyWith(color: colorScheme.onSurfaceVariant),
                 maxLines: 1,
@@ -3688,23 +3680,13 @@ class _ItemListTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync = ref.watch(itemProvider(itemName));
+    final detailAsync = ref.watch(catalogItemProvider(itemName));
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     final entry = detailAsync.whenOrNull(data: (e) => e);
-    final spriteUrl = entry?.spriteUrl;
-    // Z-crystals have a placeholder shortEffect ("XXX new effect for …").
-    // Use flavor text for them; keep shortEffect for everything else.
-    final normalizedItemName = itemName
-        .replaceAll(RegExp(r'-(held|bag)$'), '')
-        .replaceAll(RegExp(r'-+$'), '');
-    final isZCrystal = normalizedItemName.endsWith('-z');
-    final description = entry == null
-        ? null
-        : (isZCrystal && entry.flavorTextEntries.isNotEmpty)
-            ? entry.flavorTextEntries.last.text
-            : entry.shortEffect;
+    final spriteUrl = entry?.sprite;
+    final description = entry?.effectShort;
 
     return ListTile(
       dense: true,

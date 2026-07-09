@@ -49,19 +49,22 @@ void main() {
 
   group('fetchMoves', () {
     test('returns List<MoveSummary> on 200', () async {
-      when(() => mockDio.get<dynamic>('/pokemon/moves/6'))
+      when(() => mockDio.get<dynamic>('/pokemon/moves/6',
+              queryParameters: any(named: 'queryParameters')))
           .thenAnswer((_) async => Response(
                 data: {
                   'pokemon_id': 6,
                   'name': 'charizard',
-                  'moves': [
-                    {
-                      'name': 'flamethrower',
-                      'learn_details': [
-                        {'version_group': 'sword-shield', 'method': 'machine', 'level': 0}
-                      ],
-                    }
-                  ],
+                  'moves': {
+                    '9': [
+                      {
+                        'name': 'flamethrower',
+                        'learn_details': [
+                          {'version_group': 'sword-shield', 'method': 'machine', 'level': 0}
+                        ],
+                      }
+                    ],
+                  },
                 },
                 statusCode: 200,
                 requestOptions: RequestOptions(path: '/pokemon/moves/6'),

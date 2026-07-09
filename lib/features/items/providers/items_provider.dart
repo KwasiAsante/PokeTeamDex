@@ -1,11 +1,32 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:poke_team_dex/services/catalog/catalog_models.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
+import 'package:poke_team_dex/utils/app_logger.dart';
 
-final itemsListProvider = FutureProvider<List<String>>((ref) async {
-  final repo = ref.read(pokeApiRepositoryProvider);
-  return repo.fetchItemList();
+/// Backend-first full item catalog. Falls back to PokéAPI name list on failure.
+final itemsListProvider = FutureProvider<List<BackendItemEntry>>((ref) async {
+  ref.keepAlive();
+  try {
+    final repo = ref.read(pokemonBackendRepositoryProvider);
+    final first = await repo.fetchCatalogItems(pageSize: 1000);
+    var items = first.items;
+    if (first.totalPages > 1) {
+      final rest = await Future.wait([
+        for (int p = 2; p <= first.totalPages; p++)
+          repo.fetchCatalogItems(page: p, pageSize: 1000),
+      ]);
+      items = [...items, for (final r in rest) ...r.items];
+    }
+    AppLogger().d('[catalog] items: loaded ${items.length} entries from backend (${first.totalPages} pages)');
+    return items;
+  } catch (e) {
+    AppLogger().w('[catalog] items backend failed, falling back to PokéAPI', error: e);
+    final names = await ref.read(pokeApiRepositoryProvider).fetchItemList();
+    return names.map(BackendItemEntry.fromName).toList();
+  }
 });
 
 // Not autoDispose — persists across tab switches.
@@ -55,53 +76,79 @@ final itemProvider =
   return repo.fetchItem(name);
 });
 
+final catalogItemProvider =
+    FutureProvider.autoDispose.family<BackendItemEntry, String>((ref, name) {
+  return ref.read(pokemonBackendRepositoryProvider).fetchCatalogItem(name);
+});
+
 // ── Filtered + sorted list ────────────────────────────────────────────────────
 
-final filteredItemsProvider = Provider<AsyncValue<List<String>>>((ref) {
+final filteredItemsProvider = Provider<AsyncValue<List<BackendItemEntry>>>((ref) {
   final pocket = ref.watch(itemPocketFilterProvider);
   final sort   = ref.watch(itemSortProvider);
   final search = ref.watch(itemsSearchProvider).trim().toLowerCase();
 
-  // For ID sorting we need the full list order as a reference index.
-  final fullListAsync = ref.watch(itemsListProvider);
-  final fullList = fullListAsync.asData?.value ?? const [];
+  final backendAsync = ref.watch(itemsListProvider);
+  final backendList = backendAsync.asData?.value ?? const <BackendItemEntry>[];
+  // Map for fast name → entry lookup (used when pocket filter is active).
+  final catalogMap = <String, BackendItemEntry>{
+    for (final e in backendList) e.name: e,
+  };
+  // ID order map for idAscending/idDescending sorts.
   final idOrder = <String, int>{
-    for (int i = 0; i < fullList.length; i++) fullList[i]: i,
+    for (int i = 0; i < backendList.length; i++) backendList[i].name: i,
   };
 
-  // Use pocket-specific list when filtered, otherwise the full list.
-  final AsyncValue<List<String>> listAsync = pocket != null
-      ? ref.watch(itemsByPocketProvider(pocket))
-      : fullListAsync;
-
-  if (listAsync is AsyncLoading || fullListAsync is AsyncLoading) {
+  // Determine the base list of entries to filter/sort.
+  final AsyncValue<List<BackendItemEntry>> entriesAsync;
+  if (pocket != null) {
+    // Pocket filter uses PokéAPI name list; enrich from catalog where available.
+    final pocketAsync = ref.watch(itemsByPocketProvider(pocket));
+    if (pocketAsync is AsyncLoading || backendAsync is AsyncLoading) {
+      return const AsyncValue.loading();
+    }
+    if (pocketAsync is AsyncError) {
+      return AsyncValue.error(
+          (pocketAsync as AsyncError).error,
+          (pocketAsync as AsyncError).stackTrace);
+    }
+    final pocketNames = pocketAsync.requireValue;
+    entriesAsync = AsyncValue.data(
+      pocketNames
+          .map((n) => catalogMap[n] ?? BackendItemEntry.fromName(n))
+          .toList(),
+    );
+  } else if (backendAsync is AsyncLoading) {
     return const AsyncValue.loading();
-  }
-  if (listAsync is AsyncError) {
+  } else if (backendAsync is AsyncError) {
     return AsyncValue.error(
-        (listAsync as AsyncError).error,
-        (listAsync as AsyncError).stackTrace);
+        (backendAsync as AsyncError).error,
+        (backendAsync as AsyncError).stackTrace);
+  } else {
+    entriesAsync = AsyncValue.data(List.of(backendList));
   }
 
-  List<String> items = List<String>.from(listAsync.requireValue);
+  List<BackendItemEntry> items = List.of(entriesAsync.requireValue);
 
   if (search.isNotEmpty) {
     items = items
-        .where((n) => n.replaceAll('-', ' ').contains(search))
+        .where((e) =>
+            e.name.replaceAll('-', ' ').contains(search) ||
+            e.displayName.toLowerCase().contains(search))
         .toList();
   }
 
   switch (sort) {
     case ItemSort.nameAZ:
-      items.sort();
+      items.sort((a, b) => a.name.compareTo(b.name));
     case ItemSort.nameZA:
-      items.sort((a, b) => b.compareTo(a));
+      items.sort((a, b) => b.name.compareTo(a.name));
     case ItemSort.idAscending:
       items.sort((a, b) =>
-          (idOrder[a] ?? 999999).compareTo(idOrder[b] ?? 999999));
+          (idOrder[a.name] ?? 999999).compareTo(idOrder[b.name] ?? 999999));
     case ItemSort.idDescending:
       items.sort((a, b) =>
-          (idOrder[b] ?? 999999).compareTo(idOrder[a] ?? 999999));
+          (idOrder[b.name] ?? 999999).compareTo(idOrder[a.name] ?? 999999));
   }
 
   return AsyncValue.data(items);

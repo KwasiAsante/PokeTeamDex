@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/features/teams/presentation/slot_config_screen.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
@@ -9,11 +10,18 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
-import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show AbilityInfo;
+import 'package:poke_team_dex/services/pokemon_resolved/models.dart'
+    show AbilityInfo, PokemonResolvedBackendResponse;
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_backend_repository.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_cache.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
+    show pokemonBackendRepositoryProvider, pokemonResolvedCacheProvider;
 import '../helpers/test_app.dart';
 import '../helpers/test_database.dart';
 
 class MockPokeApiRepository extends Mock implements PokeApiRepository {}
+class MockPokemonBackendRepository extends Mock implements PokemonBackendRepository {}
+class MockPokemonResolvedCache extends Mock implements PokemonResolvedCache {}
 
 PokemonEntry _entry() => PokemonEntry(
       id: 6,
@@ -43,7 +51,15 @@ const _species = PokemonSpeciesEntry(
 );
 
 void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    await PokemonDataRegistry.initialize();
+    registerFallbackValue(const Duration());
+  });
+
   late MockPokeApiRepository mockApi;
+  late MockPokemonBackendRepository mockBackendRepo;
+  late MockPokemonResolvedCache mockCache;
 
   setUp(() {
     mockApi = MockPokeApiRepository();
@@ -51,6 +67,19 @@ void main() {
     when(() => mockApi.fetchPokemonSpecies(any())).thenAnswer((_) async => _species);
     when(() => mockApi.fetchPokemonByName(any())).thenAnswer((_) async => _entry());
     when(() => mockApi.fetchPokemonEncounters(any())).thenAnswer((_) async => []);
+    when(() => mockApi.fetchItemList()).thenAnswer((_) async => []);
+    when(() => mockApi.fetchPriorEvoEntries(any())).thenAnswer((_) async => []);
+
+    mockBackendRepo = MockPokemonBackendRepository();
+    when(() => mockBackendRepo.fetchResolved(any(), gen: any(named: 'gen')))
+        .thenAnswer((_) async =>
+            PokemonResolvedBackendResponse.fromJson(_resolvedJson()));
+
+    // Hive is not initialized in tests — mock the cache so providers skip
+    // straight to the backend (which is itself mocked above).
+    mockCache = MockPokemonResolvedCache();
+    when(() => mockCache.getIfValid(any())).thenReturn(null);
+    when(() => mockCache.putWithTTL(any(), any(), any())).thenReturn(null);
   });
 
   /// Creates a team + slot in [db] and returns (teamId, slotId).
@@ -108,6 +137,8 @@ void main() {
         db: db,
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
+          pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
+          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),
@@ -133,6 +164,8 @@ void main() {
         db: db,
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
+          pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
+          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),
@@ -163,6 +196,8 @@ void main() {
         db: db,
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
+          pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
+          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),
@@ -199,6 +234,8 @@ void main() {
         db: db,
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
+          pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
+          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),
@@ -226,6 +263,8 @@ void main() {
         db: db,
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
+          pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
+          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),
@@ -244,3 +283,30 @@ void main() {
     });
   });
 }
+
+Map<String, dynamic> _resolvedJson() => {
+  'pokemon_id': 6, 'gen': 9, 'name': 'charizard',
+  'types': ['Fire', 'Flying'],
+  'base_stats': {'hp': 78, 'attack': 84, 'defense': 78,
+                 'special-attack': 109, 'special-defense': 85, 'speed': 100},
+  'abilities': [{'name': 'blaze', 'is_hidden': false, 'slot': 1}],
+  'height': 17, 'weight': 905, 'base_experience': 240,
+  'species_name': 'charizard', 'moves': [], 'moves_url': null,
+  'supplement_moves': [], 'smogon_analyses': null,
+  'varieties': [], 'varieties_url': null,
+  'forms': [{'name': 'charizard', 'form_id': 6, 'is_default': true,
+             'front_sprite_url': null, 'sprite_urls': null}],
+  'forms_url': null,
+  'sprite_urls': {'official_artwork': null, 'official_artwork_shiny': null,
+                  'home': null, 'home_shiny': null, 'home_female': null,
+                  'home_female_shiny': null, 'game_front': null,
+                  'game_front_shiny': null, 'game_front_female': null,
+                  'game_front_female_shiny': null},
+  'resolved_at': '2026-06-18T12:00:00Z',
+  'genus': 'Flame Pokémon', 'generation_name': 'generation-i',
+  'gender_rate': 1, 'capture_rate': 45, 'base_happiness': 70,
+  'hatch_counter': 20, 'growth_rate': 'medium-slow',
+  'egg_groups': ['monster', 'dragon'], 'flavor_text_entries': [],
+  'flavor_text_url': null, 'is_baby': false,
+  'is_legendary': false, 'is_mythical': false, 'evolution_chain_id': 2,
+};

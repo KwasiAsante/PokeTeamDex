@@ -107,6 +107,19 @@ The provider most screens actually consume, `resolvedPokemonProvider` (`FuturePr
 
 ---
 
+## `catalog/`
+
+Dart models for the standalone `/moves`, `/items`, `/abilities` catalog endpoints.
+
+| File | Purpose |
+| ---- | ------- |
+| `catalog_models.dart` | `BackendMoveEntry`, `BackendItemEntry`, `BackendAbilityEntry`, `PaginatedCatalogResponse<T>` |
+
+Fetch methods are in `pokemon_resolved/pokemon_backend_repository.dart`.
+Riverpod providers and backend-first + fallback logic live in the respective `lib/features/*/providers/` files.
+
+---
+
 ## `sync/`
 
 Bidirectional sync engine.

@@ -807,7 +807,7 @@ class _FilledSlotCard extends ConsumerWidget {
     final formsData = ref.watch(pokemonFormsProvider((id: slot.pokemonId, gen: formatGen))).asData?.value;
     final varietiesData = ref.watch(pokemonVarietiesProvider((id: slot.pokemonId, gen: formatGen))).asData?.value;
     final itemAsync = slot.heldItemName != null
-        ? ref.watch(itemProvider(slot.heldItemName!))
+        ? ref.watch(catalogItemProvider(slot.heldItemName!))
         : null;
 
     final colorScheme = Theme.of(context).colorScheme;
@@ -1141,11 +1141,11 @@ class _FilledSlotCard extends ConsumerWidget {
                                 size: 96,
                               );
                             }),
-                            if (itemEntry?.spriteUrl != null)
+                            if (itemEntry?.sprite != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
                                 child: CachedNetworkImage(
-                                  imageUrl: itemEntry!.spriteUrl!,
+                                  imageUrl: itemEntry!.sprite!,
                                   width: 36,
                                   height: 36,
                                   errorWidget: (_, _, _) =>

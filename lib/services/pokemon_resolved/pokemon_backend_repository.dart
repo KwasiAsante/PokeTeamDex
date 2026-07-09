@@ -1,4 +1,5 @@
 import 'package:poke_team_dex/services/api/api_client.dart';
+import 'package:poke_team_dex/services/catalog/catalog_models.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 
@@ -89,5 +90,107 @@ class PokemonBackendRepository {
     return (data['flavor_text_entries'] as List<dynamic>)
         .map((e) => FlavorTextEntry.fromBackend(e as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<PaginatedCatalogResponse<BackendMoveEntry>> fetchCatalogMoves({
+    int page = 1,
+    int pageSize = 200,
+    int? gen,
+    String? damageClass,
+    bool? isZMove,
+    bool? isMaxMove,
+  }) async {
+    final qp = <String, dynamic>{'page': page, 'page_size': pageSize};
+    if (gen != null) qp['gen'] = gen;
+    if (damageClass != null) qp['damage_class'] = damageClass;
+    if (isZMove != null) qp['is_z_move'] = isZMove;
+    if (isMaxMove != null) qp['is_max_move'] = isMaxMove;
+    final response = await _apiClient.dio.get<dynamic>('/moves', queryParameters: qp);
+    if (response.statusCode != 200) {
+      throw Exception('fetchCatalogMoves failed: ${response.statusCode}');
+    }
+    return PaginatedCatalogResponse.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+      (item) => BackendMoveEntry.fromJson(item as Map<String, dynamic>),
+    );
+  }
+
+  Future<BackendMoveEntry> fetchCatalogMove(String idOrName) async {
+    final response =
+        await _apiClient.dio.get<dynamic>('/moves/$idOrName');
+    if (response.statusCode != 200) {
+      throw Exception('fetchCatalogMove failed for $idOrName: ${response.statusCode}');
+    }
+    return BackendMoveEntry.fromJson(
+        Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<PaginatedCatalogResponse<BackendItemEntry>> fetchCatalogItems({
+    int page = 1,
+    int pageSize = 200,
+    int? gen,
+    String? category,
+    bool? isMegaStone,
+    bool? isZCrystal,
+    bool? isBerry,
+    bool? isPlate,
+    bool? isMemory,
+  }) async {
+    final qp = <String, dynamic>{'page': page, 'page_size': pageSize};
+    if (gen != null) qp['gen'] = gen;
+    if (category != null) qp['category'] = category;
+    if (isMegaStone != null) qp['is_mega_stone'] = isMegaStone;
+    if (isZCrystal != null) qp['is_z_crystal'] = isZCrystal;
+    if (isBerry != null) qp['is_berry'] = isBerry;
+    if (isPlate != null) qp['is_plate'] = isPlate;
+    if (isMemory != null) qp['is_memory'] = isMemory;
+    final response = await _apiClient.dio.get<dynamic>('/items', queryParameters: qp);
+    if (response.statusCode != 200) {
+      throw Exception('fetchCatalogItems failed: ${response.statusCode}');
+    }
+    return PaginatedCatalogResponse.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+      (item) => BackendItemEntry.fromJson(item as Map<String, dynamic>),
+    );
+  }
+
+  Future<BackendItemEntry> fetchCatalogItem(String idOrName) async {
+    final response =
+        await _apiClient.dio.get<dynamic>('/items/$idOrName');
+    if (response.statusCode != 200) {
+      throw Exception('fetchCatalogItem failed for $idOrName: ${response.statusCode}');
+    }
+    return BackendItemEntry.fromJson(
+        Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<PaginatedCatalogResponse<BackendAbilityEntry>> fetchCatalogAbilities({
+    int page = 1,
+    int pageSize = 200,
+    int? gen,
+    String? pokemon,
+  }) async {
+    final qp = <String, dynamic>{'page': page, 'page_size': pageSize};
+    if (gen != null) qp['gen'] = gen;
+    if (pokemon != null) qp['pokemon'] = pokemon;
+    final response =
+        await _apiClient.dio.get<dynamic>('/abilities', queryParameters: qp);
+    if (response.statusCode != 200) {
+      throw Exception('fetchCatalogAbilities failed: ${response.statusCode}');
+    }
+    return PaginatedCatalogResponse.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+      (item) => BackendAbilityEntry.fromJson(item as Map<String, dynamic>),
+    );
+  }
+
+  Future<BackendAbilityEntry> fetchCatalogAbility(String idOrName) async {
+    final response =
+        await _apiClient.dio.get<dynamic>('/abilities/$idOrName');
+    if (response.statusCode != 200) {
+      throw Exception('fetchCatalogAbility failed for $idOrName: ${response.statusCode}');
+    }
+    return BackendAbilityEntry.fromJson(
+        Map<String, dynamic>.from(response.data as Map));
   }
 }
