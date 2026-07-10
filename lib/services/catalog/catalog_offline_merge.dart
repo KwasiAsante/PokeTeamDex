@@ -22,6 +22,13 @@ import 'package:poke_team_dex/utils/app_logger.dart';
 /// exists — the per-entry PokéAPI fetches (~900 moves, ~2100 items, ~300
 /// abilities) are expensive, which is why [withBackendFallback] caches the
 /// result for 24h once built.
+///
+/// The single-entry counterparts ([buildOfflineMoveEntry]/
+/// [buildOfflineItemEntry]/[buildOfflineAbilityEntry]) back
+/// [catalogMoveProvider]/[catalogItemProvider]/[catalogAbilityProvider] and
+/// mirror the backend's `get_move`/`get_item`/`get_ability` (`_get_entry`)
+/// live-fetch-and-merge path instead — one PokéAPI fetch, not a full catalog
+/// rebuild.
 const _kRomanToGen = {
   'i': 1, 'ii': 2, 'iii': 3, 'iv': 4, 'v': 5,
   'vi': 6, 'vii': 7, 'viii': 8, 'ix': 9,
@@ -88,7 +95,7 @@ Future<List<BackendMoveEntry>> buildOfflineMoveCatalog(
       final raw = entry.value as Map<String, dynamic>;
       final displayName = raw['name'] as String? ?? entry.key;
       final slug = psSlugFromDisplayName(displayName);
-      results[slug] = _mergeMove(raw, null, slug);
+      results[slug] = _mergeMove(raw, null, slug, psData.moves);
     }
     AppLogger().w(
         '[catalog offline] move list unavailable; built ${results.length} entries from PS data only');
@@ -122,7 +129,7 @@ Future<List<BackendMoveEntry>> buildOfflineMoveCatalog(
     final psId = psIdFromName(canonicalName);
     coveredPsIds.add(psId);
     final raw = psData.moves[psId] as Map<String, dynamic>?;
-    results[canonicalName] = _mergeMove(raw, moveEntry, canonicalName);
+    results[canonicalName] = _mergeMove(raw, moveEntry, canonicalName, psData.moves);
   }
 
   for (final entry in psData.moves.entries) {
@@ -131,7 +138,7 @@ Future<List<BackendMoveEntry>> buildOfflineMoveCatalog(
     final displayName = raw['name'] as String? ?? entry.key;
     final slug = psSlugFromDisplayName(displayName);
     if (results.containsKey(slug)) continue;
-    results[slug] = _mergeMove(raw, null, slug);
+    results[slug] = _mergeMove(raw, null, slug, psData.moves);
   }
 
   for (final baseName in zVaries) {
@@ -143,10 +150,37 @@ Future<List<BackendMoveEntry>> buildOfflineMoveCatalog(
   return results.values.toList();
 }
 
+/// Offline fallback for [catalogMoveProvider] — single-move counterpart to
+/// [buildOfflineMoveCatalog], mirroring the backend's `get_move`/`_get_entry`
+/// live-fetch-and-merge path (`CatalogService._get_entry`): fetch the move
+/// live from PokéAPI, look up its PS counterpart (if any), and merge.
+Future<BackendMoveEntry> buildOfflineMoveEntry(
+  PokeApiRepository pokeApi,
+  PsDataService psData,
+  String nameOrId,
+) async {
+  await psData.initialize();
+  MoveEntry? pokeApiEntry;
+  try {
+    pokeApiEntry = await pokeApi.fetchMove(nameOrId);
+  } catch (_) {
+    pokeApiEntry = null;
+  }
+  final canonicalName =
+      pokeApiEntry != null ? _stripVariantSuffix(pokeApiEntry.name) : nameOrId;
+  final psId = psIdFromName(canonicalName);
+  final raw = psData.moves[psId] as Map<String, dynamic>?;
+  if (raw == null && pokeApiEntry == null) {
+    throw Exception('Move "$nameOrId" not found offline');
+  }
+  return _mergeMove(raw, pokeApiEntry, canonicalName, psData.moves);
+}
+
 BackendMoveEntry _mergeMove(
   Map<String, dynamic>? raw,
   MoveEntry? pokeApiEntry,
   String slug,
+  Map<String, dynamic> psMoves,
 ) {
   final displayName = raw?['name'] as String? ?? _titleCaseSlug(slug);
   var gen = (raw?['gen'] as num?)?.toInt() ?? 1;
@@ -161,6 +195,7 @@ BackendMoveEntry _mergeMove(
   String? contestType;
   String? target;
   String? effectShort;
+  String? effect;
 
   if (pokeApiEntry != null) {
     damageClass = pokeApiEntry.damageClass ?? damageClass;
@@ -168,6 +203,7 @@ BackendMoveEntry _mergeMove(
     contestType = pokeApiEntry.contestTypeName;
     target = pokeApiEntry.targetName;
     effectShort = pokeApiEntry.shortEffect;
+    effect = pokeApiEntry.longEffect;
     type ??= pokeApiEntry.typeName;
     power ??= pokeApiEntry.power;
     accuracy ??= pokeApiEntry.accuracy;
@@ -177,16 +213,35 @@ BackendMoveEntry _mergeMove(
 
   // Z-moves and Max/G-max moves are tied to a single generation by game
   // mechanics — more reliable than PokéAPI's generation field, which many of
-  // them don't even have a resource for.
-  if (isZMove) gen = 7;
-  if (isMaxMove) gen = 8;
+  // them don't even have a resource for. Mutually exclusive (mirrors the
+  // backend's `if is_z_move: gen=7 elif is_max_move: gen=8`) — no known PS
+  // move has both flags set, but match the exact precedence regardless.
+  if (isZMove) {
+    gen = 7;
+  } else if (isMaxMove) {
+    gen = 8;
+  }
 
   final flagsRaw = raw?['flags'];
   final flags = flagsRaw is Map
       ? flagsRaw.map((k, v) => MapEntry(k as String, (v as num).toInt()))
       : const <String, int>{};
 
+  // raw['z_move_base'] is a PS no-separator id (e.g. "volttackle") — convert
+  // to the same hyphenated PokéAPI-style slug used everywhere else (e.g.
+  // "volt-tackle") so it can be passed straight to catalogMoveProvider,
+  // mirroring the backend's `_merge_move` (catalog_service.py:365-369).
+  final zMoveBasePsId = raw?['z_move_base'] as String?;
+  String? zMoveBase;
+  if (zMoveBasePsId != null) {
+    final baseRaw = psMoves[zMoveBasePsId] as Map<String, dynamic>?;
+    zMoveBase = baseRaw != null
+        ? psSlugFromDisplayName(baseRaw['name'] as String)
+        : zMoveBasePsId;
+  }
+
   return BackendMoveEntry(
+    pokeApiId: pokeApiEntry?.id,
     name: slug,
     displayName: displayName,
     gen: gen,
@@ -198,12 +253,13 @@ BackendMoveEntry _mergeMove(
     priority: priority,
     isZMove: isZMove,
     isMaxMove: isMaxMove,
-    zMoveBase: raw?['z_move_base'] as String?,
+    zMoveBase: zMoveBase,
     flags: flags,
     secondary: raw?['secondary'] as Map<String, dynamic>?,
     contestType: contestType,
     target: target,
     effectShort: effectShort,
+    effect: effect,
   );
 }
 
@@ -281,6 +337,30 @@ Future<List<BackendItemEntry>> buildOfflineItemCatalog(
   return results.values.toList();
 }
 
+/// Offline fallback for [catalogItemProvider] — single-item counterpart to
+/// [buildOfflineItemCatalog], mirroring the backend's `get_item`/`_get_entry`.
+Future<BackendItemEntry> buildOfflineItemEntry(
+  PokeApiRepository pokeApi,
+  PsDataService psData,
+  String nameOrId,
+) async {
+  await psData.initialize();
+  ItemEntry? pokeApiEntry;
+  try {
+    pokeApiEntry = await pokeApi.fetchItem(nameOrId);
+  } catch (_) {
+    pokeApiEntry = null;
+  }
+  final canonicalName =
+      pokeApiEntry != null ? _stripVariantSuffix(pokeApiEntry.name) : nameOrId;
+  final psId = psIdFromName(canonicalName);
+  final raw = psData.items[psId] as Map<String, dynamic>?;
+  if (raw == null && pokeApiEntry == null) {
+    throw Exception('Item "$nameOrId" not found offline');
+  }
+  return _mergeItem(raw, pokeApiEntry, canonicalName);
+}
+
 BackendItemEntry _mergeItem(
   Map<String, dynamic>? raw,
   ItemEntry? pokeApiEntry,
@@ -293,6 +373,7 @@ BackendItemEntry _mergeItem(
   final megaSpeciesRaw = raw?['mega_species'] as Map<String, dynamic>?;
 
   return BackendItemEntry(
+    pokeApiId: pokeApiEntry?.id,
     name: slug,
     displayName: displayName,
     gen: gen,
@@ -305,6 +386,10 @@ BackendItemEntry _mergeItem(
     isBerry: raw?['is_berry'] as bool? ?? false,
     isPlate: raw?['is_plate'] as bool? ?? false,
     isMemory: raw?['is_memory'] as bool? ?? false,
+    // Mirrors the backend's `is_battle_relevant=ps_id in self._items_ps` —
+    // true iff the item has a real PS data entry (raw is null for
+    // PokéAPI-only items with no PS match, e.g. key items, mail, medicine).
+    isBattleRelevant: raw != null,
     effectShort: pokeApiEntry?.shortEffect,
     effect: pokeApiEntry?.longEffect,
   );
@@ -362,22 +447,180 @@ Future<List<BackendAbilityEntry>> buildOfflineAbilityCatalog(
   return results.values.toList();
 }
 
+/// Offline fallback for [catalogAbilityProvider] — single-ability
+/// counterpart to [buildOfflineAbilityCatalog], mirroring the backend's
+/// `get_ability`/`_get_entry`.
+Future<BackendAbilityEntry> buildOfflineAbilityEntry(
+  PokeApiRepository pokeApi,
+  PsDataService psData,
+  String nameOrId,
+) async {
+  await psData.initialize();
+  AbilityEntry? pokeApiEntry;
+  try {
+    pokeApiEntry = await pokeApi.fetchAbility(nameOrId);
+  } catch (_) {
+    pokeApiEntry = null;
+  }
+  final canonicalName = pokeApiEntry?.name ?? nameOrId;
+  final psId = psIdFromName(canonicalName);
+  final raw = psData.abilities[psId] as Map<String, dynamic>?;
+  if (raw == null && pokeApiEntry == null) {
+    throw Exception('Ability "$nameOrId" not found offline');
+  }
+  return _mergeAbility(raw, pokeApiEntry, canonicalName);
+}
+
 BackendAbilityEntry _mergeAbility(
   Map<String, dynamic>? raw,
   AbilityEntry? pokeApiEntry,
   String slug,
 ) {
   final displayName = raw?['name'] as String? ?? _titleCaseSlug(slug);
-  var gen = (raw?['gen'] as num?)?.toInt() ?? 3;
+  // Mirrors the backend's `_merge_ability`'s own default (`raw.get("gen", 1)`,
+  // catalog_service.py:436) — was incorrectly 3 here, inconsistent with both
+  // the backend and this file's own _mergeMove/_mergeItem (both `?? 1`).
+  var gen = (raw?['gen'] as num?)?.toInt() ?? 1;
   if (pokeApiEntry != null) {
     gen = _genFromGenerationName(pokeApiEntry.generationName) ?? gen;
   }
 
   return BackendAbilityEntry(
+    pokeApiId: pokeApiEntry?.id,
     name: slug,
     displayName: displayName,
     gen: gen,
     effectShort: pokeApiEntry?.shortEffect,
     effect: pokeApiEntry?.longEffect,
   );
+}
+
+/// PS ability-slot key ("0"/"1"/"H") → PokéAPI-style slot number — mirrors
+/// the backend's `_PS_TO_SLOT` (catalog_service.py:50).
+const _kPsToSlotForPokemonAbilities = {'0': 1, '1': 2, 'H': 3};
+
+/// Canonical form of regional adjectives as they appear as learnset/pokedex
+/// key suffixes — mirrors the backend's `_REGION_CANONICAL`
+/// (learnset_service.py:25-34).
+const _kRegionCanonical = {
+  'alola': 'alola',
+  'alolan': 'alola',
+  'galar': 'galar',
+  'galarian': 'galar',
+  'hisui': 'hisui',
+  'hisuian': 'hisui',
+  'paldea': 'paldea',
+  'paldean': 'paldea',
+};
+
+final RegExp _kNormalizeSplitRe = RegExp(r'[-_ ]');
+
+/// Returns PS pokedex-key lookup candidates for a Pokémon name, in priority
+/// order — mirrors the backend's `normalize_ps_id` (learnset_service.py:37-74)
+/// exactly, including the region-prefix-reversal candidate (e.g.
+/// "alolan-vulpix" → "vulpixalola") that a single-candidate [psIdFromName]
+/// call would miss.
+List<String> _normalizePsId(String name) {
+  final clean = name.trim().toLowerCase();
+  final noSep = clean.replaceAll(_kNormalizeSplitRe, '');
+  final candidates = <String>[
+    noSep,
+    clean,
+    clean.replaceAll('-', '_'),
+    clean.replaceAll('-', ' '),
+  ];
+
+  final parts = clean.split(_kNormalizeSplitRe);
+  if (parts.length >= 2) {
+    final canonical = _kRegionCanonical[parts.first];
+    if (canonical != null) {
+      final species = parts.sublist(1).join();
+      candidates.add(species + canonical);
+    }
+  }
+
+  final seen = <String>{};
+  final result = <String>[];
+  for (final c in candidates) {
+    if (seen.add(c)) result.add(c);
+  }
+  return result;
+}
+
+/// Offline fallback for [abilitiesForPokemonProvider] — mirrors the
+/// backend's `_abilities_for_pokemon`/`_resolve_pokemon_ps_id`
+/// (catalog_service.py:528-551): resolve [pokemon] (a species name or
+/// numeric dex number, as the backend accepts both) to a PS pokedex id, read
+/// its `abilities` map (PS-slot-keyed: "0"/"1"/"H"), and merge each ability
+/// name with PokéAPI data.
+///
+/// Simplification vs. the backend: `_abilities_for_pokemon` is a synchronous
+/// method that first checks the already-preloaded in-memory ability catalog
+/// before falling back to a PS-only merge (it cannot make a live PokéAPI call
+/// itself). This offline path instead always does a live per-ability
+/// fetch+merge via [buildOfflineAbilityEntry] — reusing that function rather
+/// than duplicating its merge logic — which gives full PokéAPI enrichment
+/// every time rather than only when the full catalog happens to already be
+/// warm. This endpoint variant has no current caller anywhere in the app
+/// (built for endpoint-surface completeness only), so this tradeoff favors
+/// simplicity over exactly replicating the backend's internal caching detail.
+Future<List<BackendAbilityEntry>> buildOfflineAbilitiesForPokemon(
+  PokeApiRepository pokeApi,
+  PsDataService psData,
+  String pokemon,
+) async {
+  await psData.initialize();
+
+  String? psId;
+  final asNum = int.tryParse(pokemon);
+  if (asNum != null) {
+    for (final entry in psData.pokedex.entries) {
+      final dexNum = ((entry.value as Map<String, dynamic>)['num'] as num?)?.toInt();
+      if (dexNum == asNum) {
+        psId = entry.key;
+        break;
+      }
+    }
+  } else {
+    // Mirrors the backend's `_resolve_pokemon_ps_id`'s name branch — tries
+    // every `normalize_ps_id` candidate in order, including the
+    // region-prefix-reversal case a single psIdFromName call would miss
+    // (e.g. "alolan-vulpix" only matches via the reversed "vulpixalola").
+    for (final candidate in _normalizePsId(pokemon)) {
+      if (psData.pokedex.containsKey(candidate)) {
+        psId = candidate;
+        break;
+      }
+    }
+  }
+  if (psId == null) {
+    throw Exception('Pokémon "$pokemon" not found offline');
+  }
+
+  final pokedexEntry = psData.pokedex[psId] as Map<String, dynamic>;
+  final abilitiesRaw =
+      (pokedexEntry['abilities'] as Map<String, dynamic>?) ?? const {};
+
+  final result = <BackendAbilityEntry>[];
+  for (final entry in abilitiesRaw.entries) {
+    final key = entry.key;
+    final abilityName = entry.value as String; // PS display name, e.g. "Sand Veil"
+    final slot = _kPsToSlotForPokemonAbilities[key] ?? 1;
+    final isHidden = key == 'H';
+    // buildOfflineAbilityEntry needs a PokéAPI-style slug for its live fetch
+    // (e.g. "sand-veil"), not the raw PS display name.
+    final abilitySlug = psSlugFromDisplayName(abilityName);
+    final ability = await buildOfflineAbilityEntry(pokeApi, psData, abilitySlug);
+    result.add(BackendAbilityEntry(
+      pokeApiId: ability.pokeApiId,
+      name: ability.name,
+      displayName: ability.displayName,
+      gen: ability.gen,
+      effectShort: ability.effectShort,
+      effect: ability.effect,
+      slot: slot,
+      isHidden: isHidden,
+    ));
+  }
+  return result;
 }

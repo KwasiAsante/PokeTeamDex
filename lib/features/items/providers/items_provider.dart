@@ -54,6 +54,41 @@ final itemPocketFilterProvider = StateProvider<String?>((ref) => null);
 /// Sort direction for the item list.
 final itemSortProvider = StateProvider<ItemSort>((ref) => ItemSort.nameAZ);
 
+/// Filter by generation (1-9) — mirrors the backend's `/items?gen=` param
+/// (`catalog_service.py`'s `list_items`). Not yet exposed in the UI.
+final itemsGenFilterProvider = StateProvider<int?>((ref) => null);
+
+/// Filter by exact PokéAPI item-category name (e.g. "mega-stones") — mirrors
+/// the backend's `/items?category=` param. More granular than
+/// [itemPocketFilterProvider] (a pocket groups multiple categories together,
+/// e.g. "misc" bundles 25 categories) — not yet exposed in the UI.
+final itemsCategoryFilterProvider = StateProvider<String?>((ref) => null);
+
+/// Filter to only mega stones (true) or only non-mega-stones (false) —
+/// mirrors the backend's `/items?is_mega_stone=` param. Not yet exposed in the UI.
+final itemsIsMegaStoneFilterProvider = StateProvider<bool?>((ref) => null);
+
+/// Filter to only Z-crystals — mirrors `/items?is_z_crystal=`. Not yet
+/// exposed in the UI.
+final itemsIsZCrystalFilterProvider = StateProvider<bool?>((ref) => null);
+
+/// Filter to only berries — mirrors `/items?is_berry=`. Not yet exposed in
+/// the UI.
+final itemsIsBerryFilterProvider = StateProvider<bool?>((ref) => null);
+
+/// Filter to only plates — mirrors `/items?is_plate=`. Not yet exposed in
+/// the UI.
+final itemsIsPlateFilterProvider = StateProvider<bool?>((ref) => null);
+
+/// Filter to only memories — mirrors `/items?is_memory=`. Not yet exposed in
+/// the UI.
+final itemsIsMemoryFilterProvider = StateProvider<bool?>((ref) => null);
+
+/// Filter to only PS-sourced/battle-relevant items (true) or only
+/// PokéAPI-only items like key items/mail/medicine (false) — mirrors the
+/// backend's `/items?is_battle_relevant=` param. Not yet exposed in the UI.
+final itemsIsBattleRelevantFilterProvider = StateProvider<bool?>((ref) => null);
+
 /// The item pockets available as filter options.
 /// Maps PokéAPI pocket name → display label.
 const kItemPockets = <String, String>{
@@ -67,18 +102,99 @@ const kItemPockets = <String, String>{
   'misc':      'Misc',
 };
 
-/// Item names for a given pocket, fetched from PokéAPI and cached.
+/// PokéAPI item-category name → pocket name, verified against the live
+/// `/item-pocket/{pocket}` endpoints for all 8 real pockets (misc, medicine,
+/// pokeballs, machines, berries, mail, battle, key — "mail" has no filter
+/// chip in [kItemPockets] and is intentionally not user-facing here).
 ///
-/// "held-items" is special-cased: it's a PokéAPI item *category* nested
-/// inside the "misc" pocket, not a pocket of its own — see
-/// [PokeApiRepository.fetchItemsByCategory].
-final itemsByPocketProvider =
-    FutureProvider.family<List<String>, String>((ref, pocket) async {
-  final repo = ref.read(pokeApiRepositoryProvider);
-  return pocket == 'held-items'
-      ? repo.fetchItemsByCategory('held-items')
-      : repo.fetchItemsByPocket(pocket);
-});
+/// This replaces a live `/item-pocket/{pocket}` fetch per filter tap
+/// ([PokeApiRepository.fetchItemsByPocket], now removed) with a lookup over
+/// each entry's already-known `category` field (present on every
+/// [BackendItemEntry] from either the backend catalog or the offline
+/// PokéAPI+PS merge) — pocket filtering now works identically online and
+/// offline, with no extra network dependency at all.
+///
+/// Static PokéAPI game data that does not change; safe to hardcode. Note the
+/// name collision: the "medicine" *category* here belongs to the "berries"
+/// *pocket* (distinct from the "medicine" pocket's own categories) — this
+/// map disambiguates that correctly since it's keyed by category, not by a
+/// naive category-equals-pocket-name assumption.
+const _kCategoryToPocket = <String, String>{
+  // misc
+  'collectibles': 'misc',
+  'evolution': 'misc',
+  'spelunking': 'misc',
+  'held-items': 'misc',
+  'choice': 'misc',
+  'effort-training': 'misc',
+  'bad-held-items': 'misc',
+  'training': 'misc',
+  'plates': 'misc',
+  'species-specific': 'misc',
+  'type-enhancement': 'misc',
+  'loot': 'misc',
+  'mulch': 'misc',
+  'dex-completion': 'misc',
+  'scarves': 'misc',
+  'jewels': 'misc',
+  'mega-stones': 'misc',
+  'memories': 'misc',
+  'species-candies': 'misc',
+  'dynamax-crystals': 'misc',
+  'curry-ingredients': 'misc',
+  'tera-shard': 'misc',
+  'sandwich-ingredients': 'misc',
+  'tm-materials': 'misc',
+  'picnic': 'misc',
+  // medicine
+  'vitamins': 'medicine',
+  'healing': 'medicine',
+  'pp-recovery': 'medicine',
+  'revival': 'medicine',
+  'status-cures': 'medicine',
+  'nature-mints': 'medicine',
+  // pokeballs
+  'special-balls': 'pokeballs',
+  'standard-balls': 'pokeballs',
+  'apricorn-balls': 'pokeballs',
+  // machines
+  'all-machines': 'machines',
+  // berries
+  'effort-drop': 'berries',
+  'medicine': 'berries',
+  'other': 'berries',
+  'in-a-pinch': 'berries',
+  'picky-healing': 'berries',
+  'type-protection': 'berries',
+  'baking-only': 'berries',
+  'catching-bonus': 'berries',
+  // mail (no filter chip today)
+  'all-mail': 'mail',
+  // battle
+  'stat-boosts': 'battle',
+  'flutes': 'battle',
+  'miracle-shooter': 'battle',
+  // key
+  'event-items': 'key',
+  'gameplay': 'key',
+  'plot-advancement': 'key',
+  'unused': 'key',
+  'apricorn-box': 'key',
+  'data-cards': 'key',
+  'z-crystals': 'key',
+};
+
+/// Resolves an entry's pocket-filter membership from its own `category`
+/// field — see [_kCategoryToPocket]. "held-items" is special-cased in
+/// [kItemPockets] as its own pseudo-pocket (it's really a category nested
+/// inside "misc"), so it's matched by category equality rather than via the
+/// category→pocket map.
+bool _entryMatchesPocket(BackendItemEntry entry, String pocket) {
+  final category = entry.category;
+  if (category == null) return false;
+  if (pocket == 'held-items') return category == 'held-items';
+  return _kCategoryToPocket[category] == pocket;
+}
 
 // ── Per-item detail (autoDispose — large family cache) ────────────────────────
 
@@ -90,7 +206,20 @@ final itemProvider =
 
 final catalogItemProvider =
     FutureProvider.autoDispose.family<BackendItemEntry, String>((ref, name) {
-  return ref.read(pokemonBackendRepositoryProvider).fetchCatalogItem(name);
+  return withBackendFallback<BackendItemEntry>(
+    cacheKey: 'catalog_item_$name',
+    box: ref.read(backendFallbackBoxProvider),
+    isOnline: ref.read(backendFallbackIsOnlineProvider),
+    backendCall: () =>
+        ref.read(pokemonBackendRepositoryProvider).fetchCatalogItem(name),
+    offlineFallback: () => buildOfflineItemEntry(
+      ref.read(pokeApiRepositoryProvider),
+      ref.read(psDataServiceProvider),
+      name,
+    ),
+    fromJson: BackendItemEntry.fromJson,
+    toJson: (item) => item.toJson(),
+  );
 });
 
 // ── Filtered + sorted list ────────────────────────────────────────────────────
@@ -99,50 +228,61 @@ final filteredItemsProvider = Provider<AsyncValue<List<BackendItemEntry>>>((ref)
   final pocket = ref.watch(itemPocketFilterProvider);
   final sort   = ref.watch(itemSortProvider);
   final search = ref.watch(itemsSearchProvider).trim().toLowerCase();
+  final genFilter = ref.watch(itemsGenFilterProvider);
+  final categoryFilter = ref.watch(itemsCategoryFilterProvider);
+  final isMegaStoneFilter = ref.watch(itemsIsMegaStoneFilterProvider);
+  final isZCrystalFilter = ref.watch(itemsIsZCrystalFilterProvider);
+  final isBerryFilter = ref.watch(itemsIsBerryFilterProvider);
+  final isPlateFilter = ref.watch(itemsIsPlateFilterProvider);
+  final isMemoryFilter = ref.watch(itemsIsMemoryFilterProvider);
+  final isBattleRelevantFilter = ref.watch(itemsIsBattleRelevantFilterProvider);
 
   final backendAsync = ref.watch(itemsListProvider);
-  final backendList = backendAsync.asData?.value ?? const <BackendItemEntry>[];
-  // Map for fast name → entry lookup (used when pocket filter is active).
-  final catalogMap = <String, BackendItemEntry>{
-    for (final e in backendList) e.name: e,
-  };
+  if (backendAsync is AsyncLoading) return const AsyncValue.loading();
+  if (backendAsync is AsyncError) {
+    return AsyncValue.error(
+        (backendAsync as AsyncError).error,
+        (backendAsync as AsyncError).stackTrace);
+  }
+  final backendList = backendAsync.requireValue;
   // ID order map for idAscending/idDescending sorts.
   final idOrder = <String, int>{
     for (int i = 0; i < backendList.length; i++) backendList[i].name: i,
   };
 
-  // Determine the base list of entries to filter/sort.
-  final AsyncValue<List<BackendItemEntry>> entriesAsync;
-  if (pocket != null) {
-    // Pocket filter uses PokéAPI name list; enrich from catalog where available.
-    final pocketAsync = ref.watch(itemsByPocketProvider(pocket));
-    if (pocketAsync is AsyncLoading || backendAsync is AsyncLoading) {
-      return const AsyncValue.loading();
-    }
-    if (pocketAsync is AsyncError) {
-      return AsyncValue.error(
-          (pocketAsync as AsyncError).error,
-          (pocketAsync as AsyncError).stackTrace);
-    }
-    final pocketNames = pocketAsync.requireValue;
-    // catalogMap now comes from a full PokéAPI+PS merge (backend or offline
-    // fallback) rather than a sentinel-name list, so a pocket name with no
-    // catalog match is genuinely missing data — skip it rather than
-    // fabricate a placeholder entry.
-    entriesAsync = AsyncValue.data(
-      pocketNames.map((n) => catalogMap[n]).whereType<BackendItemEntry>().toList(),
-    );
-  } else if (backendAsync is AsyncLoading) {
-    return const AsyncValue.loading();
-  } else if (backendAsync is AsyncError) {
-    return AsyncValue.error(
-        (backendAsync as AsyncError).error,
-        (backendAsync as AsyncError).stackTrace);
-  } else {
-    entriesAsync = AsyncValue.data(List.of(backendList));
-  }
+  // Pocket membership is derived from each entry's own `category` field
+  // (see [_entryMatchesPocket]) rather than a live PokéAPI fetch — works
+  // identically online and offline, no extra network dependency.
+  List<BackendItemEntry> items = pocket == null
+      ? List.of(backendList)
+      : backendList.where((e) => _entryMatchesPocket(e, pocket)).toList();
 
-  List<BackendItemEntry> items = List.of(entriesAsync.requireValue);
+  if (genFilter != null) {
+    items = items.where((e) => e.gen == genFilter).toList();
+  }
+  if (categoryFilter != null) {
+    items = items.where((e) => e.category == categoryFilter).toList();
+  }
+  if (isMegaStoneFilter != null) {
+    items = items.where((e) => e.isMegaStone == isMegaStoneFilter).toList();
+  }
+  if (isZCrystalFilter != null) {
+    items = items.where((e) => e.isZCrystal == isZCrystalFilter).toList();
+  }
+  if (isBerryFilter != null) {
+    items = items.where((e) => e.isBerry == isBerryFilter).toList();
+  }
+  if (isPlateFilter != null) {
+    items = items.where((e) => e.isPlate == isPlateFilter).toList();
+  }
+  if (isMemoryFilter != null) {
+    items = items.where((e) => e.isMemory == isMemoryFilter).toList();
+  }
+  if (isBattleRelevantFilter != null) {
+    items = items
+        .where((e) => e.isBattleRelevant == isBattleRelevantFilter)
+        .toList();
+  }
 
   if (search.isNotEmpty) {
     items = items

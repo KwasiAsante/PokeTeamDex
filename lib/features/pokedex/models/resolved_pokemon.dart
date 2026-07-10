@@ -27,7 +27,7 @@ class ResolvedPokemon {
 
   /// Additional moves sourced from the backend (Smogon / supplement data).
   /// Empty on the offline fallback path.
-  final List<SupplementMove> supplementMoves;
+  final List<LearnsetSupplementMove> supplementMoves;
 
   /// Smogon analysis data returned by the backend, if available.
   /// Null on the offline fallback path.
@@ -38,7 +38,7 @@ class ResolvedPokemon {
     required this.species,
     required this.cosmeticForms,
     required this.spriteUrls,
-    this.supplementMoves = const <SupplementMove>[],
+    this.supplementMoves = const <LearnsetSupplementMove>[],
     this.smogonAnalyses,
   });
 
@@ -63,7 +63,7 @@ class ResolvedPokemon {
         spriteUrls: SpriteUrlsFull.fromJson(
             json['sprite_urls'] as Map<String, dynamic>? ?? {}),
         supplementMoves: (json['supplement_moves'] as List<dynamic>? ?? [])
-            .map((m) => SupplementMove.fromJson(m as Map<String, dynamic>))
+            .map((m) => LearnsetSupplementMove.fromJson(m as Map<String, dynamic>))
             .toList(),
         smogonAnalyses: (json['smogon_analyses'] as List<dynamic>?)
             ?.map((e) => Map<String, dynamic>.from(e as Map))

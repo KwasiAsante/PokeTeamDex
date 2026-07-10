@@ -83,25 +83,45 @@ Future<T> withBackendFallback<T>({
   final resolvedBox = box ?? Hive.box(kBackendFallbackBoxName);
 
   T? readCache() {
-    final data = resolvedBox.get(cacheKey);
-    if (data is! Map) return null;
-    final payload = data['payload'];
-    final expiresAt = data['expiresAt'] as int?;
-    if (payload is! Map || expiresAt == null) return null;
-    final graceDeadline = expiresAt + _kStaleTTL.inMilliseconds;
-    if (DateTime.now().millisecondsSinceEpoch > graceDeadline) return null;
-    // JSON round-trip guarantees nested maps are Map<String,dynamic> — Hive on
-    // web (IndexedDB/MessagePack) deserialises them as Map<dynamic,dynamic>,
-    // which crashes fromJson casts. Same pattern as PokemonResolvedCache.
-    final normalized = jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
-    return fromJson(normalized);
+    try {
+      final data = resolvedBox.get(cacheKey);
+      if (data is! Map) return null;
+      final payload = data['payload'];
+      final expiresAt = data['expiresAt'] as int?;
+      if (payload is! Map || expiresAt == null) return null;
+      final graceDeadline = expiresAt + _kStaleTTL.inMilliseconds;
+      if (DateTime.now().millisecondsSinceEpoch > graceDeadline) return null;
+      // JSON round-trip guarantees nested maps are Map<String,dynamic> — Hive on
+      // web (IndexedDB/MessagePack) deserialises them as Map<dynamic,dynamic>,
+      // which crashes fromJson casts. Same pattern as PokemonResolvedCache.
+      final normalized = jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
+      return fromJson(normalized);
+    } catch (e, st) {
+      // A malformed/corrupted/schema-drifted entry must be treated as a
+      // cache miss (falling through to offlineFallback below), not allowed
+      // to propagate out of withBackendFallback entirely — that would skip
+      // the offline-reconstruction step even though the device is online
+      // and perfectly capable of rebuilding the data.
+      AppLogger().w(
+          '[withBackendFallback] cache read failed for "$cacheKey" (treating as miss)',
+          error: e, stackTrace: st);
+      return null;
+    }
   }
 
+  // Writing to the cache is a best-effort side-effect, never a condition for
+  // success — a Hive write failure (closed box, disk full, serialization
+  // error) must never discard an already-obtained result.
   void writeCache(T value, Duration ttl) {
-    resolvedBox.put(cacheKey, {
-      'payload': toJson(value),
-      'expiresAt': DateTime.now().add(ttl).millisecondsSinceEpoch,
-    });
+    try {
+      resolvedBox.put(cacheKey, {
+        'payload': toJson(value),
+        'expiresAt': DateTime.now().add(ttl).millisecondsSinceEpoch,
+      });
+    } catch (e, st) {
+      AppLogger().w('[withBackendFallback] cache write failed for "$cacheKey"',
+          error: e, stackTrace: st);
+    }
   }
 
   try {

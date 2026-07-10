@@ -60,12 +60,12 @@ PokéAPI integration with Hive TTL cache.
 | File | Purpose |
 | ---- | ------- |
 | `poke_api_client.dart` | Dio configured for `https://pokeapi.co/api/v2` |
-| `poke_api_repository.dart` | `fetchPokemon(id)`, `fetchPokemonSpecies(id)`, `fetchPokemonByName(name)`, `fetchPokemonEncounters(id)`, `fetchMove(name)`, `fetchItem(name)`, `fetchItemsByCategory(category)` |
+| `poke_api_repository.dart` | `fetchPokemon(id)`, `fetchPokemonSpecies(id)`, `fetchPokemonByName(name)`, `fetchPokemonEncounters(id)`, `fetchMove(name)`, `fetchItem(name)` |
 | `poke_api_cache.dart` | Hive box wrapper; TTL = 24h for list data, 7d for detail data |
 | `poke_api_providers.dart` | `pokeApiRepositoryProvider` (injectable in tests via override) |
 | `models/` | `PokemonEntry`, `PokemonSpeciesEntry`, `PokemonEncounterEntry` — JSON deserialization |
 
-`PokeApiRepository` keeps an in-memory map per entity type (`_pokemonById`, `_speciesById`, `_abilityByName`, `_evolutionChainById`, `_formByName`, `_moveByName`, `_itemByName`) layered on top of the Hive cache, so repeat lookups of the same Pokémon/move/item/ability skip re-parsing the cached JSON. `fetchItemsByCategory` exists separately from the pocket-based fetch because PokéAPI's `"held-items"` filter is an item *category* nested inside the `misc` pocket, not a pocket itself — calling the pocket endpoint with `"held-items"` 404s.
+`PokeApiRepository` keeps an in-memory map per entity type (`_pokemonById`, `_speciesById`, `_abilityByName`, `_evolutionChainById`, `_formByName`, `_moveByName`, `_itemByName`) layered on top of the Hive cache, so repeat lookups of the same Pokémon/move/item/ability skip re-parsing the cached JSON. Item-pocket filtering (`lib/features/items/providers/items_provider.dart`'s `_kCategoryToPocket`) no longer goes through this repository at all — it derives pocket membership from each catalog entry's own `category` field via a static, verified PokéAPI category→pocket map, so it works identically online and offline with no live `/item-pocket` fetch.
 
 ---
 
@@ -75,9 +75,10 @@ Backend-resolved Pokémon data infrastructure — the Flutter-side counterpart t
 
 | File | Purpose |
 | ---- | ------- |
-| `models.dart` | `AbilityInfo`, `MoveLearnDetail` (+ `viaPrev`/`prevo` fields), `MoveSummary`, `SupplementMove`, `SpriteUrlsFull`, `VarietyBackendData`, `FormBackendData`, `PokemonResolvedBackendResponse` — typed models for the backend response, plus `toPokemonEntry()`/`toPokemonSpeciesEntry()`/`toCosmeticForms()` converters |
+| `models.dart` | `AbilityInfo`, `MoveLearnDetail` (+ `viaPrev`/`prevo` fields), `MoveSummary`, `LearnsetSupplementMove`, `SpriteUrlsFull`, `VarietyBackendData`, `FormBackendData`, `PokemonResolvedBackendResponse` — typed models for the backend response, plus `toPokemonEntry()`/`toPokemonSpeciesEntry()`/`toCosmeticForms()` converters |
 | `pokemon_backend_repository.dart` | `PokemonBackendRepository` — HTTP calls to `GET /pokemon/{id}/resolved` and the `varieties`/`forms`/`smogon`/`moves`/`flavor-text` sub-endpoints; `fetchMoves(id, {gen})` accepts an optional gen param and parses the backend's gen-keyed dict response |
 | `pokemon_resolved_providers.dart` | `pokemonBackendRepositoryProvider`, and lazy-loaded sub-resource providers (`pokemonMovesProvider({id, gen?})`, `pokemonVarietiesProvider`, `pokemonFormsProvider`, `pokemonFlavorTextProvider`, `validLearnsetProvider({id, gen})`) — each wraps [`withBackendFallback`](#util) |
+| `sprite_url_builder.dart` | Offline-fallback sprite-URL construction mirroring the backend's `pokemon_resolver.py` (`_build_variety_sprite_urls`/`_build_base_sprite_urls`/`_build_form_sprite_urls`/`_build_pokeapi_sprite_url`/`_build_showdown_sprite_url`/`_build_icon_url`/`_to_showdown_name`). `buildVarietySpriteUrls()` is shared by the base Pokémon and each variety (both have a raw PokéAPI `sprites` object); `buildFormSpriteUrlsProbed()` HEAD-probes constructed HOME/official-artwork URLs for cosmetic form-entries, which have no `sprites` object of their own — same probing behaviour as the backend's `_fetch_forms` |
 
 Backend-response caching moved from a dedicated `PokemonResolvedCache` Hive
 wrapper to the shared `backend_fallback_cache` box owned by

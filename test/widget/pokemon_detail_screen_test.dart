@@ -10,6 +10,8 @@ import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_backend_repository.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
+import 'package:poke_team_dex/services/ps_data/ps_data_providers.dart';
+import 'package:poke_team_dex/services/ps_data/ps_data_service.dart';
 import 'package:poke_team_dex/services/util/backend_provider_utils.dart';
 import '../helpers/test_app.dart';
 import '../helpers/test_database.dart';
@@ -47,12 +49,24 @@ void main() {
   late MockPokeApiRepository mockApi;
   late _MockBackendRepo mockBackend;
   late _MockBox mockBox;
+  late PsDataService psData;
 
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     await PokemonDataRegistry.initialize();
     registerFallbackValue('');
     registerFallbackValue(0);
+
+    // Pre-initialize outside any testWidgets()/pumpAndSettle() cycle —
+    // rootBundle.loadString() for shared/ps_data/ never resolves inside a
+    // pumped widget-test frame in this environment (a flutter_test
+    // asset-loading quirk, not a production issue: plain `test()` +
+    // ProviderContainer suites load these same files fine). Doing the real
+    // load here once and overriding psDataServiceProvider with the already-
+    // initialized instance below means resolvedPokemonProvider's offline
+    // path never has to await a real asset load mid-pump.
+    psData = PsDataService();
+    await psData.initialize();
   });
 
   setUp(() {
@@ -70,6 +84,8 @@ void main() {
     when(() => mockBox.put(any(), any())).thenAnswer((_) async {});
     when(() => mockBackend.fetchResolved(any()))
         .thenThrow(Exception('test: backend disabled'));
+    when(() => mockBackend.fetchCatalogAbility(any()))
+        .thenThrow(Exception('test: backend disabled'));
   });
 
   List<dynamic> overrides() => [
@@ -77,6 +93,7 @@ void main() {
         pokemonBackendRepositoryProvider.overrideWithValue(mockBackend),
         backendFallbackBoxProvider.overrideWithValue(mockBox),
         backendFallbackIsOnlineProvider.overrideWithValue(() async => true),
+        psDataServiceProvider.overrideWithValue(psData),
       ];
 
   group('PokemonDetailScreen', () {

@@ -42,12 +42,22 @@ final pokemonByNameProvider =
 /// (Aegislash, Rotom) which each have their own `/pokemon` resource and are
 /// surfaced via [pokemonSpeciesProvider]'s varieties instead.
 ///
-/// The form matching the species' default appearance does not always share
-/// its name with the species/pokemon resource — Cherrim's default form is
-/// "cherrim-overcast" (not "cherrim"), and Xerneas' default is
-/// "xerneas-neutral" despite "xerneas-active" being listed first in `forms`.
-/// Only the form resource's own `is_default` flag is reliable, so every
-/// candidate is resolved and filtered by it.
+/// Non-default detection mirrors the backend's `_fetch_forms` exactly
+/// (position-based: `forms[0]` is assumed to be the default, falling back to
+/// "everything but index 0" if that yields nothing) — deliberately NOT each
+/// form's own `is_default` API flag, for strict online/offline parity. This
+/// assumption is wrong for a small, known set of species where PokéAPI's
+/// `forms[0]` disagrees with `is_default` (confirmed: Xerneas — `forms[0]` is
+/// "xerneas-active", but "xerneas-neutral" is the real default per its own
+/// `is_default` flag, its sprite matching the base species' dex-number
+/// sprite, and PS's bundled pokedex.json having no separate "xerneasactive"
+/// entry at all). That's a backend limitation this mirrors on purpose rather
+/// than "fixing" locally, so online and offline behavior always match.
+///
+/// Every returned entry's [PokemonFormEntry.isDefault] is forced to `false`
+/// — mirrors the backend's `FormData(is_default=False, ...)`, which is
+/// always hardcoded rather than read from the form's own flag (since, by
+/// construction, everything returned here is already "non-default").
 ///
 /// Returns `[]` for species with a single form or multiple varieties —
 /// no `pokemon-form` requests are made for the vast majority of species
@@ -69,9 +79,51 @@ final cosmeticFormsProvider = FutureProvider.autoDispose
         pokemon.formNames.every((fn) => varietyNames.contains(fn));
     if (allFormsAreVarieties) return const [];
   }
-  final forms = await Future.wait(pokemon.formNames.map(repo.fetchPokemonForm));
-  return forms.where((f) => !f.isDefault).toList();
+
+  // Mirrors the backend's `_fetch_forms`:
+  //   non_defaults = [n for n in form_names if n != species_name and n != form_names[0]]
+  //   if not non_defaults: non_defaults = form_names[1:] if len(form_names) > 1 else []
+  final formNames = pokemon.formNames;
+  var nonDefaultNames = formNames
+      .where((n) => n != species.name && n != formNames.first)
+      .toList();
+  if (nonDefaultNames.isEmpty) {
+    nonDefaultNames = formNames.length > 1 ? formNames.sublist(1) : const [];
+  }
+  if (nonDefaultNames.isEmpty) return const [];
+
+  // Isolate each form fetch — mirrors the backend's `_fetch_forms`, which
+  // uses `asyncio.gather(..., return_exceptions=True)` and still emits a
+  // degraded entry for a form whose fetch failed rather than dropping every
+  // other form too. A single transient PokéAPI failure (timeout, 404) must
+  // not take down the entire Pokémon resolution — resolvedPokemonProvider's
+  // and pokemonFormsProvider's offline fallbacks both await this unguarded,
+  // with no try/catch of their own, so an unhandled rejection here
+  // previously propagated all the way out to a full BackendUnavailableException
+  // even when everything except the forms/cosmetic chips loaded fine.
+  final forms = await Future.wait(nonDefaultNames.map((name) async {
+    try {
+      return await repo.fetchPokemonForm(name);
+    } catch (_) {
+      return null;
+    }
+  }));
+  return forms
+      .whereType<PokemonFormEntry>()
+      .map((f) => f.isDefault ? _withIsDefaultFalse(f) : f)
+      .toList();
 });
+
+PokemonFormEntry _withIsDefaultFalse(PokemonFormEntry f) => PokemonFormEntry(
+      id: f.id,
+      name: f.name,
+      formName: f.formName,
+      isDefault: false,
+      spriteUrl: f.spriteUrl,
+      spriteShinyUrl: f.spriteShinyUrl,
+      officialArtworkUrl: f.officialArtworkUrl,
+      officialArtworkShinyUrl: f.officialArtworkShinyUrl,
+    );
 
 final evolutionChainProvider =
     FutureProvider.autoDispose.family<EvolutionNode, int>((ref, chainId) async {

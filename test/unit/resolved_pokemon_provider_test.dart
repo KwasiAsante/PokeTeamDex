@@ -115,7 +115,13 @@ void main() {
       final resolved = await container.read(resolvedPokemonProvider((id: 1, gen: null)).future);
 
       expect(resolved, isA<ResolvedPokemon>());
-      expect(resolved.detail, same(detailEntry));
+      // detail is no longer the same instance — the offline fallback now
+      // always runs it through resolveGenAccuratePokedexData, which prefers
+      // PS's pokedex.json (real bulbasaur data) over this fixture's
+      // deliberately-wrong placeholder type/stats. Identity/species are
+      // unaffected since only detail's types/stats/abilities get patched.
+      expect(resolved.detail.id, detailEntry.id);
+      expect(resolved.detail.name, detailEntry.name);
       expect(resolved.species, same(speciesEntry));
       expect(resolved.cosmeticForms, isEmpty);
     });

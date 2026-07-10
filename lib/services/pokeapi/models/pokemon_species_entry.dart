@@ -93,7 +93,11 @@ class PokemonSpeciesEntry {
         'is_mythical': isMythical,
         'evolution_chain_id': evolutionChainId,
         'varieties': varieties
-            .map((v) => {'is_default': v.isDefault, 'name': v.name})
+            .map((v) => {
+                  'is_default': v.isDefault,
+                  'name': v.name,
+                  'pokemon_id': v.pokemonId,
+                })
             .toList(),
       };
 
@@ -120,6 +124,7 @@ class PokemonSpeciesEntry {
           .map((v) => PokemonVariety(
                 isDefault: (v as Map)['is_default'] as bool? ?? false,
                 name: v['name'] as String,
+                pokemonId: (v['pokemon_id'] as num?)?.toInt(),
               ))
           .toList(),
     );
@@ -164,7 +169,12 @@ class FlavorTextEntry {
 
   factory FlavorTextEntry.fromJson(Map<String, dynamic> json) {
     return FlavorTextEntry(
-      text: (json['flavor_text'] as String).replaceAll(RegExp(r'\s+'), ' '),
+      // Mirrors the backend's exact normalization (resolve(),
+      // `e["flavor_text"].replace("\n", " ").replace("\f", " ")`) — only
+      // newline/form-feed become a single space each; unlike a `\s+`
+      // collapse, this does NOT merge consecutive whitespace (e.g. a
+      // double-newline becomes two spaces, same as backend).
+      text: (json['flavor_text'] as String).replaceAll('\n', ' ').replaceAll('\f', ' '),
       language: json['language']['name'] as String,
       version: json['version']['name'] as String,
     );
@@ -195,14 +205,28 @@ class EvolutionChainLink {
 class PokemonVariety {
   final bool isDefault;
   final String name; // e.g. 'venusaur-mega', 'pikachu-alola-cap'
+  // Parsed from the species response's own `pokemon.url` — lets callers
+  // build a slim placeholder for this variety (mirrors the backend's
+  // `_fetch_varieties` stub-on-fetch-failure path) without needing a
+  // successful `/pokemon/{name}` fetch first. Null for varieties built from
+  // pre-this-fix cached species data.
+  final int? pokemonId;
 
-  const PokemonVariety({required this.isDefault, required this.name});
+  const PokemonVariety({required this.isDefault, required this.name, this.pokemonId});
 
   factory PokemonVariety.fromJson(Map<String, dynamic> json) {
+    final pokemonMap = json['pokemon'] as Map;
     return PokemonVariety(
       isDefault: json['is_default'] as bool,
-      name: (json['pokemon'] as Map)['name'] as String,
+      name: pokemonMap['name'] as String,
+      pokemonId: _idFromUrl(pokemonMap['url'] as String?),
     );
+  }
+
+  static int? _idFromUrl(String? url) {
+    if (url == null) return null;
+    final segments = url.split('/').where((s) => s.isNotEmpty).toList();
+    return segments.isEmpty ? null : int.tryParse(segments.last);
   }
 
   String get displayName {

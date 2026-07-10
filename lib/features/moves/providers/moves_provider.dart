@@ -46,6 +46,22 @@ final movesSearchProvider = StateProvider<String>((ref) => '');
 final movesDamageClassFilterProvider = StateProvider<String?>((ref) => null);
 final movesTypeFilterProvider = StateProvider<String?>((ref) => null);
 
+/// Filter by generation (1-9) — mirrors the backend's `/moves?gen=` param
+/// (`catalog_service.py`'s `list_moves`). Not yet exposed in the UI.
+final movesGenFilterProvider = StateProvider<int?>((ref) => null);
+
+/// Filter by PokéAPI contest-type name (e.g. "cool", "tough") — mirrors the
+/// backend's `/moves?contest_type=` param. Not yet exposed in the UI.
+final movesContestTypeFilterProvider = StateProvider<String?>((ref) => null);
+
+/// Filter to only Z-moves (true) or only non-Z-moves (false) — mirrors the
+/// backend's `/moves?is_z_move=` param. Not yet exposed in the UI.
+final movesIsZMoveFilterProvider = StateProvider<bool?>((ref) => null);
+
+/// Filter to only Max/G-max moves (true) or only non-Max moves (false) —
+/// mirrors the backend's `/moves?is_max_move=` param. Not yet exposed in the UI.
+final movesIsMaxMoveFilterProvider = StateProvider<bool?>((ref) => null);
+
 /// Move names for a given type — fetched from /type/{name}, cached 7 days.
 /// Still used by the retry callback in MovesScreen; type filtering is now
 /// client-side on backend entries for the filtered provider.
@@ -59,6 +75,10 @@ final movesByTypeProvider =
 final filteredMovesProvider = Provider<AsyncValue<List<BackendMoveEntry>>>((ref) {
   final typeFilter = ref.watch(movesTypeFilterProvider);
   final damageClassFilter = ref.watch(movesDamageClassFilterProvider);
+  final genFilter = ref.watch(movesGenFilterProvider);
+  final contestTypeFilter = ref.watch(movesContestTypeFilterProvider);
+  final isZMoveFilter = ref.watch(movesIsZMoveFilterProvider);
+  final isMaxMoveFilter = ref.watch(movesIsMaxMoveFilterProvider);
   final search = ref.watch(movesSearchProvider).trim().toLowerCase();
 
   final listAsync = ref.watch(movesListProvider);
@@ -78,6 +98,18 @@ final filteredMovesProvider = Provider<AsyncValue<List<BackendMoveEntry>>>((ref)
   if (damageClassFilter != null) {
     entries = entries.where((e) => e.damageClass == damageClassFilter).toList();
   }
+  if (genFilter != null) {
+    entries = entries.where((e) => e.gen == genFilter).toList();
+  }
+  if (contestTypeFilter != null) {
+    entries = entries.where((e) => e.contestType == contestTypeFilter).toList();
+  }
+  if (isZMoveFilter != null) {
+    entries = entries.where((e) => e.isZMove == isZMoveFilter).toList();
+  }
+  if (isMaxMoveFilter != null) {
+    entries = entries.where((e) => e.isMaxMove == isMaxMoveFilter).toList();
+  }
   if (search.isNotEmpty) {
     entries = entries
         .where((e) =>
@@ -85,6 +117,15 @@ final filteredMovesProvider = Provider<AsyncValue<List<BackendMoveEntry>>>((ref)
             e.displayName.toLowerCase().contains(search))
         .toList();
   }
+
+  // Mirrors the backend's `list_moves` (`values.sort(key=lambda m: m.name)`,
+  // catalog_service.py:477) — the backend always sorts by name before
+  // pagination, so online display order is alphabetical purely as an
+  // artifact of that sort + naive page concatenation. The offline builder's
+  // enumeration order instead follows PokéAPI's own `/move` list (roughly
+  // numeric ID order), so without this explicit sort, move order would
+  // visibly differ between online and offline.
+  entries.sort((a, b) => a.name.compareTo(b.name));
 
   return AsyncValue.data(entries);
 });
@@ -94,7 +135,20 @@ final filteredMovesProvider = Provider<AsyncValue<List<BackendMoveEntry>>>((ref)
 /// own move resource doesn't carry.
 final catalogMoveProvider =
     FutureProvider.autoDispose.family<BackendMoveEntry, String>((ref, name) {
-  return ref.read(pokemonBackendRepositoryProvider).fetchCatalogMove(name);
+  return withBackendFallback<BackendMoveEntry>(
+    cacheKey: 'catalog_move_$name',
+    box: ref.read(backendFallbackBoxProvider),
+    isOnline: ref.read(backendFallbackIsOnlineProvider),
+    backendCall: () =>
+        ref.read(pokemonBackendRepositoryProvider).fetchCatalogMove(name),
+    offlineFallback: () => buildOfflineMoveEntry(
+      ref.read(pokeApiRepositoryProvider),
+      ref.read(psDataServiceProvider),
+      name,
+    ),
+    fromJson: BackendMoveEntry.fromJson,
+    toJson: (move) => move.toJson(),
+  );
 });
 
 /// Fetches a machine's item name and URL by the machine's full PokéAPI URL.

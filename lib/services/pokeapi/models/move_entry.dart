@@ -1,4 +1,5 @@
 class MoveEntry {
+  final int? id;
   final String name;
   final String? typeName;
   final String? damageClass; // 'physical', 'special', 'status'
@@ -6,6 +7,7 @@ class MoveEntry {
   final int? accuracy;
   final int? pp;
   final String? shortEffect;
+  final String? longEffect;
 
   // Extended fields parsed from the full /move/{name} response
   final String? generationName;   // e.g. "generation-i"
@@ -24,6 +26,7 @@ class MoveEntry {
   final String? superContestEffectUrl;
 
   const MoveEntry({
+    this.id,
     required this.name,
     this.typeName,
     this.damageClass,
@@ -31,6 +34,7 @@ class MoveEntry {
     this.accuracy,
     this.pp,
     this.shortEffect,
+    this.longEffect,
     this.generationName,
     this.targetName,
     this.priority = 0,
@@ -47,6 +51,7 @@ class MoveEntry {
 
   factory MoveEntry.fromJson(Map<String, dynamic> json) {
     String? shortEffect;
+    String? longEffect;
     final effectEntries = json['effect_entries'] as List?;
     if (effectEntries != null) {
       final en = effectEntries.cast<Map>().firstWhere(
@@ -54,6 +59,14 @@ class MoveEntry {
             orElse: () => {},
           );
       shortEffect = en['short_effect'] as String?;
+      longEffect = en['effect'] as String?;
+    }
+    // "$effect_chance" is a literal placeholder PokéAPI leaves in the effect
+    // text (e.g. "Has a $effect_chance% chance to..."); substitute the move's
+    // own effect_chance value, mirroring the backend's `_merge_move`.
+    final effectChance = json['effect_chance'];
+    if (longEffect != null && effectChance != null) {
+      longEffect = longEffect.replaceAll(r'$effect_chance', '$effectChance');
     }
 
     // Meta
@@ -119,6 +132,7 @@ class MoveEntry {
         .toList();
 
     return MoveEntry(
+      id: json['id'] as int?,
       name: json['name'] as String,
       typeName: json['type']?['name'] as String?,
       damageClass: json['damage_class']?['name'] as String?,
@@ -126,6 +140,7 @@ class MoveEntry {
       accuracy: json['accuracy'] is int ? json['accuracy'] as int : null,
       pp: json['pp'] as int?,
       shortEffect: shortEffect,
+      longEffect: longEffect,
       generationName: json['generation']?['name'] as String?,
       targetName: json['target']?['name'] as String?,
       priority: json['priority'] as int? ?? 0,

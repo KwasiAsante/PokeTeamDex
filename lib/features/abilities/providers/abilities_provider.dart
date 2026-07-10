@@ -129,5 +129,48 @@ final filteredAbilitiesProvider = Provider<AsyncValue<List<BackendAbilityEntry>>
 /// Pokémon detail screen where only effect text and gen label are needed.
 final catalogAbilityProvider =
     FutureProvider.autoDispose.family<BackendAbilityEntry, String>((ref, name) {
-  return ref.read(pokemonBackendRepositoryProvider).fetchCatalogAbility(name);
+  return withBackendFallback<BackendAbilityEntry>(
+    cacheKey: 'catalog_ability_$name',
+    box: ref.read(backendFallbackBoxProvider),
+    isOnline: ref.read(backendFallbackIsOnlineProvider),
+    backendCall: () =>
+        ref.read(pokemonBackendRepositoryProvider).fetchCatalogAbility(name),
+    offlineFallback: () => buildOfflineAbilityEntry(
+      ref.read(pokeApiRepositoryProvider),
+      ref.read(psDataServiceProvider),
+      name,
+    ),
+    fromJson: BackendAbilityEntry.fromJson,
+    toJson: (ability) => ability.toJson(),
+  );
+});
+
+/// A Pokémon's own 2-3 abilities (with `slot`/`isHidden` per entry) via the
+/// backend's `/abilities?pokemon=` variant — distinct from
+/// [abilitiesListProvider]'s full paginated catalog. Not currently called
+/// from any screen (per-Pokémon ability display goes through
+/// [resolveGenAccuratePokedexData]/`resolvedPokemonProvider` instead), but
+/// built for full endpoint-surface parity — see [buildOfflineAbilitiesForPokemon].
+final abilitiesForPokemonProvider = FutureProvider.autoDispose
+    .family<List<BackendAbilityEntry>, String>((ref, pokemon) {
+  return withBackendFallback<List<BackendAbilityEntry>>(
+    cacheKey: 'catalog_abilities_for_$pokemon',
+    box: ref.read(backendFallbackBoxProvider),
+    isOnline: ref.read(backendFallbackIsOnlineProvider),
+    backendCall: () async {
+      final response = await ref
+          .read(pokemonBackendRepositoryProvider)
+          .fetchCatalogAbilities(pokemon: pokemon, pageSize: 10);
+      return response.items;
+    },
+    offlineFallback: () => buildOfflineAbilitiesForPokemon(
+      ref.read(pokeApiRepositoryProvider),
+      ref.read(psDataServiceProvider),
+      pokemon,
+    ),
+    fromJson: (json) => (json['items'] as List<dynamic>)
+        .map((a) => BackendAbilityEntry.fromJson(a as Map<String, dynamic>))
+        .toList(),
+    toJson: (abilities) => {'items': abilities.map((a) => a.toJson()).toList()},
+  );
 });

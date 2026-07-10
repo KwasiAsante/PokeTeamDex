@@ -4,6 +4,7 @@ import 'package:poke_team_dex/features/pokedex/models/resolved_pokemon.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/sprite_url_builder.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/ps_data/ps_data_providers.dart';
@@ -18,8 +19,14 @@ const _kBase =
 /// Uses [withBackendFallback]: tries the backend first, falls back to a
 /// cached copy (accepting up to 24h stale), then to a full offline
 /// reconstruction from PokéAPI + bundled PS data (gen-accurate stat/type
-/// overrides and learnset-supplement moves), and only throws if neither a
-/// cache entry nor internet access is available.
+/// overrides), and only throws if neither a cache entry nor internet access
+/// is available.
+///
+/// [detail.moves] stays raw-PokéAPI in the offline path (no learnset
+/// supplement moves) — [pokemonMovesProvider] is the sole owner of that
+/// merge and is what the Moves tab actually renders; `detail.moves` here is
+/// only ever shown as a brief fallback while that provider is still loading,
+/// so it isn't worth duplicating the merge for.
 ///
 /// This provider is **keepAlive** (no `.autoDispose`) — once resolved it stays
 /// in memory for the app session. This eliminates the ~100 provider rebuild
@@ -66,53 +73,71 @@ Future<ResolvedPokemon> _offlineFallback(Ref ref, int id, int? gen) async {
           : await ref.read(cosmeticFormsProvider(detail.name).future);
   final cosmeticForms = _patchCosmeticForms(rawCosmetic, detail.id, detail.name);
 
-  final spriteUrls = SpriteUrlsFull(
-    officialArtwork: detail.officialArtworkUrl,
-    officialArtworkShiny: detail.officialArtworkShinyUrl,
+  // Sprite URLs for the base Pokémon — mirrors the backend's
+  // `_build_base_sprite_urls` call site in `resolve()`. Uses the RAW nullable
+  // `gen` (not the gen-9-defaulted `dataGen` below): gen == null means plain
+  // root sprites, not a versioned gen-9 directory.
+  final registry = PokemonDataRegistry.instance;
+  final psSpriteName = toShowdownName(detail.name, registry.psFormExceptions);
+  final genSpriteIdOverride = baseGenSpriteIdOverride(
+    pokemonId: detail.id,
+    formNames: detail.formNames,
+    speciesName: species.name,
+  );
+  final spriteUrls = buildVarietySpriteUrls(
+    sprites: detail.sprites,
+    psName: psSpriteName,
+    varietyId: detail.id,
+    gen: gen,
+    genSpriteIdOverride: genSpriteIdOverride,
+    varietyIconIdOverrides: registry.varietyIconIdOverrides,
   );
 
-  if (gen == null) {
-    return ResolvedPokemon(
-      detail: detail,
-      species: species,
-      cosmeticForms: cosmeticForms,
-      spriteUrls: spriteUrls,
-    );
-  }
+  // gen == null means "no specific gen requested" — mirrors the backend's
+  // `data_gen = gen if gen is not None else 9`: types/stats/abilities still
+  // get gen-9-accurate PS consolidation, just not pinned to an older gen.
+  final dataGen = gen ?? 9;
 
-  // Gen-accurate stat/type overrides + learnset supplement moves, sourced
-  // from the same bundled shared/ps_data/ files the backend itself reads.
+  // Gen-accurate types/stats/abilities, sourced from the same bundled
+  // shared/ps_data/ files the backend itself reads — PS's pokedex.json base
+  // entry is the primary source (PokéAPI is only the fallback), with
+  // pokedex-gen-overrides.json patched on top per field.
   final psData = ref.read(psDataServiceProvider);
   await psData.initialize();
-  final speciesPsId = psIdFromName(detail.speciesName ?? detail.name);
+  // Always key the PS lookup off the actually-resolved Pokémon's own name —
+  // mirrors the backend's `ps_id = pokemon_name.replace("-", "").lower()`
+  // (resolve(), `pokemon_name = pokemon_data["name"]`). The backend NEVER
+  // falls back to the species name: when the PS entry is missing (e.g.
+  // "wormadamplant" — Wormadam's default form has no distinct PS entry, only
+  // the base "wormadam" does), it falls through to raw PokéAPI data, which
+  // `resolveGenAccuratePokedexData` already replicates via its `rawTypes`/
+  // `rawStats`/`rawAbilities` parameters. Preferring speciesName here would
+  // silently substitute the BASE species' PS entry for genuine varieties
+  // (e.g. Charizard-Mega-X would incorrectly resolve against base Charizard).
+  final speciesPsId = psIdFromName(detail.name);
 
-  var patchedDetail = detail;
-  final override = genAccuratePokedexOverride(psData, speciesPsId, gen);
-  if (override != null && (override.stats.isNotEmpty || override.types.isNotEmpty)) {
-    patchedDetail = PokemonEntry(
-      id: detail.id,
-      name: detail.name,
-      speciesName: detail.speciesName,
-      height: detail.height,
-      weight: detail.weight,
-      baseExperience: detail.baseExperience,
-      types: override.types.isNotEmpty ? override.types : detail.types,
-      officialArtworkUrl: detail.officialArtworkUrl,
-      sprites: detail.sprites,
-      stats: override.stats.isNotEmpty ? override.stats : detail.stats,
-      abilities: detail.abilities,
-      moves: detail.moves,
-      formNames: detail.formNames,
-    );
-  }
-
-  final learnset = await psData.learnsetForGen(gen);
-  final supplementMoves = learnsetSupplementMoves(
-    psData: psData,
-    learnsetForGen: learnset,
-    speciesPsId: speciesPsId,
-    gen: gen,
-    existingMoveNames: detail.moves.map((m) => m.name).toSet(),
+  final resolved = resolveGenAccuratePokedexData(
+    psData,
+    speciesPsId,
+    dataGen,
+    rawTypes: detail.types,
+    rawStats: detail.stats,
+    rawAbilities: detail.abilities,
+  );
+  final patchedDetail = PokemonEntry(
+    id: detail.id,
+    name: detail.name,
+    speciesName: detail.speciesName,
+    height: detail.height,
+    weight: detail.weight,
+    baseExperience: detail.baseExperience,
+    types: resolved.types,
+    officialArtworkUrl: detail.officialArtworkUrl,
+    sprites: detail.sprites,
+    stats: resolved.stats,
+    abilities: resolved.abilities,
+    moves: detail.moves,
+    formNames: detail.formNames,
   );
 
   return ResolvedPokemon(
@@ -120,7 +145,6 @@ Future<ResolvedPokemon> _offlineFallback(Ref ref, int id, int? gen) async {
     species: species,
     cosmeticForms: cosmeticForms,
     spriteUrls: spriteUrls,
-    supplementMoves: supplementMoves,
   );
 }
 
