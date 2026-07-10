@@ -77,6 +77,7 @@ class PokemonEntry {
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
+        'species_name': speciesName,
         'height': height,
         'weight': weight,
         'base_experience': baseExperience,
@@ -85,7 +86,33 @@ class PokemonEntry {
         'stats': stats,
         'abilities': abilities.map((a) => a.toJson()).toList(),
         'moves': moves.map((m) => m.toJson()).toList(),
+        'form_names': formNames,
       };
+
+  /// Round-trips a [toJson] payload — a flat snapshot of this object's own
+  /// fields — as opposed to [fromJson], which parses a raw `/pokemon/{id}`
+  /// PokéAPI response (a structurally different, nested shape).
+  factory PokemonEntry.fromCacheJson(Map<String, dynamic> json) {
+    return PokemonEntry(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      speciesName: json['species_name'] as String?,
+      height: json['height'] as int,
+      weight: json['weight'] as int,
+      baseExperience: json['base_experience'] as int?,
+      types: (json['types'] as List).cast<String>(),
+      sprites: (json['sprites'] as Map<String, dynamic>?),
+      stats: (json['stats'] as Map<String, dynamic>? ?? {})
+          .map((k, v) => MapEntry(k, v as int)),
+      abilities: (json['abilities'] as List<dynamic>? ?? [])
+          .map((a) => AbilityInfo.fromJson(a as Map<String, dynamic>))
+          .toList(),
+      moves: (json['moves'] as List<dynamic>? ?? [])
+          .map((m) => MoveSummary.fromJson(m as Map<String, dynamic>))
+          .toList(),
+      formNames: (json['form_names'] as List?)?.cast<String>() ?? const [],
+    );
+  }
 
   String displayId() => '#${id.toString().padLeft(3, '0')}';
 

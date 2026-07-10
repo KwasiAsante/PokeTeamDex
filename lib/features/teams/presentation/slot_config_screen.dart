@@ -11,19 +11,18 @@ import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/abilities/providers/abilities_provider.dart'
-    show catalogAbilityProvider;
+    show abilitiesListProvider, catalogAbilityProvider;
 import 'package:poke_team_dex/features/items/providers/items_provider.dart';
 import 'package:poke_team_dex/features/moves/providers/moves_provider.dart'
     show catalogMoveProvider;
 import 'package:poke_team_dex/services/catalog/catalog_models.dart'
-    show BackendMoveEntry;
+    show BackendAbilityEntry, BackendItemEntry, BackendMoveEntry;
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
     show teamByIdProvider, teamSlotsProvider;
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
-import 'package:poke_team_dex/services/format/format_service.dart';
 import 'package:poke_team_dex/services/format/slot_validator.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart'
     show MoveSummary, VarietyBackendData;
@@ -334,13 +333,14 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   /// Compute real-time violations against [format] for current form values.
   /// Uses PokéAPI version-group learnsets for game-specific accuracy.
+  /// [availableAbilities]/[availableItems] must already be gen-filtered.
   Map<String, String> _computeViolations(
-    FormatService service,
     GameFormat format,
     String pokemonName,
     List<MoveSummary> pokemonMoves,
+    List<BackendAbilityEntry> availableAbilities,
+    List<BackendItemEntry> availableItems,
   ) {
-    if (!service.isInitialized) return {};
     return validateSlotSync(
       _abilityName,
       _heldItemName,
@@ -348,7 +348,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       pokemonName,
       pokemonMoves,
       format,
-      service,
+      availableAbilities,
+      availableItems,
     ).violations;
   }
 
@@ -624,11 +625,19 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         final speciesName = pokemon.displaySpeciesName;
 
         // ── Format & mechanics ─────────────────────────────────────────────
-        // format/formatId computed above; only formatService is watched here.
-        final formatService = ref.watch(formatServiceProvider);
         final mechanics = format != null
             ? GenerationMechanics.forGen(format.gen)
             : null;
+        final availableAbilities = format != null
+            ? (ref.watch(abilitiesListProvider).asData?.value ?? const <BackendAbilityEntry>[])
+                .where((a) => a.gen <= format.gen)
+                .toList()
+            : const <BackendAbilityEntry>[];
+        final availableItems = format != null
+            ? (ref.watch(itemsListProvider).asData?.value ?? const <BackendItemEntry>[])
+                .where((i) => i.gen <= format.gen)
+                .toList()
+            : const <BackendItemEntry>[];
 
         // ── Form state ─────────────────────────────────────────────────────
         final allVarieties = resolved.species.varieties.map((v) => v.name).toList();
@@ -738,19 +747,16 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
           return ancestorAll.difference(effectiveLearnableMoveSet);
         }) ??
             const <String>{};
-        // Event moves: surfaced for the picker's "Event" badge only.
-        final effectiveEventMoves = <String>{};
-        if (format != null && formatService.isInitialized) {
-          final eventIds =
-              formatService.eventMovesForGen(effectivePokemonName, format.gen);
-          if (eventIds.isNotEmpty) {
-            for (final name in effectiveLearnableMoves) {
-              if (eventIds.contains(name.replaceAll('-', '').toLowerCase())) {
-                effectiveEventMoves.add(name);
+        // Event moves: surfaced for the picker's "Event" badge only. The
+        // backend already merges PS learnset data server-side, so any move
+        // whose learn method is "event" for this (already gen-scoped) move
+        // list is a genuine event-exclusive move.
+        final effectiveEventMoves = format != null
+            ? {
+                for (final m in effectivePokemonMoves)
+                  if (m.learnDetails.any((d) => d.method == 'event')) m.name,
               }
-            }
-          }
-        }
+            : const <String>{};
         final allPickableMoves = {
           ...effectiveLearnableMoves,
           ...effectivePriorEvoMoves,
@@ -768,8 +774,8 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
         // Prior-evo moves are excluded from violation checking.
         final effectiveViolations = {
           for (final entry in (format != null
-                  ? _computeViolations(formatService, format, pokemon.name,
-                      effectivePokemonMoves)
+                  ? _computeViolations(format, pokemon.name, effectivePokemonMoves,
+                      availableAbilities, availableItems)
                   : <String, String>{})
               .entries)
             if (!entry.key.startsWith('move') ||
@@ -1690,8 +1696,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
                         if (moveDetail.type.isNotEmpty)
                           TypeBadge(type: moveDetail.type),
                         Builder(builder: (ctx) {
-                          final svc = ref.read(formatServiceProvider);
-                          final special = classifyMoveType(svc, moveDetail!.name);
+                          final special = classifyMoveType(moveDetail);
                           if (special == null) return const SizedBox.shrink();
                           return Padding(
                             padding: const EdgeInsets.only(left: 4),

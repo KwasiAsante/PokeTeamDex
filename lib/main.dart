@@ -27,8 +27,8 @@ import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/services/update/update_provider.dart';
 import 'package:poke_team_dex/services/tray/tray_service.dart';
 import 'package:poke_team_dex/shared/theme/app_theme.dart';
-import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_cache.dart'
-    show kResolvedCacheVersion;
+import 'package:poke_team_dex/services/util/backend_provider_utils.dart'
+    show kBackendFallbackBoxName, clearBackendFallbackCacheIfStale;
 import 'package:poke_team_dex/utils/app_logger.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -147,16 +147,8 @@ void main() async {
 
   await Hive.initFlutter();
   await Hive.openBox('pokeapi_cache');
-  await Hive.openBox('pokemon_resolved_cache');
-
-  // Clear the resolved cache when the schema version has been bumped.
-  // Ensures stale entries (missing fields, renamed keys) don't survive an app update.
-  final resolvedBox = Hive.box('pokemon_resolved_cache');
-  final storedVersion = resolvedBox.get('__version__') as int? ?? 0;
-  if (storedVersion != kResolvedCacheVersion) {
-    await resolvedBox.clear();
-    await resolvedBox.put('__version__', kResolvedCacheVersion);
-  }
+  await Hive.openBox(kBackendFallbackBoxName);
+  await clearBackendFallbackCacheIfStale();
 
   await PokemonDataRegistry.initialize();
 

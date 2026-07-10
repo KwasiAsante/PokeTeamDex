@@ -17,9 +17,6 @@ import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provid
 import 'package:poke_team_dex/features/teams/providers/team_detail_providers.dart'
     show teamSlotsProvider;
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
-import 'package:poke_team_dex/services/format/format_models.dart';
-import 'package:poke_team_dex/services/format/format_providers.dart';
-import 'package:poke_team_dex/services/format/format_service.dart';
 import 'package:poke_team_dex/services/pokeapi/models/encounter_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/evolution_chain.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
@@ -1109,21 +1106,15 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
       });
   }
 
-  /// Moves grouped by learn method for the selected version group, supplemented
-  /// with an "Event Moves" group for genuine event/gift-Pokémon moves the PS
-  /// detailed-learnset source knows about that PokéAPI has no
-  /// `move_learn_method` category for at all (e.g. Pokémon Crystal's gift
-  /// Dratini knowing Extreme Speed from the start). [psIdToName] recovers a
-  /// displayable PokéAPI move name + id for those PS-only entries; [gen] and
-  /// [formatService] are the generation/service to query — both null when the
-  /// service isn't ready yet or the selected version has no known generation.
+  /// Moves grouped by learn method for the selected version group. The
+  /// backend already merges PS learnset data server-side — any genuine
+  /// event/gift-Pokémon move (e.g. Pokémon Crystal's gift Dratini knowing
+  /// Extreme Speed from the start) arrives with `method: "event"` and lands
+  /// in the `groups['event']` bucket naturally, same as any other method.
   Map<String, List<_MoveRow>> _grouped(
     String? version,
-    List<MoveSummary> moves, {
-    required Map<String, String> psIdToName,
-    int? gen,
-    FormatService? formatService,
-  }) {
+    List<MoveSummary> moves,
+  ) {
     final groups = <String, List<_MoveRow>>{};
     for (final m in moves) {
       final moveName = m.name;
@@ -1141,92 +1132,19 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     }
     // Sort level-up by level
     groups['level-up']?.sort((a, b) => a.level.compareTo(b.level));
-
-    if (gen != null && formatService != null && formatService.isInitialized) {
-      final alreadyShown = {
-        for (final rows in groups.values) for (final r in rows) r.moveName,
-      };
-      final eventRows = <_MoveRow>[];
-      for (final id in formatService.eventMovesForGen(widget.pokemon.name, gen)) {
-        final name = _resolveEventMoveName(id, psIdToName, formatService);
-        if (name == null || alreadyShown.contains(name)) continue;
-        eventRows.add(_MoveRow(moveName: name, level: 0));
-      }
-      if (eventRows.isNotEmpty) {
-        eventRows.sort((a, b) => a.moveName.compareTo(b.moveName));
-        groups['event'] = eventRows;
-      }
-    }
+    groups['event']?.sort((a, b) => a.moveName.compareTo(b.moveName));
     return groups;
   }
 
-  /// Maps PS move id (e.g. "extremespeed") → PokéAPI move name (e.g.
-  /// "extreme-speed") for every move PokéAPI lists for [current] or any
-  /// [ancestorSets] member, across all generations. Needed to recover a
-  /// displayable name + `moveProvider`-fetchable id for moves that
-  /// [FormatService.eventMovesForGen] surfaces by PS id — those moves do
-  /// appear in PokéAPI's data (just attributed to a different generation or
-  /// method there), so this reverse-lookup virtually always resolves.
-  static Map<String, String> _psIdToNameMap(
-    List<MoveSummary> current,
-    List<({String speciesName, List<MoveSummary> moves})> ancestorSets,
-  ) {
-    final map = <String, String>{};
-    for (final m in current) {
-      map.putIfAbsent(_toPsId(m.name), () => m.name);
-    }
-    for (final ancestor in ancestorSets) {
-      for (final m in ancestor.moves) {
-        map.putIfAbsent(_toPsId(m.name), () => m.name);
-      }
-    }
-    return map;
-  }
-
-  /// Resolves a PS move id surfaced by [FormatService.eventMovesForGen] to a
-  /// displayable PokéAPI-style move name. Tries [psIdToName] first (the move
-  /// appears in PokéAPI's data for the species or an ancestor — just under a
-  /// different generation/method); falls back to PS's own move database for
-  /// moves PokéAPI has zero record of for the line at all — e.g. Eevee's
-  /// Gen-2 event-exclusive Growth (a Stadium-2/gift encounter, unlike
-  /// Dratini's Extreme Speed which PokéAPI at least lists via a later-gen
-  /// egg/tutor method). PS names preserve official punctuation/hyphenation
-  /// ("King's Shield", "U-turn"), so lower-casing, hyphenating whitespace and
-  /// dropping apostrophes reliably reproduces the PokéAPI slug.
-  static String? _resolveEventMoveName(
-    String psId,
-    Map<String, String> psIdToName,
-    FormatService? formatService,
-  ) {
-    final known = psIdToName[psId];
-    if (known != null) return known;
-    final entry = formatService?.moveDetail(psId);
-    if (entry == null) return null;
-    return entry.name.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
-  }
-
   /// For each ancestor, returns exclusive move rows learnable in [selectedVg]
-  /// that the current Pokémon cannot learn in [selectedVg] — including
-  /// genuine event/gift-exclusive moves from [FormatService.eventMovesForGen]
-  /// (e.g. Dragonair/Dragonite's "Prior Evolution Exclusive ▸ Dratini" group
-  /// surfacing Extreme Speed from Pokémon Crystal's gift Dratini, which
-  /// PokéAPI's `move_learn_method` data has no category for at all).
-  /// [psIdToName], [gen] and [formatService] mirror [_grouped]'s parameters.
+  /// that the current Pokémon cannot learn in [selectedVg]. These are moves
+  /// that must be learned before the Pokémon evolves.
   List<({String speciesName, List<_MoveRow> rows})> _buildPriorEvoGroups(
     String? selectedVg,
     List<MoveSummary> moves,
-    List<({String speciesName, List<MoveSummary> moves})> ancestorSets, {
-    required Map<String, String> psIdToName,
-    int? gen,
-    FormatService? formatService,
-  }) {
-    final canQueryEvents =
-        gen != null && formatService != null && formatService.isInitialized;
-
-    // Moves the current Pokémon can learn in the selected version group —
-    // plus its own genuine event moves, which shouldn't be flagged as
-    // "exclusive to an ancestor" just because PokéAPI's version-group data
-    // doesn't carry them either.
+    List<({String speciesName, List<MoveSummary> moves})> ancestorSets,
+  ) {
+    // Moves the current Pokémon can learn in the selected version group.
     final currentInVg = <String>{};
     for (final m in moves) {
       final moveName = m.name;
@@ -1236,12 +1154,6 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
           currentInVg.add(moveName);
           break;
         }
-      }
-    }
-    if (canQueryEvents) {
-      for (final id in formatService.eventMovesForGen(widget.pokemon.name, gen)) {
-        final name = _resolveEventMoveName(id, psIdToName, formatService);
-        if (name != null) currentInVg.add(name);
       }
     }
 
@@ -1259,15 +1171,6 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
             rows.add(_MoveRow(moveName: moveName, level: level));
           }
           break;
-        }
-      }
-      if (canQueryEvents) {
-        for (final id in formatService.eventMovesForGen(ancestor.speciesName, gen)) {
-          final name = _resolveEventMoveName(id, psIdToName, formatService);
-          if (name == null || currentInVg.contains(name)) continue;
-          if (!rows.any((r) => r.moveName == name)) {
-            rows.add(_MoveRow(moveName: name, level: 0));
-          }
         }
       }
       rows.sort((a, b) => a.moveName.compareTo(b.moveName));
@@ -1291,35 +1194,12 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
     final versions = _versions(moves);
     _selectedVersion ??= versions.isNotEmpty ? versions.first : null;
 
-    // FormatService gates on `initialize()` resolving — `allFormatsProvider`
-    // is the readiness signal (mirrors the gating pattern used elsewhere).
-    // Until it resolves, `formatService`/`gen` stay null and the event-move
-    // supplementary lookups in `_grouped`/`_buildPriorEvoGroups` are skipped.
-    final formatsReady = ref.watch(allFormatsProvider).hasValue;
-    final formatService = formatsReady ? ref.read(formatServiceProvider) : null;
-    final gen = _selectedVersion != null
-        ? genForVersionGroup(_selectedVersion!)
-        : null;
-
     final priorEvoAsync = ref.watch(priorEvoMoveSetsProvider((id: widget.pokemon.id, gen: null)));
-    final ancestorSets = priorEvoAsync.whenOrNull(data: (sets) => sets) ?? const [];
-    final psIdToName = _psIdToNameMap(moves, ancestorSets);
 
-    final grouped = _grouped(
-      _selectedVersion,
-      moves,
-      psIdToName: psIdToName,
-      gen: gen,
-      formatService: formatService,
-    );
+    final grouped = _grouped(_selectedVersion, moves);
 
     final priorEvoGroups = priorEvoAsync.whenOrNull(
-      data: (sets) => _buildPriorEvoGroups(
-        _selectedVersion, moves, sets,
-        psIdToName: psIdToName,
-        gen: gen,
-        formatService: formatService,
-      ),
+      data: (sets) => _buildPriorEvoGroups(_selectedVersion, moves, sets),
     ) ?? const [];
     final priorEvoLoading = priorEvoAsync.isLoading;
 
@@ -1367,33 +1247,6 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
                               rows: grouped[method]!,
                               showLevel: method == 'level-up',
                             )),
-                    // FormatService backs the "Event Moves" group — while it's
-                    // still initializing, `formatsReady` is false and the group
-                    // is simply absent from `grouped`, which looks identical to
-                    // "this Pokémon has no event moves". Show a spinner so it's
-                    // clear the table is still loading, not empty.
-                    if (!formatsReady)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: colorScheme.tertiary,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Loading event moves…',
-                              style: textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant),
-                            ),
-                          ],
-                        ),
-                      ),
                     if (priorEvoLoading)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
@@ -1462,11 +1315,6 @@ class _MovesTabState extends ConsumerState<_MovesTab> {
       .split('-')
       .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
       .join(' ');
-
-  /// PokéAPI uses hyphenated names ("extreme-speed"); PS ids strip hyphens
-  /// ("extremespeed") — mirrors `_toPsId` in slot_validator.dart.
-  static String _toPsId(String pokeApiName) =>
-      pokeApiName.replaceAll('-', '').toLowerCase();
 }
 
 class _MoveRow {

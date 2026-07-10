@@ -4,19 +4,22 @@ import 'package:poke_team_dex/features/pokedex/models/resolved_pokemon.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
-import 'package:poke_team_dex/utils/app_logger.dart';
+import 'package:poke_team_dex/services/ps_data/ps_data_providers.dart';
+import 'package:poke_team_dex/services/ps_data/ps_data_service.dart';
+import 'package:poke_team_dex/services/util/backend_provider_utils.dart';
 
 const _kBase =
     'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
 
 /// Merges Pokémon data for a single ID into one [ResolvedPokemon].
 ///
-/// Fetch order:
-/// 1. Hive cache hit  — returns immediately without network calls.
-/// 2. Backend fetch   — fast on Postgres hit; result is written to Hive cache.
-/// 3. Offline fallback — Task C behaviour: assembles from PokéAPI providers
-///    (which are themselves Hive-cached by pokeapi_cache).
+/// Uses [withBackendFallback]: tries the backend first, falls back to a
+/// cached copy (accepting up to 24h stale), then to a full offline
+/// reconstruction from PokéAPI + bundled PS data (gen-accurate stat/type
+/// overrides and learnset-supplement moves), and only throws if neither a
+/// cache entry nor internet access is available.
 ///
 /// This provider is **keepAlive** (no `.autoDispose`) — once resolved it stays
 /// in memory for the app session. This eliminates the ~100 provider rebuild
@@ -30,34 +33,27 @@ final resolvedPokemonProvider =
     FutureProvider.family<ResolvedPokemon, ({int id, int? gen})>((ref, params) async {
   final id = params.id;
   final gen = params.gen;
-  final cache = ref.read(pokemonResolvedCacheProvider);
-
-  // Cache key includes gen so gen-specific sprite data is stored separately.
   final cacheKey = gen != null ? 'resolved_${id}_g$gen' : 'resolved_$id';
 
-  // 1. Hive cache hit
-  final cached = cache.getIfValid(cacheKey);
-  if (cached != null) {
-    AppLogger().d('[resolved] Hive cache hit id=$id gen=$gen');
-    final response = PokemonResolvedBackendResponse.fromJson(cached);
-    return _fromBackendResponse(response);
-  }
+  return withBackendFallback<ResolvedPokemon>(
+    cacheKey: cacheKey,
+    box: ref.read(backendFallbackBoxProvider),
+    isOnline: ref.read(backendFallbackIsOnlineProvider),
+    backendCall: () async {
+      final repo = ref.read(pokemonBackendRepositoryProvider);
+      final response = await repo.fetchResolved(id, gen: gen);
+      return _fromBackendResponse(response);
+    },
+    offlineFallback: () => _offlineFallback(ref, id, gen),
+    fromJson: ResolvedPokemon.fromJson,
+    toJson: (r) => r.toJson(),
+  );
+});
 
-  // 2. Backend fetch (returns fast on Postgres hit)
-  try {
-    AppLogger().d('[resolved] fetching from backend id=$id gen=$gen');
-    final repo = ref.read(pokemonBackendRepositoryProvider);
-    final response = await repo.fetchResolved(id, gen: gen);
-    AppLogger().d('[resolved] backend ok id=$id name=${response.name}');
-    cache.putWithTTL(cacheKey, response.toJson(), const Duration(days: 7));
-    return _fromBackendResponse(response);
-  } catch (e) {
-    AppLogger().w('[resolved] backend failed id=$id, falling back to PokéAPI', error: e);
-    // 3. Offline fallback — Task C behavior
-  }
-
-  // Offline: assemble from PokéAPI (already Hive-cached per pokeapi_cache).
-  // Use ref.read (not ref.watch) after an await to avoid StateError.
+/// Assembles a [ResolvedPokemon] from PokéAPI (Hive-cached per pokeapi_cache)
+/// plus bundled PS data — a full, non-degraded reconstruction of what the
+/// backend would have returned, not a partial/sentinel result.
+Future<ResolvedPokemon> _offlineFallback(Ref ref, int id, int? gen) async {
   final detail = await ref.read(pokemonDetailProvider(id).future);
   final species = await ref.read(pokemonSpeciesProvider(id).future);
 
@@ -68,51 +64,65 @@ final resolvedPokemonProvider =
       PokemonDataRegistry.instance.noCosmeticFormsPokemon.contains(detail.name)
           ? const <PokemonFormEntry>[]
           : await ref.read(cosmeticFormsProvider(detail.name).future);
+  final cosmeticForms = _patchCosmeticForms(rawCosmetic, detail.id, detail.name);
 
-  // Patch gender form entries whose /pokemon-form sprite URL is null
-  // (frillish-female, jellicent-female) and preserve artwork URLs.
-  final patched = rawCosmetic.map((f) {
-    if (f.spriteUrl == null && f.formName == 'female') {
-      return PokemonFormEntry(
-        id: f.id,
-        name: f.name,
-        formName: f.formName,
-        isDefault: f.isDefault,
-        spriteUrl: '${_kBase}female/${detail.id}.png',
-        spriteShinyUrl: '${_kBase}shiny/female/${detail.id}.png',
-        officialArtworkUrl: f.officialArtworkUrl,
-        officialArtworkShinyUrl: f.officialArtworkShinyUrl,
-      );
-    }
-    return f;
-  }).toList();
+  final spriteUrls = SpriteUrlsFull(
+    officialArtwork: detail.officialArtworkUrl,
+    officialArtworkShiny: detail.officialArtworkShinyUrl,
+  );
 
-  // Synthetic female entry for species with gender-diff sprites but no
-  // separate /pokemon-form resource (e.g. Unfezant).
-  final cosmeticForms = [
-    ...patched,
-    if (PokemonDataRegistry.instance.cosmeticGenderDiffPokemon
-        .contains(detail.name))
-      PokemonFormEntry(
-        id: detail.id,
-        name: '${detail.name}-female',
-        formName: 'female',
-        isDefault: false,
-        spriteUrl: '${_kBase}female/${detail.id}.png',
-        spriteShinyUrl: '${_kBase}shiny/female/${detail.id}.png',
-      ),
-  ];
+  if (gen == null) {
+    return ResolvedPokemon(
+      detail: detail,
+      species: species,
+      cosmeticForms: cosmeticForms,
+      spriteUrls: spriteUrls,
+    );
+  }
+
+  // Gen-accurate stat/type overrides + learnset supplement moves, sourced
+  // from the same bundled shared/ps_data/ files the backend itself reads.
+  final psData = ref.read(psDataServiceProvider);
+  await psData.initialize();
+  final speciesPsId = psIdFromName(detail.speciesName ?? detail.name);
+
+  var patchedDetail = detail;
+  final override = genAccuratePokedexOverride(psData, speciesPsId, gen);
+  if (override != null && (override.stats.isNotEmpty || override.types.isNotEmpty)) {
+    patchedDetail = PokemonEntry(
+      id: detail.id,
+      name: detail.name,
+      speciesName: detail.speciesName,
+      height: detail.height,
+      weight: detail.weight,
+      baseExperience: detail.baseExperience,
+      types: override.types.isNotEmpty ? override.types : detail.types,
+      officialArtworkUrl: detail.officialArtworkUrl,
+      sprites: detail.sprites,
+      stats: override.stats.isNotEmpty ? override.stats : detail.stats,
+      abilities: detail.abilities,
+      moves: detail.moves,
+      formNames: detail.formNames,
+    );
+  }
+
+  final learnset = await psData.learnsetForGen(gen);
+  final supplementMoves = learnsetSupplementMoves(
+    psData: psData,
+    learnsetForGen: learnset,
+    speciesPsId: speciesPsId,
+    gen: gen,
+    existingMoveNames: detail.moves.map((m) => m.name).toSet(),
+  );
 
   return ResolvedPokemon(
-    detail: detail,
+    detail: patchedDetail,
     species: species,
     cosmeticForms: cosmeticForms,
-    spriteUrls: SpriteUrlsFull(
-      officialArtwork: detail.officialArtworkUrl,
-      officialArtworkShiny: detail.officialArtworkShinyUrl,
-    ),
+    spriteUrls: spriteUrls,
+    supplementMoves: supplementMoves,
   );
-});
+}
 
 ResolvedPokemon _fromBackendResponse(PokemonResolvedBackendResponse r) {
   final detail = r.toPokemonEntry();

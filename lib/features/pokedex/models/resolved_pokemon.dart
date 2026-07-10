@@ -42,6 +42,34 @@ class ResolvedPokemon {
     this.smogonAnalyses,
   });
 
+  /// Cache round-trip for [withBackendFallback] — a self-contained snapshot
+  /// of every field, independent of the backend response wire format.
+  Map<String, dynamic> toJson() => {
+        'detail': detail.toJson(),
+        'species': species.toCacheJson(),
+        'cosmetic_forms': cosmeticForms.map((f) => f.toCacheJson()).toList(),
+        'sprite_urls': spriteUrls.toJson(),
+        'supplement_moves': supplementMoves.map((m) => m.toJson()).toList(),
+        'smogon_analyses': smogonAnalyses,
+      };
+
+  factory ResolvedPokemon.fromJson(Map<String, dynamic> json) => ResolvedPokemon(
+        detail: PokemonEntry.fromCacheJson(json['detail'] as Map<String, dynamic>),
+        species: PokemonSpeciesEntry.fromCacheJson(
+            json['species'] as Map<String, dynamic>),
+        cosmeticForms: (json['cosmetic_forms'] as List<dynamic>? ?? [])
+            .map((f) => PokemonFormEntry.fromCacheJson(f as Map<String, dynamic>))
+            .toList(),
+        spriteUrls: SpriteUrlsFull.fromJson(
+            json['sprite_urls'] as Map<String, dynamic>? ?? {}),
+        supplementMoves: (json['supplement_moves'] as List<dynamic>? ?? [])
+            .map((m) => SupplementMove.fromJson(m as Map<String, dynamic>))
+            .toList(),
+        smogonAnalyses: (json['smogon_analyses'] as List<dynamic>?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList(),
+      );
+
   int get id => detail.id;
   String get name => detail.name;
   String? get speciesName => detail.speciesName;

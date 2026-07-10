@@ -1,30 +1,46 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:poke_team_dex/features/items/providers/items_provider.dart';
 import 'package:poke_team_dex/services/catalog/catalog_models.dart';
+import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_backend_repository.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
+import 'package:poke_team_dex/services/util/backend_provider_utils.dart';
 
 class MockPokemonBackendRepository extends Mock
     implements PokemonBackendRepository {}
 
 class MockPokeApiRepository extends Mock implements PokeApiRepository {}
 
+class MockBox extends Mock implements Box {}
+
 void main() {
   late MockPokemonBackendRepository mockBackend;
   late MockPokeApiRepository mockPokeApi;
+  late MockBox mockBox;
+
+  setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+  });
 
   setUp(() {
     mockBackend = MockPokemonBackendRepository();
     mockPokeApi = MockPokeApiRepository();
+    mockBox = MockBox();
+    when(() => mockBox.get(any())).thenReturn(null);
+    when(() => mockBox.put(any(), any())).thenAnswer((_) async {});
   });
 
-  ProviderContainer makeContainer() => ProviderContainer(overrides: [
+  ProviderContainer makeContainer({bool online = true}) =>
+      ProviderContainer(overrides: [
         pokemonBackendRepositoryProvider.overrideWithValue(mockBackend),
         pokeApiRepositoryProvider.overrideWithValue(mockPokeApi),
+        backendFallbackBoxProvider.overrideWithValue(mockBox),
+        backendFallbackIsOnlineProvider.overrideWithValue(() async => online),
       ]);
 
   test('itemsListProvider returns backend entries on success', () async {
@@ -56,7 +72,7 @@ void main() {
     expect(result[0].name, 'leftovers');
   });
 
-  test('itemsListProvider falls back to PokéAPI on backend failure', () async {
+  test('itemsListProvider falls back to offline PokéAPI+PS merge on backend failure', () async {
     when(() => mockBackend.fetchCatalogItems(
               page: any(named: 'page'),
               pageSize: any(named: 'pageSize'),
@@ -70,13 +86,16 @@ void main() {
             ))
         .thenThrow(Exception('backend down'));
     when(() => mockPokeApi.fetchItemList())
-        .thenAnswer((_) async => ['leftovers', 'master-ball']);
+        .thenAnswer((_) async => ['leftovers']);
+    when(() => mockPokeApi.fetchItem('leftovers')).thenAnswer((_) async => const ItemEntry(
+          name: 'leftovers',
+          category: 'held-items',
+        ));
 
     final container = makeContainer();
     final result = await container.read(itemsListProvider.future);
-    expect(result.length, 2);
-    expect(result[0].name, 'leftovers');
-    expect(result[0].gen, 0); // sentinel
+    final leftovers = result.firstWhere((e) => e.name == 'leftovers');
+    expect(leftovers.category, 'held-items');
   });
 
   test('filteredItemsProvider applies name search', () async {
@@ -93,8 +112,10 @@ void main() {
             ))
         .thenAnswer((_) async => PaginatedCatalogResponse(
               items: [
-                BackendItemEntry.fromName('leftovers'),
-                BackendItemEntry.fromName('master-ball'),
+                BackendItemEntry.fromJson(
+                    {'name': 'leftovers', 'display_name': 'Leftovers', 'gen': 2}),
+                BackendItemEntry.fromJson(
+                    {'name': 'master-ball', 'display_name': 'Master Ball', 'gen': 1}),
               ],
               total: 2, page: 1, pageSize: 1000, totalPages: 1,
             ));

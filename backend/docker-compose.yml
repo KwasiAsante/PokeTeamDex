@@ -22,7 +22,7 @@ services:
       dockerfile: backend/Dockerfile
     container_name: poketeamdex_api
     ports:
-      - "8000:8000"
+      - "8009:8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://dev:dev@db:5432/poketeamdex
       SECRET_KEY: dev-secret-key-change-in-production

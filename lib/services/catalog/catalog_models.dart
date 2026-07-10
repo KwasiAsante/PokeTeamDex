@@ -76,15 +76,27 @@ class BackendMoveEntry {
     );
   }
 
-  // Used when backend is unavailable — gen/type/damageClass are empty sentinels.
-  // filteredMovesProvider treats empty type/damageClass as "pass all filters".
-  factory BackendMoveEntry.fromName(String name) => BackendMoveEntry(
-        name: name,
-        displayName: _titleCase(name),
-        gen: 0,
-        type: '',
-        damageClass: '',
-      );
+  Map<String, dynamic> toJson() => {
+        'id': pokeApiId,
+        'name': name,
+        'display_name': displayName,
+        'gen': gen,
+        'type': type,
+        'damage_class': damageClass,
+        'power': power,
+        'accuracy': accuracy,
+        'pp': pp,
+        'priority': priority,
+        'is_z_move': isZMove,
+        'is_max_move': isMaxMove,
+        'z_move_base': zMoveBase,
+        'flags': flags,
+        'secondary': secondary,
+        'contest_type': contestType,
+        'target': target,
+        'effect_short': effectShort,
+        'effect': effect,
+      };
 }
 
 class BackendItemEntry {
@@ -145,11 +157,24 @@ class BackendItemEntry {
         effect: json['effect'] as String?,
       );
 
-  factory BackendItemEntry.fromName(String name) => BackendItemEntry(
-        name: name,
-        displayName: _titleCase(name),
-        gen: 0,
-      );
+  Map<String, dynamic> toJson() => {
+        'id': pokeApiId,
+        'name': name,
+        'display_name': displayName,
+        'gen': gen,
+        'category': category,
+        'sprite': sprite,
+        'fling_power': flingPower,
+        'is_mega_stone': isMegaStone,
+        'mega_species': megaSpecies,
+        'is_z_crystal': isZCrystal,
+        'is_berry': isBerry,
+        'is_plate': isPlate,
+        'is_memory': isMemory,
+        'is_battle_relevant': isBattleRelevant,
+        'effect_short': effectShort,
+        'effect': effect,
+      };
 
   String get categoryLabel => category != null ? _titleCase(category!) : '';
 }
@@ -187,11 +212,16 @@ class BackendAbilityEntry {
         isHidden: json['is_hidden'] as bool? ?? false,
       );
 
-  factory BackendAbilityEntry.fromName(String name) => BackendAbilityEntry(
-        name: name,
-        displayName: _titleCase(name),
-        gen: 0,
-      );
+  Map<String, dynamic> toJson() => {
+        'id': pokeApiId,
+        'name': name,
+        'display_name': displayName,
+        'gen': gen,
+        'effect_short': effectShort,
+        'effect': effect,
+        'slot': slot,
+        'is_hidden': isHidden,
+      };
 
   static const _kGenLabels = <int, String>{
     1: 'Gen I', 2: 'Gen II', 3: 'Gen III', 4: 'Gen IV', 5: 'Gen V',

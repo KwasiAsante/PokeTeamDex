@@ -13,6 +13,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/pokedex/models/resolved_pokemon.dart';
@@ -23,12 +24,12 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_backend_repository.dart';
-import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_cache.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
+import 'package:poke_team_dex/services/util/backend_provider_utils.dart';
 
 class _MockRepo extends Mock implements PokeApiRepository {}
 class _MockBackendRepo extends Mock implements PokemonBackendRepository {}
-class _MockCache extends Mock implements PokemonResolvedCache {}
+class _MockBox extends Mock implements Box {}
 
 // ── Fixture helpers ────────────────────────────────────────────────────────
 
@@ -68,15 +69,17 @@ PokemonFormEntry _form(String name, String formName,
 /// so these tests exercise the PokéAPI offline fallback path.
 ProviderContainer _container(_MockRepo repo) {
   final backendRepo = _MockBackendRepo();
-  final cache = _MockCache();
-  when(() => cache.getIfValid(any())).thenReturn(null);
+  final box = _MockBox();
+  when(() => box.get(any())).thenReturn(null);
+  when(() => box.put(any(), any())).thenAnswer((_) async {});
   when(() => backendRepo.fetchResolved(any(), gen: any(named: 'gen')))
       .thenThrow(Exception('test: backend disabled'));
   return ProviderContainer(
     overrides: [
       pokeApiRepositoryProvider.overrideWithValue(repo),
       pokemonBackendRepositoryProvider.overrideWithValue(backendRepo),
-      pokemonResolvedCacheProvider.overrideWithValue(cache),
+      backendFallbackBoxProvider.overrideWithValue(box),
+      backendFallbackIsOnlineProvider.overrideWithValue(() async => true),
     ],
   );
 }

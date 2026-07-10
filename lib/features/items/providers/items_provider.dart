@@ -1,32 +1,44 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:poke_team_dex/services/catalog/catalog_models.dart';
+import 'package:poke_team_dex/services/catalog/catalog_offline_merge.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/models/item_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
-import 'package:poke_team_dex/utils/app_logger.dart';
+import 'package:poke_team_dex/services/ps_data/ps_data_providers.dart';
+import 'package:poke_team_dex/services/util/backend_provider_utils.dart';
 
-/// Backend-first full item catalog. Falls back to PokéAPI name list on failure.
+/// Backend-first full item catalog. Falls back to a full offline
+/// PokéAPI+PS-data merge (see [buildOfflineItemCatalog]) when the backend and
+/// cache are both unavailable.
 final itemsListProvider = FutureProvider<List<BackendItemEntry>>((ref) async {
   ref.keepAlive();
-  try {
-    final repo = ref.read(pokemonBackendRepositoryProvider);
-    final first = await repo.fetchCatalogItems(pageSize: 1000);
-    var items = first.items;
-    if (first.totalPages > 1) {
-      final rest = await Future.wait([
-        for (int p = 2; p <= first.totalPages; p++)
-          repo.fetchCatalogItems(page: p, pageSize: 1000),
-      ]);
-      items = [...items, for (final r in rest) ...r.items];
-    }
-    AppLogger().d('[catalog] items: loaded ${items.length} entries from backend (${first.totalPages} pages)');
-    return items;
-  } catch (e) {
-    AppLogger().w('[catalog] items backend failed, falling back to PokéAPI', error: e);
-    final names = await ref.read(pokeApiRepositoryProvider).fetchItemList();
-    return names.map(BackendItemEntry.fromName).toList();
-  }
+  return withBackendFallback<List<BackendItemEntry>>(
+    cacheKey: 'catalog_items',
+    box: ref.read(backendFallbackBoxProvider),
+    isOnline: ref.read(backendFallbackIsOnlineProvider),
+    backendCall: () async {
+      final repo = ref.read(pokemonBackendRepositoryProvider);
+      final first = await repo.fetchCatalogItems(pageSize: 1000);
+      var items = first.items;
+      if (first.totalPages > 1) {
+        final rest = await Future.wait([
+          for (int p = 2; p <= first.totalPages; p++)
+            repo.fetchCatalogItems(page: p, pageSize: 1000),
+        ]);
+        items = [...items, for (final r in rest) ...r.items];
+      }
+      return items;
+    },
+    offlineFallback: () => buildOfflineItemCatalog(
+      ref.read(pokeApiRepositoryProvider),
+      ref.read(psDataServiceProvider),
+    ),
+    fromJson: (json) => (json['items'] as List<dynamic>)
+        .map((i) => BackendItemEntry.fromJson(i as Map<String, dynamic>))
+        .toList(),
+    toJson: (items) => {'items': items.map((i) => i.toJson()).toList()},
+  );
 });
 
 // Not autoDispose — persists across tab switches.
@@ -113,10 +125,12 @@ final filteredItemsProvider = Provider<AsyncValue<List<BackendItemEntry>>>((ref)
           (pocketAsync as AsyncError).stackTrace);
     }
     final pocketNames = pocketAsync.requireValue;
+    // catalogMap now comes from a full PokéAPI+PS merge (backend or offline
+    // fallback) rather than a sentinel-name list, so a pocket name with no
+    // catalog match is genuinely missing data — skip it rather than
+    // fabricate a placeholder entry.
     entriesAsync = AsyncValue.data(
-      pocketNames
-          .map((n) => catalogMap[n] ?? BackendItemEntry.fromName(n))
-          .toList(),
+      pocketNames.map((n) => catalogMap[n]).whereType<BackendItemEntry>().toList(),
     );
   } else if (backendAsync is AsyncLoading) {
     return const AsyncValue.loading();

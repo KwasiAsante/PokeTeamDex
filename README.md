@@ -170,7 +170,7 @@ graph TD
 
     AP --> FMT[formatServiceProvider\nFormatService]
     FMT --> AFP[allFormatsProvider\nFuture-List-GameFormat]
-    FMT --> LSP[learnsetProvider\nFuture-List-String]
+    FMT --> SVP[slotValidationProvider\nFuture-SlotValidation]
 ```
 
 Key provider patterns used:
@@ -363,12 +363,16 @@ lib/services/
 │   ├── poke_api_cache.dart      # Hive TTL cache (24h lists, 7d details)
 │   ├── poke_api_providers.dart  # Riverpod providers
 │   └── models/                  # PokemonEntry, PokemonSpeciesEntry, etc.
-├── pokemon_resolved/             # Backend-resolved data infra: cache + repository + models
+├── pokemon_resolved/             # Backend-resolved data infra: repository + models
 │   ├── models.dart              # AbilityInfo, MoveSummary, SpriteUrlsFull, PokemonResolvedBackendResponse
-│   ├── pokemon_resolved_cache.dart       # Hive cache (7d TTL) for backend-resolved responses
 │   ├── pokemon_backend_repository.dart   # HTTP calls to GET /pokemon/{id}/resolved + sub-endpoints
-│   └── pokemon_resolved_providers.dart   # pokemonResolvedCacheProvider, lazy moves/varieties/forms/flavor-text providers
+│   └── pokemon_resolved_providers.dart   # lazy moves/varieties/forms/flavor-text providers (each via withBackendFallback)
 │                                  # (resolvedPokemonProvider itself lives in features/pokedex/providers/, below)
+├── util/
+│   └── backend_provider_utils.dart  # withBackendFallback<T>() — shared backend/cache/offline-fallback contract
+├── ps_data/
+│   ├── ps_data_service.dart     # Raw shared/ps_data/ access for offline fallbacks
+│   └── ps_data_providers.dart   # psDataServiceProvider
 ├── sync/
 │   ├── sync_service.dart        # Push + pull orchestration
 │   ├── sync_providers.dart      # Riverpod wrappers + sync trigger helper
@@ -749,16 +753,16 @@ sequenceDiagram
     participant SlotConfig
     participant Riverpod
     participant PokeApi
-    participant FormatService
+    participant Backend
     participant Drift
 
     User->>SlotConfig: Open slot config screen
     SlotConfig->>Riverpod: watch(pokemonDetailProvider(id))
     Riverpod->>PokeApi: fetchPokemon(id) — hits Hive cache or network
     PokeApi-->>Riverpod: PokemonEntry
-    SlotConfig->>Riverpod: watch(learnsetProvider(pokemon, gen))
-    Riverpod->>FormatService: learnsetForGen(pokemon, gen)
-    FormatService-->>Riverpod: List of legal move names
+    SlotConfig->>Riverpod: watch(slotValidationProvider(slot, formatId))
+    Riverpod->>Backend: GET /pokemon/{id}/moves?gen — PS learnset already merged
+    Backend-->>Riverpod: List of legal move names + violations
 
     User->>SlotConfig: Edit EVs, moves, nature, etc.
     User->>SlotConfig: Tap Save

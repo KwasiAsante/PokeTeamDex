@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/database/app_database.dart';
@@ -13,15 +14,15 @@ import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart'
     show AbilityInfo, PokemonResolvedBackendResponse;
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_backend_repository.dart';
-import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_cache.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
-    show pokemonBackendRepositoryProvider, pokemonResolvedCacheProvider;
+    show pokemonBackendRepositoryProvider;
+import 'package:poke_team_dex/services/util/backend_provider_utils.dart';
 import '../helpers/test_app.dart';
 import '../helpers/test_database.dart';
 
 class MockPokeApiRepository extends Mock implements PokeApiRepository {}
 class MockPokemonBackendRepository extends Mock implements PokemonBackendRepository {}
-class MockPokemonResolvedCache extends Mock implements PokemonResolvedCache {}
+class MockBox extends Mock implements Box {}
 
 PokemonEntry _entry() => PokemonEntry(
       id: 6,
@@ -59,7 +60,7 @@ void main() {
 
   late MockPokeApiRepository mockApi;
   late MockPokemonBackendRepository mockBackendRepo;
-  late MockPokemonResolvedCache mockCache;
+  late MockBox mockBox;
 
   setUp(() {
     mockApi = MockPokeApiRepository();
@@ -68,6 +69,7 @@ void main() {
     when(() => mockApi.fetchPokemonByName(any())).thenAnswer((_) async => _entry());
     when(() => mockApi.fetchPokemonEncounters(any())).thenAnswer((_) async => []);
     when(() => mockApi.fetchItemList()).thenAnswer((_) async => []);
+    when(() => mockApi.fetchAbilityList()).thenAnswer((_) async => []);
     when(() => mockApi.fetchPriorEvoEntries(any())).thenAnswer((_) async => []);
 
     mockBackendRepo = MockPokemonBackendRepository();
@@ -75,11 +77,11 @@ void main() {
         .thenAnswer((_) async =>
             PokemonResolvedBackendResponse.fromJson(_resolvedJson()));
 
-    // Hive is not initialized in tests — mock the cache so providers skip
-    // straight to the backend (which is itself mocked above).
-    mockCache = MockPokemonResolvedCache();
-    when(() => mockCache.getIfValid(any())).thenReturn(null);
-    when(() => mockCache.putWithTTL(any(), any(), any())).thenReturn(null);
+    // Hive is not initialized in tests — mock the cache box so providers
+    // skip straight to the backend (which is itself mocked above).
+    mockBox = MockBox();
+    when(() => mockBox.get(any())).thenReturn(null);
+    when(() => mockBox.put(any(), any())).thenAnswer((_) async {});
   });
 
   /// Creates a team + slot in [db] and returns (teamId, slotId).
@@ -138,7 +140,8 @@ void main() {
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
           pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
-          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
+          backendFallbackBoxProvider.overrideWithValue(mockBox),
+          backendFallbackIsOnlineProvider.overrideWithValue(() async => true),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),
@@ -165,7 +168,8 @@ void main() {
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
           pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
-          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
+          backendFallbackBoxProvider.overrideWithValue(mockBox),
+          backendFallbackIsOnlineProvider.overrideWithValue(() async => true),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),
@@ -197,7 +201,8 @@ void main() {
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
           pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
-          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
+          backendFallbackBoxProvider.overrideWithValue(mockBox),
+          backendFallbackIsOnlineProvider.overrideWithValue(() async => true),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),
@@ -235,7 +240,8 @@ void main() {
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
           pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
-          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
+          backendFallbackBoxProvider.overrideWithValue(mockBox),
+          backendFallbackIsOnlineProvider.overrideWithValue(() async => true),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),
@@ -264,7 +270,8 @@ void main() {
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
           pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
-          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
+          backendFallbackBoxProvider.overrideWithValue(mockBox),
+          backendFallbackIsOnlineProvider.overrideWithValue(() async => true),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),

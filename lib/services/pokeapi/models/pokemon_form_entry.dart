@@ -38,4 +38,31 @@ class PokemonFormEntry {
       spriteShinyUrl: sprites?['front_shiny'] as String?,
     );
   }
+
+  /// Flat cache snapshot of this object's own fields — round-trips with
+  /// [fromCacheJson]. Distinct from [fromJson], which parses a raw
+  /// `/pokemon-form/{name}` PokéAPI response (a differently-shaped payload).
+  Map<String, dynamic> toCacheJson() => {
+        'id': id,
+        'name': name,
+        'form_name': formName,
+        'is_default': isDefault,
+        'sprite_url': spriteUrl,
+        'sprite_shiny_url': spriteShinyUrl,
+        'official_artwork_url': officialArtworkUrl,
+        'official_artwork_shiny_url': officialArtworkShinyUrl,
+      };
+
+  factory PokemonFormEntry.fromCacheJson(Map<String, dynamic> json) {
+    return PokemonFormEntry(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      formName: json['form_name'] as String? ?? '',
+      isDefault: json['is_default'] as bool? ?? false,
+      spriteUrl: json['sprite_url'] as String?,
+      spriteShinyUrl: json['sprite_shiny_url'] as String?,
+      officialArtworkUrl: json['official_artwork_url'] as String?,
+      officialArtworkShinyUrl: json['official_artwork_shiny_url'] as String?,
+    );
+  }
 }

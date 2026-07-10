@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:poke_team_dex/services/catalog/catalog_models.dart';
+import 'package:poke_team_dex/services/catalog/catalog_offline_merge.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
-import 'package:poke_team_dex/utils/app_logger.dart';
+import 'package:poke_team_dex/services/ps_data/ps_data_providers.dart';
+import 'package:poke_team_dex/services/util/backend_provider_utils.dart';
 
 /// Maps PokéAPI generation names (as stored in abilityGenerationFilterProvider)
 /// to the integer gen field used by the backend.
@@ -19,30 +21,38 @@ const _kGenNameToInt = <String, int>{
   'generation-ix': 9,
 };
 
-/// Backend-first full ability catalog. Falls back to PokéAPI name list on failure.
-/// Fallback entries use gen == 0 as a sentinel; the gen filter passes them through
-/// so the list stays usable when the backend is offline.
+/// Backend-first full ability catalog. Falls back to a full offline
+/// PokéAPI+PS-data merge (see [buildOfflineAbilityCatalog]) when the backend
+/// and cache are both unavailable.
 final abilitiesListProvider =
     FutureProvider<List<BackendAbilityEntry>>((ref) async {
   ref.keepAlive();
-  try {
-    final repo = ref.read(pokemonBackendRepositoryProvider);
-    final first = await repo.fetchCatalogAbilities(pageSize: 1000);
-    var items = first.items;
-    if (first.totalPages > 1) {
-      final rest = await Future.wait([
-        for (int p = 2; p <= first.totalPages; p++)
-          repo.fetchCatalogAbilities(page: p, pageSize: 1000),
-      ]);
-      items = [...items, for (final r in rest) ...r.items];
-    }
-    AppLogger().d('[catalog] abilities: loaded ${items.length} entries from backend (${first.totalPages} pages)');
-    return items;
-  } catch (e) {
-    AppLogger().w('[catalog] abilities backend failed, falling back to PokéAPI', error: e);
-    final names = await ref.read(pokeApiRepositoryProvider).fetchAbilityList();
-    return names.map(BackendAbilityEntry.fromName).toList();
-  }
+  return withBackendFallback<List<BackendAbilityEntry>>(
+    cacheKey: 'catalog_abilities',
+    box: ref.read(backendFallbackBoxProvider),
+    isOnline: ref.read(backendFallbackIsOnlineProvider),
+    backendCall: () async {
+      final repo = ref.read(pokemonBackendRepositoryProvider);
+      final first = await repo.fetchCatalogAbilities(pageSize: 1000);
+      var items = first.items;
+      if (first.totalPages > 1) {
+        final rest = await Future.wait([
+          for (int p = 2; p <= first.totalPages; p++)
+            repo.fetchCatalogAbilities(page: p, pageSize: 1000),
+        ]);
+        items = [...items, for (final r in rest) ...r.items];
+      }
+      return items;
+    },
+    offlineFallback: () => buildOfflineAbilityCatalog(
+      ref.read(pokeApiRepositoryProvider),
+      ref.read(psDataServiceProvider),
+    ),
+    fromJson: (json) => (json['items'] as List<dynamic>)
+        .map((a) => BackendAbilityEntry.fromJson(a as Map<String, dynamic>))
+        .toList(),
+    toJson: (abilities) => {'items': abilities.map((a) => a.toJson()).toList()},
+  );
 });
 
 // Not autoDispose — persists across tab switches.
@@ -92,11 +102,8 @@ final filteredAbilitiesProvider = Provider<AsyncValue<List<BackendAbilityEntry>>
   if (genFilter != null) {
     final genInt = _kGenNameToInt[genFilter];
     if (genInt != null) {
-      // gen == 0 is the PokéAPI fallback sentinel (backend unavailable) — pass
-      // through so the list stays usable offline. With real backend data each
-      // entry has a non-zero gen and the exact-match filter works as expected.
       entries = entries
-          .where((e) => e.gen == 0 || e.gen == genInt)
+          .where((e) => e.gen == genInt)
           .toList();
     }
   }

@@ -1,49 +1,55 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_backend_repository.dart';
-import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_cache.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
+import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
+import 'package:poke_team_dex/services/util/backend_provider_utils.dart';
 
 class MockPokemonBackendRepository extends Mock
     implements PokemonBackendRepository {}
 
-class MockPokemonResolvedCache extends Mock implements PokemonResolvedCache {}
+class MockPokeApiRepository extends Mock implements PokeApiRepository {}
+
+class MockBox extends Mock implements Box {}
 
 void main() {
   late MockPokemonBackendRepository mockRepo;
-  late MockPokemonResolvedCache mockCache;
+  late MockPokeApiRepository mockPokeApi;
+  late MockBox mockBox;
 
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     await PokemonDataRegistry.initialize();
-    registerFallbackValue(const Duration(days: 7));
-    registerFallbackValue('');
-    registerFallbackValue(<String, dynamic>{});
   });
 
   setUp(() {
     mockRepo = MockPokemonBackendRepository();
-    mockCache = MockPokemonResolvedCache();
+    mockPokeApi = MockPokeApiRepository();
+    mockBox = MockBox();
+    when(() => mockBox.get(any())).thenReturn(null);
+    when(() => mockBox.put(any(), any())).thenAnswer((_) async {});
   });
 
-  ProviderContainer makeContainer() {
+  ProviderContainer makeContainer({bool online = true}) {
     return ProviderContainer(overrides: [
       pokemonBackendRepositoryProvider.overrideWithValue(mockRepo),
-      pokemonResolvedCacheProvider.overrideWithValue(mockCache),
+      pokeApiRepositoryProvider.overrideWithValue(mockPokeApi),
+      backendFallbackBoxProvider.overrideWithValue(mockBox),
+      backendFallbackIsOnlineProvider.overrideWithValue(() async => online),
     ]);
   }
 
-  // ── gen: null (no format / Pokédex) ────────────────────────────────────────
-
-  test('returns ResolvedPokemon from backend when cache misses (gen: null)', () async {
-    when(() => mockCache.getIfValid(any())).thenReturn(null);
+  test('returns ResolvedPokemon from backend on success', () async {
     when(() => mockRepo.fetchResolved(6, gen: any(named: 'gen')))
         .thenAnswer((_) async => _makeBackendResponse());
-    when(() => mockCache.putWithTTL(any(), any(), any())).thenReturn(null);
 
     final container = makeContainer();
     final result =
@@ -53,74 +59,70 @@ void main() {
     expect(result.detail.types, ['fire', 'flying']); // toPokemonEntry lowercases types
     expect(result.species.evolutionChainId, 2);
     expect(result.spriteUrls.officialArtwork, 'https://example.com/art/6.png');
-    // gen: null → cache key is 'resolved_6' (no gen suffix)
-    verify(() => mockCache.putWithTTL('resolved_6', any(), any())).called(1);
+    verify(() => mockBox.put('resolved_6', any())).called(1);
   });
 
-  test('returns ResolvedPokemon from Hive cache without backend call', () async {
-    when(() => mockCache.getIfValid('resolved_6'))
-        .thenReturn(_makeBackendResponse().toJson());
+  test('serves cached data (within 24h grace) when backend fails', () async {
+    final cachedResponse = _makeBackendResponse();
+    when(() => mockBox.get('resolved_6')).thenReturn({
+      'payload': _resolvedPokemonJsonFrom(cachedResponse),
+      'expiresAt': DateTime.now().millisecondsSinceEpoch - 1000, // just expired
+    });
+    when(() => mockRepo.fetchResolved(6, gen: any(named: 'gen')))
+        .thenThrow(Exception('backend down'));
 
     final container = makeContainer();
     final result =
         await container.read(resolvedPokemonProvider((id: 6, gen: null)).future);
 
     expect(result.id, 6);
-    verifyNever(() => mockRepo.fetchResolved(any(), gen: any(named: 'gen')));
   });
 
-  test('falls back gracefully when backend throws', () async {
-    when(() => mockCache.getIfValid(any())).thenReturn(null);
+  test('falls back to offline PokéAPI assembly when backend and cache both fail', () async {
     when(() => mockRepo.fetchResolved(6, gen: any(named: 'gen')))
-        .thenThrow(Exception('offline'));
-
-    final container = makeContainer();
-    final future =
-        container.read(resolvedPokemonProvider((id: 6, gen: null)).future);
-    expect(future, isA<Future>());
-  });
-
-  // ── gen: 5 (explicit generation) ────────────────────────────────────────────
-
-  test('explicit gen uses gen-specific cache key resolved_{id}_g{gen}', () async {
-    when(() => mockCache.getIfValid(any())).thenReturn(null);
-    when(() => mockRepo.fetchResolved(6, gen: any(named: 'gen')))
-        .thenAnswer((_) async => _makeBackendResponse());
-    when(() => mockCache.putWithTTL(any(), any(), any())).thenReturn(null);
-
-    final container = makeContainer();
-    await container.read(resolvedPokemonProvider((id: 6, gen: 5)).future);
-
-    verify(() => mockCache.putWithTTL('resolved_6_g5', any(), any())).called(1);
-  });
-
-  test('gen: null and gen: 5 are independent provider instances', () async {
-    when(() => mockCache.getIfValid(any())).thenReturn(null);
-    when(() => mockRepo.fetchResolved(6, gen: any(named: 'gen')))
-        .thenAnswer((_) async => _makeBackendResponse());
-    when(() => mockCache.putWithTTL(any(), any(), any())).thenReturn(null);
-
-    final container = makeContainer();
-
-    await container.read(resolvedPokemonProvider((id: 6, gen: null)).future);
-    await container.read(resolvedPokemonProvider((id: 6, gen: 5)).future);
-
-    // Two separate backend calls — different provider keys.
-    verify(() => mockRepo.fetchResolved(6, gen: any(named: 'gen'))).called(2);
-    verify(() => mockCache.putWithTTL('resolved_6', any(), any())).called(1);
-    verify(() => mockCache.putWithTTL('resolved_6_g5', any(), any())).called(1);
-  });
-
-  test('gen: 5 Hive cache key is resolved_6_g5', () async {
-    when(() => mockCache.getIfValid('resolved_6_g5'))
-        .thenReturn(_makeBackendResponse().toJson());
+        .thenThrow(Exception('backend down'));
+    when(() => mockPokeApi.fetchPokemon(6)).thenAnswer((_) async => PokemonEntry(
+          id: 6,
+          name: 'charizard',
+          speciesName: 'charizard',
+          height: 17,
+          weight: 905,
+          types: ['fire', 'flying'],
+          stats: {'hp': 78},
+          formNames: ['charizard'],
+        ));
+    when(() => mockPokeApi.fetchPokemonSpecies(6)).thenAnswer((_) async => const PokemonSpeciesEntry(
+          id: 6,
+          name: 'charizard',
+          eggGroups: [],
+          flavorTextEntries: [],
+          evolutionChainId: 2,
+        ));
+    when(() => mockPokeApi.fetchPokemonByName('charizard')).thenAnswer((_) async => PokemonEntry(
+          id: 6,
+          name: 'charizard',
+          height: 17,
+          weight: 905,
+          types: ['fire', 'flying'],
+          formNames: ['charizard'], // single form → cosmeticFormsProvider returns []
+        ));
 
     final container = makeContainer();
     final result =
-        await container.read(resolvedPokemonProvider((id: 6, gen: 5)).future);
+        await container.read(resolvedPokemonProvider((id: 6, gen: null)).future);
 
     expect(result.id, 6);
-    verifyNever(() => mockRepo.fetchResolved(any(), gen: any(named: 'gen')));
+    expect(result.species.evolutionChainId, 2);
+  });
+
+  test('explicit gen uses gen-specific cache key resolved_{id}_g{gen}', () async {
+    when(() => mockRepo.fetchResolved(6, gen: any(named: 'gen')))
+        .thenAnswer((_) async => _makeBackendResponse());
+
+    final container = makeContainer();
+    await container.read(resolvedPokemonProvider((id: 6, gen: 5)).future);
+
+    verify(() => mockBox.put('resolved_6_g5', any())).called(1);
   });
 }
 
@@ -153,3 +155,18 @@ PokemonResolvedBackendResponse _makeBackendResponse() =>
       'flavor_text_url': null, 'is_baby': false,
       'is_legendary': false, 'is_mythical': false, 'evolution_chain_id': 2,
     });
+
+/// Mirrors what [resolvedPokemonProvider]'s `_fromBackendResponse` +
+/// `ResolvedPokemon.toJson` produce, for pre-seeding the mock cache.
+Map<String, dynamic> _resolvedPokemonJsonFrom(PokemonResolvedBackendResponse r) {
+  final detail = r.toPokemonEntry();
+  final species = r.toPokemonSpeciesEntry();
+  return {
+    'detail': detail.toJson(),
+    'species': species.toCacheJson(),
+    'cosmetic_forms': [],
+    'sprite_urls': r.spriteUrls.toJson(),
+    'supplement_moves': [],
+    'smogon_analyses': null,
+  };
+}

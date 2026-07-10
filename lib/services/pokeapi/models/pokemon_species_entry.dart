@@ -73,6 +73,58 @@ class PokemonSpeciesEntry {
     );
   }
 
+  /// Flat cache snapshot of this object's own fields — round-trips with
+  /// [fromCacheJson]. Distinct from [fromJson], which parses a raw
+  /// `/pokemon-species/{id}` PokéAPI response (a differently-shaped payload).
+  Map<String, dynamic> toCacheJson() => {
+        'id': id,
+        'name': name,
+        'genus': genus,
+        'generation_name': generationName,
+        'gender_rate': genderRate,
+        'capture_rate': captureRate,
+        'base_happiness': baseHappiness,
+        'hatch_counter': hatchCounter,
+        'growth_rate': growthRate,
+        'egg_groups': eggGroups,
+        'flavor_text_entries': flavorTextEntries.map((e) => e.toJson()).toList(),
+        'is_baby': isBaby,
+        'is_legendary': isLegendary,
+        'is_mythical': isMythical,
+        'evolution_chain_id': evolutionChainId,
+        'varieties': varieties
+            .map((v) => {'is_default': v.isDefault, 'name': v.name})
+            .toList(),
+      };
+
+  factory PokemonSpeciesEntry.fromCacheJson(Map<String, dynamic> json) {
+    return PokemonSpeciesEntry(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      genus: json['genus'] as String?,
+      generationName: json['generation_name'] as String?,
+      genderRate: json['gender_rate'] as int?,
+      captureRate: json['capture_rate'] as int?,
+      baseHappiness: json['base_happiness'] as int?,
+      hatchCounter: json['hatch_counter'] as int?,
+      growthRate: json['growth_rate'] as String?,
+      eggGroups: (json['egg_groups'] as List?)?.cast<String>() ?? const [],
+      flavorTextEntries: (json['flavor_text_entries'] as List<dynamic>? ?? [])
+          .map((e) => FlavorTextEntry.fromBackend(e as Map<String, dynamic>))
+          .toList(),
+      isBaby: json['is_baby'] as bool? ?? false,
+      isLegendary: json['is_legendary'] as bool? ?? false,
+      isMythical: json['is_mythical'] as bool? ?? false,
+      evolutionChainId: json['evolution_chain_id'] as int?,
+      varieties: (json['varieties'] as List<dynamic>? ?? [])
+          .map((v) => PokemonVariety(
+                isDefault: (v as Map)['is_default'] as bool? ?? false,
+                name: v['name'] as String,
+              ))
+          .toList(),
+    );
+  }
+
   static int? _extractChainId(String? url) {
     if (url == null) return null;
     final segments = Uri.parse(url).pathSegments;

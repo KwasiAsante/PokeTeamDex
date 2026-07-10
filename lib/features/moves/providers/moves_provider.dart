@@ -1,34 +1,44 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:poke_team_dex/services/catalog/catalog_models.dart';
+import 'package:poke_team_dex/services/catalog/catalog_offline_merge.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
-import 'package:poke_team_dex/utils/app_logger.dart';
+import 'package:poke_team_dex/services/ps_data/ps_data_providers.dart';
+import 'package:poke_team_dex/services/util/backend_provider_utils.dart';
 
-/// Backend-first full move catalog. Falls back to PokéAPI name list on failure.
-/// Fallback entries use sentinel values (type == '', damageClass == '') — the
-/// filtered provider treats those as "no metadata, pass all filters".
+/// Backend-first full move catalog. Falls back to a full offline
+/// PokéAPI+PS-data merge (see [buildOfflineMoveCatalog]) when the backend and
+/// cache are both unavailable.
 final movesListProvider = FutureProvider<List<BackendMoveEntry>>((ref) async {
   ref.keepAlive();
-  try {
-    final repo = ref.read(pokemonBackendRepositoryProvider);
-    final first = await repo.fetchCatalogMoves(pageSize: 1000);
-    var items = first.items;
-    if (first.totalPages > 1) {
-      final rest = await Future.wait([
-        for (int p = 2; p <= first.totalPages; p++)
-          repo.fetchCatalogMoves(page: p, pageSize: 1000),
-      ]);
-      items = [...items, for (final r in rest) ...r.items];
-    }
-    AppLogger().d('[catalog] moves: loaded ${items.length} entries from backend (${first.totalPages} pages)');
-    return items;
-  } catch (e) {
-    AppLogger().w('[catalog] moves backend failed, falling back to PokéAPI', error: e);
-    final names = await ref.read(pokeApiRepositoryProvider).fetchMoveList();
-    return names.map(BackendMoveEntry.fromName).toList();
-  }
+  return withBackendFallback<List<BackendMoveEntry>>(
+    cacheKey: 'catalog_moves',
+    box: ref.read(backendFallbackBoxProvider),
+    isOnline: ref.read(backendFallbackIsOnlineProvider),
+    backendCall: () async {
+      final repo = ref.read(pokemonBackendRepositoryProvider);
+      final first = await repo.fetchCatalogMoves(pageSize: 1000);
+      var items = first.items;
+      if (first.totalPages > 1) {
+        final rest = await Future.wait([
+          for (int p = 2; p <= first.totalPages; p++)
+            repo.fetchCatalogMoves(page: p, pageSize: 1000),
+        ]);
+        items = [...items, for (final r in rest) ...r.items];
+      }
+      return items;
+    },
+    offlineFallback: () => buildOfflineMoveCatalog(
+      ref.read(pokeApiRepositoryProvider),
+      ref.read(psDataServiceProvider),
+    ),
+    fromJson: (json) => (json['items'] as List<dynamic>)
+        .map((m) => BackendMoveEntry.fromJson(m as Map<String, dynamic>))
+        .toList(),
+    toJson: (moves) => {'items': moves.map((m) => m.toJson()).toList()},
+  );
 });
 
 // Persists across tab switches.
@@ -46,10 +56,6 @@ final movesByTypeProvider =
 });
 
 /// Filtered move names derived client-side from the backend entry list.
-///
-/// Type and damage class filters use entry metadata when available (gen > 0).
-/// Fallback entries (gen == 0, type == '') pass all filters to preserve usability
-/// when the backend is unavailable.
 final filteredMovesProvider = Provider<AsyncValue<List<BackendMoveEntry>>>((ref) {
   final typeFilter = ref.watch(movesTypeFilterProvider);
   final damageClassFilter = ref.watch(movesDamageClassFilterProvider);
@@ -66,16 +72,11 @@ final filteredMovesProvider = Provider<AsyncValue<List<BackendMoveEntry>>>((ref)
 
   List<BackendMoveEntry> entries = List.of(listAsync.requireValue);
 
-  // Empty type/damageClass == sentinel (PokéAPI fallback) — skip that filter.
   if (typeFilter != null) {
-    entries = entries
-        .where((e) => e.type.isEmpty || e.type == typeFilter)
-        .toList();
+    entries = entries.where((e) => e.type == typeFilter).toList();
   }
   if (damageClassFilter != null) {
-    entries = entries
-        .where((e) => e.damageClass.isEmpty || e.damageClass == damageClassFilter)
-        .toList();
+    entries = entries.where((e) => e.damageClass == damageClassFilter).toList();
   }
   if (search.isNotEmpty) {
     entries = entries

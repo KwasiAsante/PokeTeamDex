@@ -38,13 +38,23 @@ void main() {
       expect(entry.effectShort, 'May paralyze target.');
     });
 
-    test('fromName creates sentinel entry', () {
-      final entry = BackendMoveEntry.fromName('fire-blast');
-      expect(entry.name, 'fire-blast');
-      expect(entry.displayName, 'Fire Blast');
-      expect(entry.gen, 0);
-      expect(entry.type, '');
-      expect(entry.damageClass, '');
+    test('toJson round-trips through fromJson', () {
+      const entry = BackendMoveEntry(
+        name: 'thunderbolt',
+        displayName: 'Thunderbolt',
+        gen: 1,
+        type: 'electric',
+        damageClass: 'special',
+        power: 90,
+        accuracy: 100,
+        pp: 15,
+      );
+      final roundTripped = BackendMoveEntry.fromJson(entry.toJson());
+      expect(roundTripped.name, entry.name);
+      expect(roundTripped.gen, entry.gen);
+      expect(roundTripped.type, entry.type);
+      expect(roundTripped.damageClass, entry.damageClass);
+      expect(roundTripped.power, entry.power);
     });
   });
 
@@ -74,12 +84,17 @@ void main() {
       expect(entry.effectShort, 'Restores 1/16 HP.');
     });
 
-    test('fromName creates sentinel entry', () {
-      final entry = BackendItemEntry.fromName('master-ball');
-      expect(entry.name, 'master-ball');
-      expect(entry.displayName, 'Master Ball');
-      expect(entry.gen, 0);
-      expect(entry.category, null);
+    test('toJson round-trips through fromJson', () {
+      const entry = BackendItemEntry(
+        name: 'leftovers',
+        displayName: 'Leftovers',
+        gen: 2,
+        category: 'held-items',
+      );
+      final roundTripped = BackendItemEntry.fromJson(entry.toJson());
+      expect(roundTripped.name, entry.name);
+      expect(roundTripped.gen, entry.gen);
+      expect(roundTripped.category, entry.category);
     });
   });
 
@@ -101,11 +116,15 @@ void main() {
       expect(entry.isHidden, false);
     });
 
-    test('fromName creates sentinel entry', () {
-      final entry = BackendAbilityEntry.fromName('levitate');
-      expect(entry.name, 'levitate');
-      expect(entry.displayName, 'Levitate');
-      expect(entry.gen, 0);
+    test('toJson round-trips through fromJson', () {
+      const entry = BackendAbilityEntry(
+        name: 'levitate',
+        displayName: 'Levitate',
+        gen: 3,
+      );
+      final roundTripped = BackendAbilityEntry.fromJson(entry.toJson());
+      expect(roundTripped.name, entry.name);
+      expect(roundTripped.gen, entry.gen);
     });
   });
 
