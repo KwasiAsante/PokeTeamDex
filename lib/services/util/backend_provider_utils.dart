@@ -59,9 +59,9 @@ class BackendUnavailableException implements Exception {
 /// 3. If there is no usable cache entry and the device has internet access,
 ///    run [offlineFallback] — a full, non-degraded reconstruction of the data
 ///    from PokéAPI + bundled PS data — and cache the result for 24h.
-/// 4. If there is no cache entry and no internet, throw
-///    [BackendUnavailableException] with a user-visible message. Callers must
-///    never fabricate an empty/sentinel result here.
+/// 4. If there is no cache entry and no internet, or [offlineFallback] itself
+///    fails, throw [BackendUnavailableException] with a user-visible message.
+///    Callers must never fabricate an empty/sentinel result here.
 ///
 /// [fromJson]/[toJson] convert between [T] and the `Map<String, dynamic>`
 /// wire format stored in the cache — callers whose [T] is a `List` (the
@@ -122,9 +122,17 @@ Future<T> withBackendFallback<T>({
   final online = await (isOnline ?? _defaultIsOnline)();
   if (online) {
     AppLogger().d('[withBackendFallback] running offline fallback for "$cacheKey"');
-    final result = await offlineFallback();
-    writeCache(result, _kStaleTTL);
-    return result;
+    try {
+      final result = await offlineFallback();
+      writeCache(result, _kStaleTTL);
+      return result;
+    } catch (e, st) {
+      AppLogger().w('[withBackendFallback] offline fallback failed for "$cacheKey"',
+          error: e, stackTrace: st);
+      throw BackendUnavailableException(
+        'Unable to load data — the server is unreachable and the offline data load failed.',
+      );
+    }
   }
 
   throw BackendUnavailableException(

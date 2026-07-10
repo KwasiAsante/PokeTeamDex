@@ -11,7 +11,12 @@ import 'package:poke_team_dex/utils/app_logger.dart';
 /// merge client-side: enumerate every name from PokéAPI (the authoritative
 /// source for which entries exist), fetch each concurrently, enrich with
 /// bundled PS data where available, then append PS-only entries (Z-moves,
-/// Max moves, etc.) that have no PokéAPI page of their own.
+/// Max moves, etc.) that have no PokéAPI page of their own. If PokéAPI's name
+/// list itself is unreachable, falls back further to a PS-data-only catalog
+/// (mirrors `_preload_kind`'s `if not names:` branch) rather than failing —
+/// every PS id is tracked as it's matched to a PokéAPI entry so that pass
+/// never double-adds an entry whose PS display-name slug differs from
+/// PokéAPI's canonical name for the same move/item/ability.
 ///
 /// Only runs when the backend is unreachable AND no usable cache entry
 /// exists — the per-entry PokéAPI fetches (~900 moves, ~2100 items, ~300
@@ -56,13 +61,39 @@ Future<List<R>> _mapBounded<T, R>(
   return results.cast<R>();
 }
 
+/// Enumerates a PokéAPI name list, mirroring the backend's
+/// `_fetch_pokeapi_names` — returns `[]` on any failure (network error, bad
+/// response) rather than throwing, so callers can fall back to a
+/// PS-only-enumeration build instead of failing outright.
+Future<List<String>> _fetchNamesOrEmpty(Future<List<String>> Function() fetch) async {
+  try {
+    return await fetch();
+  } catch (_) {
+    return const [];
+  }
+}
+
 Future<List<BackendMoveEntry>> buildOfflineMoveCatalog(
   PokeApiRepository pokeApi,
   PsDataService psData,
 ) async {
   await psData.initialize();
-  final names = await pokeApi.fetchMoveList();
+  final names = await _fetchNamesOrEmpty(pokeApi.fetchMoveList);
   final results = <String, BackendMoveEntry>{};
+
+  if (names.isEmpty) {
+    // PokéAPI's move list is unreachable — build from PS data alone rather
+    // than returning nothing, mirroring the backend's `_preload_kind`.
+    for (final entry in psData.moves.entries) {
+      final raw = entry.value as Map<String, dynamic>;
+      final displayName = raw['name'] as String? ?? entry.key;
+      final slug = psSlugFromDisplayName(displayName);
+      results[slug] = _mergeMove(raw, null, slug);
+    }
+    AppLogger().w(
+        '[catalog offline] move list unavailable; built ${results.length} entries from PS data only');
+    return results.values.toList();
+  }
 
   final zVaries = <String>{};
   final zVariesRe = RegExp(r'^(.+)--(?:physical|special)$');
@@ -79,16 +110,23 @@ Future<List<BackendMoveEntry>> buildOfflineMoveCatalog(
     }
   });
 
+  // Tracks PS ids already merged from a PokéAPI match, keyed independently
+  // of the resulting entry name — a PS raw entry's own display-name slug can
+  // diverge from PokéAPI's canonical name for the same move, so name-only
+  // dedup below isn't enough to prevent a duplicate.
+  final coveredPsIds = <String>{};
   for (final moveEntry in fetched) {
     if (moveEntry == null) continue;
     final canonicalName = _stripVariantSuffix(moveEntry.name);
     if (results.containsKey(canonicalName)) continue;
     final psId = psIdFromName(canonicalName);
+    coveredPsIds.add(psId);
     final raw = psData.moves[psId] as Map<String, dynamic>?;
     results[canonicalName] = _mergeMove(raw, moveEntry, canonicalName);
   }
 
   for (final entry in psData.moves.entries) {
+    if (coveredPsIds.contains(entry.key)) continue;
     final raw = entry.value as Map<String, dynamic>;
     final displayName = raw['name'] as String? ?? entry.key;
     final slug = psSlugFromDisplayName(displayName);
@@ -196,8 +234,20 @@ Future<List<BackendItemEntry>> buildOfflineItemCatalog(
   PsDataService psData,
 ) async {
   await psData.initialize();
-  final names = await pokeApi.fetchItemList();
+  final names = await _fetchNamesOrEmpty(pokeApi.fetchItemList);
   final results = <String, BackendItemEntry>{};
+
+  if (names.isEmpty) {
+    for (final entry in psData.items.entries) {
+      final raw = entry.value as Map<String, dynamic>;
+      final displayName = raw['name'] as String? ?? entry.key;
+      final slug = psSlugFromDisplayName(displayName);
+      results[slug] = _mergeItem(raw, null, slug);
+    }
+    AppLogger().w(
+        '[catalog offline] item list unavailable; built ${results.length} entries from PS data only');
+    return results.values.toList();
+  }
 
   final fetched = await _mapBounded<String, ItemEntry?>(names, 20, (name) async {
     try {
@@ -207,16 +257,19 @@ Future<List<BackendItemEntry>> buildOfflineItemCatalog(
     }
   });
 
+  final coveredPsIds = <String>{};
   for (final itemEntry in fetched) {
     if (itemEntry == null) continue;
     final canonicalName = _stripVariantSuffix(itemEntry.name);
     if (results.containsKey(canonicalName)) continue;
     final psId = psIdFromName(canonicalName);
+    coveredPsIds.add(psId);
     final raw = psData.items[psId] as Map<String, dynamic>?;
     results[canonicalName] = _mergeItem(raw, itemEntry, canonicalName);
   }
 
   for (final entry in psData.items.entries) {
+    if (coveredPsIds.contains(entry.key)) continue;
     final raw = entry.value as Map<String, dynamic>;
     final displayName = raw['name'] as String? ?? entry.key;
     final slug = psSlugFromDisplayName(displayName);
@@ -262,8 +315,20 @@ Future<List<BackendAbilityEntry>> buildOfflineAbilityCatalog(
   PsDataService psData,
 ) async {
   await psData.initialize();
-  final names = await pokeApi.fetchAbilityList();
+  final names = await _fetchNamesOrEmpty(pokeApi.fetchAbilityList);
   final results = <String, BackendAbilityEntry>{};
+
+  if (names.isEmpty) {
+    for (final entry in psData.abilities.entries) {
+      final raw = entry.value as Map<String, dynamic>;
+      final displayName = raw['name'] as String? ?? entry.key;
+      final slug = psSlugFromDisplayName(displayName);
+      results[slug] = _mergeAbility(raw, null, slug);
+    }
+    AppLogger().w(
+        '[catalog offline] ability list unavailable; built ${results.length} entries from PS data only');
+    return results.values.toList();
+  }
 
   final fetched = await _mapBounded<String, AbilityEntry?>(names, 20, (name) async {
     try {
@@ -273,16 +338,19 @@ Future<List<BackendAbilityEntry>> buildOfflineAbilityCatalog(
     }
   });
 
+  final coveredPsIds = <String>{};
   for (final abilityEntry in fetched) {
     if (abilityEntry == null) continue;
     final canonicalName = abilityEntry.name;
     if (results.containsKey(canonicalName)) continue;
     final psId = psIdFromName(canonicalName);
+    coveredPsIds.add(psId);
     final raw = psData.abilities[psId] as Map<String, dynamic>?;
     results[canonicalName] = _mergeAbility(raw, abilityEntry, canonicalName);
   }
 
   for (final entry in psData.abilities.entries) {
+    if (coveredPsIds.contains(entry.key)) continue;
     final raw = entry.value as Map<String, dynamic>;
     final displayName = raw['name'] as String? ?? entry.key;
     final slug = psSlugFromDisplayName(displayName);
