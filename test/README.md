@@ -45,7 +45,8 @@ Pure logic tests — no Flutter, no Drift, no network.
 | File | Tests | What it covers |
 |------|-------|---------------|
 | `stat_calculator_test.dart` | ~20 | Gen III+ stat formula for HP and non-HP stats; edge cases (min/max EVs, neutral/boosting/lowering natures) |
-| `showdown_export_test.dart` | ~15 | `buildShowdownExport()` — Showdown text format, EV zero-omission, shiny flag, nickname handling |
+| `showdown_export_test.dart` | ~20 | `buildShowdownExport()` — Showdown text format, EV zero-omission, shiny flag, nickname handling, Happiness/Gigantamax/Tera Type lines |
+| `ps_import_parser_test.dart` | ~15 | `parsePsTeam()` — nature line parsing (real PS syntax + legacy prefix), Gigantamax/Tera Type/Happiness parsing, period-stripping in species names |
 | `sync_service_test.dart` | ~25 | Push drain (happy path, retry, discard after 5), pull merge (create/update/delete), conflict resolution (local newer / remote newer / remote deleted) |
 | `format_models_test.dart` | ~20 | `GameFormat.fromJson()`, `GenerationMechanics.forGen()`, `PsMoveEntry`/`PsItemEntry`/`PsAbilityEntry` parsing |
 | `form_filter_test.dart` | ~18 | `filterFormChips()` — regional variants, Mega, Gigantamax, alternate forms |

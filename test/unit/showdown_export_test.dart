@@ -22,6 +22,9 @@ TeamSlot _slot({
   String? gender,
   bool isShiny = false,
   int level = 50,
+  int? friendship,
+  bool hasGigantamax = false,
+  String? teraType,
   String? move1,
   String? move2,
   String? move3,
@@ -52,6 +55,8 @@ TeamSlot _slot({
       gender: gender,
       isShiny: isShiny,
       level: level,
+      friendship: friendship,
+      teraType: teraType,
       move1: move1,
       move2: move2,
       move3: move3,
@@ -72,7 +77,7 @@ TeamSlot _slot({
       syncStatus: 'synced',
       isDeleted: false,
       isMegaEvolved: false,
-      hasGigantamax: false,
+      hasGigantamax: hasGigantamax,
       gigantamaxEnabled: false,
       isAlpha: false,
       updatedAt: DateTime(2024),
@@ -206,6 +211,61 @@ void main() {
 
       expect(shinyResult, contains('Shiny: Yes'));
       expect(normalResult, isNot(contains('Shiny')));
+    });
+
+    test('Happiness line included only when friendship is set', () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final withFriendship = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25, friendship: 0,
+      );
+      final withoutFriendship = _slot(
+        id: 2, slot: 2, teamId: 1, pokemonId: 25,
+      );
+
+      final withResult = await buildShowdownExport([withFriendship], mockApi);
+      final withoutResult =
+          await buildShowdownExport([withoutFriendship], mockApi);
+
+      expect(withResult, contains('Happiness: 0'));
+      expect(withoutResult, isNot(contains('Happiness')));
+    });
+
+    test('Gigantamax: Yes line included only when hasGigantamax', () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final gmax = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25, hasGigantamax: true,
+      );
+      final notGmax = _slot(
+        id: 2, slot: 2, teamId: 1, pokemonId: 25, hasGigantamax: false,
+      );
+
+      final gmaxResult = await buildShowdownExport([gmax], mockApi);
+      final notGmaxResult = await buildShowdownExport([notGmax], mockApi);
+
+      expect(gmaxResult, contains('Gigantamax: Yes'));
+      expect(notGmaxResult, isNot(contains('Gigantamax')));
+    });
+
+    test('Tera Type line included and capitalised when set', () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final withTera = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25, teraType: 'fire',
+      );
+      final withoutTera = _slot(
+        id: 2, slot: 2, teamId: 1, pokemonId: 25,
+      );
+
+      final withResult = await buildShowdownExport([withTera], mockApi);
+      final withoutResult = await buildShowdownExport([withoutTera], mockApi);
+
+      expect(withResult, contains('Tera Type: Fire'));
+      expect(withoutResult, isNot(contains('Tera Type')));
     });
 
     test('zero EVs are omitted entirely', () async {
