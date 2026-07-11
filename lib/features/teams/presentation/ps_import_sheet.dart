@@ -7,64 +7,13 @@ import 'package:go_router/go_router.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/teams/logic/ps_form_resolver.dart';
+import 'package:poke_team_dex/features/teams/logic/ps_import_parser.dart';
 import 'package:poke_team_dex/features/teams/logic/ps_import_resolvers.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart' show setTeamIsBox;
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/utils/snack_bar.dart';
-
-// ── Parser models ─────────────────────────────────────────────────────────────
-
-class _PsSlot {
-  final String species; // normalised PokéAPI name (e.g. charizard-mega-x)
-  final String? nickname;
-  final String? item;     // normalised (e.g. choice-scarf)
-  final String? ability;  // normalised
-  final int level;
-  final bool isShiny;
-  final String? gender;   // 'male' | 'female' | null
-  final String? nature;   // lowercase (e.g. jolly)
-  final Map<String, int> evs; // {pokeapi-stat-name: value}
-  final Map<String, int> ivs;
-  final List<String> moves; // normalised pokeapi names
-
-  const _PsSlot({
-    required this.species,
-    this.nickname,
-    this.item,
-    this.ability,
-    this.level = 100,
-    this.isShiny = false,
-    this.gender,
-    this.nature,
-    this.evs = const {},
-    this.ivs = const {},
-    this.moves = const [],
-  });
-}
-
-class _PsTeam {
-  final String name;
-  final String? formatId; // e.g. "gen9ou"
-  final List<_PsSlot> slots;
-  const _PsTeam({required this.name, this.formatId, required this.slots});
-}
-
-// ── Parser ────────────────────────────────────────────────────────────────────
-
-const _kStatMap = {
-  'HP': 'hp', 'Atk': 'attack', 'Def': 'defense',
-  'SpA': 'special-attack', 'SpD': 'special-defense', 'Spe': 'speed',
-};
-
-String _norm(String s) => s
-    .toLowerCase()
-    .trim()
-    .replaceAll(' ', '-')
-    .replaceAll("'", '')      // U+0027 ASCII apostrophe
-    .replaceAll('\u2019', '') // U+2019 RIGHT SINGLE QUOTATION MARK (used by some PS clients)
-    .replaceAll('\u02BC', ''); // U+02BC MODIFIER LETTER APOSTROPHE
 
 Future<String?> _resolveFormName(
     dynamic repo, int basePokemonId, String psName) async {
@@ -78,139 +27,6 @@ Future<String?> _resolveFormName(
     return resolveFormFromVarieties(psName, varieties);
   } catch (_) {
     return null;
-  }
-}
-
-_PsTeam _parseTeam(String text) {
-  String teamName = 'Imported Team';
-  String? formatId;
-
-  // Strip === Team Name === header.
-  final headerRe = RegExp(r'===\s*(?:\[([^\]]+)\]\s*)?(.+?)\s*===');
-  final headerMatch = headerRe.firstMatch(text);
-  if (headerMatch != null) {
-    if (headerMatch.group(1) != null) {
-      // "[gen9ou] My Team" → extract format and name
-      final rawFmt = headerMatch.group(1)!.trim().toLowerCase().replaceAll(' ', '');
-      formatId = rawFmt.isNotEmpty ? rawFmt : null;
-    }
-    if ((headerMatch.group(2) ?? '').isNotEmpty) {
-      teamName = headerMatch.group(2)!.trim();
-    }
-    text = text.substring(headerMatch.end);
-  }
-
-  // Split into Pokémon blocks (separated by blank lines).
-  final blocks = text
-      .split(RegExp(r'\n\s*\n'))
-      .map((b) => b.trim())
-      .where((b) => b.isNotEmpty)
-      .toList();
-
-  final slots = <_PsSlot>[];
-  for (final block in blocks) {
-    final slot = _parseBlock(block);
-    if (slot != null) slots.add(slot);
-  }
-
-  return _PsTeam(name: teamName, formatId: formatId, slots: slots);
-}
-
-_PsSlot? _parseBlock(String block) {
-  final lines =
-      block.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
-  if (lines.isEmpty) return null;
-
-  // ── Line 0: [Nickname (Species)] [(M/F)] [@ Item] ─────────────────────────
-  var first = lines[0];
-  String? item;
-  if (first.contains(' @ ')) {
-    final idx = first.lastIndexOf(' @ ');
-    item = _norm(first.substring(idx + 3).trim());
-    first = first.substring(0, idx).trim();
-  }
-
-  String? gender;
-  if (first.endsWith('(M)')) {
-    gender = 'male';
-    first = first.substring(0, first.length - 3).trim();
-  } else if (first.endsWith('(F)')) {
-    gender = 'female';
-    first = first.substring(0, first.length - 3).trim();
-  }
-
-  String? nickname;
-  String species;
-  final parenMatch = RegExp(r'^(.*?)\(([^)]+)\)\s*$').firstMatch(first);
-  if (parenMatch != null && parenMatch.group(1)!.trim().isNotEmpty) {
-    nickname = parenMatch.group(1)!.trim();
-    species = _norm(parenMatch.group(2)!.trim());
-  } else if (parenMatch != null) {
-    species = _norm(parenMatch.group(2)!.trim());
-  } else {
-    species = _norm(first.trim());
-  }
-
-  // ── Remaining lines ────────────────────────────────────────────────────────
-  String? ability;
-  int level = 100;
-  bool isShiny = false;
-  String? nature;
-  final evs = <String, int>{};
-  final ivs = <String, int>{};
-  final moves = <String>[];
-
-  for (int i = 1; i < lines.length; i++) {
-    final line = lines[i];
-    if (line.startsWith('Ability: ')) {
-      ability = _norm(line.substring(9).trim());
-    } else if (line.startsWith('Level: ')) {
-      level = int.tryParse(line.substring(7).trim()) ?? 100;
-    } else if (line.startsWith('Shiny: Yes')) {
-      isShiny = true;
-    } else if (line.startsWith('EVs: ')) {
-      _parseStatLine(line.substring(5), evs);
-    } else if (line.startsWith('IVs: ')) {
-      _parseStatLine(line.substring(5), ivs);
-    } else if (line.startsWith('Nature: ')) {
-      // "Nature: Timid Nature" → strip prefix and " Nature" suffix → "Timid"
-      var raw = line.substring(8).trim();
-      if (raw.endsWith(' Nature')) raw = raw.substring(0, raw.length - 7).trim();
-      nature = raw.isNotEmpty
-          ? raw[0].toUpperCase() + raw.substring(1).toLowerCase()
-          : null;
-    } else if (line.startsWith('- ')) {
-      // Strip Hidden Power type annotation: "Hidden Power [Ice]" → "hidden-power"
-      var move = line.substring(2).trim();
-      move = move.replaceAll(RegExp(r'\s*\[.*?\]'), '').trim();
-      moves.add(_norm(move));
-    }
-  }
-
-  if (species.isEmpty) return null;
-
-  return _PsSlot(
-    species: species,
-    nickname: nickname,
-    item: item,
-    ability: ability,
-    level: level,
-    isShiny: isShiny,
-    gender: gender,
-    nature: nature,
-    evs: evs,
-    ivs: ivs,
-    moves: moves.take(4).toList(),
-  );
-}
-
-void _parseStatLine(String s, Map<String, int> target) {
-  for (final part in s.split('/')) {
-    final m = RegExp(r'(\d+)\s+(\w+)').firstMatch(part.trim());
-    if (m != null) {
-      final stat = _kStatMap[m.group(2)];
-      if (stat != null) target[stat] = int.parse(m.group(1)!);
-    }
   }
 }
 
@@ -314,7 +130,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
     });
 
     try {
-      final parsed = _parseTeam(text);
+      final parsed = parsePsTeam(text);
       if (parsed.slots.isEmpty) {
         setState(() {
           _error = 'No valid Pokémon found. Check the format and try again.';
@@ -344,7 +160,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
   /// so remaining Pokémon can continue filling up to [maxBoxSize] slots.
   /// If the box is also at capacity, remaining Pokémon are skipped and the
   /// user is informed of the count.
-  Future<void> _importIntoTeam(_PsTeam parsed, int teamId) async {
+  Future<void> _importIntoTeam(PsTeam parsed, int teamId) async {
     final pokeRepo = ref.read(pokeApiRepositoryProvider);
     final slotRepo = ref.read(teamSlotRepositoryProvider);
     final teamRepo = ref.read(teamRepositoryProvider);
@@ -461,6 +277,9 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         isShiny: Value(s.isShiny),
         gender: Value(s.gender),
         formName: Value(resolvedFormName),
+        friendship: Value(s.friendship),
+        gigantamaxEnabled: Value(s.isGigantamax),
+        teraType: Value(s.teraType),
         evHp:  Value(s.evs['hp']  ?? 0),
         evAtk: Value(s.evs['attack'] ?? 0),
         evDef: Value(s.evs['defense'] ?? 0),
@@ -510,7 +329,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
   }
 
   /// Creates a new team record and populates it with the parsed Pokémon.
-  Future<void> _importAsNewTeam(_PsTeam parsed) async {
+  Future<void> _importAsNewTeam(PsTeam parsed) async {
     final repo = ref.read(pokeApiRepositoryProvider);
     final teamRepo = ref.read(teamRepositoryProvider);
     final slotRepo = ref.read(teamSlotRepositoryProvider);
@@ -574,7 +393,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
   /// Inserts parsed slots into [teamId] and returns a list of error messages
   /// for any Pokémon that could not be resolved.
   Future<List<String>> _insertSlots({
-    required _PsTeam parsed,
+    required PsTeam parsed,
     required int teamId,
     required dynamic repo,
     required dynamic slotRepo,
@@ -641,6 +460,9 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         isShiny: Value(s.isShiny),
         gender: Value(s.gender),
         formName: Value(resolvedFormName),
+        friendship: Value(s.friendship),
+        gigantamaxEnabled: Value(s.isGigantamax),
+        teraType: Value(s.teraType),
         evHp:  Value(s.evs['hp']  ?? 0),
         evAtk: Value(s.evs['attack'] ?? 0),
         evDef: Value(s.evs['defense'] ?? 0),

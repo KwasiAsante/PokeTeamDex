@@ -127,6 +127,14 @@ Future<String> buildShowdownExport(
 
     if (slot.isShiny) lines.add('Shiny: Yes');
 
+    if (slot.friendship != null) lines.add('Happiness: ${slot.friendship}');
+
+    if (slot.gigantamaxEnabled) lines.add('Gigantamax: Yes');
+
+    if (slot.teraType != null) {
+      lines.add('Tera Type: ${slot.teraType!.toCapitalCase()}');
+    }
+
     if (slot.natureName != null) {
       lines.add('${_normalisedNature(slot.natureName!)} Nature');
     }

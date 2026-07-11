@@ -87,9 +87,10 @@ The core team builder feature — the most complex module.
 `logic/` files:
 
 - `ps_form_resolver.dart` — heuristics for resolving a PS form name from PokéAPI variety name; exceptions-first lookup
+- `ps_import_parser.dart` — pure text parser (`parsePsTeam`) for pasted Showdown exports; no API calls, unit-testable independent of `PsImportSheet`
 - `hidden_power.dart` — Hidden Power type/power from IVs (Gen 2 DV formula vs. Gen 3+ IV-LSB formula); shared by `SlotConfigScreen`, `TeamDetailScreen`, and `showdown_export.dart`
 
-**`services/showdown_export.dart`** — `buildShowdownExport(team, slots)` produces standard Showdown `.txt` format.
+**`services/showdown_export.dart`** — `buildShowdownExport(team, slots)` produces standard Showdown `.txt` format, including Happiness/Gigantamax/Tera Type lines when set.
 
 ---
 
