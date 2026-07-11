@@ -128,7 +128,7 @@ Future<String> buildShowdownExport(
     if (slot.isShiny) lines.add('Shiny: Yes');
 
     if (slot.natureName != null) {
-      lines.add('Nature: ${_normalisedNature(slot.natureName!)} Nature');
+      lines.add('${_normalisedNature(slot.natureName!)} Nature');
     }
 
     // EVs — omit zero values
@@ -143,6 +143,28 @@ Future<String> buildShowdownExport(
     addEv(slot.evSpd, 'SpD');
     addEv(slot.evSpe, 'Spe');
     if (evParts.isNotEmpty) lines.add('EVs: ${evParts.join(' / ')}');
+
+    // IVs — omit stats at their generation-appropriate default. Gen 1/2
+    // slots store raw 0–15 DVs (see GenerationMechanics.statMax); PS's own
+    // file format always uses the doubled 0–31 IV scale even for Gen 1/2
+    // (verified against real Showdown-exported Gen 1/2 teams — every IV
+    // value in them is even), so DVs are converted via IV = DV × 2 here.
+    // Gen 3+ IVs are already on that scale and used as-is.
+    final isDvGen = gen == 1 || gen == 2;
+    final ivDefault = isDvGen ? 30 : 31;
+    final ivParts = <String>[];
+    void addIv(int? val, String label) {
+      final raw = val ?? (isDvGen ? 15 : 31);
+      final converted = isDvGen ? raw * 2 : raw;
+      if (converted != ivDefault) ivParts.add('$converted $label');
+    }
+    addIv(slot.ivHp, 'HP');
+    addIv(slot.ivAtk, 'Atk');
+    addIv(slot.ivDef, 'Def');
+    addIv(slot.ivSpa, 'SpA');
+    addIv(slot.ivSpd, 'SpD');
+    addIv(slot.ivSpe, 'Spe');
+    if (ivParts.isNotEmpty) lines.add('IVs: ${ivParts.join(' / ')}');
 
     // Moves — Hidden Power gets its IV-derived type appended, e.g.
     // "Hidden Power [Ice]", matching the syntax PS's parser (and our own

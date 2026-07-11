@@ -184,7 +184,8 @@ void main() {
       );
       final result = await buildShowdownExport([slot], mockApi);
 
-      expect(result, contains('Nature: Timid Nature'));
+      expect(result, contains('Timid Nature'));
+      expect(result, isNot(contains('Nature: Timid')));
     });
 
     test('shiny: yes line included only when shiny', () async {
@@ -231,6 +232,64 @@ void main() {
       final result = await buildShowdownExport([slot], mockApi);
 
       expect(result, contains('EVs: 4 HP / 252 SpA / 252 Spe'));
+    });
+
+    test('default (31) IVs are omitted entirely — Gen 3+', () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25,
+        ivHp: 31, ivAtk: 31, ivDef: 31, ivSpa: 31, ivSpd: 31, ivSpe: 31,
+      );
+      final result = await buildShowdownExport([slot], mockApi, gen: 9);
+
+      expect(result, isNot(contains('IVs:')));
+    });
+
+    test('non-default IVs appear with correct labels — Gen 3+ uses raw values',
+        () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25,
+        ivAtk: 0, ivSpa: 30,
+      );
+      final result = await buildShowdownExport([slot], mockApi, gen: 9);
+
+      expect(result, contains('IVs: 0 Atk / 30 SpA'));
+    });
+
+    test('Gen 1/2 DVs are doubled to PS\'s IV scale, omitted at DV 15 (→ 30)',
+        () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      // Def DV 13 → IV 26 (matches a real Showdown-exported Gen 1/2 team);
+      // every other stat left at default DV 15 → IV 30, omitted.
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25, ivDef: 13,
+      );
+      final gen1Result = await buildShowdownExport([slot], mockApi, gen: 1);
+      final gen2Result = await buildShowdownExport([slot], mockApi, gen: 2);
+
+      expect(gen1Result, contains('IVs: 26 Def'));
+      expect(gen2Result, contains('IVs: 26 Def'));
+      expect(gen1Result, isNot(contains('HP')));
+    });
+
+    test('Gen 1/2 fully-default DVs (15) are omitted entirely', () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25,
+        ivHp: 15, ivAtk: 15, ivDef: 15, ivSpa: 15, ivSpd: 15, ivSpe: 15,
+      );
+      final result = await buildShowdownExport([slot], mockApi, gen: 2);
+
+      expect(result, isNot(contains('IVs:')));
     });
 
     test('moves appear as "- Move" lines, null moves skipped', () async {
