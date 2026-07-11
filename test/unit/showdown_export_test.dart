@@ -67,23 +67,32 @@ TeamSlot _slot({
       createdAt: DateTime(2024),
     );
 
-PokemonEntry _pokemon(String name, {int id = 1}) => PokemonEntry(
+PokemonEntry _pokemon(String name, {int id = 1, String? speciesName}) =>
+    PokemonEntry(
       id: id,
       name: name,
+      speciesName: speciesName ?? name,
       height: 10,
       weight: 100,
       types: ['normal'],
     );
 
-PokemonSpeciesEntry _species(int id, String name, List<String> varietyNames) =>
+PokemonSpeciesEntry _species(
+  int id,
+  String name, {
+  required String defaultVariety,
+  List<String> otherVarieties = const [],
+}) =>
     PokemonSpeciesEntry(
       id: id,
       name: name,
       eggGroups: const [],
       flavorTextEntries: const [],
-      varieties: varietyNames
-          .map((n) => PokemonVariety(isDefault: n == name, name: n))
-          .toList(),
+      varieties: [
+        PokemonVariety(isDefault: true, name: defaultVariety),
+        for (final v in otherVarieties)
+          PokemonVariety(isDefault: false, name: v),
+      ],
     );
 
 void main() {
@@ -227,11 +236,14 @@ void main() {
       expect(result.split('\n').where((l) => l.startsWith('- ')), hasLength(2));
     });
 
-    test('battle-meaningful formName (real variety) is used as species', () async {
+    test('battle-meaningful formName (real, non-default variety) is used as species',
+        () async {
       when(() => mockApi.fetchPokemon(479))
           .thenAnswer((_) async => _pokemon('rotom', id: 479));
       when(() => mockApi.fetchPokemonSpecies(479)).thenAnswer((_) async =>
-          _species(479, 'rotom', ['rotom', 'rotom-wash', 'rotom-heat']));
+          _species(479, 'rotom',
+              defaultVariety: 'rotom',
+              otherVarieties: ['rotom-wash', 'rotom-heat']));
 
       final slot = _slot(
         id: 1, slot: 1, teamId: 1, pokemonId: 479, formName: 'rotom-wash',
@@ -241,13 +253,33 @@ void main() {
       expect(result, startsWith('Rotom-Wash'));
     });
 
+    // Pyroar/Jellicent's *default* variety is itself gender-suffixed at the
+    // PokéAPI /pokemon level ("pyroar-male"), with "pyroar-female" existing
+    // only as a cosmetic pokemon-form (no /pokemon-species variety of its
+    // own). Both quirks must be handled: pokemon.name alone would read
+    // "Pyroar Male" even with no form selected, and a naive variety-name
+    // match would treat "pyroar-male" as a real form if it were ever stored.
+    test('gender-suffixed default variety, no form selected — species is just the base name',
+        () async {
+      when(() => mockApi.fetchPokemon(668)).thenAnswer(
+          (_) async => _pokemon('pyroar-male', id: 668, speciesName: 'pyroar'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 668, gender: 'male',
+      );
+      final result = await buildShowdownExport([slot], mockApi);
+
+      expect(result, startsWith('Pyroar (M)'));
+      expect(result, isNot(contains('Male)')));
+    });
+
     test(
-        'cosmetic-only formName (no matching variety) is dropped from '
-        'species — gender still applies via (M)/(F) tag', () async {
-      when(() => mockApi.fetchPokemon(668))
-          .thenAnswer((_) async => _pokemon('pyroar', id: 668));
-      when(() => mockApi.fetchPokemonSpecies(668))
-          .thenAnswer((_) async => _species(668, 'pyroar', ['pyroar']));
+        'cosmetic-only formName (no matching non-default variety) is dropped '
+        'from species — gender still applies via (M)/(F) tag', () async {
+      when(() => mockApi.fetchPokemon(668)).thenAnswer(
+          (_) async => _pokemon('pyroar-male', id: 668, speciesName: 'pyroar'));
+      when(() => mockApi.fetchPokemonSpecies(668)).thenAnswer((_) async =>
+          _species(668, 'pyroar', defaultVariety: 'pyroar-male'));
 
       final slot = _slot(
         id: 1, slot: 1, teamId: 1, pokemonId: 668,
@@ -257,6 +289,24 @@ void main() {
 
       expect(result, startsWith('Pyroar (F)'));
       expect(result, isNot(contains('Female')));
+    });
+
+    test(
+        'formName equal to the default variety itself (e.g. corrupted data) '
+        'is still ignored, not treated as a real form', () async {
+      when(() => mockApi.fetchPokemon(668)).thenAnswer(
+          (_) async => _pokemon('pyroar-male', id: 668, speciesName: 'pyroar'));
+      when(() => mockApi.fetchPokemonSpecies(668)).thenAnswer((_) async =>
+          _species(668, 'pyroar', defaultVariety: 'pyroar-male'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 668,
+        formName: 'pyroar-male', gender: 'male',
+      );
+      final result = await buildShowdownExport([slot], mockApi);
+
+      expect(result, startsWith('Pyroar (M)'));
+      expect(result, isNot(contains('Male)')));
     });
 
     test('multiple slots are separated by double newline and sorted by slot', () async {

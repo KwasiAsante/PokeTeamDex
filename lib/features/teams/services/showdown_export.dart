@@ -66,24 +66,33 @@ Future<String> buildShowdownExport(
 
   for (final slot in slots..sort((a, b) => a.slot.compareTo(b.slot))) {
     final pokemon = await pokeApi.fetchPokemon(slot.pokemonId);
-    final baseName = pokemon.name.toCapitalCase();
+    // Some species' *default* variety is itself gender-suffixed at the
+    // /pokemon level (e.g. Pyroar's default variety is literally named
+    // "pyroar-male", Jellicent's "jellicent-male") — pokemon.name would
+    // wrongly become "Pyroar Male" even with no form selected. speciesName
+    // is the species-level name ("pyroar"), unaffected by this. Same
+    // speciesName-vs-name distinction used for form suffix stripping
+    // elsewhere in the app.
+    final baseName = (pokemon.speciesName ?? pokemon.name).toCapitalCase();
     final nickname = slot.nickname?.trim();
     final hasNickname =
         nickname != null && nickname.isNotEmpty && nickname != baseName;
 
     // Species display name includes form when set — but only for
-    // battle-meaningful varieties (species with their own /pokemon
-    // resource, e.g. "rotom-wash"). Cosmetic form-entries (e.g. Pyroar's
-    // or Jellicent's "-female" sprite-only form, which has no /pokemon
-    // resource of its own) aren't real PS species and must not be folded
-    // into the species name — PS conveys their gender purely via the
-    // (M)/(F) tag below. Folding a cosmetic form in here produces a
-    // species string PS's teambuilder can't recognise (shows "???"/no
-    // sprite on import).
+    // battle-meaningful, non-default varieties (species with their own
+    // /pokemon resource, e.g. "rotom-wash"). Cosmetic form-entries (e.g.
+    // Pyroar's or Jellicent's "-female" sprite-only form, which has no
+    // /pokemon resource of its own) aren't real PS species and must not be
+    // folded into the species name — PS conveys their gender purely via
+    // the (M)/(F) tag below. The default-variety exclusion additionally
+    // covers species like Pyroar/Jellicent whose default variety name
+    // (e.g. "pyroar-male") would otherwise match here too.
     String? battleFormName;
     if (slot.formName != null && slot.formName!.isNotEmpty) {
       final species = await pokeApi.fetchPokemonSpecies(pokemon.id);
-      if (species.varieties.any((v) => v.name == slot.formName)) {
+      final matchedVariety =
+          species.varieties.where((v) => v.name == slot.formName).firstOrNull;
+      if (matchedVariety != null && !matchedVariety.isDefault) {
         battleFormName = slot.formName;
       }
     }
