@@ -151,6 +151,52 @@ Ability: Scrappy
     });
   });
 
+  group('psIvDefault', () {
+    test('Gen 1/2 default to 15 (raw DV scale)', () {
+      expect(psIvDefault(1), 15);
+      expect(psIvDefault(2), 15);
+    });
+
+    test('Gen 3+ and unknown/null gen default to 31', () {
+      expect(psIvDefault(3), 31);
+      expect(psIvDefault(9), 31);
+      expect(psIvDefault(null), 31);
+    });
+  });
+
+  group('psIvToStored', () {
+    test('Gen 1/2 halves the PS-scale IV back to a raw DV', () {
+      // Real Showdown-exported Gen 1/2 IVs are always even (DV × 2).
+      expect(psIvToStored(30, 1), 15);
+      expect(psIvToStored(26, 2), 13);
+      expect(psIvToStored(0, 1), 0);
+    });
+
+    test('Gen 3+ and unknown/null gen store the IV as-is', () {
+      expect(psIvToStored(30, 3), 30);
+      expect(psIvToStored(0, 9), 0);
+      expect(psIvToStored(31, null), 31);
+    });
+  });
+
+  group('parsePsTeam — Gen 1/2 IVs (DV scale)', () {
+    test('a real Gen 1/2 IV line parses as the PS-scale (doubled) value — '
+        'gen-aware conversion to raw DVs happens at insert time, not here', () {
+      const text = '''
+Pikachu @ Light Ball
+IVs: 26 Def
+- Thunderbolt
+''';
+      final team = parsePsTeam(text);
+      // parsePsTeam itself is gen-agnostic; it always returns the raw parsed
+      // PS value. Converting it to a stored DV is the caller's job via
+      // psIvToStored — this test guards against ever baking a gen-specific
+      // conversion into the parser itself, which would double-convert data
+      // when the caller also applies psIvToStored.
+      expect(team.slots.single.ivs['defense'], 26);
+    });
+  });
+
   group('parsePsTeam — real Showdown export fixture', () {
     // Trimmed from a real Pokémon Showdown Teambuilder export.
     const text = '''

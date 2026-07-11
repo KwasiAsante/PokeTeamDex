@@ -11,6 +11,7 @@ import 'package:poke_team_dex/features/teams/logic/ps_import_parser.dart';
 import 'package:poke_team_dex/features/teams/logic/ps_import_resolvers.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart' show setTeamIsBox;
+import 'package:poke_team_dex/features/teams/services/ps_export_service.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/utils/snack_bar.dart';
@@ -29,6 +30,13 @@ Future<String?> _resolveFormName(
     return null;
   }
 }
+
+/// Resolves the DV/IV value to store for a parsed PS stat entry, converting
+/// PS's doubled 0–31 scale down to raw 0–15 DVs for Gen 1/2 (see
+/// psIvToStored) and falling back to the gen-appropriate default when the
+/// stat was omitted from the pasted export.
+int _resolveIv(int? psIv, int? gen) =>
+    psIv != null ? psIvToStored(psIv, gen) : psIvDefault(gen);
 
 // ── Import sheet ──────────────────────────────────────────────────────────────
 
@@ -170,6 +178,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
     final team = await teamRepo.getById(teamId);
     final existing = await slotRepo.getByTeam(teamId);
     final maxBoxSize = await configRepo.getMaxBoxSize();
+    final gen = await PsExportService.resolveGen(ref, team.formatLabel);
 
     final occupied = {for (final s in existing) s.slot};
     bool isBox = team.isBox;
@@ -264,7 +273,6 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         }
       }
 
-      const ivDefault = 31;
       await slotRepo.insert(TeamSlotsCompanion(
         teamId: Value(teamId),
         slot: Value(slot),
@@ -286,12 +294,12 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         evSpa: Value(s.evs['special-attack'] ?? 0),
         evSpd: Value(s.evs['special-defense'] ?? 0),
         evSpe: Value(s.evs['speed'] ?? 0),
-        ivHp:  Value(s.ivs['hp']  ?? ivDefault),
-        ivAtk: Value(s.ivs['attack'] ?? ivDefault),
-        ivDef: Value(s.ivs['defense'] ?? ivDefault),
-        ivSpa: Value(s.ivs['special-attack'] ?? ivDefault),
-        ivSpd: Value(s.ivs['special-defense'] ?? ivDefault),
-        ivSpe: Value(s.ivs['speed'] ?? ivDefault),
+        ivHp:  Value(_resolveIv(s.ivs['hp'], gen)),
+        ivAtk: Value(_resolveIv(s.ivs['attack'], gen)),
+        ivDef: Value(_resolveIv(s.ivs['defense'], gen)),
+        ivSpa: Value(_resolveIv(s.ivs['special-attack'], gen)),
+        ivSpd: Value(_resolveIv(s.ivs['special-defense'], gen)),
+        ivSpe: Value(_resolveIv(s.ivs['speed'], gen)),
         move1: Value(s.moves.isNotEmpty ? s.moves[0] : null),
         move2: Value(s.moves.length > 1 ? s.moves[1] : null),
         move3: Value(s.moves.length > 2 ? s.moves[2] : null),
@@ -341,6 +349,8 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
 
     final teamName = resolveTeamName(_nameCtrl.text, parsed.name);
     final formatId = resolveFormatId(_selectedFormat, parsed.formatId);
+    final gen = _selectedFormat?.gen ??
+        await PsExportService.resolveGen(ref, formatId);
 
     final teamId = await teamRepo.insert(TeamsCompanion(
       name: Value(teamName),
@@ -369,6 +379,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
       repo: repo,
       slotRepo: slotRepo,
       now: now,
+      gen: gen,
     );
 
     final insertedSlots = await slotRepo.getByTeam(teamId);
@@ -398,9 +409,9 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
     required dynamic repo,
     required dynamic slotRepo,
     required DateTime now,
+    required int? gen,
   }) async {
     final errors = <String>[];
-    const ivDefault = 31;
 
     for (int i = 0; i < parsed.slots.length; i++) {
       final s = parsed.slots[i];
@@ -469,12 +480,12 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
         evSpa: Value(s.evs['special-attack'] ?? 0),
         evSpd: Value(s.evs['special-defense'] ?? 0),
         evSpe: Value(s.evs['speed'] ?? 0),
-        ivHp:  Value(s.ivs['hp']  ?? ivDefault),
-        ivAtk: Value(s.ivs['attack'] ?? ivDefault),
-        ivDef: Value(s.ivs['defense'] ?? ivDefault),
-        ivSpa: Value(s.ivs['special-attack'] ?? ivDefault),
-        ivSpd: Value(s.ivs['special-defense'] ?? ivDefault),
-        ivSpe: Value(s.ivs['speed'] ?? ivDefault),
+        ivHp:  Value(_resolveIv(s.ivs['hp'], gen)),
+        ivAtk: Value(_resolveIv(s.ivs['attack'], gen)),
+        ivDef: Value(_resolveIv(s.ivs['defense'], gen)),
+        ivSpa: Value(_resolveIv(s.ivs['special-attack'], gen)),
+        ivSpd: Value(_resolveIv(s.ivs['special-defense'], gen)),
+        ivSpe: Value(_resolveIv(s.ivs['speed'], gen)),
         move1: Value(s.moves.isNotEmpty ? s.moves[0] : null),
         move2: Value(s.moves.length > 1 ? s.moves[1] : null),
         move3: Value(s.moves.length > 2 ? s.moves[2] : null),

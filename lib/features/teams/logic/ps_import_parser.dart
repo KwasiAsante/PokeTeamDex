@@ -196,6 +196,19 @@ PsSlot? _parseBlock(String block) {
   );
 }
 
+/// The value TeamSlots stores for a stat when the pasted export omits it.
+/// Gen 1/2 slots store raw 0–15 DVs; Gen 3+ (and unknown/null gen) store
+/// 0–31 IVs. Mirrors buildShowdownExport's ivDefault.
+int psIvDefault(int? gen) => (gen == 1 || gen == 2) ? 15 : 31;
+
+/// Converts a parsed PS IV value to the value TeamSlots stores for [gen].
+/// PS's own file format always uses the doubled 0–31 IV scale, even for
+/// Gen 1/2 (every IV value in a real Gen 1/2 Showdown export is even) — so
+/// Gen 1/2 values are halved back to raw 0–15 DVs. Inverse of
+/// buildShowdownExport's DV × 2 conversion.
+int psIvToStored(int psIv, int? gen) =>
+    (gen == 1 || gen == 2) ? psIv ~/ 2 : psIv;
+
 void _parseStatLine(String s, Map<String, int> target) {
   for (final part in s.split('/')) {
     final m = RegExp(r'(\d+)\s+(\w+)').firstMatch(part.trim());
