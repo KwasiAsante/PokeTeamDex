@@ -113,7 +113,9 @@ async def get_pokemon_moves(
     """
     Return the moves list for a Pokémon.
 
-    Without `gen`: all version groups from PokéAPI are returned (no supplement moves).
+    Without `gen`: all version groups from PokéAPI are returned, and Showdown
+    learnset supplement moves (event/egg/tutor moves absent from PokéAPI) are
+    appended for every generation.
     With `gen=N`: moves are filtered to that generation's version groups, and any moves
     present in the Showdown learnset but absent from PokéAPI are appended.
     """

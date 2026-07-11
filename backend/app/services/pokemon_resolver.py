@@ -3,7 +3,7 @@ pokemon_resolver.py — Backend aggregation service for GET /pokemon/{id}/resolv
 
 Merges:
   - PokéAPI  (types, stats, abilities, forms, sprites)
-  - Showdown learnset_N.json  (moves PokéAPI doesn't know about — loaded by LearnsetService in sub-issue B)
+  - Showdown learnset_N.json  (moves PokéAPI doesn't know about — loaded by LearnsetService)
   - Showdown pokedex / gen-overrides  (gen-accurate types & stats)
   - Smogon pkmn.github.io  (competitive sets, fetched in background)
 """

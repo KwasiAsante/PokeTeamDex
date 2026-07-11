@@ -228,7 +228,7 @@ class PokemonResolvedResponse(BaseModel):
     weight: int = 0
     base_experience: int | None = None
     species_name: str | None = None
-    form_names: list[str] = []            # derived from forms[].name for convenience
+    form_names: list[str] = []            # reserved; not currently populated by resolve()
     moves: dict[int, list[MoveSummary]] = {}  # slim: {}; full via ?includes[]=moves; keyed by gen
     moves_url: str | None = None          # /pokemon/moves/{pokemon_id}
     smogon_analyses: list[SmogonFormatData] | None

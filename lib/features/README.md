@@ -57,8 +57,8 @@ The core team builder feature — the most complex module.
 
 | Screen | Description |
 | ------ | ----------- |
-| `TeamsScreen` | Folder hierarchy; create/rename/delete teams and folders; drag-reorder; drag-to-folder |
-| `TeamDetailScreen` | 6-slot list with filled/empty slot cards; Showdown export; format picker; rename |
+| `TeamsScreen` | Folder hierarchy; create/rename/delete teams and folders; drag-reorder; drag-to-folder; folder overflow menu's "Save All Teams" saves every team/box in the folder sequentially with a live progress dialog, re-triggering each team's PS export |
+| `TeamDetailScreen` | 6-slot list with filled/empty slot cards; Showdown export; format picker; rename; "Save All" re-triggers the PS export instead of leaving the exported `.txt` stale |
 | `SlotPickerScreen` | Browse Pokédex to assign a Pokémon to a slot (format auto-filters to eligible Pokémon) |
 | `SlotConfigScreen` | Full slot configuration — all per-Pokémon fields |
 
@@ -87,7 +87,7 @@ The core team builder feature — the most complex module.
 `logic/` files:
 
 - `ps_form_resolver.dart` — heuristics for resolving a PS form name from PokéAPI variety name; exceptions-first lookup
-- `ps_import_parser.dart` — pure text parser (`parsePsTeam`) for pasted Showdown exports; no API calls, unit-testable independent of `PsImportSheet`
+- `ps_import_parser.dart` — pure text parser (`parsePsTeam`) for pasted Showdown exports; no API calls, unit-testable independent of `PsImportSheet`; also exposes `applyGenGates()` (strips fields the target generation doesn't have — ability/nature Gen 3+, item/gender/shiny/happiness Gen 2+, Gigantamax Gen 8 only, Tera Type Gen 9 only, mirroring `SlotConfigScreen`'s own gates) and `psIvToStored()`/`psIvDefault()` (converts PS's doubled Gen 1/2 IV scale back to raw 0–15 DVs)
 - `hidden_power.dart` — Hidden Power type/power from IVs (Gen 2 DV formula vs. Gen 3+ IV-LSB formula); shared by `SlotConfigScreen`, `TeamDetailScreen`, and `showdown_export.dart`
 
 **`services/showdown_export.dart`** — `buildShowdownExport(team, slots)` produces standard Showdown `.txt` format, including Happiness/Gigantamax/Tera Type lines when set.
