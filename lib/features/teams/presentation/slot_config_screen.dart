@@ -527,11 +527,16 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   /// Errors are swallowed so they don't disrupt the normal save flow.
   Future<void> _maybePsExport(TeamSlot existing) async {
     if (!PsExportService.isSupported) return;
-    final teamRepo = ref.read(teamRepositoryProvider);
-    final slotRepo = ref.read(teamSlotRepositoryProvider);
-    final team = await teamRepo.getById(existing.teamId);
-    final slots = await slotRepo.getByTeam(existing.teamId);
-    await PsExportService.maybeExportTeam(ref: ref, team: team, slots: slots);
+    try {
+      final teamRepo = ref.read(teamRepositoryProvider);
+      final slotRepo = ref.read(teamSlotRepositoryProvider);
+      final team = await teamRepo.getById(existing.teamId);
+      final slots = await slotRepo.getByTeam(existing.teamId);
+      await PsExportService.maybeExportTeam(
+          ref: ref, team: team, slots: slots);
+    } catch (_) {
+      // Best-effort — do not surface PS export errors to the user.
+    }
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
