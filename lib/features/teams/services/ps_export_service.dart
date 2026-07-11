@@ -15,6 +15,7 @@ class PsExportService {
   /// Exports [team] to:
   ///   `{psDirectory}/{folderName}/[psFormat] {teamName}.txt`
   ///   (or `{psDirectory}/{teamName}.txt` when [folder] or format is null)
+  /// Boxes use a `-box` suffix on the format tag: `[psFormat-box] {teamName}.txt`.
   /// The PS format prefix in the filename lets PS identify the tier without
   /// needing a === ... === header inside the file (which breaks PS's parser).
   static Future<void> exportTeam({
@@ -31,9 +32,13 @@ class PsExportService {
     if (text.trim().isEmpty) return;
 
     // Build filename: "[gen6anythinggoes] Team Name.txt" when format is known.
+    // Boxes get a "-box" suffix on the format tag: "[gen6anythinggoes-box] Box Name.txt".
     final psFormat = formatLabel != null ? kFormatToPsFormat[formatLabel] : null;
-    final baseName = psFormat != null
-        ? '[${_sanitize(psFormat)}] ${_sanitize(team.name)}'
+    final formatTag = psFormat != null
+        ? (team.isBox ? '${_sanitize(psFormat)}-box' : _sanitize(psFormat))
+        : null;
+    final baseName = formatTag != null
+        ? '[$formatTag] ${_sanitize(team.name)}'
         : _sanitize(team.name);
     final teamFile = '$baseName.txt';
     final dir = folder != null
