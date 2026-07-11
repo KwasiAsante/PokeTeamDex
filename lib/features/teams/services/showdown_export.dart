@@ -71,10 +71,24 @@ Future<String> buildShowdownExport(
     final hasNickname =
         nickname != null && nickname.isNotEmpty && nickname != baseName;
 
-    // Species display name includes form when set.
-    // slot.formName = "rotom-wash" → "Rotom-Wash"; null → base species name.
-    final speciesDisplay = slot.formName != null && slot.formName!.isNotEmpty
-        ? _capitalizeHyphenated(slot.formName!)
+    // Species display name includes form when set — but only for
+    // battle-meaningful varieties (species with their own /pokemon
+    // resource, e.g. "rotom-wash"). Cosmetic form-entries (e.g. Pyroar's
+    // or Jellicent's "-female" sprite-only form, which has no /pokemon
+    // resource of its own) aren't real PS species and must not be folded
+    // into the species name — PS conveys their gender purely via the
+    // (M)/(F) tag below. Folding a cosmetic form in here produces a
+    // species string PS's teambuilder can't recognise (shows "???"/no
+    // sprite on import).
+    String? battleFormName;
+    if (slot.formName != null && slot.formName!.isNotEmpty) {
+      final species = await pokeApi.fetchPokemonSpecies(pokemon.id);
+      if (species.varieties.any((v) => v.name == slot.formName)) {
+        battleFormName = slot.formName;
+      }
+    }
+    final speciesDisplay = battleFormName != null
+        ? _capitalizeHyphenated(battleFormName)
         : baseName;
 
     // Gender tag: (M) for male, (F) for female, empty for genderless.

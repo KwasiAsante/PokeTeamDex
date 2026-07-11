@@ -3,6 +3,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
 
 class MockPokeApiRepository extends Mock implements PokeApiRepository {}
@@ -17,6 +18,8 @@ TeamSlot _slot({
   String? abilityName,
   String? natureName,
   String? heldItemName,
+  String? formName,
+  String? gender,
   bool isShiny = false,
   int level = 50,
   String? move1,
@@ -39,6 +42,8 @@ TeamSlot _slot({
       abilityName: abilityName,
       natureName: natureName,
       heldItemName: heldItemName,
+      formName: formName,
+      gender: gender,
       isShiny: isShiny,
       level: level,
       move1: move1,
@@ -62,12 +67,23 @@ TeamSlot _slot({
       createdAt: DateTime(2024),
     );
 
-PokemonEntry _pokemon(String name) => PokemonEntry(
-      id: 1,
+PokemonEntry _pokemon(String name, {int id = 1}) => PokemonEntry(
+      id: id,
       name: name,
       height: 10,
       weight: 100,
       types: ['normal'],
+    );
+
+PokemonSpeciesEntry _species(int id, String name, List<String> varietyNames) =>
+    PokemonSpeciesEntry(
+      id: id,
+      name: name,
+      eggGroups: const [],
+      flavorTextEntries: const [],
+      varieties: varietyNames
+          .map((n) => PokemonVariety(isDefault: n == name, name: n))
+          .toList(),
     );
 
 void main() {
@@ -209,6 +225,38 @@ void main() {
       expect(result, contains('- Thunderbolt'));
       expect(result, contains('- Surf'));
       expect(result.split('\n').where((l) => l.startsWith('- ')), hasLength(2));
+    });
+
+    test('battle-meaningful formName (real variety) is used as species', () async {
+      when(() => mockApi.fetchPokemon(479))
+          .thenAnswer((_) async => _pokemon('rotom', id: 479));
+      when(() => mockApi.fetchPokemonSpecies(479)).thenAnswer((_) async =>
+          _species(479, 'rotom', ['rotom', 'rotom-wash', 'rotom-heat']));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 479, formName: 'rotom-wash',
+      );
+      final result = await buildShowdownExport([slot], mockApi);
+
+      expect(result, startsWith('Rotom-Wash'));
+    });
+
+    test(
+        'cosmetic-only formName (no matching variety) is dropped from '
+        'species — gender still applies via (M)/(F) tag', () async {
+      when(() => mockApi.fetchPokemon(668))
+          .thenAnswer((_) async => _pokemon('pyroar', id: 668));
+      when(() => mockApi.fetchPokemonSpecies(668))
+          .thenAnswer((_) async => _species(668, 'pyroar', ['pyroar']));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 668,
+        formName: 'pyroar-female', gender: 'female',
+      );
+      final result = await buildShowdownExport([slot], mockApi);
+
+      expect(result, startsWith('Pyroar (F)'));
+      expect(result, isNot(contains('Female')));
     });
 
     test('multiple slots are separated by double newline and sorted by slot', () async {
