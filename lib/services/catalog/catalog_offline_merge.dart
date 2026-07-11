@@ -39,6 +39,21 @@ int? _genFromGenerationName(String? generationName) {
   return _kRomanToGen[generationName.split('-').last];
 }
 
+/// Excludes PokéAPI entries that exist in the raw API but aren't part of the
+/// mainline games — mirrors the backend's `_is_pokeapi_entry_excluded`.
+///
+/// Abilities: Pokémon Conquest's warlord "abilities" (e.g. "Aqua Boost",
+/// "Black Hole") share the /ability resource with real abilities, flagged
+/// only by `is_main_series` — PokéAPI still reports a valid mainline
+/// `generation` for them (Aqua Boost -> generation-v), so gen-based
+/// filtering can't catch these.
+bool _isAbilityExcluded(AbilityEntry entry) => entry.isMainSeries == false;
+
+/// Items: Conquest's "Data Card" items (item-category "data-cards") likewise
+/// carry valid mainline `game_indices`, so category is the only signal —
+/// items have no `is_main_series` field at all.
+bool _isItemExcluded(ItemEntry entry) => entry.category == 'data-cards';
+
 final _variantSuffixRe = RegExp(r'--\w+$');
 String _stripVariantSuffix(String name) => name.replaceAll(_variantSuffixRe, '');
 
@@ -147,7 +162,8 @@ Future<List<BackendMoveEntry>> buildOfflineMoveCatalog(
   }
 
   AppLogger().d('[catalog offline] built ${results.length} move entries');
-  return results.values.toList();
+  var moves = results.values.toList();
+  return moves;
 }
 
 /// Offline fallback for [catalogMoveProvider] — single-move counterpart to
@@ -173,7 +189,8 @@ Future<BackendMoveEntry> buildOfflineMoveEntry(
   if (raw == null && pokeApiEntry == null) {
     throw Exception('Move "$nameOrId" not found offline');
   }
-  return _mergeMove(raw, pokeApiEntry, canonicalName, psData.moves);
+  var mergedMove = _mergeMove(raw, pokeApiEntry, canonicalName, psData.moves);
+  return mergedMove;
 }
 
 BackendMoveEntry _mergeMove(
@@ -302,7 +319,8 @@ Future<List<BackendItemEntry>> buildOfflineItemCatalog(
     }
     AppLogger().w(
         '[catalog offline] item list unavailable; built ${results.length} entries from PS data only');
-    return results.values.toList();
+    var items = results.values.toList();
+    return items;
   }
 
   final fetched = await _mapBounded<String, ItemEntry?>(names, 20, (name) async {
@@ -316,6 +334,7 @@ Future<List<BackendItemEntry>> buildOfflineItemCatalog(
   final coveredPsIds = <String>{};
   for (final itemEntry in fetched) {
     if (itemEntry == null) continue;
+    if (_isItemExcluded(itemEntry)) continue;
     final canonicalName = _stripVariantSuffix(itemEntry.name);
     if (results.containsKey(canonicalName)) continue;
     final psId = psIdFromName(canonicalName);
@@ -351,6 +370,11 @@ Future<BackendItemEntry> buildOfflineItemEntry(
   } catch (_) {
     pokeApiEntry = null;
   }
+  if (pokeApiEntry != null && _isItemExcluded(pokeApiEntry)) {
+    // Non-mainline entry (e.g. a Conquest data card) — treat as if PokéAPI
+    // has no page for it, same as the catalog-build-time exclusion.
+    pokeApiEntry = null;
+  }
   final canonicalName =
       pokeApiEntry != null ? _stripVariantSuffix(pokeApiEntry.name) : nameOrId;
   final psId = psIdFromName(canonicalName);
@@ -358,7 +382,8 @@ Future<BackendItemEntry> buildOfflineItemEntry(
   if (raw == null && pokeApiEntry == null) {
     throw Exception('Item "$nameOrId" not found offline');
   }
-  return _mergeItem(raw, pokeApiEntry, canonicalName);
+  var mergedItem = _mergeItem(raw, pokeApiEntry, canonicalName);
+  return mergedItem;
 }
 
 BackendItemEntry _mergeItem(
@@ -412,7 +437,8 @@ Future<List<BackendAbilityEntry>> buildOfflineAbilityCatalog(
     }
     AppLogger().w(
         '[catalog offline] ability list unavailable; built ${results.length} entries from PS data only');
-    return results.values.toList();
+    var abilities = results.values.toList();
+    return abilities;
   }
 
   final fetched = await _mapBounded<String, AbilityEntry?>(names, 20, (name) async {
@@ -426,6 +452,7 @@ Future<List<BackendAbilityEntry>> buildOfflineAbilityCatalog(
   final coveredPsIds = <String>{};
   for (final abilityEntry in fetched) {
     if (abilityEntry == null) continue;
+    if (_isAbilityExcluded(abilityEntry)) continue;
     final canonicalName = abilityEntry.name;
     if (results.containsKey(canonicalName)) continue;
     final psId = psIdFromName(canonicalName);
@@ -444,7 +471,8 @@ Future<List<BackendAbilityEntry>> buildOfflineAbilityCatalog(
   }
 
   AppLogger().d('[catalog offline] built ${results.length} ability entries');
-  return results.values.toList();
+  var abilities = results.values.toList();
+  return abilities;
 }
 
 /// Offline fallback for [catalogAbilityProvider] — single-ability
@@ -462,13 +490,19 @@ Future<BackendAbilityEntry> buildOfflineAbilityEntry(
   } catch (_) {
     pokeApiEntry = null;
   }
+  if (pokeApiEntry != null && _isAbilityExcluded(pokeApiEntry)) {
+    // Non-mainline entry (e.g. a Conquest ability) — treat as if PokéAPI has
+    // no page for it, same as the catalog-build-time exclusion.
+    pokeApiEntry = null;
+  }
   final canonicalName = pokeApiEntry?.name ?? nameOrId;
   final psId = psIdFromName(canonicalName);
   final raw = psData.abilities[psId] as Map<String, dynamic>?;
   if (raw == null && pokeApiEntry == null) {
     throw Exception('Ability "$nameOrId" not found offline');
   }
-  return _mergeAbility(raw, pokeApiEntry, canonicalName);
+  var mergedAbility = _mergeAbility(raw, pokeApiEntry, canonicalName);
+  return mergedAbility;
 }
 
 BackendAbilityEntry _mergeAbility(
