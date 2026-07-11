@@ -14,6 +14,7 @@ import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provid
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/features/teams/data/dynamax_data.dart';
 import 'package:poke_team_dex/features/teams/data/form_descriptor.dart';
+import 'package:poke_team_dex/features/teams/logic/hidden_power.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/presentation/ps_import_sheet.dart';
 import 'package:poke_team_dex/features/teams/presentation/slot_config_screen.dart';
@@ -22,6 +23,7 @@ import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/features/teams/presentation/move_copy_slot_sheet.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
+import 'package:poke_team_dex/features/teams/services/ps_export_service.dart';
 import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -223,7 +225,8 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
                               IconButton(
                                 icon: const Icon(Icons.save_rounded),
                                 tooltip: 'Save all slots',
-                                onPressed: () => _saveAllSlots(context, slots),
+                                onPressed: () =>
+                                    _saveAllSlots(context, slots, team),
                               ),
                               IconButton(
                                 icon: const Icon(Icons.upload_outlined),
@@ -439,7 +442,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
           builder: (_) => PsImportSheet(targetTeamId: widget.teamId),
         );
       case _TeamAction.saveAll:
-        _saveAllSlots(context, slots);
+        _saveAllSlots(context, slots, team);
       case _TeamAction.exportShowdown:
         _exportShowdown(context, slots, team);
       case _TeamAction.promoteToBox:
@@ -452,9 +455,11 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
   }
 
   Future<void> _saveAllSlots(
-      BuildContext context, List<TeamSlot> slots) async {
+      BuildContext context, List<TeamSlot> slots, Team team) async {
     final slotRepo = ref.read(teamSlotRepositoryProvider);
     final count = await slotRepo.saveAll(slots);
+    // Best-effort PS export — runs after the DB write succeeds.
+    await PsExportService.maybeExportTeam(ref: ref, team: team, slots: slots);
     if (context.mounted) {
       showAppSnackBar(context, 'Saved $count slot${count == 1 ? '' : 's'}.');
     }
@@ -468,6 +473,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
         slots, pokeApi,
         teamName: team.name,
         formatLabel: team.formatLabel, // raw format id → PS format lookup
+        gen: await PsExportService.resolveGen(ref, team.formatLabel),
       );
       await Clipboard.setData(ClipboardData(text: text));
       HapticFeedback.lightImpact();
@@ -767,33 +773,16 @@ class _FilledSlotCard extends ConsumerWidget {
     'hp', 'attack', 'defense', 'special-attack', 'special-defense', 'speed',
   ];
 
-  static const _hpTypeNames = [
-    'Fighting', 'Flying', 'Poison', 'Ground', 'Rock', 'Bug',
-    'Ghost',    'Steel',  'Fire',   'Water',  'Grass', 'Electric',
-    'Psychic',  'Ice',    'Dragon', 'Dark',
-  ];
-
-  static String _hiddenPowerTypeName(TeamSlot slot, {int? gen}) {
-    final ivHp  = slot.ivHp  ?? 31;
-    final ivAtk = slot.ivAtk ?? 31;
-    final ivDef = slot.ivDef ?? 31;
-    final ivSpa = slot.ivSpa ?? 31;
-    final ivSpd = slot.ivSpd ?? 31;
-    final ivSpe = slot.ivSpe ?? 31;
-    int idx;
-    if (gen == 2) {
-      idx = (ivAtk % 4) * 4 + (ivDef % 4);
-    } else {
-      final n = (ivHp  & 1) +
-                (ivAtk & 1) * 2 +
-                (ivDef & 1) * 4 +
-                (ivSpe & 1) * 8 +
-                (ivSpa & 1) * 16 +
-                (ivSpd & 1) * 32;
-      idx = (n * 15) ~/ 63;
-    }
-    return _hpTypeNames[idx];
-  }
+  static String _hiddenPowerTypeName(TeamSlot slot, {int? gen}) =>
+      hiddenPowerTypeName(
+        ivHp: slot.ivHp,
+        ivAtk: slot.ivAtk,
+        ivDef: slot.ivDef,
+        ivSpa: slot.ivSpa,
+        ivSpd: slot.ivSpd,
+        ivSpe: slot.ivSpe,
+        gen: gen,
+      );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

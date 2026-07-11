@@ -3,6 +3,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
+import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
 
 class MockPokeApiRepository extends Mock implements PokeApiRepository {}
@@ -17,6 +18,8 @@ TeamSlot _slot({
   String? abilityName,
   String? natureName,
   String? heldItemName,
+  String? formName,
+  String? gender,
   bool isShiny = false,
   int level = 50,
   String? move1,
@@ -29,6 +32,12 @@ TeamSlot _slot({
   int? evSpa,
   int? evSpd,
   int? evSpe,
+  int? ivHp,
+  int? ivAtk,
+  int? ivDef,
+  int? ivSpa,
+  int? ivSpd,
+  int? ivSpe,
 }) =>
     TeamSlot(
       id: id,
@@ -39,6 +48,8 @@ TeamSlot _slot({
       abilityName: abilityName,
       natureName: natureName,
       heldItemName: heldItemName,
+      formName: formName,
+      gender: gender,
       isShiny: isShiny,
       level: level,
       move1: move1,
@@ -51,6 +62,12 @@ TeamSlot _slot({
       evSpa: evSpa,
       evSpd: evSpd,
       evSpe: evSpe,
+      ivHp: ivHp,
+      ivAtk: ivAtk,
+      ivDef: ivDef,
+      ivSpa: ivSpa,
+      ivSpd: ivSpd,
+      ivSpe: ivSpe,
       // Required fields with defaults
       syncStatus: 'synced',
       isDeleted: false,
@@ -62,12 +79,32 @@ TeamSlot _slot({
       createdAt: DateTime(2024),
     );
 
-PokemonEntry _pokemon(String name) => PokemonEntry(
-      id: 1,
+PokemonEntry _pokemon(String name, {int id = 1, String? speciesName}) =>
+    PokemonEntry(
+      id: id,
       name: name,
+      speciesName: speciesName ?? name,
       height: 10,
       weight: 100,
       types: ['normal'],
+    );
+
+PokemonSpeciesEntry _species(
+  int id,
+  String name, {
+  required String defaultVariety,
+  List<String> otherVarieties = const [],
+}) =>
+    PokemonSpeciesEntry(
+      id: id,
+      name: name,
+      eggGroups: const [],
+      flavorTextEntries: const [],
+      varieties: [
+        PokemonVariety(isDefault: true, name: defaultVariety),
+        for (final v in otherVarieties)
+          PokemonVariety(isDefault: false, name: v),
+      ],
     );
 
 void main() {
@@ -147,7 +184,8 @@ void main() {
       );
       final result = await buildShowdownExport([slot], mockApi);
 
-      expect(result, contains('Nature: Timid Nature'));
+      expect(result, contains('Timid Nature'));
+      expect(result, isNot(contains('Nature: Timid')));
     });
 
     test('shiny: yes line included only when shiny', () async {
@@ -196,6 +234,64 @@ void main() {
       expect(result, contains('EVs: 4 HP / 252 SpA / 252 Spe'));
     });
 
+    test('default (31) IVs are omitted entirely — Gen 3+', () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25,
+        ivHp: 31, ivAtk: 31, ivDef: 31, ivSpa: 31, ivSpd: 31, ivSpe: 31,
+      );
+      final result = await buildShowdownExport([slot], mockApi, gen: 9);
+
+      expect(result, isNot(contains('IVs:')));
+    });
+
+    test('non-default IVs appear with correct labels — Gen 3+ uses raw values',
+        () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25,
+        ivAtk: 0, ivSpa: 30,
+      );
+      final result = await buildShowdownExport([slot], mockApi, gen: 9);
+
+      expect(result, contains('IVs: 0 Atk / 30 SpA'));
+    });
+
+    test('Gen 1/2 DVs are doubled to PS\'s IV scale, omitted at DV 15 (→ 30)',
+        () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      // Def DV 13 → IV 26 (matches a real Showdown-exported Gen 1/2 team);
+      // every other stat left at default DV 15 → IV 30, omitted.
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25, ivDef: 13,
+      );
+      final gen1Result = await buildShowdownExport([slot], mockApi, gen: 1);
+      final gen2Result = await buildShowdownExport([slot], mockApi, gen: 2);
+
+      expect(gen1Result, contains('IVs: 26 Def'));
+      expect(gen2Result, contains('IVs: 26 Def'));
+      expect(gen1Result, isNot(contains('HP')));
+    });
+
+    test('Gen 1/2 fully-default DVs (15) are omitted entirely', () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25,
+        ivHp: 15, ivAtk: 15, ivDef: 15, ivSpa: 15, ivSpd: 15, ivSpe: 15,
+      );
+      final result = await buildShowdownExport([slot], mockApi, gen: 2);
+
+      expect(result, isNot(contains('IVs:')));
+    });
+
     test('moves appear as "- Move" lines, null moves skipped', () async {
       when(() => mockApi.fetchPokemon(25))
           .thenAnswer((_) async => _pokemon('pikachu'));
@@ -209,6 +305,137 @@ void main() {
       expect(result, contains('- Thunderbolt'));
       expect(result, contains('- Surf'));
       expect(result.split('\n').where((l) => l.startsWith('- ')), hasLength(2));
+    });
+
+    test('Hidden Power gets its IV-derived type appended — default (31) IVs → Dark',
+        () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25, move1: 'hidden-power',
+      );
+      final result = await buildShowdownExport([slot], mockApi);
+
+      expect(result, contains('- Hidden Power [Dark]'));
+    });
+
+    test('Hidden Power type uses the Gen 2 DV formula when gen: 2 is passed',
+        () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      // Same raw Atk/Def values resolve to different types depending on
+      // formula: Gen 2 (DV mod 4) → Ghost, Gen 3+ (IV LSB) → Dragon.
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25, move1: 'hidden-power',
+        ivAtk: 13, ivDef: 10,
+      );
+
+      final gen2Result = await buildShowdownExport([slot], mockApi, gen: 2);
+      final gen9Result = await buildShowdownExport([slot], mockApi, gen: 9);
+
+      expect(gen2Result, contains('- Hidden Power [Ghost]'));
+      expect(gen9Result, contains('- Hidden Power [Dragon]'));
+    });
+
+    test('Hidden Power type reflects custom IVs — [Ice]', () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25, move1: 'hidden-power',
+        ivHp: 30, ivAtk: 30, ivDef: 30, ivSpa: 31, ivSpd: 31, ivSpe: 31,
+      );
+      final result = await buildShowdownExport([slot], mockApi);
+
+      expect(result, contains('- Hidden Power [Ice]'));
+    });
+
+    test('non-Hidden-Power moves are not given a type suffix', () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25, move1: 'thunderbolt',
+      );
+      final result = await buildShowdownExport([slot], mockApi);
+
+      expect(result, contains('- Thunderbolt'));
+      expect(result, isNot(contains('[')));
+    });
+
+    test('battle-meaningful formName (real, non-default variety) is used as species',
+        () async {
+      when(() => mockApi.fetchPokemon(479))
+          .thenAnswer((_) async => _pokemon('rotom', id: 479));
+      when(() => mockApi.fetchPokemonSpecies(479)).thenAnswer((_) async =>
+          _species(479, 'rotom',
+              defaultVariety: 'rotom',
+              otherVarieties: ['rotom-wash', 'rotom-heat']));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 479, formName: 'rotom-wash',
+      );
+      final result = await buildShowdownExport([slot], mockApi);
+
+      expect(result, startsWith('Rotom-Wash'));
+    });
+
+    // Pyroar/Jellicent's *default* variety is itself gender-suffixed at the
+    // PokéAPI /pokemon level ("pyroar-male"), with "pyroar-female" existing
+    // only as a cosmetic pokemon-form (no /pokemon-species variety of its
+    // own). Both quirks must be handled: pokemon.name alone would read
+    // "Pyroar Male" even with no form selected, and a naive variety-name
+    // match would treat "pyroar-male" as a real form if it were ever stored.
+    test('gender-suffixed default variety, no form selected — species is just the base name',
+        () async {
+      when(() => mockApi.fetchPokemon(668)).thenAnswer(
+          (_) async => _pokemon('pyroar-male', id: 668, speciesName: 'pyroar'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 668, gender: 'male',
+      );
+      final result = await buildShowdownExport([slot], mockApi);
+
+      expect(result, startsWith('Pyroar (M)'));
+      expect(result, isNot(contains('Male)')));
+    });
+
+    test(
+        'cosmetic-only formName (no matching non-default variety) is dropped '
+        'from species — gender still applies via (M)/(F) tag', () async {
+      when(() => mockApi.fetchPokemon(668)).thenAnswer(
+          (_) async => _pokemon('pyroar-male', id: 668, speciesName: 'pyroar'));
+      when(() => mockApi.fetchPokemonSpecies(668)).thenAnswer((_) async =>
+          _species(668, 'pyroar', defaultVariety: 'pyroar-male'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 668,
+        formName: 'pyroar-female', gender: 'female',
+      );
+      final result = await buildShowdownExport([slot], mockApi);
+
+      expect(result, startsWith('Pyroar (F)'));
+      expect(result, isNot(contains('Female')));
+    });
+
+    test(
+        'formName equal to the default variety itself (e.g. corrupted data) '
+        'is still ignored, not treated as a real form', () async {
+      when(() => mockApi.fetchPokemon(668)).thenAnswer(
+          (_) async => _pokemon('pyroar-male', id: 668, speciesName: 'pyroar'));
+      when(() => mockApi.fetchPokemonSpecies(668)).thenAnswer((_) async =>
+          _species(668, 'pyroar', defaultVariety: 'pyroar-male'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 668,
+        formName: 'pyroar-male', gender: 'male',
+      );
+      final result = await buildShowdownExport([slot], mockApi);
+
+      expect(result, startsWith('Pyroar (M)'));
+      expect(result, isNot(contains('Male)')));
     });
 
     test('multiple slots are separated by double newline and sorted by slot', () async {

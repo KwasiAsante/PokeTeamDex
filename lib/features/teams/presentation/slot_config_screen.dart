@@ -38,6 +38,7 @@ import 'package:poke_team_dex/features/teams/data/dynamax_data.dart';
 import 'package:poke_team_dex/features/teams/data/form_filter.dart';
 import 'package:poke_team_dex/features/teams/data/z_moves_data.dart';
 import 'package:poke_team_dex/features/teams/data/ribbon_catalog.dart';
+import 'package:poke_team_dex/features/teams/logic/hidden_power.dart';
 import 'package:poke_team_dex/features/teams/presentation/instance_chain_view.dart';
 import 'package:poke_team_dex/features/teams/presentation/instance_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/services/ps_export_service.dart';
@@ -534,23 +535,10 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
       final teamRepo = ref.read(teamRepositoryProvider);
       final slotRepo = ref.read(teamSlotRepositoryProvider);
-      final folderRepo = ref.read(teamFolderRepositoryProvider);
-
       final team = await teamRepo.getById(existing.teamId);
-      TeamFolder? folder;
-      if (team.folderId != null) {
-        folder = await folderRepo.getByIdOrNull(team.folderId!);
-      }
       final slots = await slotRepo.getByTeam(existing.teamId);
-
-      await PsExportService.exportTeam(
-        team: team,
-        folder: folder,
-        slots: slots,
-        psDirectory: psDir,
-        pokeApi: ref.read(pokeApiRepositoryProvider),
-        formatLabel: team.formatLabel, // raw format id → PS format lookup
-      );
+      await PsExportService.maybeExportTeam(
+          ref: ref, team: team, slots: slots);
     } catch (_) {
       // Best-effort — do not surface PS export errors to the user.
     }
@@ -1911,62 +1899,19 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
 
   // ── Hidden Power ─────────────────────────────────────────────────────────
 
-  /// Type names for the 16 possible Hidden Power types (indices 0–15).
-  static const _hpTypeNames = [
-    'Fighting', 'Flying', 'Poison', 'Ground', 'Rock', 'Bug',
-    'Ghost',    'Steel',  'Fire',   'Water',  'Grass', 'Electric',
-    'Psychic',  'Ice',    'Dragon', 'Dark',
-  ];
-
-  /// Returns 0–15 index of the Hidden Power type from current IVs/DVs.
-  /// Gen 2: type = (Atk_DV mod 4)*4 + (Def_DV mod 4).
-  /// Gen 3+: uses LSB of each IV in HP/Atk/Def/Spe/SpA/SpD order.
-  int _hiddenPowerTypeIndex({int? gen}) {
-    final iv = _ivCtrls.map((c) => int.tryParse(c.text) ?? 31).toList();
-    if (gen == 2) {
-      return (iv[1] % 4) * 4 + (iv[2] % 4);
-    }
-    // Bit order: HP, Atk, Def, Spe, SpA, SpD (Spe=index 5, SpA=index 3, SpD=index 4)
-    final n = (iv[0] & 1) +
-        (iv[1] & 1) * 2 +
-        (iv[2] & 1) * 4 +
-        (iv[5] & 1) * 8 +
-        (iv[3] & 1) * 16 +
-        (iv[4] & 1) * 32;
-    return (n * 15) ~/ 63;
-  }
-
-  /// Returns the power of Hidden Power.
-  /// Gen 2: 31–70, using MSBs of Atk/Def/Spe/Special DVs and Special mod 4.
-  /// Gen 3–5: 30–70, using second bits of all IVs.
-  /// Gen 6+: always 60.
-  int _hiddenPowerPower({int? gen}) {
-    if (gen != null && gen >= 6) return 60;
-    final iv = _ivCtrls.map((c) => int.tryParse(c.text) ?? 31).toList();
-    if (gen == 2) {
-      // HPpower = floor((5*(v + 2w + 4x + 8y) + Z) / 2) + 31
-      // v=Special MSB, w=Speed MSB, x=Def MSB, y=Atk MSB, Z=Special mod 4
-      final v = iv[3] >= 8 ? 1 : 0;
-      final w = iv[5] >= 8 ? 1 : 0;
-      final x = iv[2] >= 8 ? 1 : 0;
-      final y = iv[1] >= 8 ? 1 : 0;
-      final z = iv[3] % 4;
-      return (5 * (v + 2 * w + 4 * x + 8 * y) + z) ~/ 2 + 31;
-    }
-    final u = ((iv[0] >> 1) & 1) +
-        ((iv[1] >> 1) & 1) * 2 +
-        ((iv[2] >> 1) & 1) * 4 +
-        ((iv[5] >> 1) & 1) * 8 +
-        ((iv[3] >> 1) & 1) * 16 +
-        ((iv[4] >> 1) & 1) * 32;
-    return (u * 40) ~/ 63 + 30;
-  }
-
   Widget _buildHiddenPower({int? gen}) {
-    final typeIdx = _hiddenPowerTypeIndex(gen: gen);
-    final typeName = _hpTypeNames[typeIdx].toLowerCase();
-    final power = _hiddenPowerPower(gen: gen);
-    final typeColor = PokemonTypeColors.colors[typeName] ??
+    final iv = _ivCtrls.map((c) => int.tryParse(c.text) ?? 31).toList();
+    final hpTypeName = hiddenPowerTypeName(
+      ivHp: iv[0], ivAtk: iv[1], ivDef: iv[2],
+      ivSpa: iv[3], ivSpd: iv[4], ivSpe: iv[5],
+      gen: gen,
+    );
+    final power = hiddenPowerPower(
+      ivHp: iv[0], ivAtk: iv[1], ivDef: iv[2],
+      ivSpa: iv[3], ivSpd: iv[4], ivSpe: iv[5],
+      gen: gen,
+    );
+    final typeColor = PokemonTypeColors.colors[hpTypeName.toLowerCase()] ??
         Theme.of(context).colorScheme.primary;
 
     return Row(
@@ -1983,7 +1928,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
-            _hpTypeNames[typeIdx],
+            hpTypeName,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,

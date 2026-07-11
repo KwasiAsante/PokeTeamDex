@@ -1,5 +1,6 @@
 import 'package:change_case/change_case.dart';
 import 'package:poke_team_dex/database/app_database.dart';
+import 'package:poke_team_dex/features/teams/logic/hidden_power.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
 
 /// Maps a PokeTeamDex format ID → the corresponding Pokémon Showdown format
@@ -61,20 +62,44 @@ Future<String> buildShowdownExport(
   String? teamName,
   String? formatLabel,
   String? formatName,
+  int? gen,
 }) async {
   final blocks = <String>[];
 
   for (final slot in slots..sort((a, b) => a.slot.compareTo(b.slot))) {
     final pokemon = await pokeApi.fetchPokemon(slot.pokemonId);
-    final baseName = pokemon.name.toCapitalCase();
+    // Some species' *default* variety is itself gender-suffixed at the
+    // /pokemon level (e.g. Pyroar's default variety is literally named
+    // "pyroar-male", Jellicent's "jellicent-male") — pokemon.name would
+    // wrongly become "Pyroar Male" even with no form selected. speciesName
+    // is the species-level name ("pyroar"), unaffected by this. Same
+    // speciesName-vs-name distinction used for form suffix stripping
+    // elsewhere in the app.
+    final baseName = (pokemon.speciesName ?? pokemon.name).toCapitalCase();
     final nickname = slot.nickname?.trim();
     final hasNickname =
         nickname != null && nickname.isNotEmpty && nickname != baseName;
 
-    // Species display name includes form when set.
-    // slot.formName = "rotom-wash" → "Rotom-Wash"; null → base species name.
-    final speciesDisplay = slot.formName != null && slot.formName!.isNotEmpty
-        ? _capitalizeHyphenated(slot.formName!)
+    // Species display name includes form when set — but only for
+    // battle-meaningful, non-default varieties (species with their own
+    // /pokemon resource, e.g. "rotom-wash"). Cosmetic form-entries (e.g.
+    // Pyroar's or Jellicent's "-female" sprite-only form, which has no
+    // /pokemon resource of its own) aren't real PS species and must not be
+    // folded into the species name — PS conveys their gender purely via
+    // the (M)/(F) tag below. The default-variety exclusion additionally
+    // covers species like Pyroar/Jellicent whose default variety name
+    // (e.g. "pyroar-male") would otherwise match here too.
+    String? battleFormName;
+    if (slot.formName != null && slot.formName!.isNotEmpty) {
+      final species = await pokeApi.fetchPokemonSpecies(pokemon.id);
+      final matchedVariety =
+          species.varieties.where((v) => v.name == slot.formName).firstOrNull;
+      if (matchedVariety != null && !matchedVariety.isDefault) {
+        battleFormName = slot.formName;
+      }
+    }
+    final speciesDisplay = battleFormName != null
+        ? _capitalizeHyphenated(battleFormName)
         : baseName;
 
     // Gender tag: (M) for male, (F) for female, empty for genderless.
@@ -103,7 +128,7 @@ Future<String> buildShowdownExport(
     if (slot.isShiny) lines.add('Shiny: Yes');
 
     if (slot.natureName != null) {
-      lines.add('Nature: ${_normalisedNature(slot.natureName!)} Nature');
+      lines.add('${_normalisedNature(slot.natureName!)} Nature');
     }
 
     // EVs — omit zero values
@@ -119,9 +144,45 @@ Future<String> buildShowdownExport(
     addEv(slot.evSpe, 'Spe');
     if (evParts.isNotEmpty) lines.add('EVs: ${evParts.join(' / ')}');
 
-    // Moves
+    // IVs — omit stats at their generation-appropriate default. Gen 1/2
+    // slots store raw 0–15 DVs (see GenerationMechanics.statMax); PS's own
+    // file format always uses the doubled 0–31 IV scale even for Gen 1/2
+    // (verified against real Showdown-exported Gen 1/2 teams — every IV
+    // value in them is even), so DVs are converted via IV = DV × 2 here.
+    // Gen 3+ IVs are already on that scale and used as-is.
+    final isDvGen = gen == 1 || gen == 2;
+    final ivDefault = isDvGen ? 30 : 31;
+    final ivParts = <String>[];
+    void addIv(int? val, String label) {
+      final raw = val ?? (isDvGen ? 15 : 31);
+      final converted = isDvGen ? raw * 2 : raw;
+      if (converted != ivDefault) ivParts.add('$converted $label');
+    }
+    addIv(slot.ivHp, 'HP');
+    addIv(slot.ivAtk, 'Atk');
+    addIv(slot.ivDef, 'Def');
+    addIv(slot.ivSpa, 'SpA');
+    addIv(slot.ivSpd, 'SpD');
+    addIv(slot.ivSpe, 'Spe');
+    if (ivParts.isNotEmpty) lines.add('IVs: ${ivParts.join(' / ')}');
+
+    // Moves — Hidden Power gets its IV-derived type appended, e.g.
+    // "Hidden Power [Ice]", matching the syntax PS's parser (and our own
+    // import parser) expects.
     for (final move in [slot.move1, slot.move2, slot.move3, slot.move4]) {
-      if (move != null) lines.add('- ${move.toCapitalCase()}');
+      if (move == null) continue;
+      final moveLabel = move.toCapitalCase();
+      lines.add(move == 'hidden-power'
+          ? '- $moveLabel [${hiddenPowerTypeName(
+              ivHp: slot.ivHp,
+              ivAtk: slot.ivAtk,
+              ivDef: slot.ivDef,
+              ivSpa: slot.ivSpa,
+              ivSpd: slot.ivSpd,
+              ivSpe: slot.ivSpe,
+              gen: gen,
+            )}]'
+          : '- $moveLabel');
     }
 
     blocks.add(lines.join('\n'));
