@@ -23,7 +23,7 @@ TeamSlot _slot({
   bool isShiny = false,
   int level = 50,
   int? friendship,
-  bool gigantamaxEnabled = false,
+  bool hasGigantamax = false,
   String? teraType,
   String? move1,
   String? move2,
@@ -77,8 +77,8 @@ TeamSlot _slot({
       syncStatus: 'synced',
       isDeleted: false,
       isMegaEvolved: false,
-      hasGigantamax: false,
-      gigantamaxEnabled: gigantamaxEnabled,
+      hasGigantamax: hasGigantamax,
+      gigantamaxEnabled: false,
       isAlpha: false,
       updatedAt: DateTime(2024),
       createdAt: DateTime(2024),
@@ -232,15 +232,15 @@ void main() {
       expect(withoutResult, isNot(contains('Happiness')));
     });
 
-    test('Gigantamax: Yes line included only when gigantamaxEnabled', () async {
+    test('Gigantamax: Yes line included only when hasGigantamax', () async {
       when(() => mockApi.fetchPokemon(25))
           .thenAnswer((_) async => _pokemon('pikachu'));
 
       final gmax = _slot(
-        id: 1, slot: 1, teamId: 1, pokemonId: 25, gigantamaxEnabled: true,
+        id: 1, slot: 1, teamId: 1, pokemonId: 25, hasGigantamax: true,
       );
       final notGmax = _slot(
-        id: 2, slot: 2, teamId: 1, pokemonId: 25, gigantamaxEnabled: false,
+        id: 2, slot: 2, teamId: 1, pokemonId: 25, hasGigantamax: false,
       );
 
       final gmaxResult = await buildShowdownExport([gmax], mockApi);

@@ -129,7 +129,7 @@ Future<String> buildShowdownExport(
 
     if (slot.friendship != null) lines.add('Happiness: ${slot.friendship}');
 
-    if (slot.gigantamaxEnabled) lines.add('Gigantamax: Yes');
+    if (slot.hasGigantamax) lines.add('Gigantamax: Yes');
 
     if (slot.teraType != null) {
       lines.add('Tera Type: ${slot.teraType!.toCapitalCase()}');
