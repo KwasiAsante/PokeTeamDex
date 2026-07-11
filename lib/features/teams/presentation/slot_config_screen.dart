@@ -333,7 +333,9 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
       _evCtrls.fold(0, (sum, c) => sum + (int.tryParse(c.text) ?? 0));
 
   /// Compute real-time violations against [format] for current form values.
-  /// Uses PokéAPI version-group learnsets for game-specific accuracy.
+  /// [pokemonMoves] is the backend-resolved, gen-filtered movepool (PokéAPI
+  /// version-group data merged with PS learnset supplement moves) for
+  /// game-specific accuracy.
   /// [availableAbilities]/[availableItems] must already be gen-filtered.
   Map<String, String> _computeViolations(
     GameFormat format,

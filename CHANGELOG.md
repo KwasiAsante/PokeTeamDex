@@ -4,6 +4,32 @@ All notable changes to PokeTeamDex are documented here.
 
 ---
 
+## [1.1.0] — 2026-07-11
+
+### Added
+
+- **Backend-driven move/item/ability catalog + gen-accurate learnsets** (closes investigation #276) — `shared/ps_data/` is now the single source of truth for PS-derived data (moves, items, abilities, pokedex overrides, per-generation `learnset_1.json`–`learnset_9.json`), generated straight from Pokémon Showdown's TypeScript source instead of the lossy compiled `learnsets.json` endpoint; new backend `LearnsetService` and `CatalogService` back `GET /moves`, `GET /items`, `GET /abilities` (+ single-entry variants) and a gen-aware `?gen=N` filter on `GET /pokemon/moves/{id}` and `/pokemon/{id}/resolved`, both PostgreSQL-cached (new `catalog_cache` table, 7-day TTL, same pattern as `pokemon_resolved`); Flutter's move/item/ability pickers and list/detail screens now go through a single `withBackendFallback` utility (backend cache → Hive cache → offline reconstruction from bundled PS data → error) instead of calling PokéAPI directly, and prior-evolution moves route through the backend correctly via new `viaPrev`/`prevo` fields on move learn details
+- **Save All Teams** — folder overflow menu action that saves every team and box in a folder in one action (between "Import from Showdown" and "Rename"/"Delete"), with a live progress dialog and a matching best-effort PS export per team; stops and reports how many teams succeeded if a save fails partway through
+- Showdown export now includes EVs' IVs on the correct scale (Gen 1/2 DVs doubled to PS's IV convention) and appends the Hidden Power type annotation (`Hidden Power [Ice]`)
+- OpenAPI `summary=`, descriptions, and tag metadata added to every backend router so `/docs` and `/redoc` render a complete, grouped API reference
+
+### Fixed
+
+- **PS import was silently dropping or mis-storing several fields.** Nature was never captured on a real Showdown paste (parser matched a corrupted-data artifact instead of PS's actual `<Nature> Nature` syntax); Gigantamax, Tera Type, and Happiness lines weren't parsed on import or emitted on export at all; species names containing periods (`Mr. Rime`, `Mime Jr.`) failed to resolve; Gen 1/2 IVs weren't converted back to raw DVs on import (PS's file format always uses the doubled IV scale, even for Gen 1/2); fields that don't exist in the target generation (gender/nature/item/happiness/shiny/Gigantamax/Tera Type) are now stripped instead of stored blindly when they're present in a pasted export that doesn't match the team's format
+- Showdown export no longer folds a gender-suffixed default variety (Pyroar, Jellicent) or a cosmetic gender-only form into the exported species name — gender is conveyed solely via the `(M)`/`(F)` tag, matching real PS output
+- Box team exports to the configured PS teams directory now use a `[{format}-box]` filename prefix instead of `[{format}]`, distinguishing them from regular team exports
+- "Save All" (team detail screen and the new folder-level action) now re-triggers the PS export instead of leaving the exported `.txt` file stale until an individual slot was saved again
+- Female sprite fallback logic corrected on the Teams screen
+- Backend catalog move/ability generation is now derived from PokéAPI instead of an unreliable PS field; Z-Move and Max Move generation forced to 7 and 8 respectively; removed a nonexistent `max_move_base` field and fixed `z_move_base` to populate from the Z-Crystal item instead of a move field that doesn't exist
+- CI: Docker build context corrected to the project root to match the Dockerfile; `.env` now created from `.env.example` before Flutter builds so CI doesn't fail on a missing environment file
+
+### Changed
+
+- `dotenv` integrated for environment variable management, with `DEBUG_API_URL` support for pointing a debug build at a local backend
+- 17 pre-existing test failures fixed as part of the catalog integration work (form chip default-form leak, `pokemon_registry.json` data integrity issues, mock response formats, an AppBar icon screen-width guard, and a Hive dependency leak in widget tests)
+
+---
+
 ## [1.0.8] — 2026-06-20
 
 ### Added

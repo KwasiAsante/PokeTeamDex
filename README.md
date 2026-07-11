@@ -38,7 +38,7 @@ A full-featured Pokémon team builder and Pokédex browser built with Flutter. S
 | Area | Features |
 |------|----------|
 | **Pokédex** | Browse all 1000+ Pokémon, search/filter by gen/type/game, base stats, evolutions, forms, moves, abilities, locations, type effectiveness matrix |
-| **Team Builder** | Create/edit teams in folder hierarchy, 6-slot configuration with full stat preview, EV/IV grids, drag-reorder, format picker; responsive overflow menu for reorder actions on mobile |
+| **Team Builder** | Create/edit teams in folder hierarchy, 6-slot configuration with full stat preview, EV/IV grids, drag-reorder, format picker; responsive overflow menu for reorder actions on mobile; Save All Teams saves every team/box in a folder in one action with a live progress dialog |
 | **Slot Config** | Ability, nature, held item, 4 moves (generation-aware), EV/IV, level, shiny, gender, friendship, ribbons, Mega/Dynamax/Gigantamax, contest stats, Pokémon identity chains |
 | **Reference** | Moves, Items, Abilities, Types, Natures, Locations browsers |
 | **Sync** | Offline-first — all data local; bidirectional push/pull sync to PostgreSQL backend |
@@ -59,7 +59,7 @@ A full-featured Pokémon team builder and Pokédex browser built with Flutter. S
 | [Smogon/pokemon-showdown](https://github.com/smogon/pokemon-showdown) | Source repository for the PS data files pulled by `scripts/sync_ps_data.py` |
 | [Smogon Sprites](https://github.com/smogon/sprites) | Animated and generation-specific sprites used in the team builder and slot config |
 
-PS data is downloaded and trimmed by `scripts/sync_ps_data.py` and bundled into `assets/data/ps/`. The app checks a SHA hash on startup and auto-downloads updates from the backend when the data changes upstream.
+PS data is downloaded and trimmed by `scripts/sync_ps_data.py` and bundled into `shared/ps_data/` at the project root — the single source both the Flutter app and the backend read from (backend directly off disk via `PS_DATA_DIR`, Flutter from the bundled asset). The app checks a SHA hash on startup and auto-downloads updates from the backend when the data changes upstream.
 
 ---
 
@@ -365,9 +365,12 @@ lib/services/
 │   └── models/                  # PokemonEntry, PokemonSpeciesEntry, etc.
 ├── pokemon_resolved/             # Backend-resolved data infra: repository + models
 │   ├── models.dart              # AbilityInfo, MoveSummary, SpriteUrlsFull, PokemonResolvedBackendResponse
-│   ├── pokemon_backend_repository.dart   # HTTP calls to GET /pokemon/{id}/resolved + sub-endpoints
+│   ├── pokemon_backend_repository.dart   # HTTP calls to GET /pokemon/{id}/resolved + sub-endpoints + catalog fetches
 │   └── pokemon_resolved_providers.dart   # lazy moves/varieties/forms/flavor-text providers (each via withBackendFallback)
 │                                  # (resolvedPokemonProvider itself lives in features/pokedex/providers/, below)
+├── catalog/                      # Dart models for GET /moves, /items, /abilities
+│   ├── catalog_models.dart      # BackendMoveEntry, BackendItemEntry, BackendAbilityEntry, PaginatedCatalogResponse<T>
+│   └── catalog_offline_merge.dart  # Client-side replication of CatalogService's PokéAPI+PS merge for offline fallback
 ├── util/
 │   └── backend_provider_utils.dart  # withBackendFallback<T>() — shared backend/cache/offline-fallback contract
 ├── ps_data/
@@ -395,7 +398,7 @@ The format engine validates team slots against competitive Pokémon Showdown rul
 flowchart TD
     INIT[FormatService.initialize]
     HIVE{Hive cache\nhit?}
-    ASSETS[Load bundled\nassets/data/ps/]
+    ASSETS[Load bundled\nshared/ps_data/]
     PARSE[Parse JSON\ninto in-memory maps]
     BG[Background:\nfetch /ps-data/version]
     SHA{SHA\nchanged?}
@@ -413,16 +416,17 @@ flowchart TD
     PARSE --> DONE
 ```
 
-**PS Data files** (in `assets/data/ps/`, populated by `scripts/sync_ps_data.py`):
+**PS Data files** (in `shared/ps_data/` at the project root, populated by `scripts/sync_ps_data.py`, plus `assets/data/ps/formats.json` which is manually curated):
 
 | File | Contents |
 |------|----------|
-| `learnsets.json` | Per-Pokémon move lists by learn method and generation |
+| `learnset_1.json` … `learnset_9.json` | Per-generation, per-Pokémon move lists (method, level, `via_prevo`) |
+| `pokedex.json` / `pokedex-gen-overrides.json` | Species/variety base data + per-gen stat/type/ability overrides |
 | `moves.json` | All move stats (type, power, accuracy, PP, Z/Max data) |
 | `items.json` | All items (generation introduced, Mega stone / Z-crystal mapping) |
 | `abilities.json` | All abilities (name, generation introduced) |
-| `formats.json` | 32 competitive format definitions |
-| `learnsets-g6-allowlist.json` | Gen 6 legality cross-reference |
+| `formats-data.json` | Per-format tier/banlist data |
+| `assets/data/ps/formats.json` | 32 competitive format definitions (manually curated, not PS-generated) |
 
 **Generation mechanics** enforced by `GenerationMechanics.forGen(n)`:
 
@@ -484,14 +488,24 @@ graph LR
         PR2["GET /pokemon/varieties/:id"]
         PR3["GET /pokemon/forms/:id"]
         PR4["GET /pokemon/smogon/:id"]
-        PR5["GET /pokemon/moves/:id"]
+        PR5["GET /pokemon/moves/:id?gen="]
         PR6["GET /pokemon/flavor-text/:id"]
+    end
+
+    subgraph Catalog["Catalog — moves/items/abilities"]
+        C1["GET /moves"]
+        C2["GET /moves/:id_or_name"]
+        C3["GET /items"]
+        C4["GET /items/:id_or_name"]
+        C5["GET /abilities"]
+        C6["GET /abilities/:id_or_name"]
     end
 
     subgraph Admin
         AD1["POST /admin/notify-update"]
         AD2["GET /admin/version"]
         AD3["DELETE /admin/cache/pokemon"]
+        AD4["DELETE /admin/cache/catalog"]
     end
 
     subgraph Health
@@ -827,7 +841,7 @@ pip install requests json5
 python scripts/sync_ps_data.py
 ```
 
-This downloads trimmed Pokémon Showdown JSON files into `assets/data/ps/` and copies version hashes to `backend/app/static/`.
+This downloads trimmed Pokémon Showdown JSON files into `shared/ps_data/` — read directly by the backend and bundled into the Flutter app.
 
 ### 4. Regenerate Drift code after schema changes
 
@@ -907,6 +921,7 @@ uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
 | `0007_add_tera_type_to_slots` | `tera_type` column on TeamSlots |
 | `0008_add_sort_order_and_is_box` | `sort_order` on Teams/TeamFolders; `is_box` on Teams |
 | `0009_add_pokemon_resolved` | `pokemon_resolved` cache table (server-side aggregation cache, 7-day TTL) |
+| `0010_add_catalog_cache` | `catalog_cache` table — same JSONB + 7-day TTL pattern, for `GET /moves`/`/items`/`/abilities` |
 
 ```bash
 cd backend
@@ -922,7 +937,7 @@ When Pokémon Showdown releases format updates, run:
 
 ```bash
 python scripts/sync_ps_data.py
-git add assets/data/ps/ backend/app/static/
+git add shared/ps_data/
 git commit -m "chore: update PS data"
 # Redeploy backend — clients will detect the SHA change and auto-download
 ```
@@ -1102,6 +1117,7 @@ test/
 ├── unit/                           # Pure Dart logic — no Flutter framework
 │   ├── stat_calculator_test.dart   # Gen III+ stat formula (HP + other stats)
 │   ├── showdown_export_test.dart   # PS text format builder
+│   ├── ps_import_parser_test.dart  # PS import parser — nature/Gigantamax/Tera Type/Happiness, gen-gating, DV/IV conversion
 │   ├── sync_service_test.dart      # Push drain, pull merge, conflict resolution
 │   ├── format_models_test.dart     # GameFormat, GenerationMechanics, PsMoveEntry
 │   ├── form_filter_test.dart       # filterFormChips — regional/mega/gmax forms
@@ -1177,6 +1193,9 @@ poke_team_dex/
 │   │   ├── format/                  # PS format engine
 │   │   ├── pokeapi/                 # PokéAPI client + Hive cache
 │   │   ├── pokemon_resolved/        # Backend-resolved Pokémon data: cache, repository, providers
+│   │   ├── catalog/                 # Dart models for GET /moves, /items, /abilities + offline merge
+│   │   ├── util/                    # withBackendFallback<T>() — shared backend/cache/offline-fallback contract
+│   │   ├── ps_data/                 # Raw shared/ps_data/ access for offline fallbacks
 │   │   ├── sync/                    # Bidirectional sync engine
 │   │   ├── tray/                    # Desktop system tray
 │   │   ├── update/                  # GitHub release update checker
@@ -1192,23 +1211,27 @@ poke_team_dex/
 │   ├── app/
 │   │   ├── main.py                  # FastAPI app + CORS
 │   │   ├── database.py              # Async SQLAlchemy session
-│   │   ├── routers/                 # auth, teams, folders, instances, sync, ps_data, admin, logs, pokemon
-│   │   ├── models/                  # SQLAlchemy ORM models (user, team, slot, folder, instance, pokemon_resolved)
+│   │   ├── routers/                 # auth, teams, folders, instances, sync, ps_data, admin, logs, pokemon, catalog
+│   │   ├── models/                  # SQLAlchemy ORM models (user, team, slot, folder, instance, pokemon_resolved, catalog_cache)
 │   │   ├── schemas/                 # Pydantic request/response models
-│   │   ├── services/                # pokemon_resolver.py — PS data loader + cross-source aggregation
+│   │   ├── services/                # pokemon_resolver.py + learnset_service.py (PS data + aggregation), catalog_service.py (moves/items/abilities)
 │   │   └── core/                    # config.py, security.py, deps.py
 │   ├── alembic/
-│   │   └── versions/                # 0001–0009 SQL migrations
+│   │   └── versions/                # 0001–0010 SQL migrations
 │   ├── Dockerfile
 │   ├── docker-compose.yml
 │   ├── requirements.txt
 │   └── start.sh                     # alembic upgrade head + uvicorn
 │
 ├── assets/
-│   └── data/ps/                     # Bundled PS JSON data (populated by script)
+│   └── data/ps/formats.json         # Manually-curated format definitions (only current file left here)
+│
+├── shared/
+│   ├── ps_data/                     # Canonical PS data (moves/items/abilities/pokedex/per-gen learnsets) — bundled into the app AND read directly by the backend
+│   └── pokemon_registry.json        # Canonical sprite/form override registry — same deal, one copy for both sides
 │
 ├── scripts/
-│   └── sync_ps_data.py              # Downloads + trims PS data for bundling
+│   └── sync_ps_data.py              # Downloads + trims PS data into shared/ps_data/
 │
 └── test/                            # Unit, widget, and integration tests
 ```
