@@ -14,6 +14,7 @@ import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provid
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/features/teams/data/dynamax_data.dart';
 import 'package:poke_team_dex/features/teams/data/form_descriptor.dart';
+import 'package:poke_team_dex/features/teams/logic/hidden_power.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/presentation/ps_import_sheet.dart';
 import 'package:poke_team_dex/features/teams/presentation/slot_config_screen.dart';
@@ -472,6 +473,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
         slots, pokeApi,
         teamName: team.name,
         formatLabel: team.formatLabel, // raw format id → PS format lookup
+        gen: await PsExportService.resolveGen(ref, team.formatLabel),
       );
       await Clipboard.setData(ClipboardData(text: text));
       HapticFeedback.lightImpact();
@@ -771,33 +773,16 @@ class _FilledSlotCard extends ConsumerWidget {
     'hp', 'attack', 'defense', 'special-attack', 'special-defense', 'speed',
   ];
 
-  static const _hpTypeNames = [
-    'Fighting', 'Flying', 'Poison', 'Ground', 'Rock', 'Bug',
-    'Ghost',    'Steel',  'Fire',   'Water',  'Grass', 'Electric',
-    'Psychic',  'Ice',    'Dragon', 'Dark',
-  ];
-
-  static String _hiddenPowerTypeName(TeamSlot slot, {int? gen}) {
-    final ivHp  = slot.ivHp  ?? 31;
-    final ivAtk = slot.ivAtk ?? 31;
-    final ivDef = slot.ivDef ?? 31;
-    final ivSpa = slot.ivSpa ?? 31;
-    final ivSpd = slot.ivSpd ?? 31;
-    final ivSpe = slot.ivSpe ?? 31;
-    int idx;
-    if (gen == 2) {
-      idx = (ivAtk % 4) * 4 + (ivDef % 4);
-    } else {
-      final n = (ivHp  & 1) +
-                (ivAtk & 1) * 2 +
-                (ivDef & 1) * 4 +
-                (ivSpe & 1) * 8 +
-                (ivSpa & 1) * 16 +
-                (ivSpd & 1) * 32;
-      idx = (n * 15) ~/ 63;
-    }
-    return _hpTypeNames[idx];
-  }
+  static String _hiddenPowerTypeName(TeamSlot slot, {int? gen}) =>
+      hiddenPowerTypeName(
+        ivHp: slot.ivHp,
+        ivAtk: slot.ivAtk,
+        ivDef: slot.ivDef,
+        ivSpa: slot.ivSpa,
+        ivSpd: slot.ivSpd,
+        ivSpe: slot.ivSpe,
+        gen: gen,
+      );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

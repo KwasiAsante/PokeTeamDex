@@ -261,6 +261,25 @@ void main() {
       expect(result, contains('- Hidden Power [Dark]'));
     });
 
+    test('Hidden Power type uses the Gen 2 DV formula when gen: 2 is passed',
+        () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      // Same raw Atk/Def values resolve to different types depending on
+      // formula: Gen 2 (DV mod 4) → Ghost, Gen 3+ (IV LSB) → Dragon.
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25, move1: 'hidden-power',
+        ivAtk: 13, ivDef: 10,
+      );
+
+      final gen2Result = await buildShowdownExport([slot], mockApi, gen: 2);
+      final gen9Result = await buildShowdownExport([slot], mockApi, gen: 9);
+
+      expect(gen2Result, contains('- Hidden Power [Ghost]'));
+      expect(gen9Result, contains('- Hidden Power [Dragon]'));
+    });
+
     test('Hidden Power type reflects custom IVs — [Ice]', () async {
       when(() => mockApi.fetchPokemon(25))
           .thenAnswer((_) async => _pokemon('pikachu'));
