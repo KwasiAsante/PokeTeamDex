@@ -151,6 +151,79 @@ Ability: Scrappy
     });
   });
 
+  group('applyGenGates', () {
+    const fullSlot = PsSlot(
+      species: 'snorlax',
+      item: 'leftovers',
+      ability: 'thick-fat',
+      isShiny: true,
+      gender: 'male',
+      nature: 'Careful',
+      friendship: 255,
+      isGigantamax: true,
+      teraType: 'normal',
+    );
+
+    test('null gen (unknown/no format) leaves every field untouched', () {
+      final gated = applyGenGates(fullSlot, null);
+      expect(gated.item, 'leftovers');
+      expect(gated.ability, 'thick-fat');
+      expect(gated.isShiny, isTrue);
+      expect(gated.gender, 'male');
+      expect(gated.nature, 'Careful');
+      expect(gated.friendship, 255);
+      expect(gated.isGigantamax, isTrue);
+      expect(gated.teraType, 'normal');
+    });
+
+    test('Gen 1 strips item, ability, shiny, gender, nature, happiness, '
+        'Gigantamax, and Tera Type — none of those exist in Gen 1', () {
+      final gated = applyGenGates(fullSlot, 1);
+      expect(gated.item, isNull);
+      expect(gated.ability, isNull);
+      expect(gated.isShiny, isFalse);
+      expect(gated.gender, isNull);
+      expect(gated.nature, isNull);
+      expect(gated.friendship, isNull);
+      expect(gated.isGigantamax, isFalse);
+      expect(gated.teraType, isNull);
+      // Species, level, EVs/IVs, and moves are never gen-gated.
+      expect(gated.species, 'snorlax');
+    });
+
+    test('Gen 2 keeps item, shiny, gender, happiness — still no ability/nature', () {
+      final gated = applyGenGates(fullSlot, 2);
+      expect(gated.item, 'leftovers');
+      expect(gated.isShiny, isTrue);
+      expect(gated.gender, 'male');
+      expect(gated.friendship, 255);
+      expect(gated.ability, isNull);
+      expect(gated.nature, isNull);
+      expect(gated.isGigantamax, isFalse);
+      expect(gated.teraType, isNull);
+    });
+
+    test('Gen 3+ keeps ability and nature, still no Gigantamax/Tera Type', () {
+      final gated = applyGenGates(fullSlot, 3);
+      expect(gated.ability, 'thick-fat');
+      expect(gated.nature, 'Careful');
+      expect(gated.isGigantamax, isFalse);
+      expect(gated.teraType, isNull);
+    });
+
+    test('Gen 8 keeps Gigantamax, still no Tera Type', () {
+      final gated = applyGenGates(fullSlot, 8);
+      expect(gated.isGigantamax, isTrue);
+      expect(gated.teraType, isNull);
+    });
+
+    test('Gen 9 keeps Tera Type, no longer has Gigantamax', () {
+      final gated = applyGenGates(fullSlot, 9);
+      expect(gated.teraType, 'normal');
+      expect(gated.isGigantamax, isFalse);
+    });
+  });
+
   group('psIvDefault', () {
     test('Gen 1/2 default to 15 (raw DV scale)', () {
       expect(psIvDefault(1), 15);

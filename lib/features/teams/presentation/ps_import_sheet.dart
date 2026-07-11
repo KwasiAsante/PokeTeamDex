@@ -198,7 +198,8 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
     int skipped = 0;
     bool promoted = false;
 
-    for (final s in parsed.slots) {
+    for (final rawSlot in parsed.slots) {
+      final s = applyGenGates(rawSlot, gen);
       var slot = nextFree();
 
       // Auto-promote to box if we've exhausted the 6-slot team limit.
@@ -414,7 +415,7 @@ class _PsImportSheetState extends ConsumerState<PsImportSheet> {
     final errors = <String>[];
 
     for (int i = 0; i < parsed.slots.length; i++) {
-      final s = parsed.slots[i];
+      final s = applyGenGates(parsed.slots[i], gen);
       final slotNumber = i + 1;
 
       int? pokemonId;

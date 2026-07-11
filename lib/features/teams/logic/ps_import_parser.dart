@@ -1,6 +1,7 @@
 // Pure text parsing for Pokémon Showdown team exports — no API calls, no
 // widget dependencies. Kept separate from ps_import_sheet.dart so the
 // parsing logic is independently unit-testable.
+import 'package:poke_team_dex/services/format/format_models.dart';
 
 /// A single parsed Pokémon from a pasted Showdown team export.
 class PsSlot {
@@ -208,6 +209,36 @@ int psIvDefault(int? gen) => (gen == 1 || gen == 2) ? 15 : 31;
 /// buildShowdownExport's DV × 2 conversion.
 int psIvToStored(int psIv, int? gen) =>
     (gen == 1 || gen == 2) ? psIv ~/ 2 : psIv;
+
+/// Nulls out fields [slot] doesn't have a valid value for in [gen], mirroring
+/// the same generation gates SlotConfigScreen uses to hide UI sections:
+/// ability/nature (Gen 3+, `hasAbilities`), held item (Gen 2+, `hasItems`),
+/// shiny (Gen 2+, `hasShiny`), Gigantamax (Gen 8 only, `hasGigantamax`), Tera
+/// Type (Gen 9 only, `hasTeraType`), and gender/happiness (Gen 2+, no
+/// dedicated mechanics flag — gated directly on `gen >= 2` like the UI does).
+/// A null [gen] (unknown/no format) leaves every field untouched, matching
+/// the UI's own `mechanics == null || ...` fallback.
+PsSlot applyGenGates(PsSlot slot, int? gen) {
+  if (gen == null) return slot;
+  final mechanics = GenerationMechanics.forGen(gen);
+  final hasGen2Plus = gen >= 2;
+  return PsSlot(
+    species: slot.species,
+    nickname: slot.nickname,
+    item: mechanics.hasItems ? slot.item : null,
+    ability: mechanics.hasAbilities ? slot.ability : null,
+    level: slot.level,
+    isShiny: mechanics.hasShiny && slot.isShiny,
+    gender: hasGen2Plus ? slot.gender : null,
+    nature: mechanics.hasAbilities ? slot.nature : null,
+    friendship: hasGen2Plus ? slot.friendship : null,
+    isGigantamax: mechanics.hasGigantamax && slot.isGigantamax,
+    teraType: mechanics.hasTeraType ? slot.teraType : null,
+    evs: slot.evs,
+    ivs: slot.ivs,
+    moves: slot.moves,
+  );
+}
 
 void _parseStatLine(String s, Map<String, int> target) {
   for (final part in s.split('/')) {
