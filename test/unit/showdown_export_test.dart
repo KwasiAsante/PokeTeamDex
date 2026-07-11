@@ -32,6 +32,12 @@ TeamSlot _slot({
   int? evSpa,
   int? evSpd,
   int? evSpe,
+  int? ivHp,
+  int? ivAtk,
+  int? ivDef,
+  int? ivSpa,
+  int? ivSpd,
+  int? ivSpe,
 }) =>
     TeamSlot(
       id: id,
@@ -56,6 +62,12 @@ TeamSlot _slot({
       evSpa: evSpa,
       evSpd: evSpd,
       evSpe: evSpe,
+      ivHp: ivHp,
+      ivAtk: ivAtk,
+      ivDef: ivDef,
+      ivSpa: ivSpa,
+      ivSpd: ivSpd,
+      ivSpe: ivSpe,
       // Required fields with defaults
       syncStatus: 'synced',
       isDeleted: false,
@@ -234,6 +246,45 @@ void main() {
       expect(result, contains('- Thunderbolt'));
       expect(result, contains('- Surf'));
       expect(result.split('\n').where((l) => l.startsWith('- ')), hasLength(2));
+    });
+
+    test('Hidden Power gets its IV-derived type appended — default (31) IVs → Dark',
+        () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25, move1: 'hidden-power',
+      );
+      final result = await buildShowdownExport([slot], mockApi);
+
+      expect(result, contains('- Hidden Power [Dark]'));
+    });
+
+    test('Hidden Power type reflects custom IVs — [Ice]', () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25, move1: 'hidden-power',
+        ivHp: 30, ivAtk: 30, ivDef: 30, ivSpa: 31, ivSpd: 31, ivSpe: 31,
+      );
+      final result = await buildShowdownExport([slot], mockApi);
+
+      expect(result, contains('- Hidden Power [Ice]'));
+    });
+
+    test('non-Hidden-Power moves are not given a type suffix', () async {
+      when(() => mockApi.fetchPokemon(25))
+          .thenAnswer((_) async => _pokemon('pikachu'));
+
+      final slot = _slot(
+        id: 1, slot: 1, teamId: 1, pokemonId: 25, move1: 'thunderbolt',
+      );
+      final result = await buildShowdownExport([slot], mockApi);
+
+      expect(result, contains('- Thunderbolt'));
+      expect(result, isNot(contains('[')));
     });
 
     test('battle-meaningful formName (real, non-default variety) is used as species',

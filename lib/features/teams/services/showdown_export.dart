@@ -41,6 +41,34 @@ String _capitalizeHyphenated(String name) {
   }).join('-');
 }
 
+/// Type names for the 16 possible Hidden Power types (indices 0–15).
+const _kHiddenPowerTypeNames = [
+  'Fighting', 'Flying', 'Poison', 'Ground', 'Rock', 'Bug',
+  'Ghost',    'Steel',  'Fire',   'Water',  'Grass', 'Electric',
+  'Psychic',  'Ice',    'Dragon', 'Dark',
+];
+
+/// Hidden Power's type is derived from IVs, not stored directly. Unset IVs
+/// default to 31 (the standard competitive default). Mirrors the same
+/// Gen 3+ formula used for the in-app Hidden Power display (team_detail_screen.dart,
+/// slot_config_screen.dart): LSB of HP/Atk/Def/Spe/SpA/SpD IVs, weighted
+/// 1/2/4/8/16/32.
+String _hiddenPowerType(TeamSlot slot) {
+  final hp  = slot.ivHp  ?? 31;
+  final atk = slot.ivAtk ?? 31;
+  final def = slot.ivDef ?? 31;
+  final spa = slot.ivSpa ?? 31;
+  final spd = slot.ivSpd ?? 31;
+  final spe = slot.ivSpe ?? 31;
+  final n = (hp & 1) +
+      (atk & 1) * 2 +
+      (def & 1) * 4 +
+      (spe & 1) * 8 +
+      (spa & 1) * 16 +
+      (spd & 1) * 32;
+  return _kHiddenPowerTypeNames[(n * 15) ~/ 63];
+}
+
 /// Normalises a stored nature name to just the nature word, capitalised.
 /// Handles values that may have been stored with a "Nature: " prefix or
 /// " Nature" suffix due to an import parsing issue.
@@ -142,9 +170,15 @@ Future<String> buildShowdownExport(
     addEv(slot.evSpe, 'Spe');
     if (evParts.isNotEmpty) lines.add('EVs: ${evParts.join(' / ')}');
 
-    // Moves
+    // Moves — Hidden Power gets its IV-derived type appended, e.g.
+    // "Hidden Power [Ice]", matching the syntax PS's parser (and our own
+    // import parser) expects.
     for (final move in [slot.move1, slot.move2, slot.move3, slot.move4]) {
-      if (move != null) lines.add('- ${move.toCapitalCase()}');
+      if (move == null) continue;
+      final moveLabel = move.toCapitalCase();
+      lines.add(move == 'hidden-power'
+          ? '- $moveLabel [${_hiddenPowerType(slot)}]'
+          : '- $moveLabel');
     }
 
     blocks.add(lines.join('\n'));
