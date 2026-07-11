@@ -1,4 +1,5 @@
 class ItemEntry {
+  final int? id;
   final String name;
   final int? cost;
   final String? category;
@@ -16,6 +17,7 @@ class ItemEntry {
   final List<ItemMachineRef> machines;
 
   const ItemEntry({
+    this.id,
     required this.name,
     this.cost,
     this.category,
@@ -101,6 +103,7 @@ class ItemEntry {
     }).toList();
 
     return ItemEntry(
+      id: json['id'] as int?,
       name: json['name'] as String,
       cost: json['cost'] as int?,
       category: (json['category'] as Map?)

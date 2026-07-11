@@ -1,10 +1,12 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/database/app_database.dart';
 import 'package:poke_team_dex/features/teams/presentation/slot_config_screen.dart';
+import 'package:poke_team_dex/services/catalog/catalog_models.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
@@ -13,15 +15,15 @@ import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart'
     show AbilityInfo, PokemonResolvedBackendResponse;
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_backend_repository.dart';
-import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_cache.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
-    show pokemonBackendRepositoryProvider, pokemonResolvedCacheProvider;
+    show pokemonBackendRepositoryProvider;
+import 'package:poke_team_dex/services/util/backend_provider_utils.dart';
 import '../helpers/test_app.dart';
 import '../helpers/test_database.dart';
 
 class MockPokeApiRepository extends Mock implements PokeApiRepository {}
 class MockPokemonBackendRepository extends Mock implements PokemonBackendRepository {}
-class MockPokemonResolvedCache extends Mock implements PokemonResolvedCache {}
+class MockBox extends Mock implements Box {}
 
 PokemonEntry _entry() => PokemonEntry(
       id: 6,
@@ -59,7 +61,7 @@ void main() {
 
   late MockPokeApiRepository mockApi;
   late MockPokemonBackendRepository mockBackendRepo;
-  late MockPokemonResolvedCache mockCache;
+  late MockBox mockBox;
 
   setUp(() {
     mockApi = MockPokeApiRepository();
@@ -68,18 +70,34 @@ void main() {
     when(() => mockApi.fetchPokemonByName(any())).thenAnswer((_) async => _entry());
     when(() => mockApi.fetchPokemonEncounters(any())).thenAnswer((_) async => []);
     when(() => mockApi.fetchItemList()).thenAnswer((_) async => []);
+    when(() => mockApi.fetchAbilityList()).thenAnswer((_) async => []);
     when(() => mockApi.fetchPriorEvoEntries(any())).thenAnswer((_) async => []);
 
     mockBackendRepo = MockPokemonBackendRepository();
     when(() => mockBackendRepo.fetchResolved(any(), gen: any(named: 'gen')))
         .thenAnswer((_) async =>
             PokemonResolvedBackendResponse.fromJson(_resolvedJson()));
+    // catalogAbilityProvider/catalogItemProvider/catalogMoveProvider now have
+    // an offline fallback (buildOfflineAbilityEntry/etc.) that calls
+    // PsDataService.initialize() — rootBundle.loadString() for shared/ps_data/
+    // never resolves inside a pumped widget-test frame in this environment
+    // (see pokemon_detail_screen_test.dart), so leaving these unstubbed would
+    // hang pumpAndSettle once the (also unstubbed, Mock-default-null) backend
+    // call fails and the offline path kicks in. This test isn't exercising
+    // catalog data, so just succeed the backend call directly.
+    when(() => mockBackendRepo.fetchCatalogAbility(any())).thenAnswer(
+        (_) async => const BackendAbilityEntry(name: 'blaze', displayName: 'Blaze', gen: 3));
+    when(() => mockBackendRepo.fetchCatalogItem(any())).thenAnswer(
+        (_) async => const BackendItemEntry(name: 'leftovers', displayName: 'Leftovers', gen: 2));
+    when(() => mockBackendRepo.fetchCatalogMove(any())).thenAnswer(
+        (_) async => const BackendMoveEntry(
+            name: 'tackle', displayName: 'Tackle', gen: 1, type: 'normal', damageClass: 'physical'));
 
-    // Hive is not initialized in tests — mock the cache so providers skip
-    // straight to the backend (which is itself mocked above).
-    mockCache = MockPokemonResolvedCache();
-    when(() => mockCache.getIfValid(any())).thenReturn(null);
-    when(() => mockCache.putWithTTL(any(), any(), any())).thenReturn(null);
+    // Hive is not initialized in tests — mock the cache box so providers
+    // skip straight to the backend (which is itself mocked above).
+    mockBox = MockBox();
+    when(() => mockBox.get(any())).thenReturn(null);
+    when(() => mockBox.put(any(), any())).thenAnswer((_) async {});
   });
 
   /// Creates a team + slot in [db] and returns (teamId, slotId).
@@ -138,7 +156,8 @@ void main() {
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
           pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
-          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
+          backendFallbackBoxProvider.overrideWithValue(mockBox),
+          backendFallbackIsOnlineProvider.overrideWithValue(() async => true),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),
@@ -165,7 +184,8 @@ void main() {
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
           pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
-          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
+          backendFallbackBoxProvider.overrideWithValue(mockBox),
+          backendFallbackIsOnlineProvider.overrideWithValue(() async => true),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),
@@ -197,7 +217,8 @@ void main() {
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
           pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
-          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
+          backendFallbackBoxProvider.overrideWithValue(mockBox),
+          backendFallbackIsOnlineProvider.overrideWithValue(() async => true),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),
@@ -235,7 +256,8 @@ void main() {
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
           pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
-          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
+          backendFallbackBoxProvider.overrideWithValue(mockBox),
+          backendFallbackIsOnlineProvider.overrideWithValue(() async => true),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),
@@ -264,7 +286,8 @@ void main() {
         extraOverrides: [
           pokeApiRepositoryProvider.overrideWithValue(mockApi),
           pokemonBackendRepositoryProvider.overrideWithValue(mockBackendRepo),
-          pokemonResolvedCacheProvider.overrideWithValue(mockCache),
+          backendFallbackBoxProvider.overrideWithValue(mockBox),
+          backendFallbackIsOnlineProvider.overrideWithValue(() async => true),
           allFormatsProvider.overrideWith((_) async => []),
           generalFormatsProvider.overrideWith((_) async => []),
           gameFormatsProvider.overrideWith((_) async => []),

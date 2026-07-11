@@ -1,7 +1,7 @@
 import 'package:poke_team_dex/data/pokemon_data_registry.dart';
 import 'package:poke_team_dex/database/app_database.dart';
+import 'package:poke_team_dex/services/catalog/catalog_models.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
-import 'package:poke_team_dex/services/format/format_service.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show MoveSummary;
 
 /// The result of validating one slot against a format.
@@ -28,77 +28,44 @@ class SlotValidation {
 /// learnable in that specific version group.
 /// For a **general gen format** we accept moves from any version group within
 /// that generation.
+/// [availableAbilities]/[availableItems] must already be gen-filtered for
+/// [format.gen] by the caller (e.g. `slotValidationProvider` reads
+/// `abilitiesListProvider`/`itemsListProvider` and filters by `gen <= format.gen`).
 Future<SlotValidation> validateSlot(
   TeamSlot slot,
   String pokemonName,
   List<MoveSummary> pokemonMoves,
   GameFormat format,
-  FormatService service,
+  List<BackendAbilityEntry> availableAbilities,
+  List<BackendItemEntry> availableItems,
 ) async {
-  await service.initialize();
-  final gen = format.gen;
-  final m = GenerationMechanics.forGen(gen);
-  final violations = <String, String>{};
-
-  // ── Ability ──────────────────────────────────────────────────────────────
-  if (slot.abilityName != null) {
-    if (!m.hasAbilities) {
-      violations['ability'] = 'Abilities don\'t exist in Gen $gen';
-    } else {
-      final psId = _toPsId(slot.abilityName!);
-      final available = service.abilitiesForGen(gen);
-      if (!available.any((a) => a.id == psId)) {
-        violations['ability'] =
-            '${_display(slot.abilityName!)} not available in Gen $gen';
-      }
-    }
-  }
-
-  // ── Held item ─────────────────────────────────────────────────────────────
-  if (slot.heldItemName != null) {
-    if (!m.hasItems) {
-      violations['item'] = 'Held items don\'t exist in Gen $gen';
-    } else {
-      final psId = _toPsId(slot.heldItemName!);
-      final available = service.itemsForGen(gen);
-      if (!available.any((i) => i.id == psId)) {
-        violations['item'] =
-            '${_display(slot.heldItemName!)} not available in Gen $gen';
-      }
-    }
-  }
-
-  // ── Moves ────────────────────────────────────────────────────────────────
-  final learnset = buildLearnsetForFormat(
-    pokemonMoves, format,
-    pokemonName: pokemonName,
-    formatService: service,
+  return validateSlotSync(
+    slot.abilityName,
+    slot.heldItemName,
+    [slot.move1, slot.move2, slot.move3, slot.move4],
+    pokemonName,
+    pokemonMoves,
+    format,
+    availableAbilities,
+    availableItems,
   );
-  final moveSlots = {
-    'move1': slot.move1,
-    'move2': slot.move2,
-    'move3': slot.move3,
-    'move4': slot.move4,
-  };
-  for (final entry in moveSlots.entries) {
-    final moveName = entry.value;
-    if (moveName == null) continue;
-    if (learnset.contains(moveName)) continue;
-    // Gen 6: also accept moves in PS's learnsets-g6.js allow-list.
-    // This covers egg moves and tutors that are missing from the main
-    // learnsets data but that PS considers valid for Gen 6 simulation.
-    if (format.gen == 6 && service.isInG6Allowlist(pokemonName, moveName)) {
-      continue;
-    }
-    violations[entry.key] =
-        '${_display(moveName)} not learnable in ${_formatLabel(format)}';
-  }
-
-  return SlotValidation(violations);
 }
 
-/// Same logic as [validateSlot] but synchronous — for real-time feedback
-/// in the slot config screen where data is already available.
+/// Validates ability/item/move choices against [format] — Layer 1
+/// (generation availability) only.
+///
+/// [pokemonName] is the PokéAPI name (e.g. "umbreon").
+/// [pokemonMoves] is the backend-resolved moves list (already merged with PS
+/// learnset data server-side) — it includes per-version-group learn details
+/// so we can check per-game learnsets.
+///
+/// [availableAbilities]/[availableItems] must already be gen-filtered for
+/// [format.gen] by the caller.
+///
+/// For a **game format** (type == FormatType.game) we check only the moves
+/// learnable in that specific version group.
+/// For a **general gen format** we accept moves from any version group within
+/// that generation.
 SlotValidation validateSlotSync(
   String? abilityName,
   String? heldItemName,
@@ -106,7 +73,8 @@ SlotValidation validateSlotSync(
   String pokemonName,
   List<MoveSummary> pokemonMoves,
   GameFormat format,
-  FormatService service,
+  List<BackendAbilityEntry> availableAbilities,
+  List<BackendItemEntry> availableItems,
 ) {
   final gen = format.gen;
   final m = GenerationMechanics.forGen(gen);
@@ -115,7 +83,7 @@ SlotValidation validateSlotSync(
   if (abilityName != null) {
     if (!m.hasAbilities) {
       violations['ability'] = 'Abilities don\'t exist in Gen $gen';
-    } else if (!service.abilitiesForGen(gen).any((a) => a.id == _toPsId(abilityName))) {
+    } else if (!availableAbilities.any((a) => a.name == abilityName)) {
       violations['ability'] = '${_display(abilityName)} not available in Gen $gen';
     }
   }
@@ -123,23 +91,16 @@ SlotValidation validateSlotSync(
   if (heldItemName != null) {
     if (!m.hasItems) {
       violations['item'] = 'Held items don\'t exist in Gen $gen';
-    } else if (!service.itemsForGen(gen).any((i) => i.id == _toPsId(heldItemName))) {
+    } else if (!availableItems.any((i) => i.name == heldItemName)) {
       violations['item'] = '${_display(heldItemName)} not available in Gen $gen';
     }
   }
 
-  final learnset = buildLearnsetForFormat(
-    pokemonMoves, format,
-    pokemonName: pokemonName,
-    formatService: service,
-  );
+  final learnset = buildLearnsetForFormat(pokemonMoves, format);
   for (int i = 0; i < moves.length; i++) {
     final moveName = moves[i];
     if (moveName == null) continue;
     if (learnset.contains(moveName)) continue;
-    if (format.gen == 6 && service.isInG6Allowlist(pokemonName, moveName)) {
-      continue;
-    }
     violations['move${i + 1}'] =
         '${_display(moveName)} not learnable in ${_formatLabel(format)}';
   }
@@ -153,70 +114,15 @@ SlotValidation validateSlotSync(
 /// [format]. Supplements PokéAPI version-group data with PS learnset data so
 /// that moves PokéAPI incorrectly attributes to a later gen are still included
 /// (e.g. Charizard's Dragon Dance is listed in Gen 8/9 by PokéAPI but was
-/// available in Gen 6 via move tutors).
-///
-/// [pokemonName] and [formatService] are optional; when supplied the PS
-/// learnset is cross-checked: any move in [pokemonMoves] whose PS id appears
-/// in the PS learnset for [format.gen] is included regardless of PokéAPI's
-/// version-group data.
+/// available in Gen 6 via move tutors) — the backend's `/pokemon/moves`
+/// endpoint already merges PS learnset data server-side (including
+/// event-exclusive moves), so [pokemonMoves] itself is sufficient here.
 Set<String> buildLearnsetForFormat(
   List<MoveSummary> pokemonMoves,
-  GameFormat format, {
-  String? pokemonName,
-  FormatService? formatService,
-}) {
-  final result = _buildLearnset(pokemonMoves, format);
-
-  // PS supplementary pass — catches moves PokéAPI links to the wrong gen,
-  // plus genuine event/gift-Pokémon moves PokéAPI has no category for at all
-  // (e.g. Pokémon Crystal's gift Dratini knowing Extreme Speed from the
-  // start — `eventMovesForGen` surfaces it via PS's detailed-learnset source
-  // even though it never appears in Dratini's PokéAPI moves list for any
-  // Gen-2 version group).
-  if (pokemonName != null &&
-      formatService != null &&
-      formatService.isInitialized) {
-    final name = pokemonName.toLowerCase();
-    final regularPsIds = formatService.learnsetForGen(name, format.gen);
-    final eventPsIds = formatService.eventMovesForGen(name, format.gen);
-
-    final matchedPsIds = <String>{};
-    if (regularPsIds.isNotEmpty || eventPsIds.isNotEmpty) {
-      for (final moveData in pokemonMoves) {
-        final moveName = moveData.name;
-        // Convert PokéAPI name to PS id (strip hyphens) for comparison.
-        final psId = _toPsId(moveName);
-        if (regularPsIds.contains(psId) || eventPsIds.contains(psId)) {
-          result.add(moveName);
-          matchedPsIds.add(psId);
-        }
-      }
-    }
-
-    // Some genuinely event-exclusive moves never appear in PokéAPI's move
-    // list for this species at all — under ANY method or generation — e.g.
-    // Eevee's Gen-2 event-exclusive Growth (a Stadium 2 / gift encounter
-    // PokéAPI has zero record of, unlike Dratini's Extreme Speed which it at
-    // least lists under a later-gen egg/tutor method). The cross-check above
-    // can never recover these since there's no `pokemonMoves` entry to match
-    // against — fall back to PS's own move database for a displayable name.
-    for (final psId in eventPsIds.difference(matchedPsIds)) {
-      final entry = formatService.moveDetail(psId);
-      if (entry != null) result.add(_apiSlugForPsName(entry.name));
-    }
-  }
-
-  return result;
+  GameFormat format,
+) {
+  return _buildLearnset(pokemonMoves, format);
 }
-
-/// Converts a PS move display name (e.g. "King's Shield", "U-turn") to its
-/// PokéAPI-style hyphenated slug ("kings-shield", "u-turn") — the inverse of
-/// [_toPsId] for names PS tracks but that never surface in `pokemonMoves`
-/// (so there's no existing PokéAPI name string to reuse verbatim). PokéAPI
-/// slugs drop apostrophes outright and hyphenate on whitespace; PS names
-/// already preserve official punctuation/hyphenation, so this is reliable.
-String _apiSlugForPsName(String name) =>
-    name.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
 
 Set<String> _buildLearnset(
   List<MoveSummary> pokemonMoves,
@@ -266,33 +172,20 @@ Set<String> _buildLearnset(
 /// [currentLearnset] lets a caller that already built the current Pokémon's
 /// learnable-move set (with the same [currentMoves]/[format]/[pokemonName]/
 /// [formatService]) pass it straight through — `buildLearnsetForFormat` walks
-/// the full movepool plus a PS supplementary pass, so callers that also need
 /// that exact set elsewhere (e.g. the move picker) shouldn't pay for it twice.
 Set<String> buildPriorEvoExclusiveMoveNames({
   required List<MoveSummary> currentMoves,
   required List<({String speciesName, List<MoveSummary> moves})> ancestorMoveSets,
   required GameFormat format,
-  String? pokemonName,
-  FormatService? formatService,
   Set<String>? currentLearnset,
 }) {
-  final current = currentLearnset ??
-      buildLearnsetForFormat(
-        currentMoves, format,
-        pokemonName: pokemonName, formatService: formatService,
-      );
+  final current = currentLearnset ?? buildLearnsetForFormat(currentMoves, format);
   final ancestorAll = <String>{};
   for (final ancestor in ancestorMoveSets) {
-    ancestorAll.addAll(buildLearnsetForFormat(
-      ancestor.moves, format,
-      pokemonName: ancestor.speciesName, formatService: formatService,
-    ));
+    ancestorAll.addAll(buildLearnsetForFormat(ancestor.moves, format));
   }
   return ancestorAll.difference(current);
 }
-
-/// PokéAPI uses hyphenated names ("choice-specs"); PS ids strip hyphens ("choicespecs").
-String _toPsId(String pokeApiName) => pokeApiName.replaceAll('-', '').toLowerCase();
 
 String _display(String id) => id
     .split('-')

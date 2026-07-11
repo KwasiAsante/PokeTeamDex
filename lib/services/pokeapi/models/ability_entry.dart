@@ -1,4 +1,5 @@
 class AbilityEntry {
+  final int? id;
   final String name;
   final String? shortEffect;
   final String? longEffect;
@@ -11,6 +12,7 @@ class AbilityEntry {
   final List<AbilityPokemonRef> pokemon;
 
   const AbilityEntry({
+    this.id,
     required this.name,
     this.shortEffect,
     this.longEffect,
@@ -93,6 +95,7 @@ class AbilityEntry {
     });
 
     return AbilityEntry(
+      id: json['id'] as int?,
       name: json['name'] as String,
       shortEffect: shortEffect,
       longEffect: longEffect,

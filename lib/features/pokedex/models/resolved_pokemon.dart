@@ -27,7 +27,7 @@ class ResolvedPokemon {
 
   /// Additional moves sourced from the backend (Smogon / supplement data).
   /// Empty on the offline fallback path.
-  final List<SupplementMove> supplementMoves;
+  final List<LearnsetSupplementMove> supplementMoves;
 
   /// Smogon analysis data returned by the backend, if available.
   /// Null on the offline fallback path.
@@ -38,9 +38,37 @@ class ResolvedPokemon {
     required this.species,
     required this.cosmeticForms,
     required this.spriteUrls,
-    this.supplementMoves = const <SupplementMove>[],
+    this.supplementMoves = const <LearnsetSupplementMove>[],
     this.smogonAnalyses,
   });
+
+  /// Cache round-trip for [withBackendFallback] — a self-contained snapshot
+  /// of every field, independent of the backend response wire format.
+  Map<String, dynamic> toJson() => {
+        'detail': detail.toJson(),
+        'species': species.toCacheJson(),
+        'cosmetic_forms': cosmeticForms.map((f) => f.toCacheJson()).toList(),
+        'sprite_urls': spriteUrls.toJson(),
+        'supplement_moves': supplementMoves.map((m) => m.toJson()).toList(),
+        'smogon_analyses': smogonAnalyses,
+      };
+
+  factory ResolvedPokemon.fromJson(Map<String, dynamic> json) => ResolvedPokemon(
+        detail: PokemonEntry.fromCacheJson(json['detail'] as Map<String, dynamic>),
+        species: PokemonSpeciesEntry.fromCacheJson(
+            json['species'] as Map<String, dynamic>),
+        cosmeticForms: (json['cosmetic_forms'] as List<dynamic>? ?? [])
+            .map((f) => PokemonFormEntry.fromCacheJson(f as Map<String, dynamic>))
+            .toList(),
+        spriteUrls: SpriteUrlsFull.fromJson(
+            json['sprite_urls'] as Map<String, dynamic>? ?? {}),
+        supplementMoves: (json['supplement_moves'] as List<dynamic>? ?? [])
+            .map((m) => LearnsetSupplementMove.fromJson(m as Map<String, dynamic>))
+            .toList(),
+        smogonAnalyses: (json['smogon_analyses'] as List<dynamic>?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList(),
+      );
 
   int get id => detail.id;
   String get name => detail.name;

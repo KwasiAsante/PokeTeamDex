@@ -84,6 +84,28 @@ _ROMAN_TO_GEN: dict[str, int] = {
 }
 
 
+def _is_pokeapi_entry_excluded(kind: str, pokeapi_data: dict) -> bool:
+    """Excludes PokéAPI entries that exist in the raw API but aren't part of
+    the mainline games.
+
+    Abilities: Pokémon Conquest's warlord "abilities" (e.g. "Aqua Boost",
+    "Black Hole") share the /ability resource with real abilities, flagged
+    only by `is_main_series` — PokéAPI still reports a valid mainline
+    `generation` for them (Aqua Boost -> generation-v), so gen-based
+    filtering can't catch these; is_main_series is the only reliable signal.
+
+    Items: Conquest's "Data Card" items (item-category "data-cards") likewise
+    carry valid mainline `game_indices`, so category is the only signal here.
+    Items have no `is_main_series` field at all.
+    """
+    if kind == "ability":
+        return pokeapi_data.get("is_main_series") is False
+    if kind == "item":
+        category = (pokeapi_data.get("category") or {}).get("name")
+        return category == "data-cards"
+    return False
+
+
 def _pokeapi_gen(pokeapi_data: dict) -> int | None:
     """Extract the introduction generation from a PokéAPI move/ability response.
 
@@ -235,8 +257,12 @@ class CatalogService:
         # Merge each PokéAPI entry with its PS counterpart (if any).
         covered_ps_ids: set[str] = set()
         count = ps_matched = 0
+        excluded = 0
         for name, pokeapi_data in zip(names, responses):
             if pokeapi_data is None:
+                continue
+            if _is_pokeapi_entry_excluded(kind, pokeapi_data):
+                excluded += 1
                 continue
             canonical_name = pokeapi_data.get("name", name)
             # Strip PokéAPI variant suffixes that don't appear in PS:
@@ -277,8 +303,9 @@ class CatalogService:
                 target[base_name] = entry.model_copy(update={"damage_class": "varies"})
 
         logger.info(
-            "Catalog preload: %s — %d PokéAPI entries (%d with PS enrichment) + %d PS-only (%d varies)",
-            kind, count, ps_matched, ps_only, len(z_varies),
+            "Catalog preload: %s — %d PokéAPI entries (%d with PS enrichment) + %d PS-only "
+            "(%d varies, %d excluded as non-mainline)",
+            kind, count, ps_matched, ps_only, len(z_varies), excluded,
         )
 
     async def _fetch_pokeapi_names(self, kind: str) -> list[str]:
@@ -578,6 +605,10 @@ class CatalogService:
         # Not in the (possibly still-loading) in-memory catalog — fetch live.
         # PokéAPI accepts both name and numeric id at this path directly.
         pokeapi_data = await self._fetch_pokeapi_resource(kind, id_or_name)
+        if pokeapi_data is not None and _is_pokeapi_entry_excluded(kind, pokeapi_data):
+            # Non-mainline entry (e.g. a Conquest ability/data-card) — treat as
+            # if PokéAPI has no page for it, same as the preload-time exclusion.
+            pokeapi_data = None
         if pokeapi_data is not None:
             canonical_name = pokeapi_data.get("name", id_or_name)
             if kind in ("item", "move"):

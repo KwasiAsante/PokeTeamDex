@@ -128,10 +128,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
         ),
         error: (e, _) => ErrorState(
           error: e,
-          onRetry: () {
-            ref.invalidate(itemsListProvider);
-            if (pocket != null) ref.invalidate(itemsByPocketProvider(pocket));
-          },
+          onRetry: () => ref.invalidate(itemsListProvider),
         ),
         data: (entries) {
           if (entries.isEmpty) {

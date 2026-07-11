@@ -114,24 +114,39 @@ class MoveSummary {
       };
 }
 
-class SupplementMove {
+/// A move sourced from PS's per-gen learnset data (`learnset_N.json`) that
+/// PokéAPI has no record of for the species at all, under any method or
+/// generation (e.g. Pokémon Crystal's gift Dratini knowing Extreme Speed
+/// from the start) — it "supplements" PokéAPI's own move list, not a
+/// PS event-exclusive move specifically (despite the backend's own name for
+/// this concept, `EventMove`, also covers egg/tutor/level-up sources).
+class LearnsetSupplementMove {
   final String name;
   final String displayName;
   final List<int> generations;
   final List<String> methods;
+  // True when this move is only known via a pre-evolution's learnset entry
+  // (PokéAPI may not list it on the evolved form) — mirrors the backend's
+  // `EventMove.via_prevo`/`.prevo`.
+  final bool viaPrevo;
+  final String? prevo;
 
-  const SupplementMove({
+  const LearnsetSupplementMove({
     required this.name,
     required this.displayName,
     required this.generations,
     required this.methods,
+    this.viaPrevo = false,
+    this.prevo,
   });
 
-  factory SupplementMove.fromJson(Map<String, dynamic> json) => SupplementMove(
+  factory LearnsetSupplementMove.fromJson(Map<String, dynamic> json) => LearnsetSupplementMove(
         name: json['name'] as String,
         displayName: json['display_name'] as String,
         generations: List<int>.from(json['generations'] as List),
         methods: List<String>.from(json['methods'] as List),
+        viaPrevo: json['via_prevo'] as bool? ?? false,
+        prevo: json['prevo'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -139,6 +154,8 @@ class SupplementMove {
         'display_name': displayName,
         'generations': generations,
         'methods': methods,
+        'via_prevo': viaPrevo,
+        'prevo': prevo,
       };
 }
 
@@ -258,7 +275,7 @@ class PokemonResolvedBackendResponse {
   final String? speciesName;
   final List<MoveSummary> moves;
   final String? movesUrl;
-  final List<SupplementMove> supplementMoves;
+  final List<LearnsetSupplementMove> supplementMoves;
   final List<Map<String, dynamic>>? smogonAnalyses;
   final List<Map<String, dynamic>> varieties;
   final List<FormBackendData> forms;
@@ -461,6 +478,7 @@ class PokemonResolvedBackendResponse {
             .map((v) => PokemonVariety(
                   isDefault: v['is_default'] as bool? ?? false,
                   name: (v['name'] as String?) ?? '',
+                  pokemonId: (v['pokemon_id'] as num?)?.toInt(),
                 ))
             .toList(),
       );

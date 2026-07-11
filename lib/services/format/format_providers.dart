@@ -1,13 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
+import 'package:poke_team_dex/features/abilities/providers/abilities_provider.dart';
+import 'package:poke_team_dex/features/items/providers/items_provider.dart';
 import 'package:poke_team_dex/features/pokedex/providers/pokemon_detail_provider.dart';
-import 'package:poke_team_dex/services/api/api_client.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_service.dart';
 import 'package:poke_team_dex/services/format/slot_validator.dart';
 
 final formatServiceProvider = Provider<FormatService>((ref) {
-  return FormatService(ref.read(apiClientProvider));
+  return FormatService();
 });
 
 /// All formats, grouped by type.
@@ -29,30 +30,6 @@ final gameFormatsProvider = FutureProvider<List<GameFormat>>((ref) async {
   return svc.formatsOfType(FormatType.game);
 });
 
-/// Learnset for a specific Pokémon in a specific generation.
-final learnsetProvider = FutureProvider.autoDispose
-    .family<List<String>, ({String pokemon, int gen})>((ref, args) async {
-  final svc = ref.watch(formatServiceProvider);
-  await svc.initialize();
-  return svc.learnsetForGen(args.pokemon, args.gen);
-});
-
-/// Items available in a generation (Layer 1 filtered).
-final itemsForGenProvider =
-    FutureProvider.autoDispose.family<List<PsItemEntry>, int>((ref, gen) async {
-  final svc = ref.watch(formatServiceProvider);
-  await svc.initialize();
-  return svc.itemsForGen(gen);
-});
-
-/// Abilities available in a generation (Layer 1 filtered).
-final abilitiesForGenProvider =
-    FutureProvider.autoDispose.family<List<PsAbilityEntry>, int>((ref, gen) async {
-  final svc = ref.watch(formatServiceProvider);
-  await svc.initialize();
-  return svc.abilitiesForGen(gen);
-});
-
 /// Validates a single slot against the team's format (Layer 1 only).
 /// Fetches pokemon data internally to access version_group learnsets.
 /// Prior-evolution-exclusive moves are excluded from violations.
@@ -63,6 +40,13 @@ final slotValidationProvider = FutureProvider.autoDispose
   await svc.initialize();
   final format = svc.formatById(args.formatId);
   if (format == null) return const SlotValidation({});
+
+  final abilities = await ref.watch(abilitiesListProvider.future);
+  final items = await ref.watch(itemsListProvider.future);
+  final availableAbilities =
+      abilities.where((a) => a.gen <= format.gen).toList();
+  final availableItems = items.where((i) => i.gen <= format.gen).toList();
+
   final pokemon = await ref.watch(
       pokemonDetailProvider(args.slot.pokemonId).future);
 
@@ -81,7 +65,8 @@ final slotValidationProvider = FutureProvider.autoDispose
     }
   }();
 
-  final base = await validateSlot(args.slot, pokemon.name, effectiveMoves, format, svc);
+  final base = await validateSlot(
+      args.slot, pokemon.name, effectiveMoves, format, availableAbilities, availableItems);
   if (base.isValid) return base;
 
   // Fetch prior-evo move sets and suppress move violations for exclusive moves.
@@ -92,8 +77,6 @@ final slotValidationProvider = FutureProvider.autoDispose
     currentMoves: effectiveMoves,
     ancestorMoveSets: priorEvoSets,
     format: format,
-    pokemonName: pokemon.name,
-    formatService: svc,
   );
   if (priorEvoMoves.isEmpty) return base;
 

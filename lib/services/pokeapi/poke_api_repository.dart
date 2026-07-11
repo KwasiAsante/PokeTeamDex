@@ -788,60 +788,6 @@ class PokeApiRepository {
   }
   
   /// Fetches a machine by URL and returns the name of the MOVE it teaches.
-  /// Returns all item names belonging to an item pocket (e.g. "berries").
-  /// Fetches the pocket → its categories → item names; cached 7 days.
-  Future<List<String>> fetchItemsByPocket(String pocketName) async {
-    final cacheKey = 'item_pocket_$pocketName';
-    final cached = _pokeApiCache.getIfValid(cacheKey);
-    if (cached is List) return cached.cast<String>();
-
-    final pocketResp =
-        await _pokeApiClient.client.get('/item-pocket/$pocketName');
-    if (pocketResp.statusCode != 200) {
-      throw Exception('Failed to fetch pocket $pocketName');
-    }
-    final categoryNames = (pocketResp.data['categories'] as List)
-        .map((c) => (c as Map)['name'] as String)
-        .toList();
-
-    final allItems = <String>[];
-    for (final cat in categoryNames) {
-      allItems.addAll(await _fetchCategoryItemNames(cat));
-    }
-    allItems.sort();
-    _pokeApiCache.putWithTTL(cacheKey, allItems, const Duration(days: 7));
-    return allItems;
-  }
-
-  /// Returns all item names belonging to a single item *category* (e.g.
-  /// "held-items"); cached 7 days.
-  ///
-  /// Categories are not pockets — PokéAPI's `/item-pocket` list is only
-  /// {misc, medicine, pokeballs, machines, berries, mail, battle, key}.
-  /// "held-items" is one of ~25 categories nested inside the catch-all
-  /// "misc" pocket (alongside unrelated categories like mulch, picnic
-  /// ingredients, and dex-completion items), so it must be fetched as a
-  /// category directly rather than via [fetchItemsByPocket].
-  Future<List<String>> fetchItemsByCategory(String categoryName) async {
-    final cacheKey = 'item_category_$categoryName';
-    final cached = _pokeApiCache.getIfValid(cacheKey);
-    if (cached is List) return cached.cast<String>();
-
-    final items = await _fetchCategoryItemNames(categoryName)
-      ..sort();
-    _pokeApiCache.putWithTTL(cacheKey, items, const Duration(days: 7));
-    return items;
-  }
-
-  Future<List<String>> _fetchCategoryItemNames(String categoryName) async {
-    final catResp =
-        await _pokeApiClient.client.get('/item-category/$categoryName');
-    if (catResp.statusCode != 200) return const [];
-    return (catResp.data['items'] as List)
-        .map((i) => (i as Map)['name'] as String)
-        .toList();
-  }
-
   Future<String?> fetchMachineMove(String url) async {
     final id = url.split('/').where((s) => s.isNotEmpty).last;
     final cacheKey = 'machine_move_$id';

@@ -1,22 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:poke_team_dex/services/format/format_service.dart';
+import 'package:poke_team_dex/services/catalog/catalog_models.dart';
 
 enum MoveSpecialType { z, max, gmax }
 
-/// Converts a PokéAPI or display move name to the PS id format used
-/// in FormatService (lowercase, no hyphens or spaces).
+/// Converts a PokéAPI or display move name to the PS id format
+/// (lowercase, no hyphens or spaces).
 String moveToPsId(String name) =>
     name.toLowerCase().replaceAll('-', '').replaceAll(' ', '');
 
-/// Returns the special type classification for a move, or null if it
-/// is a regular move.  G-Max is checked before Max because G-Max moves
-/// are a subset of Max moves in the PS data.
-MoveSpecialType? classifyMoveType(FormatService svc, String moveName) {
-  final psId = moveToPsId(moveName);
-  if (psId.startsWith('gmax')) return MoveSpecialType.gmax;
-  final psMove = svc.moveDetail(psId);
-  if (psMove?.isMaxMove == true) return MoveSpecialType.max;
-  if (psMove?.isZMove == true) return MoveSpecialType.z;
+/// Returns the special type classification for [move], or null if it is a
+/// regular move or not yet loaded. G-Max is checked before Max because
+/// G-Max moves are a subset of Max moves in the catalog data.
+MoveSpecialType? classifyMoveType(BackendMoveEntry? move) {
+  if (move == null) return null;
+  if (moveToPsId(move.name).startsWith('gmax')) return MoveSpecialType.gmax;
+  if (move.isMaxMove) return MoveSpecialType.max;
+  if (move.isZMove) return MoveSpecialType.z;
   return null;
 }
 

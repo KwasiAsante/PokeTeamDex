@@ -7,7 +7,6 @@ import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
-import 'package:poke_team_dex/services/format/format_providers.dart' show allFormatsProvider, formatServiceProvider;
 import 'package:poke_team_dex/shared/widgets/move_type_chip.dart' show MoveTypeChip, classifyMoveType;
 
 class MovesScreen extends ConsumerStatefulWidget {
@@ -224,8 +223,7 @@ class _MoveListItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(allFormatsProvider);
-    final special = classifyMoveType(ref.read(formatServiceProvider), entry.name);
+    final special = classifyMoveType(entry);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final typeColor = entry.type.isNotEmpty
@@ -285,8 +283,7 @@ class _MoveGridCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(allFormatsProvider);
-    final special = classifyMoveType(ref.read(formatServiceProvider), entry.name);
+    final special = classifyMoveType(entry);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final typeColor = entry.type.isNotEmpty

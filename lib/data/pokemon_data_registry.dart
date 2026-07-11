@@ -34,6 +34,12 @@ class PokemonDataRegistry {
   // from mega_forms_data.dart
   final Map<String, MegaFormEntry> megaStoneMap;
 
+  // mega form name → required move (e.g. "rayquaza-mega" → "dragon-ascent") —
+  // mirrors the backend's `_mega_form_to_move` (move-triggered Mega
+  // Evolutions, as opposed to item-triggered ones already covered by
+  // [megaStoneMap]).
+  final Map<String, String> megaFormMoveRequirements;
+
   // from format_models.dart
   final Map<String, String> formatToVersionGroup;
   final Map<int, List<String>> genToVersionGroups;
@@ -45,6 +51,10 @@ class PokemonDataRegistry {
   // from pokemon_list_tile.dart
   final Map<String, String?> vgToSubpath;
   final Map<int, String> genToLastVg;
+
+  // variety name → icon sprite_id override (e.g. "calyrex-ice" → "898-ice-rider") —
+  // mirrors the backend's `_variety_icon_id_overrides`.
+  final Map<String, String> varietyIconIdOverrides;
 
   PokemonDataRegistry._({
     required this.psFormExceptions,
@@ -64,12 +74,14 @@ class PokemonDataRegistry {
     required this.noCosmeticFormsPokemon,
     required this.cosmeticGenderDiffPokemon,
     required this.megaStoneMap,
+    required this.megaFormMoveRequirements,
     required this.formatToVersionGroup,
     required this.genToVersionGroups,
     required this.gameIdToVersionPath,
     required this.genToDefaultGameId,
     required this.vgToSubpath,
     required this.genToLastVg,
+    required this.varietyIconIdOverrides,
   });
 
   static Future<void> initialize() async {
@@ -105,6 +117,7 @@ class PokemonDataRegistry {
         final m = v as Map<String, dynamic>;
         return MapEntry(k, (baseSpecies: m['baseSpecies'] as String, megaForm: m['megaForm'] as String));
       }),
+      megaFormMoveRequirements: _strMap(j['megaFormMoveRequirements']),
       formatToVersionGroup: _strMap(j['formatToVersionGroup']),
       genToVersionGroups: (j['genToVersionGroups'] as Map<String, dynamic>).map(
         (k, v) => MapEntry(int.parse(k), (v as List).cast<String>()),
@@ -119,9 +132,30 @@ class PokemonDataRegistry {
       genToLastVg: (j['genToLastVg'] as Map<String, dynamic>).map(
         (k, v) => MapEntry(int.parse(k), v as String),
       ),
+      varietyIconIdOverrides: _strMap(j['varietyIconIdOverrides']),
     );
   }
 
   static Map<String, String> _strMap(dynamic raw) =>
       (raw as Map<String, dynamic>).cast<String, String>();
+
+  Map<String, String>? _megaFormToItem;
+
+  /// mega form name → required item (e.g. "charizard-mega-x" →
+  /// "charizardite-x") — the inverse of [megaStoneMap] (keyed by item name),
+  /// mirroring the backend's `_mega_form_to_item`. Computed once, lazily.
+  Map<String, String> get megaFormToItem => _megaFormToItem ??= {
+        for (final entry in megaStoneMap.entries) entry.value.megaForm: entry.key,
+      };
+
+  Map<String, int>? _vgToGen;
+
+  /// PokéAPI version-group name → generation — the inverse of
+  /// [genToVersionGroups], mirroring the backend's `LearnsetService._vg_to_gen`
+  /// (derived identically from the same `genToVersionGroups` registry data).
+  /// Computed once, lazily.
+  Map<String, int> get vgToGen => _vgToGen ??= {
+        for (final entry in genToVersionGroups.entries)
+          for (final vg in entry.value) vg: entry.key,
+      };
 }

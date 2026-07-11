@@ -1,40 +1,66 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:poke_team_dex/services/catalog/catalog_models.dart';
+import 'package:poke_team_dex/services/catalog/catalog_offline_merge.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/models/move_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
-import 'package:poke_team_dex/utils/app_logger.dart';
+import 'package:poke_team_dex/services/ps_data/ps_data_providers.dart';
+import 'package:poke_team_dex/services/util/backend_provider_utils.dart';
 
-/// Backend-first full move catalog. Falls back to PokéAPI name list on failure.
-/// Fallback entries use sentinel values (type == '', damageClass == '') — the
-/// filtered provider treats those as "no metadata, pass all filters".
+/// Backend-first full move catalog. Falls back to a full offline
+/// PokéAPI+PS-data merge (see [buildOfflineMoveCatalog]) when the backend and
+/// cache are both unavailable.
 final movesListProvider = FutureProvider<List<BackendMoveEntry>>((ref) async {
   ref.keepAlive();
-  try {
-    final repo = ref.read(pokemonBackendRepositoryProvider);
-    final first = await repo.fetchCatalogMoves(pageSize: 1000);
-    var items = first.items;
-    if (first.totalPages > 1) {
-      final rest = await Future.wait([
-        for (int p = 2; p <= first.totalPages; p++)
-          repo.fetchCatalogMoves(page: p, pageSize: 1000),
-      ]);
-      items = [...items, for (final r in rest) ...r.items];
-    }
-    AppLogger().d('[catalog] moves: loaded ${items.length} entries from backend (${first.totalPages} pages)');
-    return items;
-  } catch (e) {
-    AppLogger().w('[catalog] moves backend failed, falling back to PokéAPI', error: e);
-    final names = await ref.read(pokeApiRepositoryProvider).fetchMoveList();
-    return names.map(BackendMoveEntry.fromName).toList();
-  }
+  return withBackendFallback<List<BackendMoveEntry>>(
+    cacheKey: 'catalog_moves',
+    box: ref.read(backendFallbackBoxProvider),
+    isOnline: ref.read(backendFallbackIsOnlineProvider),
+    backendCall: () async {
+      final repo = ref.read(pokemonBackendRepositoryProvider);
+      final first = await repo.fetchCatalogMoves(pageSize: 1000);
+      var items = first.items;
+      if (first.totalPages > 1) {
+        final rest = await Future.wait([
+          for (int p = 2; p <= first.totalPages; p++)
+            repo.fetchCatalogMoves(page: p, pageSize: 1000),
+        ]);
+        items = [...items, for (final r in rest) ...r.items];
+      }
+      return items;
+    },
+    offlineFallback: () => buildOfflineMoveCatalog(
+      ref.read(pokeApiRepositoryProvider),
+      ref.read(psDataServiceProvider),
+    ),
+    fromJson: (json) => (json['items'] as List<dynamic>)
+        .map((m) => BackendMoveEntry.fromJson(m as Map<String, dynamic>))
+        .toList(),
+    toJson: (moves) => {'items': moves.map((m) => m.toJson()).toList()},
+  );
 });
 
 // Persists across tab switches.
 final movesSearchProvider = StateProvider<String>((ref) => '');
 final movesDamageClassFilterProvider = StateProvider<String?>((ref) => null);
 final movesTypeFilterProvider = StateProvider<String?>((ref) => null);
+
+/// Filter by generation (1-9) — mirrors the backend's `/moves?gen=` param
+/// (`catalog_service.py`'s `list_moves`). Not yet exposed in the UI.
+final movesGenFilterProvider = StateProvider<int?>((ref) => null);
+
+/// Filter by PokéAPI contest-type name (e.g. "cool", "tough") — mirrors the
+/// backend's `/moves?contest_type=` param. Not yet exposed in the UI.
+final movesContestTypeFilterProvider = StateProvider<String?>((ref) => null);
+
+/// Filter to only Z-moves (true) or only non-Z-moves (false) — mirrors the
+/// backend's `/moves?is_z_move=` param. Not yet exposed in the UI.
+final movesIsZMoveFilterProvider = StateProvider<bool?>((ref) => null);
+
+/// Filter to only Max/G-max moves (true) or only non-Max moves (false) —
+/// mirrors the backend's `/moves?is_max_move=` param. Not yet exposed in the UI.
+final movesIsMaxMoveFilterProvider = StateProvider<bool?>((ref) => null);
 
 /// Move names for a given type — fetched from /type/{name}, cached 7 days.
 /// Still used by the retry callback in MovesScreen; type filtering is now
@@ -46,13 +72,13 @@ final movesByTypeProvider =
 });
 
 /// Filtered move names derived client-side from the backend entry list.
-///
-/// Type and damage class filters use entry metadata when available (gen > 0).
-/// Fallback entries (gen == 0, type == '') pass all filters to preserve usability
-/// when the backend is unavailable.
 final filteredMovesProvider = Provider<AsyncValue<List<BackendMoveEntry>>>((ref) {
   final typeFilter = ref.watch(movesTypeFilterProvider);
   final damageClassFilter = ref.watch(movesDamageClassFilterProvider);
+  final genFilter = ref.watch(movesGenFilterProvider);
+  final contestTypeFilter = ref.watch(movesContestTypeFilterProvider);
+  final isZMoveFilter = ref.watch(movesIsZMoveFilterProvider);
+  final isMaxMoveFilter = ref.watch(movesIsMaxMoveFilterProvider);
   final search = ref.watch(movesSearchProvider).trim().toLowerCase();
 
   final listAsync = ref.watch(movesListProvider);
@@ -66,16 +92,23 @@ final filteredMovesProvider = Provider<AsyncValue<List<BackendMoveEntry>>>((ref)
 
   List<BackendMoveEntry> entries = List.of(listAsync.requireValue);
 
-  // Empty type/damageClass == sentinel (PokéAPI fallback) — skip that filter.
   if (typeFilter != null) {
-    entries = entries
-        .where((e) => e.type.isEmpty || e.type == typeFilter)
-        .toList();
+    entries = entries.where((e) => e.type == typeFilter).toList();
   }
   if (damageClassFilter != null) {
-    entries = entries
-        .where((e) => e.damageClass.isEmpty || e.damageClass == damageClassFilter)
-        .toList();
+    entries = entries.where((e) => e.damageClass == damageClassFilter).toList();
+  }
+  if (genFilter != null) {
+    entries = entries.where((e) => e.gen == genFilter).toList();
+  }
+  if (contestTypeFilter != null) {
+    entries = entries.where((e) => e.contestType == contestTypeFilter).toList();
+  }
+  if (isZMoveFilter != null) {
+    entries = entries.where((e) => e.isZMove == isZMoveFilter).toList();
+  }
+  if (isMaxMoveFilter != null) {
+    entries = entries.where((e) => e.isMaxMove == isMaxMoveFilter).toList();
   }
   if (search.isNotEmpty) {
     entries = entries
@@ -85,6 +118,15 @@ final filteredMovesProvider = Provider<AsyncValue<List<BackendMoveEntry>>>((ref)
         .toList();
   }
 
+  // Mirrors the backend's `list_moves` (`values.sort(key=lambda m: m.name)`,
+  // catalog_service.py:477) — the backend always sorts by name before
+  // pagination, so online display order is alphabetical purely as an
+  // artifact of that sort + naive page concatenation. The offline builder's
+  // enumeration order instead follows PokéAPI's own `/move` list (roughly
+  // numeric ID order), so without this explicit sort, move order would
+  // visibly differ between online and offline.
+  entries.sort((a, b) => a.name.compareTo(b.name));
+
   return AsyncValue.data(entries);
 });
 
@@ -93,7 +135,20 @@ final filteredMovesProvider = Provider<AsyncValue<List<BackendMoveEntry>>>((ref)
 /// own move resource doesn't carry.
 final catalogMoveProvider =
     FutureProvider.autoDispose.family<BackendMoveEntry, String>((ref, name) {
-  return ref.read(pokemonBackendRepositoryProvider).fetchCatalogMove(name);
+  return withBackendFallback<BackendMoveEntry>(
+    cacheKey: 'catalog_move_$name',
+    box: ref.read(backendFallbackBoxProvider),
+    isOnline: ref.read(backendFallbackIsOnlineProvider),
+    backendCall: () =>
+        ref.read(pokemonBackendRepositoryProvider).fetchCatalogMove(name),
+    offlineFallback: () => buildOfflineMoveEntry(
+      ref.read(pokeApiRepositoryProvider),
+      ref.read(psDataServiceProvider),
+      name,
+    ),
+    fromJson: BackendMoveEntry.fromJson,
+    toJson: (move) => move.toJson(),
+  );
 });
 
 /// Fetches a machine's item name and URL by the machine's full PokéAPI URL.
