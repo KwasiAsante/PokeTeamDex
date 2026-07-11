@@ -11,6 +11,7 @@ import 'package:poke_team_dex/database/repositories/app_config_repository.dart';
 import 'package:poke_team_dex/features/teams/presentation/format_picker_sheet.dart';
 import 'package:poke_team_dex/features/teams/presentation/ps_import_sheet.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
+import 'package:poke_team_dex/features/teams/services/ps_export_service.dart';
 import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
@@ -524,6 +525,10 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
                     value: 'import',
                     child: Text('Import from Showdown'),
                   ),
+                  const PopupMenuItem(
+                    value: 'save_all',
+                    child: Text('Save All Teams'),
+                  ),
                   const PopupMenuDivider(),
                   const PopupMenuItem(value: 'rename', child: Text('Rename')),
                   const PopupMenuItem(value: 'delete', child: Text('Delete')),
@@ -611,6 +616,91 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
     }
   }
 
+  /// Runs the same "save all slots" flow used on the team detail screen for
+  /// every team in this folder, one at a time — writes each team's slots to
+  /// the DB and triggers a best-effort PS export per team. Shows a
+  /// non-dismissible progress dialog naming the team currently being saved,
+  /// and stops immediately (without saving remaining teams) if a DB write
+  /// fails — PS export itself is already best-effort/error-swallowing, so
+  /// only a DB failure can trigger this.
+  Future<void> _saveAllTeams(BuildContext context) async {
+    final teamRepo = ref.read(teamRepositoryProvider);
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+    final teams = await teamRepo.getByFolder(widget.folder.id);
+
+    if (teams.isEmpty) {
+      if (context.mounted) {
+        showAppSnackBar(context, 'No teams to save in this folder.');
+      }
+      return;
+    }
+
+    final progress = ValueNotifier<(int, String)>((0, teams.first.name));
+    BuildContext? dialogContext;
+    if (context.mounted) {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          dialogContext = ctx;
+          return PopScope(
+            canPop: false,
+            child: ValueListenableBuilder<(int, String)>(
+              valueListenable: progress,
+              builder: (_, value, _) {
+                final (index, teamName) = value;
+                return AlertDialog(
+                  title: const Text('Saving teams'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      LinearProgressIndicator(value: index / teams.length),
+                      const SizedBox(height: 12),
+                      Text('$teamName (${index + 1}/${teams.length})'),
+                    ],
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      );
+    }
+
+    var slotCount = 0;
+    var savedTeams = 0;
+    Object? failure;
+    try {
+      for (final team in teams) {
+        progress.value = (savedTeams, team.name);
+        final slots = await slotRepo.getByTeam(team.id);
+        slotCount += await slotRepo.saveAll(slots);
+        await PsExportService.maybeExportTeam(ref: ref, team: team, slots: slots);
+        savedTeams++;
+      }
+    } catch (e) {
+      failure = e;
+    } finally {
+      progress.dispose();
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.of(dialogContext!).pop();
+      }
+    }
+
+    if (!context.mounted) return;
+    if (failure != null) {
+      showAppSnackBar(
+        context,
+        'Save stopped after $savedTeams/${teams.length} team${teams.length == 1 ? '' : 's'} — $failure',
+        isError: true,
+      );
+    } else {
+      showAppSnackBar(context,
+          'Saved $slotCount slot${slotCount == 1 ? '' : 's'} across $savedTeams team${savedTeams == 1 ? '' : 's'}.');
+    }
+  }
+
   Future<void> _onFolderAction(
       BuildContext context, String action) async {
     if (action == 'import') {
@@ -619,6 +709,8 @@ class _FolderSectionState extends ConsumerState<_FolderSection> {
         isScrollControlled: true,
         builder: (_) => PsImportSheet(folderId: widget.folder.id),
       );
+    } else if (action == 'save_all') {
+      await _saveAllTeams(context);
     } else if (action == 'rename') {
       final controller =
           TextEditingController(text: widget.folder.name);
