@@ -22,6 +22,7 @@ import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/format/format_providers.dart';
 import 'package:poke_team_dex/features/teams/presentation/move_copy_slot_sheet.dart';
 import 'package:poke_team_dex/features/teams/providers/teams_provider.dart';
+import 'package:poke_team_dex/features/teams/services/ps_export_service.dart';
 import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
@@ -223,7 +224,8 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
                               IconButton(
                                 icon: const Icon(Icons.save_rounded),
                                 tooltip: 'Save all slots',
-                                onPressed: () => _saveAllSlots(context, slots),
+                                onPressed: () =>
+                                    _saveAllSlots(context, slots, team),
                               ),
                               IconButton(
                                 icon: const Icon(Icons.upload_outlined),
@@ -439,7 +441,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
           builder: (_) => PsImportSheet(targetTeamId: widget.teamId),
         );
       case _TeamAction.saveAll:
-        _saveAllSlots(context, slots);
+        _saveAllSlots(context, slots, team);
       case _TeamAction.exportShowdown:
         _exportShowdown(context, slots, team);
       case _TeamAction.promoteToBox:
@@ -452,9 +454,11 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
   }
 
   Future<void> _saveAllSlots(
-      BuildContext context, List<TeamSlot> slots) async {
+      BuildContext context, List<TeamSlot> slots, Team team) async {
     final slotRepo = ref.read(teamSlotRepositoryProvider);
     final count = await slotRepo.saveAll(slots);
+    // Best-effort PS export — runs after the DB write succeeds.
+    await PsExportService.maybeExportTeam(ref: ref, team: team, slots: slots);
     if (context.mounted) {
       showAppSnackBar(context, 'Saved $count slot${count == 1 ? '' : 's'}.');
     }

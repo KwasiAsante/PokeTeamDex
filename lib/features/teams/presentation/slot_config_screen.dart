@@ -527,33 +527,11 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   /// Errors are swallowed so they don't disrupt the normal save flow.
   Future<void> _maybePsExport(TeamSlot existing) async {
     if (!PsExportService.isSupported) return;
-    try {
-      final configRepo = ref.read(appConfigRepositoryProvider);
-      final psDir = await configRepo.getPsDirectory();
-      if (psDir == null || psDir.isEmpty) return;
-
-      final teamRepo = ref.read(teamRepositoryProvider);
-      final slotRepo = ref.read(teamSlotRepositoryProvider);
-      final folderRepo = ref.read(teamFolderRepositoryProvider);
-
-      final team = await teamRepo.getById(existing.teamId);
-      TeamFolder? folder;
-      if (team.folderId != null) {
-        folder = await folderRepo.getByIdOrNull(team.folderId!);
-      }
-      final slots = await slotRepo.getByTeam(existing.teamId);
-
-      await PsExportService.exportTeam(
-        team: team,
-        folder: folder,
-        slots: slots,
-        psDirectory: psDir,
-        pokeApi: ref.read(pokeApiRepositoryProvider),
-        formatLabel: team.formatLabel, // raw format id → PS format lookup
-      );
-    } catch (_) {
-      // Best-effort — do not surface PS export errors to the user.
-    }
+    final teamRepo = ref.read(teamRepositoryProvider);
+    final slotRepo = ref.read(teamSlotRepositoryProvider);
+    final team = await teamRepo.getById(existing.teamId);
+    final slots = await slotRepo.getByTeam(existing.teamId);
+    await PsExportService.maybeExportTeam(ref: ref, team: team, slots: slots);
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────

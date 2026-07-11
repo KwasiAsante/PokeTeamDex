@@ -1,8 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poke_team_dex/database/app_database.dart';
+import 'package:poke_team_dex/database/database_providers.dart';
 import 'package:poke_team_dex/features/teams/services/showdown_export.dart';
+import 'package:poke_team_dex/services/pokeapi/poke_api_providers.dart';
 import 'package:poke_team_dex/services/pokeapi/poke_api_repository.dart';
 
 /// Writes a team's Showdown export to the configured PS teams directory.
@@ -11,6 +14,40 @@ class PsExportService {
   static bool get isSupported =>
       !kIsWeb &&
       (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
+
+  /// Best-effort PS export for [team]/[slots]: resolves the configured PS
+  /// directory and the team's containing folder, then writes the export.
+  /// Swallows all errors so callers can invoke this without disrupting
+  /// their own save flow (no PS directory configured is also a no-op).
+  static Future<void> maybeExportTeam({
+    required WidgetRef ref,
+    required Team team,
+    required List<TeamSlot> slots,
+  }) async {
+    if (!isSupported) return;
+    try {
+      final configRepo = ref.read(appConfigRepositoryProvider);
+      final psDir = await configRepo.getPsDirectory();
+      if (psDir == null || psDir.isEmpty) return;
+
+      TeamFolder? folder;
+      if (team.folderId != null) {
+        final folderRepo = ref.read(teamFolderRepositoryProvider);
+        folder = await folderRepo.getByIdOrNull(team.folderId!);
+      }
+
+      await exportTeam(
+        team: team,
+        folder: folder,
+        slots: slots,
+        psDirectory: psDir,
+        pokeApi: ref.read(pokeApiRepositoryProvider),
+        formatLabel: team.formatLabel, // raw format id → PS format lookup
+      );
+    } catch (_) {
+      // Best-effort — do not surface PS export errors to callers.
+    }
+  }
 
   /// Exports [team] to:
   ///   `{psDirectory}/{folderName}/[psFormat] {teamName}.txt`
