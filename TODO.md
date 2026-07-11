@@ -185,7 +185,7 @@
 - [x] **Sync failure feedback** — push failures are now surfaced; pull still runs on push failure but sync reports error instead of success
 - [x] **Connectivity button → login shortcut** — Account row in the connectivity sheet is tappable when not signed in and navigates to the login screen
 - [x] **Login screen keyboard submit** — pressing Enter/Return on the password field triggers the login attempt
-- [ ] **`sync_ps_data.py` — moves.json/abilities.json `gen` field wrong for every entry** — all moves report `gen: 1`, all abilities report `gen: 3`; PS's raw TS source doesn't carry a `gen` field to read, needs to be derived (e.g. from learnset files or PokéAPI's `generation` field) (#293)
+- [x] **`sync_ps_data.py` — moves.json/abilities.json `gen` field wrong for every entry** — all moves report `gen: 1`, all abilities report `gen: 3` because PS's raw TS source has no `gen` field at all (confirmed against live source); mitigated in `CatalogService` by sourcing `gen` from PokéAPI's `generation` field instead, so `MoveEntry`/`AbilityEntry` now carry the correct generation — on-disk PS JSON `gen` remains a harmless unused artifact (#293)
 
 ### Bug Fixes & Polish Applied
 
@@ -313,11 +313,11 @@
 
 - [x] **Move/item/ability/learnset validation architecture** — PS supplementation incorrectly overrides PokéAPI version-group exclusions (e.g. Freeze-Dry on Alolan Ninetales in Gen 9); move heavy validation to backend with frontend offline fallback *(#276)*
   - [x] **Sub-issue A** — `sync_ps_data.py` + infra: `shared/ps_data/` folder, per-gen learnset files with `via_prevo`, TS source for moves/items/abilities, updated Dockerfile/docker-compose *(#278)*
-  - [x] **Sub-issue B** — Backend: `LearnsetService` loading per-gen files from `PS_DATA_DIR` *(#276)*
+  - [x] **Sub-issue B** — Backend: `LearnsetService` loading per-gen files from `PS_DATA_DIR` *(#279)*
   - [x] **Sub-issue C** — Backend: update `/pokemon/moves` with `gen` param + full consolidation logic *(#280)*
   - [x] **Sub-issue D** — Frontend: update move models, `pokemonMovesProvider`, `validLearnsetProvider`, slot validator refactor *(#281)*
   - [x] **Sub-issue E** — Backend: new `/items`, `/moves`, `/abilities` endpoints *(#282)*
-  - [x] **Sub-issue F** — Backend: extend PostgreSQL DB caching to all data endpoints *(#276)*
+  - [x] **Sub-issue F** — Backend: extend PostgreSQL DB caching to all data endpoints *(#283)*
   - [x] **Sub-issue G** — Frontend: integrate backend catalog endpoints for moves, items, and abilities *(#296)*
   - [x] **Sub-issue H** — Frontend: `withBackendFallback<T>` utility; migrate item/move/ability pickers + list/detail screens *(#297)*
 
