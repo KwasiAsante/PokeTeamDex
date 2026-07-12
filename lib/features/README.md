@@ -83,6 +83,7 @@ The core team builder feature — the most complex module.
 
 - `form_data.dart` — PS form exception maps and cosmetic sprite stem constants
 - `form_descriptor.dart` — `FormDescriptor` value object: bundles form name, sprite hint, and battle-meaningful flag
+- `form_filter.dart` — `filterFormChips()`: form chip gating for `SlotConfigScreen` (mega/gmax/female always excluded, ability/item-gated forms, gen-gated regional/Unown forms); `varietyNamesForFormChips()` builds its `varieties` argument, prepending a default-form stand-in only when the source list doesn't already carry one — the backend's `/resolved` varieties field never includes the default variety, unlike the offline PokéAPI fallback's raw species varieties
 
 `logic/` files:
 
