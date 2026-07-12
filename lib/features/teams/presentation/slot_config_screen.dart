@@ -630,7 +630,12 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
             : const <BackendItemEntry>[];
 
         // ── Form state ─────────────────────────────────────────────────────
-        final allVarieties = resolved.species.varieties.map((v) => v.name).toList();
+        final allVarieties = varietyNamesForFormChips(
+          varietyNames: resolved.species.varieties.map((v) => v.name).toList(),
+          hasDefaultVarietyEntry:
+              resolved.species.varieties.any((v) => v.isDefault),
+          currentVarietyName: pokemon.name,
+        );
         // Cosmetic forms pre-patched and keepAlive in resolvedPokemonProvider.
         final cosmeticFormEntries = resolved.cosmeticForms;
         final cosmeticForms = cosmeticFormEntries.map((f) => f.name).toList();

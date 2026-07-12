@@ -62,6 +62,27 @@ const Map<String, int> kRegionalSuffixMinGen = {
 
 // ── Public API ────────────────────────────────────────────────────────────
 
+/// Builds the `varieties` argument for [filterFormChips], which expects the
+/// default form as its first element so it can skip it.
+///
+/// The backend's `/resolved` `varieties` field never includes the default
+/// variety (it's filtered out server-side); the offline PokéAPI fallback's
+/// raw species varieties does. Only prepend a stand-in for the default when
+/// the real entry isn't already present — otherwise a species whose only
+/// real alternate variety happens to be first in the list (e.g.
+/// Toxtricity-Low-Key, Giratina-Origin) gets mistaken for the default and
+/// silently dropped.
+List<String> varietyNamesForFormChips({
+  required List<String> varietyNames,
+  required bool hasDefaultVarietyEntry,
+  required String currentVarietyName,
+}) {
+  return [
+    if (!hasDefaultVarietyEntry) currentVarietyName,
+    ...varietyNames,
+  ];
+}
+
 /// Returns the non-default form names that should be shown as chips.
 ///
 /// [varieties] — all varieties from the species endpoint.
