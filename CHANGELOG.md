@@ -4,6 +4,19 @@ All notable changes to PokeTeamDex are documented here.
 
 ---
 
+## [1.1.1] — 2026-07-11
+
+### Added
+
+- Slot Config now defaults Friendship to max (255) instead of 0 for new/unset slots (closes #228) — matches Showdown's own convention of treating an omitted `Happiness:` line as 255
+
+### Fixed
+
+- Form chip selector was silently disappearing for species whose only real alternate variety is its first/sole entry in the backend's variety list (Toxtricity-Low-Key, Giratina-Origin) — `filterFormChips` assumed the default form is always the first element so it could skip it, but the backend's `/resolved` endpoint never includes the default variety at all, so the real form was being dropped in its place
+- CI: `notify-backend` release job referenced `needs.create-release.outputs.tag` without declaring `create-release` in its own `needs:` list, so the v1.1.0 release notification went out with an empty version/URL instead of the real tag
+
+---
+
 ## [1.1.0] — 2026-07-11
 
 ### Added

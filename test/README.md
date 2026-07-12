@@ -49,7 +49,7 @@ Pure logic tests — no Flutter, no Drift, no network.
 | `ps_import_parser_test.dart` | ~15 | `parsePsTeam()` — nature line parsing (real PS syntax + legacy prefix), Gigantamax/Tera Type/Happiness parsing, period-stripping in species names |
 | `sync_service_test.dart` | ~25 | Push drain (happy path, retry, discard after 5), pull merge (create/update/delete), conflict resolution (local newer / remote newer / remote deleted) |
 | `format_models_test.dart` | ~20 | `GameFormat.fromJson()`, `GenerationMechanics.forGen()`, `PsMoveEntry`/`PsItemEntry`/`PsAbilityEntry` parsing |
-| `form_filter_test.dart` | ~18 | `filterFormChips()` — regional variants, Mega, Gigantamax, alternate forms |
+| `form_filter_test.dart` | ~55 | `filterFormChips()` — regional variants, Mega, Gigantamax, alternate forms; `varietyNamesForFormChips()` — default-variety stand-in only when the source list doesn't already carry one |
 | `dynamax_test.dart` | — | `resolveMaxMove()` — Max Move resolution |
 | `z_moves_test.dart` | — | `resolveZMove()`, `gmaxMoveForSpecies()`, exclusive Z-move lookup |
 | `pokemon_data_resolver_test.dart` | — | `PokemonDataResolver.resolveFormSprite()` — versioned/HOME sprite URL resolution per generation and form |
