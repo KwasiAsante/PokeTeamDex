@@ -133,7 +133,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
   bool _isShiny = false;
   String? _gender;
   int _level = 50;
-  int _friendship = 0;
+  int _friendship = 255;
   String? _abilityName;
   String? _natureName;
   String? _heldItemName;
@@ -212,7 +212,7 @@ class _SlotConfigState extends ConsumerState<SlotConfigScreen> {
     _isShiny      = slot.isShiny;
     _gender       = slot.gender;
     _level        = slot.level ?? 50;
-    _friendship   = slot.friendship ?? 0;
+    _friendship   = slot.friendship ?? 255;
     _abilityName  = slot.abilityName;
     // Normalise nature to match DropdownButton item values (Proper case).
     // Guards against lowercase values stored by older imports.
