@@ -549,4 +549,45 @@ void main() {
       expect(result, containsAll(['meowth-alola', 'meowth-galar', 'typhlosion-hisui']));
     });
   });
+
+  group('varietyNamesForFormChips', () {
+    // The backend's `/resolved` varieties field never includes the default
+    // variety, so a species with exactly one real alternate form (Toxtricity,
+    // Giratina) must not have it mistaken for the default and dropped.
+    test('prepends the current variety as a stand-in when no default entry is present', () {
+      final names = varietyNamesForFormChips(
+        varietyNames: ['toxtricity-low-key', 'toxtricity-amped-gmax', 'toxtricity-low-key-gmax'],
+        hasDefaultVarietyEntry: false,
+        currentVarietyName: 'toxtricity-amped',
+      );
+      final result = filterFormChips(varieties: names, heldItem: null, abilityName: null);
+      expect(result, contains('toxtricity-low-key'));
+    });
+
+    test('a lone non-default variety (Giratina-Origin) survives the backend-shaped list', () {
+      final names = varietyNamesForFormChips(
+        varietyNames: ['giratina-origin'],
+        hasDefaultVarietyEntry: false,
+        currentVarietyName: 'giratina-altered',
+      );
+      final result = filterFormChips(
+        varieties: names,
+        heldItem: 'griseous-orb',
+        abilityName: null,
+      );
+      expect(result, contains('giratina-origin'));
+    });
+
+    test('does not prepend when the default entry is already present (offline PokéAPI shape)', () {
+      final names = varietyNamesForFormChips(
+        varietyNames: ['toxtricity-amped', 'toxtricity-low-key'],
+        hasDefaultVarietyEntry: true,
+        currentVarietyName: 'toxtricity-amped',
+      );
+      expect(names, ['toxtricity-amped', 'toxtricity-low-key']);
+      final result = filterFormChips(varieties: names, heldItem: null, abilityName: null);
+      expect(result, contains('toxtricity-low-key'));
+      expect(result, isNot(contains('toxtricity-amped')));
+    });
+  });
 }
