@@ -311,7 +311,12 @@
   - [x] **Task F** *(optional)* — Frontend lazy-loading and provider hygiene audit post-B+C *(#239)*
   - [ ] **Sprite consolidation investigation** — single backend resolver for icons, battle sprites (all gens), HOME artwork, official artwork across all form variants *(#244)*
 
-- [ ] **Supabase vs alternatives vs local hosting** — Supabase free-tier project at risk of pausing from inactivity; investigate keep-alive ping, alternative managed Postgres (Neon), and self-hosting alongside the already-self-hosted API *(#311)*
+- [ ] **Supabase vs alternatives vs local hosting** — Supabase free-tier project at risk of pausing from inactivity; investigated keep-alive ping, alternative managed Postgres (Neon), and self-hosting alongside the already-self-hosted API; **decision: migrate to Neon** *(#311)*
+  - [ ] Provision Neon project + database matching current schema *(#313)*
+  - [ ] Migrate production data from Supabase to Neon *(#314)*
+  - [ ] Point production `DATABASE_URL` at Neon *(#315)*
+  - [ ] Update `backend/SETUP.md` and `CLAUDE.md` for Neon architecture *(#316)*
+  - [ ] Decommission the Supabase project *(#317)*
 
 - [x] **Move/item/ability/learnset validation architecture** — PS supplementation incorrectly overrides PokéAPI version-group exclusions (e.g. Freeze-Dry on Alolan Ninetales in Gen 9); move heavy validation to backend with frontend offline fallback *(#276)*
   - [x] **Sub-issue A** — `sync_ps_data.py` + infra: `shared/ps_data/` folder, per-gen learnset files with `via_prevo`, TS source for moves/items/abilities, updated Dockerfile/docker-compose *(#278)*
