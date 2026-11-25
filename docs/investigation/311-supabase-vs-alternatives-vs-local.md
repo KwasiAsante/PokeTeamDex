@@ -285,3 +285,48 @@ workflow.
 - [Railway — Free Trial docs](https://docs.railway.com/pricing/free-trial)
 - [Railway — Pricing Plans docs](https://docs.railway.com/reference/pricing/plans)
 - [Neon vs Supabase vs Railway comparison (third-party synthesis, used for framing only)](https://codelesssync.com/blog/supabase-vs-neon-vs-railway-postgresql-for-saas)
+
+---
+
+## Addendum (2026-11-25): Local Postgres as a backup target (Option A)
+
+**Decision:** Keep Neon as the single primary database (unchanged from Section 4). Add a
+local Postgres on the self-hosted API server as a **backup target only**: no live reads or
+writes, no replication, no failover.
+
+### Why this option
+
+Three ways to combine Neon with a local Postgres were considered:
+
+| Option | Description | Verdict |
+|---|---|---|
+| **A** | Neon primary; scheduled `pg_dump` from Neon restored into a local Postgres | **Chosen.** Cheapest option; protects against Neon data loss or Neon changing its free tier; doesn't touch the sync data path |
+| B | Local primary; Neon as a logical-replication replica | Rejected. Reintroduces the self-hosting operational burden from Section 1.7 |
+| C | Automatic failover between the two | Rejected. Async SQLAlchemy has no built-in failover; split-brain write risk on a multi-device sync app |
+
+Neon's free plan keeps only **6 hours** of history for point-in-time restore
+([Neon — Plans](https://neon.com/docs/introduction/plans)), so a backup held outside Neon
+fills a real gap.
+
+### Design
+
+- A `postgres` container in its own compose stack on the server. It is not added to the
+  API's `docker-compose.prod.yml`, and its port is not published to the internet.
+- A scheduled job (cron, or a sidecar container) runs `pg_dump -Fc` against Neon's **direct**
+  (non-`-pooler`) endpoint, as Neon recommends for `pg_dump`
+  ([Neon — Connection pooling](https://neon.com/docs/connect/connection-pooling)). Then:
+  1. Keep the last N dump files on disk (rotation).
+  2. `pg_restore --clean --if-exists --no-owner` the newest dump into the local Postgres,
+     so a ready-to-use copy always exists.
+- `pg_dump`/`pg_restore` client versions must match the Neon project's Postgres major
+  version or be newer ([Neon — Migrate from Postgres](https://neon.com/docs/import/migrate-from-postgres)).
+- Each pg_dump run briefly wakes Neon compute and uses free-plan CU-hours. Once a day is
+  negligible against the 100 CU-hours/month limit.
+- **Recovery (manual):** if Neon is lost, point `DATABASE_URL` at the local Postgres, or
+  restore the newest dump into a fresh Neon project.
+
+### Additional task
+
+6. **Task 6:** Local Postgres backup target on the API server: compose stack, scheduled
+   dump + restore job, dump rotation, and a documented restore procedure. Depends on #315
+   (cutover to Neon).
