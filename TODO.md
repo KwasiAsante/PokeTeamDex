@@ -312,9 +312,9 @@
   - [ ] **Sprite consolidation investigation** — single backend resolver for icons, battle sprites (all gens), HOME artwork, official artwork across all form variants *(#244)*
 
 - [ ] **Supabase vs alternatives vs local hosting** — Supabase free-tier project at risk of pausing from inactivity; investigated keep-alive ping, alternative managed Postgres (Neon), and self-hosting alongside the already-self-hosted API; **decision: migrate to Neon** *(#311)*
-  - [ ] Provision Neon project + database matching current schema *(#313)*
-  - [ ] Migrate production data from Supabase to Neon *(#314)*
-  - [ ] Point production `DATABASE_URL` at Neon *(#315)*
+  - [x] Provision Neon project + database matching current schema *(#313)*
+  - [x] Migrate production data from Supabase to Neon *(#314)*
+  - [x] Point production `DATABASE_URL` at Neon *(#315)*
   - [ ] Update `backend/SETUP.md` and `CLAUDE.md` for Neon architecture *(#316)*
   - [ ] Decommission the Supabase project *(#317)*
 
