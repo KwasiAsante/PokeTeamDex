@@ -150,13 +150,25 @@ from or writes to it.
 
 ### Install (server)
 
+The runner image is built by `.github/workflows/deploy-backup.yml` and pushed to
+`ghcr.io/kwasiasante/poketeamdex-backup:latest` whenever `backend/backup/**` changes on
+`main`. The server only needs two files:
+
 ```bash
 mkdir -p ~/docker/services/poketeamdex-backup && cd ~/docker/services/poketeamdex-backup
-# copy backend/backup/{docker-compose.yml,Dockerfile,backup.sh,.env.example} here
+# copy backend/backup/docker-compose.yml and backend/backup/.env.example here (once)
 cp .env.example .env && chmod 600 .env   # SOURCE_URL in plain postgresql://…?sslmode=require form
-docker compose up -d --build
+docker compose pull && docker compose up -d
 docker compose logs -f backup-runner     # expect "backup succeeded … tables=[…]"
 ```
+
+**Updating** (after a change to `backup.sh` merges and the workflow finishes):
+`docker compose pull && docker compose up -d`. Re-copy `docker-compose.yml` only if it
+changed.
+
+**Testing a branch before merging:** run the workflow manually on the branch (Actions →
+Deploy Backup Runner → Run workflow), then set `BACKUP_IMAGE_TAG=<branch-with-dashes>` in
+`.env` and `docker compose pull && docker compose up -d`.
 
 ### Checking it
 

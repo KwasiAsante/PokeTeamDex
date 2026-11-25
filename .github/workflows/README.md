@@ -1,6 +1,6 @@
 # .github/workflows/
 
-GitHub Actions CI/CD. Three workflows cover all automated build, deploy, and release tasks.
+GitHub Actions CI/CD. Four workflows cover all automated build, deploy, and release tasks.
 
 ---
 
@@ -26,6 +26,16 @@ Builds the FastAPI Docker image and pushes it to GHCR as `ghcr.io/kwasiasante/po
 > ```bash
 > docker compose -f docker-compose.prod.yml down && docker compose -f docker-compose.prod.yml up -d
 > ```
+
+---
+
+## deploy-backup.yml — Backup runner Docker image
+
+**Trigger:** push to `main` when any file under `backend/backup/` changes (`deploy-backend.yml` ignores that folder); also manually dispatchable via `workflow_dispatch`
+
+Builds the Neon → local Postgres backup runner (#323) and pushes it to GHCR as `ghcr.io/kwasiasante/poketeamdex-backup:latest`. A manual run on a non-`main` branch tags the image with the branch name instead (e.g. `feat-neon-local-backup`) for testing before merge.
+
+> Publishes only. On the server: `cd ~/docker/services/poketeamdex-backup && docker compose pull && docker compose up -d`. See `backend/SETUP.md` → Backups.
 
 ---
 

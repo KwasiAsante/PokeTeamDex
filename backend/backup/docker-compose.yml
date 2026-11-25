@@ -21,7 +21,8 @@ services:
       retries: 10
 
   backup-runner:
-    build: .
+    # Built by .github/workflows/deploy-backup.yml. Set BACKUP_IMAGE_TAG in .env to test a branch build.
+    image: ghcr.io/kwasiasante/poketeamdex-backup:${BACKUP_IMAGE_TAG:-latest}
     container_name: poketeamdex_backup_runner
     restart: unless-stopped
     depends_on:
