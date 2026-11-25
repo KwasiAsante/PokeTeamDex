@@ -31,9 +31,9 @@ Builds the FastAPI Docker image and pushes it to GHCR as `ghcr.io/kwasiasante/po
 
 ## deploy-backup.yml — Backup runner Docker image
 
-**Trigger:** push to `main` when any file under `backend/backup/` changes (`deploy-backend.yml` ignores that folder); also manually dispatchable via `workflow_dispatch`
+**Trigger:** push to any branch when any file under `backend/backup/` (or this workflow) changes (`deploy-backend.yml` ignores that folder); also manually dispatchable via `workflow_dispatch`
 
-Builds the Neon → local Postgres backup runner (#323) and pushes it to GHCR as `ghcr.io/kwasiasante/poketeamdex-backup:latest`. A manual run on a non-`main` branch tags the image with the branch name instead (e.g. `feat-neon-local-backup`) for testing before merge.
+Builds the Neon → local Postgres backup runner (#323) and pushes it to GHCR as `ghcr.io/kwasiasante/poketeamdex-backup:latest`. A push on any other branch tags the image with the branch name instead (e.g. `feat-neon-local-backup`) for testing before merge.
 
 > Publishes only. On the server: `cd ~/docker/services/poketeamdex-backup && docker compose pull && docker compose up -d`. See `backend/SETUP.md` → Backups.
 

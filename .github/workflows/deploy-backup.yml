@@ -1,13 +1,12 @@
 name: Deploy Backup Runner
 
 # Builds the Neon → local Postgres backup runner image (#323).
-#   push to main touching backend/backup/** → ghcr.io/<owner>/poketeamdex-backup:latest
-#   manual run on any other branch           → tagged with the branch name (for testing before merge)
+#   push to main touching backend/backup/**        → ghcr.io/<owner>/poketeamdex-backup:latest
+#   push to any other branch touching it (or manual) → tagged with the branch name, e.g. feat-neon-local-backup
 
 on:
   push:
-    branches: [main]
-    paths: ['backend/backup/**']
+    paths: ['backend/backup/**', '.github/workflows/deploy-backup.yml']
   workflow_dispatch:
 
 jobs:

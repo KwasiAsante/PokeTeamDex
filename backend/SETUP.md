@@ -166,8 +166,8 @@ docker compose logs -f backup-runner     # expect "backup succeeded … tables=[
 `docker compose pull && docker compose up -d`. Re-copy `docker-compose.yml` only if it
 changed.
 
-**Testing a branch before merging:** run the workflow manually on the branch (Actions →
-Deploy Backup Runner → Run workflow), then set `BACKUP_IMAGE_TAG=<branch-with-dashes>` in
+**Testing a branch before merging:** any push to a branch that touches `backend/backup/`
+builds an image tagged with the branch name (`/` → `-`). Set `BACKUP_IMAGE_TAG=<branch-with-dashes>` in
 `.env` and `docker compose pull && docker compose up -d`.
 
 ### Checking it
