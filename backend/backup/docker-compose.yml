@@ -1,0 +1,43 @@
+# Neon → local Postgres backup stack (#323). Backup target ONLY: the API never connects here.
+# Runs as its own stack, separate from the API's docker-compose.prod.yml. See backend/SETUP.md → "Backups".
+name: poketeamdex-backup
+
+services:
+  backup-db:
+    image: postgres:18
+    container_name: poketeamdex_backup_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: backup
+      POSTGRES_PASSWORD: ${BACKUP_DB_PASSWORD:?set BACKUP_DB_PASSWORD in .env}
+      POSTGRES_DB: poketeamdex
+    volumes:
+      - backup-db-data:/var/lib/postgresql   # postgres:18+ keeps data under a versioned subdirectory here
+    # No `ports:` on purpose. Reach it with: docker exec -it poketeamdex_backup_db psql -U backup poketeamdex
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U backup -d poketeamdex"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backup-runner:
+    # Built by .github/workflows/deploy-backup.yml. Set BACKUP_IMAGE_TAG in .env to test a branch build.
+    image: ghcr.io/kwasiasante/poketeamdex-backup:${BACKUP_IMAGE_TAG:-latest}
+    container_name: poketeamdex_backup_runner
+    restart: unless-stopped
+    depends_on:
+      backup-db:
+        condition: service_healthy
+    env_file: .env
+    volumes:
+      - ./dumps:/backups
+    # Unhealthy if there has been no successful backup in the last 26h.
+    healthcheck:
+      test: ["CMD-SHELL", "test $$(( $$(date +%s) - $$(cat /backups/.last_success 2>/dev/null || echo 0) )) -lt 93600"]
+      interval: 5m
+      timeout: 10s
+      start_period: 15m
+      retries: 1
+
+volumes:
+  backup-db-data:
