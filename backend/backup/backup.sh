@@ -48,7 +48,7 @@ run_once() {
   mv "$dump.partial" "$dump" || return 1
 
   # 2. Restore into a fresh public schema (the dump recreates it).
-  psql -q -v ON_ERROR_STOP=1 -d "$LOCAL_URL" -c 'DROP SCHEMA IF EXISTS public CASCADE;' || { log ERROR "could not reset local schema"; return 1; }
+  PGOPTIONS='-c client_min_messages=warning' psql -q -v ON_ERROR_STOP=1 -d "$LOCAL_URL" -c 'DROP SCHEMA IF EXISTS public CASCADE;' || { log ERROR "could not reset local schema"; return 1; }
   pg_restore --no-owner --no-acl --exit-on-error -d "$LOCAL_URL" "$dump" || { log ERROR "pg_restore into local Postgres failed"; return 1; }
 
   # 3. Verify: per-table row counts must match exactly. A write to Neon between the
