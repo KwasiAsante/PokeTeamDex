@@ -4,10 +4,13 @@
 
 | Environment | API Host | Database |
 |---|---|---|
-| Local dev | Docker Compose (localhost:8000) | Postgres in Docker |
-| Production | Fly.io | Supabase (PostgreSQL) |
+| Local dev | Docker Compose (`localhost:8000`) | `postgres:16` container (`docker-compose.yml`) |
+| Production | Self-hosted server, Docker Compose (`https://poketeamdex.duckdns.org`) | [Neon](https://neon.com) (Postgres 18, AWS `us-east-1`, free plan) |
 
-The Flutter app points to `localhost:8000` during development and `https://poketeamdex-api.fly.dev` in production.
+The API and the database are independent. The production compose stack runs **only** the API
+container; it reaches Neon over the internet via `DATABASE_URL`. See
+[`docs/investigation/311-supabase-vs-alternatives-vs-local.md`](../docs/investigation/311-supabase-vs-alternatives-vs-local.md)
+for why Neon was chosen (migrated from Supabase on 2026-11-25).
 
 ---
 
@@ -16,14 +19,8 @@ The Flutter app points to `localhost:8000` during development and `https://poket
 Requires: [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 
 ```bash
-# 1. Start the API and local Postgres
 cd backend
-docker compose up
-
-# 2. Run migrations (first time only, or after adding new migrations)
-docker compose exec api alembic upgrade head
-
-# 3. Open interactive API docs
+docker compose up          # API + local Postgres; start.sh runs migrations automatically
 open http://localhost:8000/docs
 ```
 
@@ -32,127 +29,111 @@ To wipe the database and start clean: `docker compose down -v`
 
 ---
 
-## Production Deployment (Fly.io + Supabase)
+## Production
 
-### Prerequisites
+### Deploying
 
-- [Fly.io account](https://fly.io) (free tier)
-- [Supabase account](https://supabase.com) (free tier)
-- flyctl CLI
-
-```bash
-brew install flyctl
-# or
-curl -L https://fly.io/install.sh | sh
-```
-
----
-
-### Step 1 — Create a Supabase project
-
-1. Go to [supabase.com](https://supabase.com) → **New project**
-2. Choose a name, password, and region (pick one close to your Fly.io region)
-3. Wait for the project to finish provisioning (~2 min)
-4. Go to **Settings → Database → Connection string**
-5. Select **URI** mode and copy the string:
-   ```
-   postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-REF].supabase.co:5432/postgres
-   ```
-6. Change the scheme to `postgresql+asyncpg://` (required for the async driver):
-   ```
-   postgresql+asyncpg://postgres:[YOUR-PASSWORD]@db.[YOUR-REF].supabase.co:5432/postgres
-   ```
-   Keep this — you'll need it in Step 3.
-
----
-
-### Step 2 — Create the Fly app (once only)
+`.github/workflows/deploy-backend.yml` builds and pushes
+`ghcr.io/kwasiasante/poketeamdex-backend:latest` on every push to `main` that touches
+`backend/**`. On the server:
 
 ```bash
-fly auth login
-cd backend
-fly launch --no-deploy   # registers the app name from fly.toml without deploying
+cd ~/docker/services/poketeamdex
+docker compose pull && docker compose down && docker compose up -d
+docker compose logs -f --tail=50
 ```
 
-If the app name `poketeamdex-api` in `fly.toml` is taken, pick a unique name and update `fly.toml`.
+`start.sh` runs `alembic upgrade head` on every container start, so migrations never need
+to be run by hand.
 
-**Fly.io regions** — update `primary_region` in `fly.toml` to the closest:
+### Environment file
 
-| Code | Location |
+On the server the env file is `~/docker/services/poketeamdex/.env`. The repo's
+`docker-compose.prod.yml` and `.env.prod.example` use the name `.env.prod`. The contents
+are the same; only the file name differs. It is gitignored. Never commit it.
+
+### Neon connection string
+
+Neon dashboard → **Connect** → turn **Connection pooling off** (direct endpoint, no
+`-pooler` in the host). Neon gives:
+
+```
+postgresql://neondb_owner:PASS@ep-xxx.c-11.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+```
+
+The app needs **two edits**:
+
+```
+postgresql+asyncpg://neondb_owner:PASS@ep-xxx.c-11.us-east-1.aws.neon.tech/neondb?ssl=require
+```
+
+| Edit | Why |
 |---|---|
-| `lhr` | London |
-| `iad` | Virginia (US East) |
-| `ord` | Chicago |
-| `lax` | Los Angeles |
-| `sin` | Singapore |
-| `syd` | Sydney |
+| `postgresql://` → `postgresql+asyncpg://` | Otherwise SQLAlchemy loads psycopg2 (not installed): `No module named 'psycopg2'` |
+| `?sslmode=…&channel_binding=…` → `?ssl=require` | asyncpg's `connect()` only accepts `ssl`: `connect() got an unexpected keyword argument 'sslmode'` |
 
----
-
-### Step 3 — Set secrets
-
-Secrets are environment variables stored securely by Fly — never in code or `fly.toml`.
+To convert one automatically:
 
 ```bash
-fly secrets set \
-  DATABASE_URL="postgresql+asyncpg://postgres:[YOUR-PASSWORD]@db.[YOUR-REF].supabase.co:5432/postgres" \
-  SECRET_KEY="$(openssl rand -hex 32)"
+echo "$NEON" | sed -E 's#^postgresql://#postgresql+asyncpg://#; s#\?.*#?ssl=require#'
 ```
 
-To verify secrets are set (values are hidden):
-```bash
-fly secrets list
-```
+> **The reverse applies to Postgres CLI tools** (`psql`, `pg_dump`, `pg_restore`): they
+> need plain `postgresql://…?sslmode=require` and reject `?ssl=require`
+> (`invalid URI query parameter: "ssl"`).
 
----
+Use the **direct** endpoint for the app, migrations, and `pg_dump`/`pg_restore`. Neon
+suspends compute after 5 minutes idle; the engine sets `pool_pre_ping=True`
+(`app/database.py`) so the first request after an idle period doesn't fail on a dead
+connection. The first query after a suspend takes slightly longer while compute resumes.
 
-### Step 4 — Deploy
+### Checking the database from a laptop
 
-```bash
-fly deploy
-```
-
-This builds the Docker image and deploys it. Takes ~2 minutes on first deploy, faster after that.
-
----
-
-### Step 5 — Run migrations against Supabase
-
-```bash
-fly ssh console -C "alembic upgrade head"
-```
-
-Run this after every deploy that includes new migrations.
-
----
-
-### Step 6 — Verify
-
-```bash
-# Check the app is running
-fly status
-
-# Check logs
-fly logs
-
-# Open API docs in browser
-fly open /docs
-```
-
-Your API is live at: `https://poketeamdex-api.fly.dev`
-
----
-
-## Subsequent Deploys
-
-After the initial setup, deploying new changes is just:
+Alembic loads the app's settings, which require `SECRET_KEY` even though migrations don't
+use it:
 
 ```bash
 cd backend
-fly deploy
-# then if there are new migrations:
-fly ssh console -C "alembic upgrade head"
+SECRET_KEY=dummy DATABASE_URL='<asyncpg direct string>' alembic current   # prints current revision
+alembic heads                                                              # latest revision in the repo
 ```
+
+### Free plan limits to watch
+
+1 GB storage per project, 100 CU-hours/month, scale-to-zero after 5 min (cannot be
+disabled), 6 hours of point-in-time restore history.
+Source: [Neon — Plans](https://neon.com/docs/introduction/plans).
+
+---
+
+## Dump / restore
+
+Use the `postgres:18` Docker image so client tools match Neon's major version (a local
+Homebrew `pg_dump` may be older). Run from any directory; the dump lands in `$PWD`.
+
+```bash
+# Dump (only the app's tables)
+docker run --rm -v "$PWD":/dump postgres:18 \
+  pg_dump -Fc -v -n public --no-owner --no-acl -d "$SOURCE" -f /dump/db.dump
+
+# Restore
+docker run --rm -v "$PWD":/dump postgres:18 \
+  pg_restore -v --no-owner --no-acl -d "$TARGET" /dump/db.dump
+```
+
+`schema "public" already exists` during restore is expected and harmless. To wipe a target
+before restoring: `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`.
+
+Verify by comparing exact row counts on both sides:
+
+```bash
+Q="SELECT table_name, (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM public.%I', table_name), false, true, '')))[1]::text::int FROM information_schema.tables WHERE table_schema='public' ORDER BY 1;"
+docker run --rm postgres:18 psql -At -d "$SOURCE" -c "$Q" > a.txt
+docker run --rm postgres:18 psql -At -d "$TARGET" -c "$Q" > b.txt
+diff a.txt b.txt && echo MATCH
+```
+
+Delete dump files afterwards; they contain all user data.
 
 ---
 
@@ -171,7 +152,5 @@ docker compose exec api alembic revision --autogenerate -m "describe your change
 
 ## Pointing Flutter at the API
 
-In development, the base URL is `http://localhost:8000`.
-In production, it is `https://poketeamdex-api.fly.dev` (or whatever name you chose).
-
-These will be wired up in Epic 7 (sync engine).
+Development: `http://localhost:8000` (Settings → API Base URL).
+Production: `https://poketeamdex.duckdns.org` (`BACKEND_URL` GitHub variable).

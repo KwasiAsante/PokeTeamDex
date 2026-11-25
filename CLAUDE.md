@@ -112,6 +112,8 @@ Follow conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`
 - **Backend hosting**: Self-hosted server via Docker Compose, `https://poketeamdex.duckdns.org`
   - **Deploying**: `docker compose down && docker compose up -d` is all that's needed — `start.sh` runs `alembic upgrade head` automatically on every container start, so migrations never need to be run by hand.
   - **Local vs prod DB**: local `docker-compose.yml` spins up a `postgres:16` container alongside the API. `docker-compose.prod.yml` runs only the API container and connects to an external PostgreSQL via `DATABASE_URL` in `.env.prod` (no Postgres container in prod).
+  - **Prod DB is Neon** (Postgres 18, AWS `us-east-1`, free plan; migrated from Supabase in #311). Use the **direct** (non-`-pooler`) endpoint. The app URL must be `postgresql+asyncpg://…?ssl=require`. asyncpg rejects `sslmode`/`channel_binding`. Postgres CLI tools (`psql`, `pg_dump`) need the opposite: `postgresql://…?sslmode=require`. Use the `postgres:18` Docker image for dump/restore. Full details in `backend/SETUP.md`.
+  - **Server env file**: on the server it's `~/docker/services/poketeamdex/.env` (the repo names it `.env.prod`; contents are the same).
 
 ---
 

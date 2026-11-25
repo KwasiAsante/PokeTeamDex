@@ -876,7 +876,7 @@ The backend is a stateless FastAPI service that can be deployed anywhere Docker 
 
 ### Docker Compose (self-hosted / VPS)
 
-`start.sh` runs `alembic upgrade head` automatically before uvicorn starts — **you never need to run migrations manually**. The production compose file (`docker-compose.prod.yml`) runs only the API container; PostgreSQL is an external service configured via `DATABASE_URL` in `.env.prod`.
+`start.sh` runs `alembic upgrade head` automatically before uvicorn starts — **you never need to run migrations manually**. The production compose file (`docker-compose.prod.yml`) runs only the API container; PostgreSQL is an external service configured via `DATABASE_URL` in `.env.prod`. Production uses [Neon](https://neon.com). See [`backend/SETUP.md`](backend/SETUP.md) for the connection-string format and dump/restore steps.
 
 ```bash
 cd backend
