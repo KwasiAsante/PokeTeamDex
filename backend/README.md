@@ -70,6 +70,11 @@ backend/
 │       ├── 0008_add_sort_order_and_is_box.py
 │       ├── 0009_add_pokemon_resolved.py
 │       └── 0010_add_catalog_cache.py
+├── backup/               # Neon → local Postgres daily backup stack (see SETUP.md → Backups)
+│   ├── docker-compose.yml  # backup-db (postgres:18, no published port) + backup-runner
+│   ├── Dockerfile          # postgres:18 client tools + curl
+│   ├── backup.sh           # dump → restore → verify row counts → rotate; daily loop
+│   └── .env.example
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt

@@ -8,3 +8,6 @@ __pycache__/
 venv/
 *.egg-info/
 .pytest_cache/
+
+# Local backup stack dump files (#323)
+backup/dumps/
