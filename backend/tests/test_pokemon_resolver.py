@@ -17,6 +17,8 @@ from app.services.pokemon_resolver import (
     _build_showdown_sprite_url,
     _extract_form_suffix,
     _variety_intro_gen,
+    _api_icon_url,
+    _build_icon_url,
 )
 from app.schemas.pokemon_resolved import SpriteUrlsFull
 
@@ -1203,3 +1205,46 @@ class TestLoadPsData:
             svc.load_ps_data()
 
         assert svc._ps_exceptions == {"charizard-mega-x": "charizardmegax"}
+
+
+# ---------------------------------------------------------------------------
+# Icon URLs — PokeAPI/sprites removed generation-viii/icons (#327)
+# ---------------------------------------------------------------------------
+
+_V = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions"
+
+
+def _icon_sprites(swsh=None, gen7=None, sv=None, swsh_female=None):
+    return {
+        "versions": {
+            "generation-vii": {"icons": {"front_default": gen7}},
+            "generation-viii": {"sword-shield": {"icons": {"front_default": swsh, "front_female": swsh_female}}},
+            "generation-ix": {"scarlet-violet": {"icons": {"front_default": sv}}},
+        }
+    }
+
+
+class TestIconUrls:
+    def test_build_icon_url_gen8_plus_uses_sword_shield(self):
+        assert _build_icon_url(25, None) == f"{_V}/generation-viii/sword-shield/icons/25.png"
+        assert _build_icon_url(25, 9) == f"{_V}/generation-viii/sword-shield/icons/25.png"
+        assert _build_icon_url(876, 8, female=True) == f"{_V}/generation-viii/sword-shield/icons/female/876.png"
+
+    def test_build_icon_url_gen7_unchanged(self):
+        assert _build_icon_url(25, 7) == f"{_V}/generation-vii/icons/25.png"
+
+    def test_api_icon_preference_order(self):
+        assert _api_icon_url(_icon_sprites(swsh="a", gen7="b", sv="c")) == "a"
+        assert _api_icon_url(_icon_sprites(gen7="b", sv="c")) == "b"  # Megas
+        assert _api_icon_url(_icon_sprites(sv="c")) == "c"  # Gen 9
+
+    def test_api_icon_female_key(self):
+        assert _api_icon_url(_icon_sprites(swsh_female="f"), "front_female") == "f"
+
+    def test_api_icon_none_when_missing(self):
+        assert _api_icon_url(_icon_sprites()) is None
+        assert _api_icon_url({}) is None
+
+    def test_api_icon_ignores_removed_generation_viii_icons_key(self):
+        sprites = {"versions": {"generation-viii": {"icons": {"front_default": f"{_V}/generation-viii/icons/25.png"}}}}
+        assert _api_icon_url(sprites) is None

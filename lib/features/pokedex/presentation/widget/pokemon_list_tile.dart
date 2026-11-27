@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -22,6 +21,9 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/favorite_button.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
+import 'package:poke_team_dex/shared/widgets/fallback_network_image.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/sprite_url_builder.dart'
+    show iconUrlCandidates;
 
 
 class PokemonListTile extends ConsumerStatefulWidget {
@@ -341,22 +343,21 @@ class _PokemonListTileState extends ConsumerState<PokemonListTile> {
                           )
                         : AnimatedSwitcher(
                             duration: const Duration(milliseconds: 200),
-                            child: CachedNetworkImage(
+                            // Icon URLs expand to every PokeAPI icon
+                            // folder (#327); other URLs pass through as-is.
+                            child: FallbackNetworkImage(
                               key: ValueKey(imageUrl),
-                              imageUrl: imageUrl,
+                              urls: [
+                                ...iconUrlCandidates(imageUrl),
+                                fallbackUrl,
+                              ],
                               fit: BoxFit.contain,
-                              errorWidget: (_, _, _) => CachedNetworkImage(
-                                  imageUrl: fallbackUrl,
-                                  width: imageSize,
-                                  height: imageSize,
-                                  fit: BoxFit.contain,
-                                  errorWidget: (_, _, _) => Icon(
-                                    Icons.catching_pokemon,
-                                    size: imageSize,
-                                    color: colorScheme.onSurfaceVariant
-                                        .withValues(alpha: 0.4),
-                                  ),
-                                ),
+                              errorWidget: (_) => Icon(
+                                Icons.catching_pokemon,
+                                size: imageSize,
+                                color: colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.4),
+                              ),
                             ),
                           ),
                   ),

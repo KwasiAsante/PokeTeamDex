@@ -122,14 +122,11 @@ _SUPPLEMENT_TO_POKEAPI_METHOD: dict[str, str] = {
 }
 
 # Fallback for when pokemon_registry.json is absent (should not happen in prod).
-_VARIETY_ICON_ID_OVERRIDES_DEFAULT: dict[str, str] = {
-    "calyrex-ice":                "898-ice-rider",
-    "calyrex-shadow":             "898-shadow-rider",
-    "toxtricity-amped-gmax":      "849-gmax",
-    "toxtricity-low-key-gmax":    "849-gmax",
-    "urshifu-single-strike-gmax": "892-gmax",
-    "urshifu-rapid-strike":       "892",       # no dedicated icon; shares 892.png with base
-}
+# Variety name → icon sprite_id override. Empty since #327: the per-game icon
+# folders (sword-shield / generation-vii / scarlet-violet) name every variety
+# by its PokéAPI variety ID, so the old "898-ice-rider"-style stems (which only
+# existed in the deleted generation-viii/icons folder) are no longer needed.
+_VARIETY_ICON_ID_OVERRIDES_DEFAULT: dict[str, str] = {}
 
 # PokéAPI form name suffix → PokeAPI/sprites repo suffix.
 # The sprites repo uses shorter names for some forms whose PokéAPI slug is longer.
@@ -254,17 +251,44 @@ def _build_showdown_sprite_url(
         return f"{_SHOWDOWN_CDN}/{dir_name}/{ps_name}.png"
 
 
+# Per-game PokéAPI icon folders, in display-preference order. All three share
+# the small pixel "box icon" style. The old generation-viii/icons folder was
+# deleted upstream (PokeAPI/sprites#295, #327); no single folder covers every
+# variety (Megas: gen VII only, G-Max: Sword/Shield only, Gen 9: Scarlet/Violet
+# only), so the Flutter client walks this same chain on 404.
+_ICON_VERSION_KEYS: tuple[tuple[str, str | None], ...] = (
+    ("generation-viii", "sword-shield"),
+    ("generation-vii", None),
+    ("generation-ix", "scarlet-violet"),
+)
+
+
+def _api_icon_url(sprites: dict, key: str = "front_default") -> str | None:
+    """First non-null icon URL from the PokéAPI response, in [_ICON_VERSION_KEYS] order."""
+    versions = sprites.get("versions") or {}
+    for gen_key, game_key in _ICON_VERSION_KEYS:
+        node = versions.get(gen_key) or {}
+        if game_key is not None:
+            node = node.get(game_key) or {}
+        url = (node.get("icons") or {}).get(key)
+        if url:
+            return url
+    return None
+
+
 def _build_icon_url(pokemon_id: int | str, gen: int, female: bool = False) -> str:
     """Gen-specific icon sprite URL.
 
     Fallback chain:
-      gen >= 8  → generation-viii/icons/{id}.png  (female/ subdir if female=True)
+      gen >= 8  → generation-viii/sword-shield/icons/{id}.png  (female/ subdir if female=True)
       gen == 7  → generation-vii/icons/{id}.png   (female/ subdir if female=True)
       gen <= 6  → plain front sprite (no icon directories; female/ subdir for female=True)
+
+    The client retries the same filename in the other icon folders on 404.
     """
     if gen is None or gen >= 8:
         subdir = "female/" if female else ""
-        return f"{_POKEAPI_SPRITES}/generation-viii/icons/{subdir}{pokemon_id}.png"
+        return f"{_POKEAPI_SPRITES}/generation-viii/sword-shield/icons/{subdir}{pokemon_id}.png"
     elif gen >= 7:
         subdir = "female/" if female else ""
         return f"{_POKEAPI_SPRITES}/generation-vii/icons/{subdir}{pokemon_id}.png"
@@ -638,12 +662,13 @@ class PokemonResolverService:
         # Icon: prefer PokéAPI's own icon URL from the sprites object.
         # Fall back to overrides and constructed paths when the API returns null.
         icons_versions = sprites.get("versions") or {}
-        gen8_icon_api = icons_versions.get("generation-viii", {}).get("icons", {}).get("front_default")
+        api_icon = _api_icon_url(sprites)
         # Gen 5 female icons use "{id}-female.png" suffix; read from response to avoid constructing wrong URL.
         gen5_icon_female_api = icons_versions.get("generation-v", {}).get("icons", {}).get("front_female")
+        api_icon_female = _api_icon_url(sprites, "front_female") or gen5_icon_female_api
         icon_override_id = self._variety_icon_id_overrides.get(variety_name)
-        if gen8_icon_api:
-            icon = gen8_icon_api
+        if api_icon:
+            icon = api_icon
         elif icon_override_id:
             # Static override for varieties whose icon uses a different sprite_id
             # than either the variety ID or the base_id-suffix pattern
@@ -670,7 +695,7 @@ class PokemonResolverService:
             icon=icon,
             icon_shiny=game_front_shiny,
             icon_female=(
-                gen5_icon_female_api  # PokéAPI response (gen 5 "{id}-female.png" naming)
+                api_icon_female  # PokéAPI response (per-game icon folders, then gen 5 "{id}-female.png")
                 or (_build_icon_url(variety_id, gen, female=True) if has_female_home else None)
             ),
             icon_female_shiny=None,

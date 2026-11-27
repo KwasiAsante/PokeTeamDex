@@ -18,7 +18,6 @@ import 'package:poke_team_dex/features/auth/providers/auth_provider.dart';
 import 'package:poke_team_dex/services/connectivity/connectivity_provider.dart';
 import 'package:poke_team_dex/services/sync/sync_providers.dart';
 import 'package:poke_team_dex/services/sync/sync_status.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:poke_team_dex/features/pokedex/providers/resolved_pokemon_provider.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/pokemon_resolved_providers.dart'
     show pokemonVarietiesProvider, pokemonFormsProvider;
@@ -28,6 +27,9 @@ import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/utils/snack_bar.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
+import 'package:poke_team_dex/shared/widgets/fallback_network_image.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/sprite_url_builder.dart'
+    show genderedIconUrlCandidates, iconUrlCandidates;
 
 class TeamsScreen extends ConsumerWidget {
   const TeamsScreen({super.key});
@@ -1394,9 +1396,6 @@ class _SlotSprite extends ConsumerWidget {
     // populated by the backend; falls through to the regular sprite for the
     // vast majority of female Pokémon that look identical to males.
     final isFemale = slot.gender == 'female';
-    final iconUrl = (isFemale ? resolved?.spriteUrls.iconFemale : null) ??
-        resolved?.spriteUrls.icon;
-    final iconFemaleFalback = isFemale ? resolved?.spriteUrls.icon : null;
     final spriteFallback =
         (isFemale ? resolved?.spriteUrls.gameFrontFemale : null) ??
             resolved?.spriteUrls.gameFront ??
@@ -1419,36 +1418,28 @@ class _SlotSprite extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.only(right: 2),
-      child: CachedNetworkImage(
-        imageUrl: iconUrl ?? iconFemaleFalback ?? spriteFallback,
+      // Each icon URL expands to every PokeAPI icon folder (#327) before
+      // falling back to the full-size game sprite.
+      child: FallbackNetworkImage(
+        urls: [
+          // Female slots try female → male per icon folder, so a missing
+          // female icon falls back to the same game's male icon first.
+          ...genderedIconUrlCandidates(
+            female: isFemale ? resolved?.spriteUrls.iconFemale : null,
+            male: resolved?.spriteUrls.icon,
+          ),
+          spriteFallback,
+        ],
         width: width,
         height: height,
         fit: BoxFit.contain,
         memCacheWidth: cacheWidth,
         memCacheHeight: cacheHeight,
-        placeholder: (_, _) => placeholder,
-        errorWidget: (_, _, _) => CachedNetworkImage(
-          imageUrl: iconFemaleFalback ?? spriteFallback,
-          width: width,
-          height: height,
-          fit: BoxFit.contain,
-          memCacheWidth: cacheWidth,
-          memCacheHeight: cacheHeight,
-          placeholder: (_, _) => placeholder,
-          errorWidget: (_, _, _) => CachedNetworkImage(
-            imageUrl: spriteFallback,
-            width: width,
-            height: height,
-            fit: BoxFit.contain,
-            memCacheWidth: cacheWidth,
-            memCacheHeight: cacheHeight,
-            placeholder: (_, _) => placeholder,
-            errorWidget: (_, _, _) => Icon(
-              Icons.catching_pokemon,
-              size: 60,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-            ),
-          ),
+        placeholder: (_) => placeholder,
+        errorWidget: (_) => Icon(
+          Icons.catching_pokemon,
+          size: 60,
+          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
         ),
       ),
     );
@@ -1548,29 +1539,21 @@ class _SlotSpriteFormAware extends ConsumerWidget {
         ?? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${slot.pokemonId}.png';
 
     // Build image at a given scale — same URL so HTTP cache is shared.
-    Widget buildImage(double scale) => CachedNetworkImage(
-          imageUrl: iconUrl ?? spriteFallback,
+    // Each icon URL expands to every PokeAPI icon folder (#327) — G-Max
+    // icons only exist in Sword/Shield, Megas only in gen VII.
+    Widget buildImage(double scale) => FallbackNetworkImage(
+          urls: [...iconUrlCandidates(iconUrl), spriteFallback],
           width: width * scale,
           height: height * scale,
           fit: BoxFit.contain,
           memCacheWidth: (cacheWidth * scale).round(),
           memCacheHeight: (cacheHeight * scale).round(),
-          placeholder: (_, _) =>
+          placeholder: (_) =>
               SizedBox(width: width * scale, height: height * scale),
-          errorWidget: (_, _, _) => CachedNetworkImage(
-            imageUrl: spriteFallback,
-            width: width * scale,
-            height: height * scale,
-            fit: BoxFit.contain,
-            memCacheWidth: (cacheWidth * scale).round(),
-            memCacheHeight: (cacheHeight * scale).round(),
-            placeholder: (_, _) =>
-                SizedBox(width: width * scale, height: height * scale),
-            errorWidget: (_, _, _) => Icon(
-              Icons.catching_pokemon,
-              size: 60,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-            ),
+          errorWidget: (_) => Icon(
+            Icons.catching_pokemon,
+            size: 60,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
           ),
         );
 

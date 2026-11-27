@@ -105,6 +105,7 @@ Tests for the Flutter-side backend-resolved Pokémon data layer (see [`lib/servi
 |------|---------------|
 | `models_test.dart` | `AbilityInfo`, `MoveLearnDetail`, `MoveSummary`, `SpriteUrlsFull`, `PokemonResolvedBackendResponse` JSON parsing and `toPokemonEntry()`/`toPokemonSpeciesEntry()`/`toCosmeticForms()` conversion |
 | `pokemon_backend_repository_test.dart` | HTTP calls to `GET /pokemon/{id}/resolved` and sub-endpoints |
+| `sprite_url_builder_icon_test.dart` | Icon URL selection after the upstream removal of `generation-viii/icons` (#327): `iconUrlCandidates()` folder chain (incl. legacy-URL rewrite and `female/`), `buildIconUrl()`, `apiIconUrl()` preference order |
 | `resolved_pokemon_provider_test.dart` | `resolvedPokemonProvider` overriding `pokemonResolvedCacheProvider`/`pokemonBackendRepositoryProvider` to exercise the PokéAPI fallback path without Hive or a live backend |
 
 ---

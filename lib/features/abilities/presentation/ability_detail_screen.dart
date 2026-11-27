@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +10,9 @@ import 'package:poke_team_dex/services/pokeapi/models/ability_entry.dart';
 import 'package:poke_team_dex/shared/widgets/async_value_states.dart';
 import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
+import 'package:poke_team_dex/shared/widgets/fallback_network_image.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/sprite_url_builder.dart'
+    show iconUrlCandidates;
 
 class AbilityDetailScreen extends ConsumerWidget {
   final String abilityName;
@@ -247,17 +249,21 @@ class _PokemonTile extends ConsumerWidget {
         ?.value
         .spriteUrls;
     final iconUrl = sprites?.icon ?? sprites?.gameFront ??
-        PokemonDataResolver.genViiiIconFallbackUrl(pokemon.pokemonId);
+        PokemonDataResolver.iconFallbackUrl(pokemon.pokemonId);
 
     return ListTile(
       dense: true,
       contentPadding: EdgeInsets.zero,
-      leading: CachedNetworkImage(
-        imageUrl: iconUrl,
+      leading: FallbackNetworkImage(
+        // Icon URLs expand to every PokeAPI icon folder (#327).
+        urls: [
+          ...iconUrlCandidates(iconUrl),
+          if (sprites?.gameFront != null) sprites!.gameFront!,
+        ],
         width: 40,
         height: 30,
         fit: BoxFit.contain,
-        errorWidget: (_, _, _) => Icon(Icons.catching_pokemon,
+        errorWidget: (_) => Icon(Icons.catching_pokemon,
             size: 28,
             color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
       ),

@@ -173,13 +173,15 @@ class SpriteUrlsFull {
   final String? gameFrontFemale;
   final String? gameFrontFemaleShiny;
   // Gen-specific icon sprite.
-  // gen 8+: generation-viii/icons/{id}.png
+  // gen 8+: generation-viii/sword-shield/icons/{id}.png (the old
+  //         generation-viii/icons folder was deleted upstream, #327; widgets
+  //         walk the other icon folders via iconUrlCandidates on 404)
   // gen 7:  generation-vii/icons/{id}.png
   // gen ≤ 6: plain front sprite (no icon directories exist)
   final String? icon;
   // Shiny icon — uses game_front_shiny since no dedicated shiny icon sprites exist.
   final String? iconShiny;
-  // Female icon — generation-viii/icons/female/{id}.png (or gen-vii equivalent).
+  // Female icon — generation-viii/sword-shield/icons/female/{id}.png (or gen-vii equivalent).
   // Only non-null for Pokémon with visually distinct female sprites.
   final String? iconFemale;
   // Female shiny icon — uses game_front_female_shiny (no dedicated sprites exist).

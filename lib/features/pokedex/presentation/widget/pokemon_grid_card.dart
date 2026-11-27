@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,6 +20,9 @@ import 'package:poke_team_dex/services/pokeapi/models/pokemon_list_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_species_entry.dart';
 import 'package:poke_team_dex/shared/theme/pokemon_type_colors.dart';
 import 'package:poke_team_dex/shared/widgets/type_badge.dart';
+import 'package:poke_team_dex/shared/widgets/fallback_network_image.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/sprite_url_builder.dart'
+    show iconUrlCandidates;
 
 
 List<(String?, String, String?)> _buildAllFormsGrid({
@@ -249,15 +251,15 @@ class _PokemonGridCardState extends ConsumerState<PokemonGridCard> {
                             )
                           : AnimatedSwitcher(
                               duration: const Duration(milliseconds: 200),
-                              child: CachedNetworkImage(
+                              child: FallbackNetworkImage(
                                 key: ValueKey(imageUrl),
-                                imageUrl: imageUrl,
+                                urls: iconUrlCandidates(imageUrl),
                                 fit: BoxFit.contain,
-                                placeholder: (_, _) => const Center(
+                                placeholder: (_) => const Center(
                                   child: Icon(Icons.catching_pokemon,
                                       size: 48, color: Colors.white30),
                                 ),
-                                errorWidget: (_, _, _) => const Center(
+                                errorWidget: (_) => const Center(
                                   child: Icon(Icons.catching_pokemon,
                                       size: 48, color: Colors.white30),
                                 ),

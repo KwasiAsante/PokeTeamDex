@@ -5,14 +5,7 @@
     "ogerpon-hearthflame": "ogerpon-hearthflame-mask",
     "ogerpon-cornerstone": "ogerpon-cornerstone-mask"
   },
-  "varietyIconIdOverrides": {
-    "calyrex-ice": "898-ice-rider",
-    "calyrex-shadow": "898-shadow-rider",
-    "toxtricity-amped-gmax": "849-gmax",
-    "toxtricity-low-key-gmax": "849-gmax",
-    "urshifu-single-strike-gmax": "892-gmax",
-    "urshifu-rapid-strike": "892"
-  },
+  "varietyIconIdOverrides": {},
   "cosmeticSpriteStems": {
     "burmy": {
       "burmy-sandy": "412-sandy",
