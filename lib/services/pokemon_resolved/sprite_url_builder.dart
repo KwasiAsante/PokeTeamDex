@@ -127,11 +127,64 @@ String? _buildShowdownSpriteUrl(String psName, int gen, {bool shiny = false}) {
   }
 }
 
+/// Per-game PokéAPI icon folders (relative to `sprites/pokemon/versions/`),
+/// in display-preference order. Mirrors the backend's `_ICON_VERSION_KEYS`.
+/// All three use the small pixel "box icon" style. No single folder covers
+/// every variety (Megas: gen VII only, G-Max: Sword/Shield only, Gen 9:
+/// Scarlet/Violet only), so widgets walk [iconUrlCandidates] on 404.
+const List<String> kIconFolders = [
+  'generation-viii/sword-shield/icons',
+  'generation-vii/icons',
+  'generation-ix/scarlet-violet/icons',
+];
+
+/// Folders that held icons in the past and were removed upstream. URLs that
+/// still point here (backend `/resolved` cache, Hive fallback cache) are
+/// rewritten by [iconUrlCandidates]. `generation-viii/icons` was deleted by
+/// PokeAPI/sprites#295 (#327).
+const List<String> _kLegacyIconFolders = ['generation-viii/icons'];
+
+final RegExp _kIconFolderPattern = RegExp(
+  '/versions/(${[...kIconFolders, ..._kLegacyIconFolders].map(RegExp.escape).join('|')})/(.+)\$',
+);
+
+/// Ordered list of icon URLs to try for [iconUrl]. If it points at one of the
+/// PokeAPI icon folders (current or deleted), returns the same filename
+/// (incl. any `female/` prefix) in each of [kIconFolders] — starting with
+/// [iconUrl]'s own folder when that folder still exists. Any other URL is
+/// returned unchanged as a single-item list. Nulls/empties are dropped.
+List<String> iconUrlCandidates(String? iconUrl) {
+  if (iconUrl == null || iconUrl.isEmpty) return const [];
+  final m = _kIconFolderPattern.firstMatch(iconUrl);
+  if (m == null) return [iconUrl];
+  final prefix = iconUrl.substring(0, m.start);
+  final file = m[2]!;
+  final urls = <String>[
+    if (kIconFolders.contains(m[1])) iconUrl,
+    for (final folder in kIconFolders) '$prefix/versions/$folder/$file',
+  ];
+  return urls.toSet().toList();
+}
+
+/// First non-null icon URL from a PokéAPI `sprites` object, in
+/// [kIconFolders] order. Mirrors the backend's `_api_icon_url`.
+String? apiIconUrl(Map<String, dynamic> sprites, [String key = 'front_default']) {
+  final versions = _asMap(sprites['versions']) ?? {};
+  for (final folder in kIconFolders) {
+    final parts = folder.split('/'); // gen[/game]/icons
+    var node = _asMap(versions[parts[0]]);
+    if (parts.length == 3) node = _asMap(node?[parts[1]]);
+    final url = _asMap(node?['icons'])?[key] as String?;
+    if (url != null && url.isNotEmpty) return url;
+  }
+  return null;
+}
+
 /// Mirrors the backend's `_build_icon_url`.
 String buildIconUrl(Object pokemonId, int? gen, {bool female = false}) {
   if (gen == null || gen >= 8) {
     final subdir = female ? 'female/' : '';
-    return '$_kPokeApiSpritesVersions/generation-viii/icons/$subdir$pokemonId.png';
+    return '$_kPokeApiSpritesVersions/${kIconFolders.first}/$subdir$pokemonId.png';
   } else if (gen >= 7) {
     final subdir = female ? 'female/' : '';
     return '$_kPokeApiSpritesVersions/generation-vii/icons/$subdir$pokemonId.png';
@@ -209,15 +262,14 @@ SpriteUrlsFull buildVarietySpriteUrls({
   final hasFemaleHome = (home['front_female'] as String?)?.isNotEmpty ?? false;
 
   final versions = _asMap(s['versions']) ?? {};
-  final gen8Icon =
-      _asMap(_asMap(versions['generation-viii'])?['icons'])?['front_default'] as String?;
+  final apiIcon = apiIconUrl(s);
   final gen5IconFemale =
       _asMap(_asMap(versions['generation-v'])?['icons'])?['front_female'] as String?;
   final iconOverrideId = varietyIconIdOverrides[varietyName];
 
   String? icon;
-  if (gen8Icon != null && gen8Icon.isNotEmpty) {
-    icon = gen8Icon;
+  if (apiIcon != null) {
+    icon = apiIcon;
   } else if (iconOverrideId != null) {
     icon = buildIconUrl(iconOverrideId, gen);
   } else if (varietyName.endsWith('-female') && basePokemonId != null) {
@@ -241,7 +293,7 @@ SpriteUrlsFull buildVarietySpriteUrls({
     gameFrontFemaleShiny: gameFrontFemaleShiny,
     icon: icon,
     iconShiny: gameFrontShiny,
-    iconFemale: gen5IconFemale ??
+    iconFemale: apiIconUrl(s, 'front_female') ?? gen5IconFemale ??
         (hasFemaleHome ? buildIconUrl(varietyId, gen, female: true) : null),
     iconFemaleShiny: null,
   );

@@ -142,7 +142,7 @@ void main() {
         cosmeticEntry: null,
         filter: null,
       );
-      expect(url, contains('generation-viii/icons/6.png'));
+      expect(url, contains('generation-viii/sword-shield/icons/6.png'));
     });
   });
 
@@ -264,7 +264,7 @@ void main() {
         cosmeticEntry: null,
         filter: null,
       );
-      expect(url, contains('generation-viii/icons/10143.png'));
+      expect(url, contains('generation-viii/sword-shield/icons/10143.png'));
     });
   });
 }

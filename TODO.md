@@ -187,6 +187,8 @@
 - [x] **Login screen keyboard submit** — pressing Enter/Return on the password field triggers the login attempt
 - [x] **`sync_ps_data.py` — moves.json/abilities.json `gen` field wrong for every entry** — all moves report `gen: 1`, all abilities report `gen: 3` because PS's raw TS source has no `gen` field at all (confirmed against live source); mitigated in `CatalogService` by sourcing `gen` from PokéAPI's `generation` field instead, so `MoveEntry`/`AbilityEntry` now carry the correct generation — on-disk PS JSON `gen` remains a harmless unused artifact (#293)
 
+- [ ] **Pokémon icons broken (team screen + Pokédex)**: PokeAPI/sprites removed `generation-viii/icons`. Repoint the icon URLs to `scarlet-violet` / `sword-shield` / `generation-vii` icons with an ordered fallback and invalidate cached URLs (#327)
+
 ### Bug Fixes & Polish Applied
 
 - [x] **Gender form sprites missing in Link selection & team screen** — `InstancePickerSheet`'s slot tile and `_SlotSprite` on the teams list never checked `slot.gender`, so gender-diff species (Indeedee, Pyroar, Unfezant, …) always showed the male/default sprite; now prefers the backend's `homeFemale`/`iconFemale` fields when present, falling through to the regular sprite for the vast majority of female Pokémon with no visual difference (#273)

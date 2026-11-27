@@ -21,6 +21,7 @@ Reusable UI components used across multiple features.
 |------|--------|---------|
 | `async_value_states.dart` | `LoadingState`, `ErrorState`, `EmptyState` | Standard loading / error / empty placeholders with consistent Material 3 styling |
 | `type_badge.dart` | `TypeBadge` | Coloured pill chip for a single Pokémon type (`labelSmall`, 11sp); uses `kTypeColors` |
+| `fallback_network_image.dart` | `FallbackNetworkImage` | `CachedNetworkImage` that walks an ordered URL list, moving to the next on load error; used for Pokémon icons with `iconUrlCandidates()` (no single PokeAPI icon folder covers every variety, #327) |
 | `pokemon_sprite.dart` | `PokemonSprite` | Sprite image with generation-aware URL resolution; falls back gracefully on load error |
 | `favorite_button.dart` | `FavoriteButton` | Star `IconButton` that reads/writes the `Favorites` Drift table |
 | `connectivity_status_button.dart` | `ConnectivityStatusButton` | AppBar wifi icon + coloured dot (green/amber/red); tapping opens connectivity status bottom sheet |

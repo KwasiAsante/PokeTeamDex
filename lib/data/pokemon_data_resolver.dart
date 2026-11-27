@@ -7,6 +7,8 @@ import 'package:poke_team_dex/services/format/format_models.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_entry.dart';
 import 'package:poke_team_dex/services/pokeapi/models/pokemon_form_entry.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/models.dart' show SpriteUrlsFull;
+import 'package:poke_team_dex/services/pokemon_resolved/sprite_url_builder.dart'
+    show buildIconUrl;
 import 'package:poke_team_dex/shared/widgets/pokemon_sprite.dart'
     show cosmeticFormHomeUrl, pokemonHomeFemaleUrl;
 
@@ -101,11 +103,12 @@ class PokemonDataResolver {
     );
   }
 
-  /// Generation-VIII icon fallback used when a resolved Pokémon has no
-  /// backend-supplied icon URL (e.g. the "learned by" / "held by" / "has
-  /// this ability" cross-reference lists on move/item/ability detail screens).
-  static String genViiiIconFallbackUrl(int pokemonId) =>
-      '${_spritesBase}versions/generation-viii/icons/$pokemonId.png';
+  /// Icon fallback used when a resolved Pokémon has no backend-supplied icon
+  /// URL (e.g. the "learned by" / "held by" / "has this ability"
+  /// cross-reference lists on move/item/ability detail screens). Points at
+  /// the first of the per-game icon folders; widgets walk the rest via
+  /// `iconUrlCandidates` on 404.
+  static String iconFallbackUrl(int pokemonId) => buildIconUrl(pokemonId, null);
 
   /// Version-group compact icon URL for list tile compact display mode.
   /// Replaces `_compactIconUrl()` from `pokemon_list_tile.dart`.
@@ -194,7 +197,7 @@ class PokemonDataResolver {
         // compact (null imageType): prefer backend-resolved icon (handles
         // female varieties like Indeedee-female whose variety ID has no icon).
         return varietySpriteUrls?.icon ??
-            '${_spritesBase}versions/generation-viii/icons/${formEntry.id}.png';
+            iconFallbackUrl(formEntry.id);
       }
     }
 
@@ -215,7 +218,7 @@ class PokemonDataResolver {
       // at the 64x64 sprite view size.
       PokedexImageType.sprite => compactIconUrl(pokemonId, filter!),
       null => spriteUrls?.icon ??
-          '${_spritesBase}versions/generation-viii/icons/$pokemonId.png',
+          iconFallbackUrl(pokemonId),
     };
   }
 

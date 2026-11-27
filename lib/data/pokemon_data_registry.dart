@@ -52,8 +52,9 @@ class PokemonDataRegistry {
   final Map<String, String?> vgToSubpath;
   final Map<int, String> genToLastVg;
 
-  // variety name → icon sprite_id override (e.g. "calyrex-ice" → "898-ice-rider") —
-  // mirrors the backend's `_variety_icon_id_overrides`.
+  // variety name → icon sprite_id override — mirrors the backend's
+  // `_variety_icon_id_overrides`. Empty since #327: the per-game icon folders
+  // name every variety by its PokéAPI ID, so no overrides are needed today.
   final Map<String, String> varietyIconIdOverrides;
 
   PokemonDataRegistry._({
