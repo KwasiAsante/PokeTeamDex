@@ -48,6 +48,38 @@ void main() {
     });
   });
 
+  group('genderedIconUrlCandidates', () {
+    test('tries female then male within each folder (Ambipom case)', () {
+      // Backend gives Ambipom: icon = gen VII (no Sword/Shield icon at all),
+      // iconFemale = Scarlet/Violet (the only female icon). The pixel gen VII
+      // male icon must come before the HD Scarlet/Violet female one.
+      final urls = genderedIconUrlCandidates(
+        female: '$_sv/female/424.png',
+        male: '$_gen7/424.png',
+      );
+      expect(urls, [
+        '$_swsh/female/424.png',
+        '$_swsh/424.png',
+        '$_gen7/female/424.png',
+        '$_gen7/424.png',
+        '$_sv/female/424.png',
+        '$_sv/424.png',
+      ]);
+    });
+
+    test('without a female icon it is just the male chain', () {
+      expect(genderedIconUrlCandidates(male: '$_gen7/424.png'),
+          iconUrlCandidates('$_gen7/424.png').toSet().toList()
+            ..sort((a, b) => _order(a).compareTo(_order(b))));
+    });
+
+    test('non-icon URLs are kept after the icon chain', () {
+      const front =
+          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/424.png';
+      expect(genderedIconUrlCandidates(male: front), [front]);
+    });
+  });
+
   group('buildIconUrl', () {
     test('gen 8+ and no-gen use Sword/Shield icons', () {
       expect(buildIconUrl(25, null), '$_swsh/25.png');
@@ -104,3 +136,6 @@ void main() {
     });
   });
 }
+
+int _order(String url) =>
+    kIconFolders.indexWhere((f) => url.contains('/versions/$f/'));

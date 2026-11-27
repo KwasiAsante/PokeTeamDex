@@ -29,7 +29,7 @@ import 'package:poke_team_dex/shared/widgets/connectivity_status_button.dart';
 import 'package:poke_team_dex/shared/widgets/settings_button.dart';
 import 'package:poke_team_dex/shared/widgets/fallback_network_image.dart';
 import 'package:poke_team_dex/services/pokemon_resolved/sprite_url_builder.dart'
-    show iconUrlCandidates;
+    show genderedIconUrlCandidates, iconUrlCandidates;
 
 class TeamsScreen extends ConsumerWidget {
   const TeamsScreen({super.key});
@@ -1396,9 +1396,6 @@ class _SlotSprite extends ConsumerWidget {
     // populated by the backend; falls through to the regular sprite for the
     // vast majority of female Pokémon that look identical to males.
     final isFemale = slot.gender == 'female';
-    final iconUrl = (isFemale ? resolved?.spriteUrls.iconFemale : null) ??
-        resolved?.spriteUrls.icon;
-    final iconFemaleFalback = isFemale ? resolved?.spriteUrls.icon : null;
     final spriteFallback =
         (isFemale ? resolved?.spriteUrls.gameFrontFemale : null) ??
             resolved?.spriteUrls.gameFront ??
@@ -1425,8 +1422,12 @@ class _SlotSprite extends ConsumerWidget {
       // falling back to the full-size game sprite.
       child: FallbackNetworkImage(
         urls: [
-          ...iconUrlCandidates(iconUrl),
-          ...iconUrlCandidates(iconFemaleFalback),
+          // Female slots try female → male per icon folder, so a missing
+          // female icon falls back to the same game's male icon first.
+          ...genderedIconUrlCandidates(
+            female: isFemale ? resolved?.spriteUrls.iconFemale : null,
+            male: resolved?.spriteUrls.icon,
+          ),
           spriteFallback,
         ],
         width: width,

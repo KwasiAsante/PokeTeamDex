@@ -166,6 +166,29 @@ List<String> iconUrlCandidates(String? iconUrl) {
   return urls.toSet().toList();
 }
 
+/// Like [iconUrlCandidates], but for a female slot: walks [kIconFolders] in
+/// order and, within each folder, tries the [female] icon then the [male]
+/// one. A species with no female icon in a folder (most of them — and e.g.
+/// Ambipom, whose only female icon is Scarlet/Violet's) therefore keeps the
+/// pixel male icon from the same game instead of jumping to a later-generation
+/// style. URLs outside the icon folders are appended unchanged.
+List<String> genderedIconUrlCandidates({String? female, String? male}) {
+  final f = iconUrlCandidates(female);
+  final m = iconUrlCandidates(male);
+  String? inFolder(List<String> urls, String folder) =>
+      urls.where((u) => u.contains('/versions/$folder/')).firstOrNull;
+  final out = <String>[
+    for (final folder in kIconFolders) ...[
+      ?inFolder(f, folder),
+      ?inFolder(m, folder),
+    ],
+    // Non-icon URLs (front sprites etc.) pass through after the icon chain.
+    ...f.where((u) => !kIconFolders.any((d) => u.contains('/versions/$d/'))),
+    ...m.where((u) => !kIconFolders.any((d) => u.contains('/versions/$d/'))),
+  ];
+  return out.toSet().toList();
+}
+
 /// First non-null icon URL from a PokéAPI `sprites` object, in
 /// [kIconFolders] order. Mirrors the backend's `_api_icon_url`.
 String? apiIconUrl(Map<String, dynamic> sprites, [String key = 'front_default']) {
