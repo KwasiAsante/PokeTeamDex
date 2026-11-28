@@ -52,3 +52,44 @@ git commit -m "chore: update PS data"
 - After catching a learnset validation bug (stale data)
 
 After committing and deploying the backend, any app instance that fetches `GET /ps-data/version` will detect the SHA change and download the updated files automatically in the background.
+
+---
+
+## build_icon_map.py
+
+Generates `shared/pokesprite_icons.json`: PokéAPI Pokémon/form name → 68×56 box icon in PokeSprite or bamq/pokemon-sprites (#231, #331). Both repos are pinned to a commit SHA (`SOURCES` in the script) so an upstream rename can't break icon URLs.
+
+### What it does
+
+1. Fetches the PokeSprite and bamq git trees at the pinned SHAs, plus PokeSprite's `data/pokemon.json` form table
+2. Fetches every PokéAPI `/pokemon` (variety) and `/pokemon-form` name, and splits each into species + form suffix (longest species-name prefix)
+3. Resolves the suffix: `SPECIES_SUFFIX_OVERRIDES` / `SUFFIX_OVERRIDES` → PokeSprite `is_alias_of` → `female` maps to the `female/` subdirectory → default forms fall back to the bare species icon
+4. Tries PokeSprite (`src: "ps"`) first, then bamq (`src: "bq"`); every hit is checked against the pinned tree
+5. Writes the map (one entry per line) and prints names with no icon in either repo
+
+### Output format
+
+| Key | Meaning |
+|-----|---------|
+| `sources.<src>.base` | Pinned raw URL root. Regular icon: `{base}/regular/{slug}.png`; shiny: `{base}/shiny/{slug}.png` |
+| `icons.<name>.slug` | File stem; may be `female/<species>` for gender-difference forms (e.g. `indeedee-female`) |
+| `icons.<name>.female` | A separate female icon exists at `{base}/regular/female/{slug}.png` |
+| `icons.<name>.shiny` | A shiny icon exists |
+
+### Usage
+
+```bash
+pip install requests
+python scripts/build_icon_map.py           # regenerate shared/pokesprite_icons.json
+python scripts/build_icon_map.py --check   # exit 1 if the committed map is stale
+```
+
+Set `GITHUB_TOKEN` if the unauthenticated GitHub API rate limit is hit.
+
+### When to run
+
+- After bumping a pinned SHA in `SOURCES`
+- When PokéAPI adds new Pokémon or forms
+- When the uncovered list shows a name that needs an entry in one of the override tables
+
+Expected uncovered names (no icon in either repo — they use the PokéAPI icon fallback): Legends Z-A Megas, Appletun-G-Max, Koraidon/Miraidon ride modes, Gimmighoul-Roaming, Urshifu-Rapid-Strike.
