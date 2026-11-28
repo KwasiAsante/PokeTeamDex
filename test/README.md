@@ -53,7 +53,7 @@ Pure logic tests — no Flutter, no Drift, no network.
 | `dynamax_test.dart` | — | `resolveMaxMove()` — Max Move resolution |
 | `z_moves_test.dart` | — | `resolveZMove()`, `gmaxMoveForSpecies()`, exclusive Z-move lookup |
 | `pokemon_data_resolver_test.dart` | — | `PokemonDataResolver.resolveFormSprite()` — versioned/HOME sprite URL resolution per generation and form |
-| `pokemon_data_registry_test.dart` | — | `PokemonDataRegistry.initialize()` — parses `assets/data/pokemon_registry.json` into the override maps |
+| `pokemon_data_registry_test.dart` | — | `PokemonDataRegistry.initialize()` — parses `shared/pokemon_registry.json` into the override maps and loads the `boxIcons` map |
 | `sprite_resolver_test.dart` | — | Thin-wrapper passthrough to `PokemonDataResolver` |
 | `resolved_pokemon_provider_test.dart` | — | `resolvedPokemonProvider` — Hive cache → backend → PokéAPI fallback ordering |
 | `linkable_slots_provider_test.dart` | 4 | `linkableSlotsProvider` — regional-form (Alolan/Galarian/etc.) cross-species matching by suffix, single-form branch fallback, plain same-species linking |
@@ -105,7 +105,7 @@ Tests for the Flutter-side backend-resolved Pokémon data layer (see [`lib/servi
 |------|---------------|
 | `models_test.dart` | `AbilityInfo`, `MoveLearnDetail`, `MoveSummary`, `SpriteUrlsFull`, `PokemonResolvedBackendResponse` JSON parsing and `toPokemonEntry()`/`toPokemonSpeciesEntry()`/`toCosmeticForms()` conversion |
 | `pokemon_backend_repository_test.dart` | HTTP calls to `GET /pokemon/{id}/resolved` and sub-endpoints |
-| `sprite_url_builder_icon_test.dart` | Icon URL selection after the upstream removal of `generation-viii/icons` (#327): `iconUrlCandidates()` folder chain (incl. legacy-URL rewrite and `female/`), `buildIconUrl()`, `apiIconUrl()` preference order |
+| `sprite_url_builder_icon_test.dart` | Icon URL selection after the upstream removal of `generation-viii/icons` (#327): `iconUrlCandidates()` folder chain (incl. legacy-URL rewrite and `female/`), `buildIconUrl()`, `apiIconUrl()` preference order; box icons (#332): `BoxIconMap` lookup, priority over the PokéAPI icon for base/Mega/G-Max/variety/Gen 9/form-entry cosmetic, PokéAPI fallback for uncovered names (Z-A Mega, Unown-B) |
 | `resolved_pokemon_provider_test.dart` | `resolvedPokemonProvider` overriding `pokemonResolvedCacheProvider`/`pokemonBackendRepositoryProvider` to exercise the PokéAPI fallback path without Hive or a live backend |
 
 ---

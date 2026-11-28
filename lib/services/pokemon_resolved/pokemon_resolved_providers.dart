@@ -254,6 +254,7 @@ final pokemonVarietiesProvider =
             varietyName: v.name,
             basePokemonId: id,
             varietyIconIdOverrides: registry.varietyIconIdOverrides,
+            boxIcons: registry.boxIcons,
           );
 
           results.add(VarietyBackendData(
@@ -336,6 +337,7 @@ final pokemonFormsProvider =
           speciesName: species.name,
           gen: effectiveGen,
           psExceptions: registry.psFormExceptions,
+          boxIcons: registry.boxIcons,
         );
         // Mirrors the backend's `api_front = sprites.front_default or
         // pokeapi_home or fallback_front` chain — prefer the form-API's own

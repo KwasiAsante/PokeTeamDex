@@ -138,7 +138,7 @@ Aggregates PokéAPI + Showdown event learnsets + Smogon competitive data for one
 - `gen` — generation to resolve for (1–9). When omitted, types/base stats use gen 9 accuracy and `game_front` uses the plain PokéAPI front sprite instead of a versioned game directory.
 - `includes` — comma-separated list of fields to expand inline: `varieties`, `forms`, `smogon`. Omitted by default to keep the response slim and avoid extra API calls; use the dedicated sub-endpoints below instead, or pass `includes` when you need everything in one round trip.
 
-Results are cached in `pokemon_resolved` (PostgreSQL, 7-day TTL). `smogon_analyses` is `null` while the background Smogon preload is in progress (~15 s after cold start) or when the Pokémon has no data in any loaded competitive format.
+Results are cached in `pokemon_resolved` (PostgreSQL, 7-day TTL). `sprite_urls.icon` is a pinned PokeSprite (Gen 1–8) / bamq (Gen 9) box icon from `shared/pokesprite_icons.json` (loaded by `load_ps_data()`, #332), falling back to the PokéAPI icon folders for names the map doesn't cover. After changing the icon map or icon logic, flush cached rows: `DELETE /admin/cache/pokemon?all=true`. `smogon_analyses` is `null` while the background Smogon preload is in progress (~15 s after cold start) or when the Pokémon has no data in any loaded competitive format.
 
 No authentication required.
 

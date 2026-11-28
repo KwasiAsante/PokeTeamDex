@@ -19,6 +19,7 @@ from app.services.pokemon_resolver import (
     _variety_intro_gen,
     _api_icon_url,
     _build_icon_url,
+    _box_icon_url,
 )
 from app.schemas.pokemon_resolved import SpriteUrlsFull
 
@@ -1248,3 +1249,98 @@ class TestIconUrls:
     def test_api_icon_ignores_removed_generation_viii_icons_key(self):
         sprites = {"versions": {"generation-viii": {"icons": {"front_default": f"{_V}/generation-viii/icons/25.png"}}}}
         assert _api_icon_url(sprites) is None
+
+
+# ---------------------------------------------------------------------------
+# PokeSprite / bamq box icons (#231, #332)
+# ---------------------------------------------------------------------------
+
+_PS = "https://raw.githubusercontent.com/msikma/pokesprite/abc/pokemon-gen8"
+_BQ = "https://raw.githubusercontent.com/bamq/pokemon-sprites/def/pokemon"
+_BOX_ICONS = {
+    "sources": {"ps": {"base": _PS}, "bq": {"base": _BQ}},
+    "icons": {
+        "pikachu": {"src": "ps", "slug": "pikachu", "female": True, "shiny": True},
+        "charizard-mega-x": {"src": "ps", "slug": "charizard-mega-x", "female": False, "shiny": True},
+        "toxtricity-amped-gmax": {"src": "ps", "slug": "toxtricity-gmax", "female": False, "shiny": True},
+        "calyrex-ice": {"src": "ps", "slug": "calyrex-ice-rider", "female": False, "shiny": True},
+        "shellos-east": {"src": "ps", "slug": "shellos-east", "female": False, "shiny": True},
+        "indeedee-female": {"src": "ps", "slug": "female/indeedee", "female": False, "shiny": True},
+        "sprigatito": {"src": "bq", "slug": "sprigatito", "female": False, "shiny": True},
+    },
+}
+
+
+class TestBoxIcons:
+    def _svc(self):
+        svc = _make_service()
+        svc._box_icons = _BOX_ICONS
+        return svc
+
+    def test_box_icon_url_builds_pinned_regular_path(self):
+        assert _box_icon_url(_BOX_ICONS, "pikachu") == f"{_PS}/regular/pikachu.png"
+        assert _box_icon_url(_BOX_ICONS, "sprigatito") == f"{_BQ}/regular/sprigatito.png"
+        assert _box_icon_url(_BOX_ICONS, "indeedee-female") == f"{_PS}/regular/female/indeedee.png"
+
+    def test_box_icon_url_none_when_uncovered(self):
+        assert _box_icon_url(_BOX_ICONS, "garchomp-mega-z") is None
+        assert _box_icon_url({}, "pikachu") is None
+
+    def test_base_pokemon_prefers_box_icon_over_api_icon(self):
+        result = self._svc()._build_base_sprite_urls(
+            _icon_sprites(swsh=f"{_V}/generation-viii/sword-shield/icons/25.png"),
+            "pikachu", 25, None, pokemon_name="pikachu",
+        )
+        assert result.icon == f"{_PS}/regular/pikachu.png"
+
+    def test_variety_mega_gmax_gen9_use_box_icons(self):
+        svc = self._svc()
+        mega = svc._build_variety_sprite_urls(
+            _icon_sprites(gen7="g7"), "charizard-megax", 10034, None, variety_name="charizard-mega-x")
+        gmax = svc._build_variety_sprite_urls(
+            _icon_sprites(swsh="s"), "toxtricity-gmax", 10219, None, variety_name="toxtricity-amped-gmax")
+        calyrex = svc._build_variety_sprite_urls(
+            _icon_sprites(swsh="s"), "calyrex-ice", 10193, None, variety_name="calyrex-ice")
+        gen9 = svc._build_base_sprite_urls(
+            _icon_sprites(sv="sv"), "sprigatito", 906, None, pokemon_name="sprigatito")
+        assert mega.icon == f"{_PS}/regular/charizard-mega-x.png"
+        assert gmax.icon == f"{_PS}/regular/toxtricity-gmax.png"
+        assert calyrex.icon == f"{_PS}/regular/calyrex-ice-rider.png"
+        assert gen9.icon == f"{_BQ}/regular/sprigatito.png"
+
+    def test_uncovered_variety_falls_back_to_pokeapi_chain(self):
+        # Legends Z-A Mega: no box icon → PokéAPI API icon, then constructed path.
+        svc = self._svc()
+        with_api = svc._build_variety_sprite_urls(
+            _icon_sprites(sv="sv-url"), "garchomp-megaz", 10300, None, variety_name="garchomp-mega-z")
+        without_api = svc._build_variety_sprite_urls(
+            {}, "garchomp-megaz", 10300, None, variety_name="garchomp-mega-z")
+        assert with_api.icon == "sv-url"
+        assert without_api.icon == _build_icon_url(10300, None)
+
+    def test_form_entry_cosmetic_uses_box_icon(self):
+        result = self._svc()._build_form_sprite_urls("shellos-east", 422, "shellos", "shellos-east", 9)
+        assert result.icon == f"{_PS}/regular/shellos-east.png"
+
+    def test_uncovered_form_entry_keeps_pokeapi_path(self):
+        result = self._svc()._build_form_sprite_urls("unown-b", 201, "unown", "unown-b", 9)
+        assert result.icon == _build_icon_url("201-b", 9)
+
+    def test_icon_female_unchanged(self):
+        # Female/shiny box icons are #334 — icon_female still comes from PokéAPI.
+        result = self._svc()._build_base_sprite_urls(
+            _icon_sprites(swsh="s", swsh_female="api-female"), "pikachu", 25, None, pokemon_name="pikachu")
+        assert result.icon_female == "api-female"
+
+    def test_committed_map_covers_acceptance_team(self):
+        import json
+        import os
+        path = os.path.join(os.path.dirname(__file__), "..", "..", "shared", "pokesprite_icons.json")
+        with open(path, encoding="utf-8") as f:
+            icon_map = json.load(f)
+        for name in ("pikachu", "charizard-mega-x", "toxtricity-amped-gmax", "sprigatito",
+                     "calyrex-ice", "shellos-east"):
+            url = _box_icon_url(icon_map, name)
+            assert url and "/regular/" in url, name
+        assert _box_icon_url(icon_map, "sprigatito").startswith(
+            "https://raw.githubusercontent.com/bamq/pokemon-sprites/")

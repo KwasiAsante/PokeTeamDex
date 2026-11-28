@@ -43,7 +43,7 @@ Unified Pokémon data resolution layer — the canonical place for sprite URL an
 | File | Purpose |
 |------|---------|
 | `pokemon_data_resolver.dart` | `PokemonDataResolver` — `resolveFormSprite()`, `resolvePokedexImageUrl()`, `resolveVersionedSprite()`, `iconFallbackUrl()` |
-| `pokemon_data_registry.dart` | `PokemonDataRegistry` — singleton loaded once via `initialize()`; parses `assets/data/pokemon_registry.json` into the override maps consumed by `PokemonDataResolver` and other call sites (cosmetic form labels, base form names, mega stone map, version-group lookups, etc.) |
+| `pokemon_data_registry.dart` | `PokemonDataRegistry` — singleton loaded once via `initialize()`; parses `shared/pokemon_registry.json` into the override maps, and `shared/pokesprite_icons.json` into `boxIcons` (a `BoxIconMap` of PokeSprite/bamq box icons, #332), consumed by `PokemonDataResolver` and other call sites (cosmetic form labels, base form names, mega stone map, version-group lookups, etc.) |
 
 ---
 

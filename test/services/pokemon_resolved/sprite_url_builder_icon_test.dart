@@ -135,6 +135,148 @@ void main() {
       );
     });
   });
+
+  // PokeSprite / bamq box icons take priority over the PokéAPI chain (#231, #332).
+  group('box icons', () {
+    const ps = 'https://raw.githubusercontent.com/msikma/pokesprite/abc/pokemon-gen8';
+    const bq = 'https://raw.githubusercontent.com/bamq/pokemon-sprites/def/pokemon';
+    final boxIcons = BoxIconMap.fromJson({
+      'sources': {
+        'ps': {'base': ps},
+        'bq': {'base': bq},
+      },
+      'icons': {
+        'pikachu': {'src': 'ps', 'slug': 'pikachu', 'female': true, 'shiny': true},
+        'charizard-mega-x': {'src': 'ps', 'slug': 'charizard-mega-x', 'female': false, 'shiny': true},
+        'toxtricity-amped-gmax': {'src': 'ps', 'slug': 'toxtricity-gmax', 'female': false, 'shiny': true},
+        'calyrex-ice': {'src': 'ps', 'slug': 'calyrex-ice-rider', 'female': false, 'shiny': true},
+        'shellos-east': {'src': 'ps', 'slug': 'shellos-east', 'female': false, 'shiny': true},
+        'indeedee-female': {'src': 'ps', 'slug': 'female/indeedee', 'female': false, 'shiny': true},
+        'sprigatito': {'src': 'bq', 'slug': 'sprigatito', 'female': false, 'shiny': true},
+      },
+    });
+
+    Map<String, dynamic> sprites({String? swsh, String? gen7, String? sv, String? swshFemale}) => {
+          'versions': {
+            'generation-vii': {'icons': {'front_default': gen7}},
+            'generation-viii': {
+              'sword-shield': {
+                'icons': {'front_default': swsh, 'front_female': swshFemale},
+              },
+            },
+            'generation-ix': {
+              'scarlet-violet': {'icons': {'front_default': sv}},
+            },
+          },
+        };
+
+    test('BoxIconMap builds pinned regular paths, null when uncovered', () {
+      expect(boxIcons.urlFor('pikachu'), '$ps/regular/pikachu.png');
+      expect(boxIcons.urlFor('sprigatito'), '$bq/regular/sprigatito.png');
+      expect(boxIcons.urlFor('indeedee-female'), '$ps/regular/female/indeedee.png');
+      expect(boxIcons.urlFor('garchomp-mega-z'), isNull);
+      expect(boxIcons.urlFor(''), isNull);
+      expect(boxIcons.urlFor(null), isNull);
+      expect(BoxIconMap.empty.urlFor('pikachu'), isNull);
+    });
+
+    test('base Pokémon prefers the box icon over the PokéAPI icon', () {
+      final urls = buildVarietySpriteUrls(
+        sprites: sprites(swsh: '$_swsh/25.png'),
+        psName: 'pikachu',
+        varietyId: 25,
+        gen: null,
+        varietyName: 'pikachu',
+        boxIcons: boxIcons,
+      );
+      expect(urls.icon, '$ps/regular/pikachu.png');
+    });
+
+    test('Mega, G-Max, variety (Calyrex-Ice) and Gen 9 use box icons', () {
+      String? icon(String name, int id, Map<String, dynamic> s) => buildVarietySpriteUrls(
+            sprites: s,
+            psName: name,
+            varietyId: id,
+            gen: null,
+            varietyName: name,
+            boxIcons: boxIcons,
+          ).icon;
+      expect(icon('charizard-mega-x', 10034, sprites(gen7: 'g7')),
+          '$ps/regular/charizard-mega-x.png');
+      expect(icon('toxtricity-amped-gmax', 10219, sprites(swsh: 's')),
+          '$ps/regular/toxtricity-gmax.png');
+      expect(icon('calyrex-ice', 10193, sprites(swsh: 's')),
+          '$ps/regular/calyrex-ice-rider.png');
+      expect(icon('sprigatito', 906, sprites(sv: 'sv')), '$bq/regular/sprigatito.png');
+    });
+
+    test('uncovered variety (Z-A Mega) falls back to the PokéAPI chain', () {
+      final withApi = buildVarietySpriteUrls(
+        sprites: sprites(sv: 'sv-url'),
+        psName: 'garchomp-megaz',
+        varietyId: 10300,
+        gen: null,
+        varietyName: 'garchomp-mega-z',
+        boxIcons: boxIcons,
+      );
+      final withoutApi = buildVarietySpriteUrls(
+        sprites: const {},
+        psName: 'garchomp-megaz',
+        varietyId: 10300,
+        gen: null,
+        varietyName: 'garchomp-mega-z',
+        boxIcons: boxIcons,
+      );
+      expect(withApi.icon, 'sv-url');
+      expect(withoutApi.icon, buildIconUrl(10300, null));
+    });
+
+    test('form-entry cosmetic (Shellos-East) uses its box icon', () {
+      final urls = buildFormSpriteUrls(
+        formName: 'shellos-east',
+        baseId: 422,
+        speciesName: 'shellos',
+        psName: 'shellos-east',
+        gen: 9,
+        boxIcons: boxIcons,
+      );
+      expect(urls.icon, '$ps/regular/shellos-east.png');
+    });
+
+    test('uncovered form entry keeps the PokéAPI path', () {
+      final urls = buildFormSpriteUrls(
+        formName: 'unown-b',
+        baseId: 201,
+        speciesName: 'unown',
+        psName: 'unown-b',
+        gen: 9,
+        boxIcons: boxIcons,
+      );
+      expect(urls.icon, buildIconUrl('201-b', 9));
+    });
+
+    test('iconFemale is unchanged (female/shiny box icons are #334)', () {
+      final urls = buildVarietySpriteUrls(
+        sprites: sprites(swsh: 's', swshFemale: 'api-female'),
+        psName: 'pikachu',
+        varietyId: 25,
+        gen: null,
+        varietyName: 'pikachu',
+        boxIcons: boxIcons,
+      );
+      expect(urls.iconFemale, 'api-female');
+    });
+
+    test('box-icon URLs pass through the fallback helpers unchanged', () {
+      const url = '$ps/regular/pikachu.png';
+      expect(iconUrlCandidates(url), [url]);
+      expect(genderedIconUrlCandidates(male: url), [url]);
+      // Gender-diff female box icon is tried before the male one.
+      const female = '$ps/regular/female/indeedee.png';
+      const male = '$ps/regular/indeedee.png';
+      expect(genderedIconUrlCandidates(female: female, male: male), [female, male]);
+    });
+  });
 }
 
 int _order(String url) =>
