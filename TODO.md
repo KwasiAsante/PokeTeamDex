@@ -321,6 +321,13 @@
   - [ ] Decommission the Supabase project *(#317)*
   - [x] Local Postgres backup target for Neon on the API server *(#323)*
 
+- [ ] **Use PokeSprite as a resource for icons** — PokéAPI icon chain mixes 68×68, 40×30 and cropped HD (Scarlet/Violet) canvases so icons render at inconsistent scales; **decision: PokeSprite (Gen 1–8) → bamq/pokemon-sprites (Gen 9) → PokéAPI fallback**, hotlinked at pinned SHAs *(#231)*
+  - [ ] Icon map generator: PokéAPI names → PokeSprite/bamq icon paths *(#331)*
+  - [ ] Use PokeSprite/bamq icons in backend + Flutter icon URL builders *(#332)*
+  - [ ] Normalise scale of PokéAPI fallback icons *(#333)*
+  - [ ] Shiny and female box icons from PokeSprite/bamq *(#334)*
+  - [ ] Attribution + README updates for PokeSprite/bamq icons *(#335)*
+
 - [x] **Move/item/ability/learnset validation architecture** — PS supplementation incorrectly overrides PokéAPI version-group exclusions (e.g. Freeze-Dry on Alolan Ninetales in Gen 9); move heavy validation to backend with frontend offline fallback *(#276)*
   - [x] **Sub-issue A** — `sync_ps_data.py` + infra: `shared/ps_data/` folder, per-gen learnset files with `via_prevo`, TS source for moves/items/abilities, updated Dockerfile/docker-compose *(#278)*
   - [x] **Sub-issue B** — Backend: `LearnsetService` loading per-gen files from `PS_DATA_DIR` *(#279)*
