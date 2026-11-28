@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:poke_team_dex/services/pokemon_resolved/sprite_url_builder.dart';
 
 typedef MegaFormEntry = ({String baseSpecies, String megaForm});
 
@@ -57,6 +58,10 @@ class PokemonDataRegistry {
   // name every variety by its PokéAPI ID, so no overrides are needed today.
   final Map<String, String> varietyIconIdOverrides;
 
+  // PokéAPI name → PokeSprite/bamq box icon, from shared/pokesprite_icons.json
+  // (#231). Mirrors the backend's `_box_icons`.
+  final BoxIconMap boxIcons;
+
   PokemonDataRegistry._({
     required this.psFormExceptions,
     required this.cosmeticSpriteStems,
@@ -83,11 +88,13 @@ class PokemonDataRegistry {
     required this.vgToSubpath,
     required this.genToLastVg,
     required this.varietyIconIdOverrides,
+    required this.boxIcons,
   });
 
   static Future<void> initialize() async {
     final raw = await rootBundle.loadString('shared/pokemon_registry.json');
     final j = jsonDecode(raw) as Map<String, dynamic>;
+    final iconRaw = await rootBundle.loadString('shared/pokesprite_icons.json');
     _instance = PokemonDataRegistry._(
       psFormExceptions: _strMap(j['psFormExceptions']),
       cosmeticSpriteStems: (j['cosmeticSpriteStems'] as Map<String, dynamic>).map(
@@ -134,6 +141,7 @@ class PokemonDataRegistry {
         (k, v) => MapEntry(int.parse(k), v as String),
       ),
       varietyIconIdOverrides: _strMap(j['varietyIconIdOverrides']),
+      boxIcons: BoxIconMap.fromJson(jsonDecode(iconRaw) as Map<String, dynamic>),
     );
   }
 

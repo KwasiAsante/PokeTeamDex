@@ -90,7 +90,10 @@ Future<ResolvedPokemon> _offlineFallback(Ref ref, int id, int? gen) async {
     varietyId: detail.id,
     gen: gen,
     genSpriteIdOverride: genSpriteIdOverride,
+    // Keys the box-icon lookup — mirrors the backend passing pokemon_name.
+    varietyName: detail.name,
     varietyIconIdOverrides: registry.varietyIconIdOverrides,
+    boxIcons: registry.boxIcons,
   );
 
   // gen == null means "no specific gen requested" — mirrors the backend's

@@ -1058,5 +1058,20 @@ void main() {
         );
       }
     });
+
+    test('loads the PokeSprite/bamq box-icon map (#332)', () {
+      final boxIcons = PokemonDataRegistry.instance.boxIcons;
+      expect(boxIcons.length, greaterThan(1500));
+      // Acceptance team: same 68×56 box-icon scale for all four.
+      for (final name in ['pikachu', 'charizard-mega-x', 'toxtricity-amped-gmax']) {
+        expect(boxIcons.urlFor(name),
+            startsWith('https://raw.githubusercontent.com/msikma/pokesprite/'),
+            reason: name);
+      }
+      expect(boxIcons.urlFor('sprigatito'),
+          startsWith('https://raw.githubusercontent.com/bamq/pokemon-sprites/'));
+      // Legends Z-A Megas aren't in either repo — PokéAPI fallback.
+      expect(boxIcons.urlFor('garchomp-mega-z'), isNull);
+    });
   });
 }
