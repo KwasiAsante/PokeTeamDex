@@ -575,7 +575,7 @@
   "greedent":{"female":false,"shiny":true,"slug":"greedent","src":"ps"},
   "greninja":{"female":false,"shiny":true,"slug":"greninja","src":"ps"},
   "greninja-ash":{"female":false,"shiny":true,"slug":"greninja-ash","src":"ps"},
-  "greninja-battle-bond":{"female":false,"shiny":true,"slug":"greninja","src":"ps"},
+  "greninja-battle-bond":{"female":false,"shiny":true,"slug":"greninja-ash","src":"ps"},
   "grimer":{"female":false,"shiny":true,"slug":"grimer","src":"ps"},
   "grimer-alola":{"female":false,"shiny":true,"slug":"grimer-alola","src":"ps"},
   "grimmsnarl":{"female":false,"shiny":true,"slug":"grimmsnarl","src":"ps"},

@@ -89,8 +89,6 @@ SUFFIX_OVERRIDES: dict[str, str] = {
 # another species' form with the same suffix.
 SPECIES_SUFFIX_OVERRIDES: dict[str, dict[str, str]] = {
     "calyrex": {"ice": "ice-rider", "shadow": "shadow-rider"},
-    # Battle Bond only transforms in battle; PokeSprite aliases it to Ash-Greninja.
-    "greninja": {"battle-bond": "$"},
     # The games use one icon for every size. PokeSprite's per-size Pumpkaboo
     # icons are flagged is_unofficial_icon, and it already aliases every
     # Gourgeist size to the base icon.
