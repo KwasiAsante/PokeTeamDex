@@ -74,7 +74,10 @@ SUFFIX_OVERRIDES: dict[str, str] = {
     "west-sea": "west",
     "galar-standard": "galar",       # darmanitan-galar-standard
     "amped-gmax": "gmax",            # toxtricity-amped-gmax
-    # Same artwork as the plain form — only the ability / underside stamp differs.
+    # Same artwork as the plain form — only the ability / underside stamp
+    # differs. Power Construct Zygarde only changes form in battle, so it uses
+    # its Aura Break counterpart's icon (Totems likewise use their non-Totem
+    # counterpart, via PokeSprite's is_alias_of table).
     "10-power-construct": "10",
     "50-power-construct": "$",
     "antique": "$",                  # sinistea / polteageist
@@ -86,6 +89,12 @@ SUFFIX_OVERRIDES: dict[str, str] = {
 # another species' form with the same suffix.
 SPECIES_SUFFIX_OVERRIDES: dict[str, dict[str, str]] = {
     "calyrex": {"ice": "ice-rider", "shadow": "shadow-rider"},
+    # Battle Bond only transforms in battle; PokeSprite aliases it to Ash-Greninja.
+    "greninja": {"battle-bond": "$"},
+    # The games use one icon for every size. PokeSprite's per-size Pumpkaboo
+    # icons are flagged is_unofficial_icon, and it already aliases every
+    # Gourgeist size to the base icon.
+    "pumpkaboo": {"small": "$", "large": "$", "super": "$"},
     "maushold": {"family-of-three": "$"},   # bamq's bare "maushold" is the family of three
     "ogerpon": {"": "teal-mask"},           # default variety has no mask suffix
 }
