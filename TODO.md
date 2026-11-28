@@ -322,7 +322,7 @@
   - [x] Local Postgres backup target for Neon on the API server *(#323)*
 
 - [ ] **Use PokeSprite as a resource for icons** — PokéAPI icon chain mixes 68×68, 40×30 and cropped HD (Scarlet/Violet) canvases so icons render at inconsistent scales; **decision: PokeSprite (Gen 1–8) → bamq/pokemon-sprites (Gen 9) → PokéAPI fallback**, hotlinked at pinned SHAs *(#231)*
-  - [ ] Icon map generator: PokéAPI names → PokeSprite/bamq icon paths *(#331)*
+  - [x] Icon map generator: PokéAPI names → PokeSprite/bamq icon paths *(#331)*
   - [ ] Use PokeSprite/bamq icons in backend + Flutter icon URL builders *(#332)*
   - [ ] Normalise scale of PokéAPI fallback icons *(#333)*
   - [ ] Shiny and female box icons from PokeSprite/bamq *(#334)*
